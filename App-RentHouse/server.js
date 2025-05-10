@@ -3,9 +3,14 @@ const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
 const path = require('path');
-// const authRoutes = require('./routes/auth');
-// const rentalRoutes = require('./routes/rentalRoutes');  
-const e = require('express');
+const admin = require('firebase-admin');
+const rentalRoutes = require('./routes/rental');
+
+// Khởi tạo Firebase Admin SDK -----------------
+const serviceAccount = require('./app-rentalhouse-firebase-admin.json');
+admin.initializeApp({
+  credential: admin.credential.cert(serviceAccount),
+});
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -25,8 +30,7 @@ mongoose.connect(MONGODB_URI)
     });
 
 // Gọi các route
-// app.use('/api/auth', authRoutes);
-// app.use('/api/rentals', rentalRoutes); 
+app.use('/api/rentals', rentalRoutes);
 // Định nghĩa route chính
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);

@@ -1,11 +1,10 @@
+require('dotenv').config();
 const express = require('express');
 const router = express.Router();
 const Rental = require('../models/Rental');
-const jwt = require('jsonwebtoken');
+const admin = require('firebase-admin');
 const multer = require('multer');
 const path = require('path');
-
-const JWT_SECRET = 'Z4fR!@c8vX3m$Lp9sWq#J2eYb%N7Tk0R'; 
 
 // Cấu hình multer để upload ảnh
 const storage = multer.diskStorage({
@@ -16,15 +15,15 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage });
 
-// Middleware xác thực JWT
-const authMiddleware = (req, res, next) => {
+// Middleware xác thực Firebase token
+const authMiddleware = async (req, res, next) => {
   const token = req.header('Authorization')?.replace('Bearer ', '');
   if (!token) {
     return res.status(401).json({ message: 'No token provided' });
   }
   try {
-    const decoded = jwt.verify(token, JWT_SECRET);
-    req.userId = decoded.userId;
+    const decodedToken = await admin.auth().verifyIdToken(token);
+    req.userId = decodedToken.uid;
     next();
   } catch (err) {
     res.status(401).json({ message: 'Invalid token' });

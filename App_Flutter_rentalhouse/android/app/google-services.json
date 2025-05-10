@@ -1,0 +1,30 @@
+{
+  "project_info": {
+    "project_number": "616377322079",
+    "firebase_url": "https://app-rentalhouse-default-rtdb.firebaseio.com",
+    "project_id": "app-rentalhouse",
+    "storage_bucket": "app-rentalhouse.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:616377322079:android:9bfd815ca719a3053ae9ea",
+        "android_client_info": {
+          "package_name": "com.example.flutter_rentalhouse"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAbbz8YWmnpy-N8wCUUnStTphrFdjjNqkg"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
