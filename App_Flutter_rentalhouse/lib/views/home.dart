@@ -2,10 +2,15 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_rentalhouse/viewmodels/vm_rental.dart';
 import 'package:flutter_rentalhouse/views/create_rental_view.dart';
+import 'package:flutter_rentalhouse/views/favorite_view.dart';
+import 'package:flutter_rentalhouse/views/main_list_cart_home.dart';
+import 'package:flutter_rentalhouse/views/message_view.dart';
+import 'package:flutter_rentalhouse/views/profile_view.dart';
 import 'package:provider/provider.dart';
+import 'package:intl/intl.dart';
 import '../viewmodels/vm_auth.dart';
 import '../views/login_view.dart';
-import '../config/api_routes.dart';
+
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -15,29 +20,124 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
+  int _selectedIndex = 0;
+  final List<Widget> _screens = [
+    const HomeContent(),
+    const FavoriteView(),
+    const SizedBox(), // Placeholder cho nút tạo bài đăng
+    const MessageView(),
+    const ProfileView(),
+  ];
+
   @override
   void initState() {
     super.initState();
-    // Lấy danh sách bài đăng khi màn hình khởi tạo
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final rentalViewModel = Provider.of<RentalViewModel>(context, listen: false);
       rentalViewModel.fetchRentals();
     });
   }
 
+  void _onItemTapped(int index) {
+    if (index == 2) {
+      Navigator.push(
+        context,
+        PageRouteBuilder(
+          pageBuilder: (context, animation, secondaryAnimation) => const CreateRentalScreen(),
+          transitionsBuilder: (context, animation, secondaryAnimation, child) {
+            return SlideTransition(
+              position: Tween<Offset>(
+                begin: const Offset(0, 1), // Từ dưới lên
+                end: Offset.zero,
+              ).animate(animation),
+              child: child,
+            );
+          },
+          transitionDuration: const Duration(milliseconds: 200),
+        ),
+      ).then((_) {
+        setState(() {
+          _selectedIndex = 0; // Quay lại tab Trang chính
+        });
+      });
+    } else {
+      setState(() {
+        _selectedIndex = index;
+      });
+    }
+  }
+
+  String formatCurrency(double amount) {
+    final formatter = NumberFormat.currency(locale: 'vi_VN', symbol: '₫', decimalDigits: 0);
+    return formatter.format(amount);
+  }
+
   @override
   Widget build(BuildContext context) {
+    return Scaffold(
+      body: _screens[_selectedIndex],
+      bottomNavigationBar: BottomNavigationBar(
+        currentIndex: _selectedIndex,
+        onTap: _onItemTapped,
+        backgroundColor: Colors.white,
+        selectedItemColor: Colors.blue[700],
+        unselectedItemColor: Colors.grey[600],
+        selectedIconTheme: const IconThemeData(size: 24, color: Colors.blue),
+        unselectedIconTheme: const IconThemeData(size: 20, color: Colors.grey),
+        showSelectedLabels: true,
+        showUnselectedLabels: true,
+        type: BottomNavigationBarType.fixed,
+        elevation: 8,
+        selectedLabelStyle: const TextStyle(fontWeight: FontWeight.bold),
+        unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.normal),
+        items: [
+          const BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Trang chính'),
+          const BottomNavigationBarItem(icon: Icon(Icons.favorite), label: 'Yêu thích'),
+          BottomNavigationBarItem(
+            icon: Container(
+              width: 50,
+              height: 50,
+              margin: const EdgeInsets.only(top: 4),
+              decoration: BoxDecoration(
+                color: Colors.blue,
+                shape: BoxShape.circle,
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.blue.withOpacity(0.4),
+                    blurRadius: 10,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: const Icon(Icons.add, color: Colors.white),
+            ),
+            label: '',
+          ),
+          const BottomNavigationBarItem(icon: Icon(Icons.chat), label: 'Nhắn tin'),
+          const BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Hồ sơ'),
+        ],
+      ),
+    );
+  }
+}
 
+class HomeContent extends StatelessWidget {
+  const HomeContent({super.key});
+
+  @override
+  Widget build(BuildContext context) {
     final rentalViewModel = Provider.of<RentalViewModel>(context);
     final authViewModel = Provider.of<AuthViewModel>(context);
 
     return Scaffold(
+      backgroundColor: Colors.white,
       appBar: AppBar(
-        title: const Text('Danh Sách Bài Đăng'),
+        backgroundColor: Colors.white,
+        title: const Text('Danh Sách Bài Đăng', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.black)),
         actions: [
           if (authViewModel.currentUser != null)
             IconButton(
-              icon: const Icon(Icons.logout),
+              icon: const Icon(Icons.logout, color: Colors.black),
               onPressed: () async {
                 await authViewModel.logout();
                 if (authViewModel.errorMessage == null) {
@@ -58,45 +158,25 @@ class _HomeScreenState extends State<HomeScreen> {
         ],
       ),
       body: rentalViewModel.isLoading
-          ? const Center(child: CircularProgressIndicator())
+          ? const Center(child: CircularProgressIndicator(color: Colors.blue))
           : rentalViewModel.errorMessage != null
-          ? Center(child: Text('Lỗi: ${rentalViewModel.errorMessage}'))
+          ? Center(
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Text('Lỗi: ${rentalViewModel.errorMessage}', style: const TextStyle(color: Colors.red, fontSize: 16)),
+        ),
+      )
           : rentalViewModel.rentals.isEmpty
-          ? const Center(child: Text('Không có bài đăng nào!'))
-          : ListView.builder(
+          ? const Center(child: Text('Không có bài đăng nào!', style: TextStyle(fontSize: 16, color: Colors.grey)))
+          : ListView.separated(
+        padding: const EdgeInsets.all(8.0),
         itemCount: rentalViewModel.rentals.length,
+        separatorBuilder: (context, index) => const Divider(height: 1, color: Colors.grey),
         itemBuilder: (context, index) {
           final rental = rentalViewModel.rentals[index];
-          return ListTile(
-            title: Text(rental.title),
-            subtitle: Text('${rental.location} - ${rental.price} VND'),
-            leading: rental.images.isNotEmpty
-                ? CachedNetworkImage(
-              imageUrl: '${ApiRoutes.baseUrl.replaceAll('/api', '')}${rental.images[0]}',
-              width: 50,
-              height: 50,
-              fit: BoxFit.cover,
-              placeholder: (context, url) => const CircularProgressIndicator(),
-              errorWidget: (context, url, error) => const Icon(Icons.error),
-            )
-                : const Icon(Icons.image),
-            onTap: () {
-              // Xử lý khi nhấn vào bài đăng (ví dụ: xem chi tiết)
-            },
-          );
+          return RentalItemWidget(rental: rental);
         },
       ),
-      floatingActionButton: authViewModel.currentUser != null
-          ? FloatingActionButton(
-        onPressed: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (context) => const CreateRentalScreen()),
-          );
-        },
-        child: const Icon(Icons.add),
-      )
-          : null,
     );
   }
 }

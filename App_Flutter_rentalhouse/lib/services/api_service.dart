@@ -37,11 +37,29 @@ class ApiService {
     if (token == null) throw Exception('Không tìm thấy token. Vui lòng đăng nhập lại.');
     var request = http.MultipartRequest('POST', Uri.parse(ApiRoutes.rentals));
     request.headers['Authorization'] = 'Bearer $token';
-    request.fields['title'] = rental.title;
-    request.fields['description'] = rental.description;
-    request.fields['price'] = rental.price.toString();
-    request.fields['location'] = rental.location;
 
+    // Thêm các trường dữ liệu từ Rental
+    request.fields['title'] = rental.title;
+    request.fields['price'] = rental.price.toString();
+    request.fields['areaTotal'] = rental.area['total'].toString();
+    request.fields['areaLivingRoom'] = rental.area['livingRoom'].toString();
+    request.fields['areaBedrooms'] = rental.area['bedrooms'].toString();
+    request.fields['areaBathrooms'] = rental.area['bathrooms'].toString();
+    request.fields['locationShort'] = rental.location['short'];
+    request.fields['locationFullAddress'] = rental.location['fullAddress'];
+    request.fields['propertyType'] = rental.propertyType;
+    request.fields['furniture'] = rental.furniture.join(',');
+    request.fields['amenities'] = rental.amenities.join(',');
+    request.fields['surroundings'] = rental.surroundings.join(',');
+    request.fields['rentalTermsMinimumLease'] = rental.rentalTerms['minimumLease'];
+    request.fields['rentalTermsDeposit'] = rental.rentalTerms['deposit'];
+    request.fields['rentalTermsPaymentMethod'] = rental.rentalTerms['paymentMethod'];
+    request.fields['rentalTermsRenewalTerms'] = rental.rentalTerms['renewalTerms'];
+    request.fields['contactInfoName'] = rental.contactInfo['name'];
+    request.fields['contactInfoPhone'] = rental.contactInfo['phone'];
+    request.fields['contactInfoAvailableHours'] = rental.contactInfo['availableHours'];
+
+    // Thêm các file ảnh
     for (var imagePath in imagePaths) {
       try {
         request.files.add(await http.MultipartFile.fromPath(

@@ -1,9 +1,15 @@
 class Rental {
   final String? id;
   final String title;
-  final String description;
   final double price;
-  final String location;
+  final Map<String, dynamic> area; // total, livingRoom, bedrooms, bathrooms
+  final Map<String, dynamic> location; // short, fullAddress
+  final String propertyType;
+  final List<String> furniture;
+  final List<String> amenities;
+  final List<String> surroundings;
+  final Map<String, dynamic> rentalTerms; // minimumLease, deposit, paymentMethod, renewalTerms
+  final Map<String, dynamic> contactInfo; // name, phone, availableHours
   final String userId;
   final List<String> images;
   final DateTime createdAt;
@@ -11,9 +17,15 @@ class Rental {
   Rental({
     this.id,
     required this.title,
-    required this.description,
     required this.price,
+    required this.area,
     required this.location,
+    required this.propertyType,
+    required this.furniture,
+    required this.amenities,
+    required this.surroundings,
+    required this.rentalTerms,
+    required this.contactInfo,
     required this.userId,
     required this.images,
     required this.createdAt,
@@ -22,9 +34,32 @@ class Rental {
   Map<String, dynamic> toJson() => {
     '_id': id,
     'title': title,
-    'description': description,
     'price': price,
-    'location': location,
+    'area': {
+      'total': area['total'],
+      'livingRoom': area['livingRoom'],
+      'bedrooms': area['bedrooms'],
+      'bathrooms': area['bathrooms'],
+    },
+    'location': {
+      'short': location['short'],
+      'fullAddress': location['fullAddress'],
+    },
+    'propertyType': propertyType,
+    'furniture': furniture,
+    'amenities': amenities,
+    'surroundings': surroundings,
+    'rentalTerms': {
+      'minimumLease': rentalTerms['minimumLease'],
+      'deposit': rentalTerms['deposit'],
+      'paymentMethod': rentalTerms['paymentMethod'],
+      'renewalTerms': rentalTerms['renewalTerms'],
+    },
+    'contactInfo': {
+      'name': contactInfo['name'],
+      'phone': contactInfo['phone'],
+      'availableHours': contactInfo['availableHours'],
+    },
     'userId': userId,
     'images': images,
     'createdAt': createdAt.toIso8601String(),
@@ -33,9 +68,32 @@ class Rental {
   factory Rental.fromJson(Map<String, dynamic> json) => Rental(
     id: json['_id'] as String?,
     title: json['title'] as String,
-    description: json['description'] as String,
     price: (json['price'] as num?)?.toDouble() ?? 0.0,
-    location: json['location'] as String,
+    area: {
+      'total': (json['area']['total'] as num?)?.toDouble() ?? 0.0,
+      'livingRoom': (json['area']['livingRoom'] as num?)?.toDouble() ?? 0.0,
+      'bedrooms': (json['area']['bedrooms'] as num?)?.toDouble() ?? 0.0,
+      'bathrooms': (json['area']['bathrooms'] as num?)?.toDouble() ?? 0.0,
+    },
+    location: {
+      'short': json['location']['short'] as String,
+      'fullAddress': json['location']['fullAddress'] as String,
+    },
+    propertyType: json['propertyType'] as String,
+    furniture: List<String>.from(json['furniture'] as List),
+    amenities: List<String>.from(json['amenities'] as List),
+    surroundings: List<String>.from(json['surroundings'] as List),
+    rentalTerms: {
+      'minimumLease': json['rentalTerms']['minimumLease'] as String,
+      'deposit': json['rentalTerms']['deposit'] as String,
+      'paymentMethod': json['rentalTerms']['paymentMethod'] as String,
+      'renewalTerms': json['rentalTerms']['renewalTerms'] as String,
+    },
+    contactInfo: {
+      'name': json['contactInfo']['name'] as String,
+      'phone': json['contactInfo']['phone'] as String,
+      'availableHours': json['contactInfo']['availableHours'] as String,
+    },
     userId: json['userId'] as String,
     images: List<String>.from(json['images'] as List),
     createdAt: DateTime.parse(json['createdAt'] as String),

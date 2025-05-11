@@ -6,7 +6,7 @@ const admin = require('firebase-admin');
 const multer = require('multer');
 const path = require('path');
 
-// Cấu hình multer để upload ảnh  -------------------------------------------------
+// Cấu hình multer để upload ảnh
 const storage = multer.diskStorage({
   destination: './uploads/',
   filename: (req, file, cb) => {
@@ -15,7 +15,7 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage });
 
-// Middleware xác thực Firebase token  -------------------------------------------------
+// Middleware xác thực Firebase token
 const authMiddleware = async (req, res, next) => {
   const token = req.header('Authorization')?.replace('Bearer ', '');
   if (!token) {
@@ -30,7 +30,7 @@ const authMiddleware = async (req, res, next) => {
   }
 };
 
-// Get all rentals -------------------------------------------------
+// Get all rentals
 router.get('/', async (req, res) => {
   try {
     const rentals = await Rental.find();
@@ -40,15 +40,38 @@ router.get('/', async (req, res) => {
   }
 });
 
-// Create a rental with multiple images  -------------------------------------------------
+// Create a rental with multiple images
 router.post('/', authMiddleware, upload.array('images'), async (req, res) => {
   try {
     const imageUrls = req.files.map(file => `/uploads/${file.filename}`);
     const rental = new Rental({
       title: req.body.title,
-      description: req.body.description,
       price: req.body.price,
-      location: req.body.location,
+      area: {
+        total: req.body.areaTotal,
+        livingRoom: req.body.areaLivingRoom,
+        bedrooms: req.body.areaBedrooms,
+        bathrooms: req.body.areaBathrooms,
+      },
+      location: {
+        short: req.body.locationShort,
+        fullAddress: req.body.locationFullAddress,
+      },
+      propertyType: req.body.propertyType,
+      furniture: req.body.furniture.split(',').map(item => item.trim()),
+      amenities: req.body.amenities.split(',').map(item => item.trim()),
+      surroundings: req.body.surroundings.split(',').map(item => item.trim()),
+      rentalTerms: {
+        minimumLease: req.body.rentalTermsMinimumLease,
+        deposit: req.body.rentalTermsDeposit,
+        paymentMethod: req.body.rentalTermsPaymentMethod,
+        renewalTerms: req.body.rentalTermsRenewalTerms,
+      },
+      contactInfo: {
+        name: req.body.contactInfoName,
+        phone: req.body.contactInfoPhone,
+        availableHours: req.body.contactInfoAvailableHours,
+      },
       userId: req.userId,
       images: imageUrls,
     });
