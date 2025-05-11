@@ -1,58 +1,47 @@
-import 'package:flutter/material.dart';
-import '../models/rental.dart';
+import 'package:flutter/foundation.dart';
 import '../services/api_service.dart';
-import 'dart:io';
+import '../models/rental.dart';
 
 class RentalViewModel extends ChangeNotifier {
   final ApiService _apiService = ApiService();
   List<Rental> _rentals = [];
-  String? _errorMessage;
   bool _isLoading = false;
+  String? _errorMessage;
 
   List<Rental> get rentals => _rentals;
-  String? get errorMessage => _errorMessage;
   bool get isLoading => _isLoading;
+  String? get errorMessage => _errorMessage;
 
+  // Lấy danh sách bài đăng
   Future<void> fetchRentals() async {
-    _setLoading(true);
+    _isLoading = true;
+    _errorMessage = null;
+    notifyListeners();
+
     try {
       _rentals = await _apiService.getRentals();
-      _errorMessage = null;
     } catch (e) {
       _errorMessage = e.toString();
+    } finally {
+      _isLoading = false;
+      notifyListeners();
     }
-    _setLoading(false);
   }
 
-  Future<void> createRental({
-    required String title,
-    required String description,
-    required double price,
-    required String location,
-    required String userId,
-    required List<File> images,
-  }) async {
-    _setLoading(true);
-    try {
-      final rental = Rental(
-        title: title,
-        description: description,
-        price: price,
-        location: location,
-        userId: userId,
-        images: [],
-        createdAt: DateTime.now(),
-      );
-      await _apiService.createRental(rental, images.map((file) => file.path).toList());
-      _errorMessage = null;
-    } catch (e) {
-      _errorMessage = e.toString();
-    }
-    _setLoading(false);
-  }
-
-  void _setLoading(bool value) {
-    _isLoading = value;
+  // Tạo bài đăng mới
+  Future<void> createRental(Rental rental, List<String> imagePaths) async {
+    _isLoading = true;
+    _errorMessage = null;
     notifyListeners();
+
+    try {
+      await _apiService.createRental(rental, imagePaths);
+      await fetchRentals(); // Cập nhật danh sách sau khi tạo
+    } catch (e) {
+      _errorMessage = e.toString();
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
   }
 }

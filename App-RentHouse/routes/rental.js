@@ -6,7 +6,7 @@ const admin = require('firebase-admin');
 const multer = require('multer');
 const path = require('path');
 
-// Cấu hình multer để upload ảnh
+// Cấu hình multer để upload ảnh  -------------------------------------------------
 const storage = multer.diskStorage({
   destination: './uploads/',
   filename: (req, file, cb) => {
@@ -15,7 +15,7 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage });
 
-// Middleware xác thực Firebase token
+// Middleware xác thực Firebase token  -------------------------------------------------
 const authMiddleware = async (req, res, next) => {
   const token = req.header('Authorization')?.replace('Bearer ', '');
   if (!token) {
@@ -30,7 +30,7 @@ const authMiddleware = async (req, res, next) => {
   }
 };
 
-// Get all rentals
+// Get all rentals -------------------------------------------------
 router.get('/', async (req, res) => {
   try {
     const rentals = await Rental.find();
@@ -40,8 +40,8 @@ router.get('/', async (req, res) => {
   }
 });
 
-// Create a rental with multiple images
-router.post('/', authMiddleware, upload.array('images', 5), async (req, res) => {
+// Create a rental with multiple images  -------------------------------------------------
+router.post('/', authMiddleware, upload.array('images'), async (req, res) => {
   try {
     const imageUrls = req.files.map(file => `/uploads/${file.filename}`);
     const rental = new Rental({

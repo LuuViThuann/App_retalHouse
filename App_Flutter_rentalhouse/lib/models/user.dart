@@ -1,30 +1,39 @@
-class User {
+import 'package:cloud_firestore/cloud_firestore.dart';
+
+class AppUser {
   final String id;
   final String email;
-  final String encryptedPassword;
+  final String phoneNumber;
+  final String address;
   final DateTime createdAt;
 
-  User({
+  AppUser({
     required this.id,
     required this.email,
-    required this.encryptedPassword,
+    required this.phoneNumber,
+    required this.address,
     required this.createdAt,
   });
 
-  factory User.fromFirestore(Map<String, dynamic> data, String id) {
-    return User(
+  factory AppUser.fromFirestore(Map<String, dynamic>? data, String id) {
+    if (data == null) {
+      throw Exception('User data is null');
+    }
+    return AppUser(
       id: id,
-      email: data['email'] ?? '',
-      encryptedPassword: data['encryptedPassword'] ?? '',
-      createdAt: DateTime.parse(data['createdAt'] ?? DateTime.now().toIso8601String()),
+      email: data['email'] as String? ?? '',
+      phoneNumber: data['phoneNumber'] as String? ?? '',
+      address: data['address'] as String? ?? '',
+      createdAt: (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
     );
   }
 
   Map<String, dynamic> toFirestore() {
     return {
       'email': email,
-      'encryptedPassword': encryptedPassword,
-      'createdAt': createdAt.toIso8601String(),
+      'phoneNumber': phoneNumber,
+      'address': address,
+      'createdAt': Timestamp.fromDate(createdAt),
     };
   }
 }

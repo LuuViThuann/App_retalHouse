@@ -31,13 +31,13 @@ class Rental {
   };
 
   factory Rental.fromJson(Map<String, dynamic> json) => Rental(
-    id: json['_id'],
-    title: json['title'],
-    description: json['description'],
-    price: json['price'].toDouble(),
-    location: json['location'],
-    userId: json['userId'],
-    images: List<String>.from(json['images']),
-    createdAt: DateTime.parse(json['createdAt']),
+    id: json['_id'] as String?,
+    title: json['title'] as String,
+    description: json['description'] as String,
+    price: (json['price'] as num?)?.toDouble() ?? 0.0,
+    location: json['location'] as String,
+    userId: json['userId'] as String,
+    images: List<String>.from(json['images'] as List),
+    createdAt: DateTime.parse(json['createdAt'] as String),
   );
 }

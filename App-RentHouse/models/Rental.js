@@ -21,9 +21,7 @@ const retalSchema = new mongoose.Schema({
         type : String,
         required : true,
     },
-    imageUrl: {
-        type: String,
-    },
+    images: [String], 
     createdAt: {
         type: Date,
         default: Date.now,

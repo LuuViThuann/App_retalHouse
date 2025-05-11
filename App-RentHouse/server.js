@@ -5,8 +5,9 @@ const cors = require('cors');
 const path = require('path');
 const admin = require('firebase-admin');
 const rentalRoutes = require('./routes/rental');
+const authRoutes = require('./routes/auth');
 
-// Khởi tạo Firebase Admin SDK -----------------
+// Khởi tạo Firebase Admin SDK
 const serviceAccount = require('./app-rentalhouse-firebase-admin.json');
 admin.initializeApp({
   credential: admin.credential.cert(serviceAccount),
@@ -21,17 +22,17 @@ app.use(express.json());
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 mongoose.connect(MONGODB_URI)
+  .then(() => {
+    console.log('Connected to MongoDB');
+  })
+  .catch((err) => {
+    console.error('Error connecting to MongoDB:', err);
+  });
 
-    .then(() => {
-      console.log('Connected to MongoDB');
-    })
-    .catch((err) => {
-      console.error('Error connecting to MongoDB:', err);
-    });
-
-// Gọi các route
+// Routes
 app.use('/api/rentals', rentalRoutes);
-// Định nghĩa route chính
+app.use('/api/auth', authRoutes);
+
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
 });
