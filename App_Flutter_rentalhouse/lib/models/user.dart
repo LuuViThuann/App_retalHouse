@@ -7,6 +7,7 @@ class AppUser {
   final String address;
   final DateTime createdAt;
   final String? token;
+  final String? avatarBase64;
 
   AppUser({
     required this.id,
@@ -15,6 +16,7 @@ class AppUser {
     required this.address,
     required this.createdAt,
     this.token,
+    this.avatarBase64,
   });
 
   factory AppUser.fromFirestore(Map<String, dynamic>? data, String id) {
@@ -28,10 +30,17 @@ class AppUser {
       address: data['address'] as String? ?? '',
       createdAt: (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
       token: data['token'] as String?,
+      avatarBase64: data['avatarBase64'] as String?,
     );
   }
 
-  get avatarUrl => null;
+  // Update avatarUrl getter to use Base64 if available
+  String? get avatarUrl {
+    if (avatarBase64 != null && avatarBase64!.isNotEmpty) {
+      return 'data:image/jpeg;base64,$avatarBase64';
+    }
+    return null;
+  }
 
   Map<String, dynamic> toFirestore() {
     return {
@@ -40,6 +49,7 @@ class AppUser {
       'address': address,
       'createdAt': Timestamp.fromDate(createdAt),
       'token': token,
+      'avatarBase64': avatarBase64,
     };
   }
 }

@@ -95,6 +95,57 @@ class AuthViewModel extends ChangeNotifier {
     }
   }
 
+  // Cập nhật thông tin người dùng
+  Future<void> updateUserProfile({
+    required String phoneNumber,
+    required String address,
+  }) async {
+    _isLoading = true;
+    _errorMessage = null;
+    notifyListeners();
+
+    try {
+      AppUser? updatedUser = await _authService.updateProfile(
+        phoneNumber: phoneNumber,
+        address: address,
+      );
+      if (updatedUser != null) {
+        _currentUser = updatedUser;
+        _errorMessage = null;
+      } else {
+        _errorMessage = 'Cập nhật hồ sơ thất bại. Vui lòng thử lại.';
+      }
+    } catch (e) {
+      _errorMessage = e.toString();
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  // Upload profile image
+  Future<void> uploadProfileImage({
+    required String imageBase64,
+  }) async {
+    _isLoading = true;
+    _errorMessage = null;
+    notifyListeners();
+
+    try {
+      final avatarBase64 = await _authService.uploadProfileImage(imageBase64: imageBase64);
+      if (avatarBase64 != null && _currentUser != null) {
+        _currentUser = _currentUser!.copyWith(avatarBase64: avatarBase64);
+      } else {
+        _errorMessage = 'Tải ảnh lên thất bại. Vui lòng thử lại.';
+      }
+    } catch (e) {
+      _errorMessage = e.toString();
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
   // Đăng xuất
   Future<void> logout() async {
     _isLoading = true;

@@ -39,8 +39,10 @@ mongoose.connect(MONGODB_URI)
 
 // Sử dụng các route đã import chạy hiển thị các dữ liệu trong API 
  // app.use('/api/rentals', rentalRoutes);
+ 
 app.use('/api/auth', authRoutes);
 app.use('/api', rentalRoutes);
+
 // Route chính để kiểm tra server hoạt động 
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
