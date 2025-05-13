@@ -31,6 +31,8 @@ class AppUser {
     );
   }
 
+  get avatarUrl => null;
+
   Map<String, dynamic> toFirestore() {
     return {
       'email': email,
