@@ -6,6 +6,7 @@ class AppUser {
   final String phoneNumber;
   final String address;
   final DateTime createdAt;
+  final String? token;
 
   AppUser({
     required this.id,
@@ -13,6 +14,7 @@ class AppUser {
     required this.phoneNumber,
     required this.address,
     required this.createdAt,
+    this.token,
   });
 
   factory AppUser.fromFirestore(Map<String, dynamic>? data, String id) {
@@ -25,6 +27,7 @@ class AppUser {
       phoneNumber: data['phoneNumber'] as String? ?? '',
       address: data['address'] as String? ?? '',
       createdAt: (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+      token: data['token'] as String?,
     );
   }
 
@@ -34,6 +37,7 @@ class AppUser {
       'phoneNumber': phoneNumber,
       'address': address,
       'createdAt': Timestamp.fromDate(createdAt),
+      'token': token,
     };
   }
 }

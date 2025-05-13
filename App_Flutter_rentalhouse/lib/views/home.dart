@@ -9,8 +9,8 @@ import 'package:flutter_rentalhouse/views/profile_view.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import '../viewmodels/vm_auth.dart';
+import '../viewmodels/vm_favorite.dart';
 import '../views/login_view.dart';
-
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -21,6 +21,7 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   int _selectedIndex = 0;
+
   final List<Widget> _screens = [
     const HomeContent(),
     const FavoriteView(),
@@ -34,7 +35,15 @@ class _HomeScreenState extends State<HomeScreen> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final rentalViewModel = Provider.of<RentalViewModel>(context, listen: false);
+      final favoriteViewModel = Provider.of<FavoriteViewModel>(context, listen: false);
+      final authViewModel = Provider.of<AuthViewModel>(context, listen: false);
+
       rentalViewModel.fetchRentals();
+
+      // Tải danh sách yêu thích nếu người dùng đã đăng nhập
+      if (authViewModel.currentUser != null) {
+        favoriteViewModel.fetchFavorites(authViewModel.currentUser!.token ?? '');
+      }
     });
   }
 
@@ -74,6 +83,8 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final favoriteViewModel = Provider.of<FavoriteViewModel>(context);
+
     return Scaffold(
       body: _screens[_selectedIndex],
       bottomNavigationBar: BottomNavigationBar(
@@ -92,7 +103,38 @@ class _HomeScreenState extends State<HomeScreen> {
         unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.normal),
         items: [
           const BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Trang chính'),
-          const BottomNavigationBarItem(icon: Icon(Icons.favorite), label: 'Yêu thích'),
+          BottomNavigationBarItem(
+            icon: Stack(
+              clipBehavior: Clip.none, // khắc phục bị che khi hiển thông báo trong bottom dạng Badge
+              children: [
+                const Icon(Icons.favorite),
+                if (favoriteViewModel.favorites.isNotEmpty)
+                  Positioned(
+                    left: 10, // Đặt badge ở góc phải
+                    bottom: 6,   // Đặt badge ở góc trên
+                    child: Container(
+                      padding: const EdgeInsets.all(4),
+                      decoration: BoxDecoration(
+                        color: Colors.red,
+                        shape: BoxShape.circle,
+                        border: Border.all(color: Colors.white, width: 1),
+                      ),
+                      constraints: const BoxConstraints(minWidth: 18, minHeight: 18), // Tăng kích thước một chút
+                      child: Text(
+                        '${favoriteViewModel.favorites.length}',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+            label: 'Yêu thích',
+          ),
           BottomNavigationBarItem(
             icon: Container(
               width: 50,
@@ -148,7 +190,7 @@ class HomeContent extends StatelessWidget {
                 } else {
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
-                      content: Text(authViewModel.errorMessage!),
+                      content: Text(authViewModel.errorMessage ?? 'Lỗi đăng xuất'),
                       backgroundColor: Colors.red,
                     ),
                   );

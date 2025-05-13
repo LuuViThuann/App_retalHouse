@@ -12,6 +12,7 @@ class Rental {
   final Map<String, dynamic> contactInfo; // name, phone, availableHours
   final String userId;
   final List<String> images;
+  final String status;
   final DateTime createdAt;
 
   Rental({
@@ -28,6 +29,7 @@ class Rental {
     required this.contactInfo,
     required this.userId,
     required this.images,
+    required this.status,
     required this.createdAt,
   });
 
@@ -62,6 +64,7 @@ class Rental {
     },
     'userId': userId,
     'images': images,
+    'status': status,
     'createdAt': createdAt.toIso8601String(),
   };
 
@@ -96,6 +99,7 @@ class Rental {
     },
     userId: json['userId'] as String,
     images: List<String>.from(json['images'] as List),
+    status: json['status'] as String? ?? 'available',
     createdAt: DateTime.parse(json['createdAt'] as String),
   );
 }

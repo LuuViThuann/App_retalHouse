@@ -11,7 +11,6 @@ import 'dart:io';
 import '../Widgets/full_screen_image.dart';
 import '../Widgets/thousand_format.dart';
 
-
 class CreateRentalScreen extends StatefulWidget {
   const CreateRentalScreen({super.key});
 
@@ -44,6 +43,7 @@ class _CreateRentalScreenState extends State<CreateRentalScreen> {
   final _contactInfoAvailableHoursController = TextEditingController();
 
   String? _selectedPropertyType;
+  String _selectedStatus = 'Đang hoạt động'; // Sử dụng giá trị hiển thị tiếng Việt
   final List<String> _propertyTypes = [
     'Căn hộ chung cư',
     'Nhà riêng',
@@ -53,8 +53,14 @@ class _CreateRentalScreenState extends State<CreateRentalScreen> {
     'Mặt bằng kinh doanh',
     'Khác'
   ];
+  final List<String> _statusOptionsVietnamese = ['Đang hoạt động', 'Đã được thuê']; // Danh sách trạng thái bằng tiếng Việt
 
   List<File> _images = [];
+
+  // Hàm ánh xạ từ tiếng Việt về giá trị gốc
+  String _mapVietnameseToStatus(String vietnameseStatus) {
+    return vietnameseStatus == 'Đang hoạt động' ? 'available' : 'rented';
+  }
 
   @override
   void dispose() {
@@ -196,7 +202,10 @@ class _CreateRentalScreenState extends State<CreateRentalScreen> {
           contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         ),
         items: items.map((String item) {
-          return DropdownMenuItem<String>(value: item, child: Text(item));
+          return DropdownMenuItem<String>(
+            value: item,
+            child: Text(item),
+          );
         }).toList(),
         onChanged: onChanged,
         validator: validator,
@@ -251,7 +260,7 @@ class _CreateRentalScreenState extends State<CreateRentalScreen> {
           'short': _locationShortController.text.trim(),
           'fullAddress': _locationFullAddressController.text.trim(),
         },
-        propertyType: _propertyTypeController.text.trim(),
+        propertyType: _selectedPropertyType ?? 'Khác',
         furniture: _furnitureController.text.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).toList(),
         amenities: _amenitiesController.text.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).toList(),
         surroundings: _surroundingsController.text.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).toList(),
@@ -268,6 +277,7 @@ class _CreateRentalScreenState extends State<CreateRentalScreen> {
         },
         userId: authViewModel.currentUser!.id,
         images: [],
+        status: _mapVietnameseToStatus(_selectedStatus), // Chuyển đổi sang giá trị gốc trước khi gửi
         createdAt: DateTime.now(),
       );
 
@@ -308,11 +318,11 @@ class _CreateRentalScreenState extends State<CreateRentalScreen> {
     final rentalViewModel = Provider.of<RentalViewModel>(context);
 
     return Scaffold(
-      backgroundColor:Colors.white,
+      backgroundColor: Colors.white,
       appBar: AppBar(
         title: const Text('Tạo Bài Đăng Mới'),
         elevation: 1.5,
-        backgroundColor:Colors.white,
+        backgroundColor: Colors.white,
         foregroundColor: Theme.of(context).colorScheme.onPrimaryContainer,
       ),
       body: Padding(
@@ -347,6 +357,22 @@ class _CreateRentalScreenState extends State<CreateRentalScreen> {
                   }
                   return null;
                 },
+              ),
+
+              _buildSectionTitle("Trạng thái bài đăng"),
+              _buildDropdownField(
+                value: _selectedStatus,
+                labelText: 'Trạng thái',
+                items: _statusOptionsVietnamese,
+                prefixIcon: Icons.info_outline,
+                isRequired: true,
+                onChanged: (newValue) {
+                  setState(() {
+                    _selectedStatus = newValue ?? 'Đang hoạt động';
+                    print('Selected status: $_selectedStatus (mapped to: ${_mapVietnameseToStatus(_selectedStatus)})'); // Debug log
+                  });
+                },
+                validator: (value) => value == null ? 'Vui lòng chọn trạng thái' : null,
               ),
 
               _buildSectionTitle("Diện tích (m²)"),
@@ -433,7 +459,8 @@ class _CreateRentalScreenState extends State<CreateRentalScreen> {
                 onChanged: (newValue) {
                   setState(() {
                     _selectedPropertyType = newValue;
-                    _propertyTypeController.text = newValue ?? '';
+                    _propertyTypeController.text = newValue ?? 'Khác';
+                    print('Selected propertyType: $newValue'); // Debug log
                   });
                 },
                 validator: (value) => value == null ? 'Vui lòng chọn loại hình' : null,

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter_rentalhouse/viewmodels/vm_auth.dart';
+import 'package:flutter_rentalhouse/viewmodels/vm_favorite.dart';
 import 'package:flutter_rentalhouse/viewmodels/vm_rental.dart';
 import 'package:flutter_rentalhouse/views/login_view.dart';
 import 'package:provider/provider.dart';
@@ -20,6 +21,7 @@ class RentalApp extends StatelessWidget {
       providers: [
         ChangeNotifierProvider(create: (_) => AuthViewModel()),
         ChangeNotifierProvider(create: (_) => RentalViewModel()),
+        ChangeNotifierProvider(create: (_) => FavoriteViewModel()),
       ],
       child: MaterialApp(
         debugShowCheckedModeBanner: false,

@@ -104,16 +104,6 @@ class _RentalDetailScreenState extends State<RentalDetailScreen> {
               icon: const Icon(Icons.arrow_back, color: Colors.white),
               onPressed: () => Navigator.pop(context),
             ),
-            actions: [
-              IconButton(
-                icon: Icon(
-                  _isFavorite ? Icons.favorite : Icons.favorite_border,
-                  color: _isFavorite ? Colors.red : Colors.white,
-                  size: 28,
-                ),
-                onPressed: _toggleFavorite,
-              ),
-            ],
             backgroundColor: Colors.blue[700],
           ),
           SliverToBoxAdapter(

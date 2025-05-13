@@ -58,6 +58,7 @@ class ApiService {
     request.fields['contactInfoName'] = rental.contactInfo['name'];
     request.fields['contactInfoPhone'] = rental.contactInfo['phone'];
     request.fields['contactInfoAvailableHours'] = rental.contactInfo['availableHours'];
+    request.fields['status'] = rental.status;
 
     // Thêm các file ảnh
     for (var imagePath in imagePaths) {

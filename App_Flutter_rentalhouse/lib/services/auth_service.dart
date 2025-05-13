@@ -2,8 +2,8 @@ import 'dart:convert';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:http/http.dart' as http;
-import '../models/user.dart';
 import '../config/api_routes.dart';
+import '../models/user.dart';
 
 class AuthService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -35,6 +35,7 @@ class AuthService {
           phoneNumber: data['phoneNumber'] as String,
           address: data['address'] as String,
           createdAt: DateTime.parse(data['createdAt'] as String),
+          token: data['token'] ?? '', // Xử lý null
         );
       } else {
         throw Exception('Đăng ký thất bại: ${response.body}');
@@ -72,6 +73,7 @@ class AuthService {
           phoneNumber: data['phoneNumber'] as String,
           address: data['address'] as String,
           createdAt: DateTime.parse(data['createdAt'] as String),
+          token: data['token'] ?? idToken, // Sử dụng idToken nếu API không trả về token
         );
       } else {
         throw Exception('Đăng nhập thất bại: ${response.body}');
@@ -123,14 +125,15 @@ class AuthService {
     }
   }
 
-  // Política de privacidad user hiện tại
+  // Lấy thông tin user hiện tại
   Future<AppUser?> getCurrentUser() async {
     try {
       final user = FirebaseAuth.instance.currentUser;
       if (user != null) {
+        final idToken = await user.getIdToken();
         final doc = await _firestore.collection('Users').doc(user.uid).get();
         if (doc.exists) {
-          return AppUser.fromFirestore(doc.data(), doc.id);
+          return AppUser.fromFirestore(doc.data(), doc.id).copyWith(token: idToken);
         }
         throw Exception('Không tìm thấy thông tin người dùng trong Firestore');
       }
@@ -139,5 +142,26 @@ class AuthService {
       print('Error getting current user: $e');
       throw Exception('Lỗi khi lấy thông tin người dùng: $e');
     }
+  }
+}
+
+// Thêm extension để hỗ trợ copyWith cho AppUser
+extension AppUserExtension on AppUser {
+  AppUser copyWith({
+    String? id,
+    String? email,
+    String? phoneNumber,
+    String? address,
+    DateTime? createdAt,
+    String? token,
+  }) {
+    return AppUser(
+      id: id ?? this.id,
+      email: email ?? this.email,
+      phoneNumber: phoneNumber ?? this.phoneNumber,
+      address: address ?? this.address,
+      createdAt: createdAt ?? this.createdAt,
+      token: token ?? this.token,
+    );
   }
 }
