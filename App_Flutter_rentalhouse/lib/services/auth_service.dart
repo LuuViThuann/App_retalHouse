@@ -122,6 +122,7 @@ class AuthService {
   Future<AppUser?> updateProfile({
     required String phoneNumber,
     required String address,
+    required String username,
   }) async {
     try {
       final user = FirebaseAuth.instance.currentUser;
@@ -135,6 +136,7 @@ class AuthService {
           'idToken': idToken,
           'phoneNumber': phoneNumber,
           'address': address,
+          'username': username,
         }),
       );
 
@@ -234,16 +236,14 @@ class AuthService {
       if (user == null) return null;
 
       final idToken = await user.getIdToken(true);
-      final doc = await _firestore.collection('Users').doc(user.uid).get();
+      final doc = await _firestore.collection('Users').doc(user.uid).get(GetOptions(source: Source.server));
       if (doc.exists) {
-        // Fetch avatarBase64 from MongoDB
         final avatarBase64 = await fetchAvatarBase64(user.uid, idToken!);
         return AppUser.fromFirestore(doc.data(), doc.id).copyWith(
           token: idToken,
-          avatarBase64: avatarBase64, // This line caused the error
+          avatarBase64: avatarBase64,
         );
       }
-      // If document doesn't exist, create it with basic data
       await _firestore.collection('Users').doc(user.uid).set({
         'email': user.email ?? '',
         'phoneNumber': '',
@@ -268,6 +268,19 @@ class AuthService {
       throw Exception('Lỗi khi lấy thông tin người dùng: $e');
     }
   }
+
+  // Lấy ID token của người dùng hiện tại
+  Future<String?> getIdToken() async {
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) return null;
+      final idToken = await user.getIdToken(true);
+      return idToken;
+    } catch (e) {
+      print('Error getting ID token: $e');
+      return null;
+    }
+  }
 }
 
 // Thêm extension để hỗ trợ copyWith cho AppUser
@@ -279,7 +292,7 @@ extension AppUserExtension on AppUser {
     String? address,
     DateTime? createdAt,
     String? token,
-    String? avatarBase64, // Ensure this is nullable
+    String? avatarBase64,
     String? username,
   }) {
     return AppUser(

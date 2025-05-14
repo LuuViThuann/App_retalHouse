@@ -18,6 +18,8 @@ class _MyProfileViewState extends State<MyProfileView> {
   bool _isEditing = false;
   late TextEditingController _phoneController;
   late TextEditingController _addressController;
+  late TextEditingController _userNameController;
+
   final ImagePicker _picker = ImagePicker();
 
   @override
@@ -25,6 +27,7 @@ class _MyProfileViewState extends State<MyProfileView> {
     super.initState();
     _phoneController = TextEditingController();
     _addressController = TextEditingController();
+    _userNameController = TextEditingController();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       Provider.of<AuthViewModel>(context, listen: false).fetchCurrentUser();
     });
@@ -34,6 +37,7 @@ class _MyProfileViewState extends State<MyProfileView> {
   void dispose() {
     _phoneController.dispose();
     _addressController.dispose();
+    _userNameController.dispose();
     super.dispose();
   }
 
@@ -84,8 +88,9 @@ class _MyProfileViewState extends State<MyProfileView> {
         final AppUser? user = authViewModel.currentUser;
 
         if (user != null) {
-          _phoneController.text = user.phoneNumber;
-          _addressController.text = user.address;
+          _phoneController.text = user.phoneNumber ?? '';
+          _addressController.text = user.address ?? '';
+          _userNameController.text = user.username ?? ''; // Initialize username controller
         }
 
         return Scaffold(
@@ -157,34 +162,48 @@ class _MyProfileViewState extends State<MyProfileView> {
                 const SizedBox(height: 32),
                 Row(
                   children: [
-                    const Icon(Icons.email_outlined, color: Colors.grey),
+                    const Icon(Icons.person_outline, color: Colors.grey),
                     const SizedBox(width: 16),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text('Email', style: TextStyle(color: Colors.grey, fontSize: 12)),
-                        Text(
-                          user.email,
-                          style: const TextStyle(fontSize: 16),
-                        ),
-                      ],
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text('Tên người dùng', style: TextStyle(color: Colors.grey, fontSize: 12)),
+                          _isEditing
+                              ? TextField(
+                            controller: _userNameController,
+                            decoration: const InputDecoration(
+                              border: OutlineInputBorder(),
+                              hintText: 'Nhập tên người dùng...',
+                            ),
+                          )
+                              : Text(
+                            user.username.isEmpty ? 'Chưa cập nhật' : user.username,
+                            style: const TextStyle(fontSize: 16),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                      ),
                     ),
                   ],
                 ),
                 const SizedBox(height: 24),
                 Row(
                   children: [
-                    const Icon(Icons.person_outline, color: Colors.grey),
+                    const Icon(Icons.email_outlined, color: Colors.grey),
                     const SizedBox(width: 16),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text('Tên người dùng', style: TextStyle(color: Colors.grey, fontSize: 12)),
-                        Text(
-                          user.username.isEmpty ? 'Chưa cập nhật' : user.username,
-                          style: const TextStyle(fontSize: 16),
-                        ),
-                      ],
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text('Email', style: TextStyle(color: Colors.grey, fontSize: 12)),
+                          Text(
+                            user.email,
+                            style: const TextStyle(fontSize: 16),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                      ),
                     ),
                   ],
                 ),
@@ -197,18 +216,19 @@ class _MyProfileViewState extends State<MyProfileView> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text('Phone Number', style: TextStyle(color: Colors.grey, fontSize: 12)),
+                          const Text('Số điện thoại', style: TextStyle(color: Colors.grey, fontSize: 12)),
                           _isEditing
                               ? TextField(
                             controller: _phoneController,
                             decoration: const InputDecoration(
                               border: OutlineInputBorder(),
-                              hintText: 'Enter phone number',
+                              hintText: 'Nhập số điện thoại...',
                             ),
                           )
                               : Text(
-                            user.phoneNumber,
+                            user.phoneNumber ?? 'Chưa cập nhật',
                             style: const TextStyle(fontSize: 16),
+                            overflow: TextOverflow.ellipsis,
                           ),
                         ],
                       ),
@@ -224,17 +244,17 @@ class _MyProfileViewState extends State<MyProfileView> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text('Address', style: TextStyle(color: Colors.grey, fontSize: 12)),
+                          const Text('Địa chỉ', style: TextStyle(color: Colors.grey, fontSize: 12)),
                           _isEditing
                               ? TextField(
                             controller: _addressController,
                             decoration: const InputDecoration(
                               border: OutlineInputBorder(),
-                              hintText: 'Enter address',
+                              hintText: 'Nhập địa chỉ...',
                             ),
                           )
                               : Text(
-                            user.address,
+                            user.address ?? 'Chưa cập nhật',
                             style: const TextStyle(fontSize: 16),
                           ),
                         ],
@@ -270,6 +290,7 @@ class _MyProfileViewState extends State<MyProfileView> {
                             await authViewModel.updateUserProfile(
                               phoneNumber: _phoneController.text,
                               address: _addressController.text,
+                              username: _userNameController.text, // Add username update
                             );
                             await authViewModel.fetchCurrentUser();
                             ScaffoldMessenger.of(context).showSnackBar(
@@ -309,14 +330,6 @@ class _MyProfileViewState extends State<MyProfileView> {
                   ),
                 ),
                 const SizedBox(height: 20),
-                if (authViewModel.errorMessage != null)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 8.0),
-                    child: Text(
-                      authViewModel.errorMessage!,
-                      style: const TextStyle(color: Colors.red),
-                    ),
-                  ),
               ],
             ),
           ),

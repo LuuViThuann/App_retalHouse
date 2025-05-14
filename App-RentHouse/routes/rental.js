@@ -4,6 +4,7 @@ const express = require('express');
 const router = express.Router();
 const Rental = require('../models/Rental');
 const Favorite = require('../models/favorite'); // Import the Favorite model
+const Comment = require('../models/comments'); // Import the Comment model
 const admin = require('firebase-admin');
 const multer = require('multer');
 const path = require('path');
@@ -66,23 +67,33 @@ router.get('/rentals', async (req, res) => {
   }
 });
 
-// Route để lấy thông tin chi tiết của một rental theo ID
+// Route để lấy thông tin chi tiết của một rental theo ID ----------------------------------------------
 router.get('/rentals/:id', async (req, res) => {
   try {
     const rental = await Rental.findById(req.params.id);
     if (!rental) {
       return res.status(404).json({ message: 'Rental not found' });
     }
-    res.json(rental);
+    // Fetch comments for this rental
+    const comments = await Comment.find({ rentalId: req.params.id })
+      .populate('userId', 'avatarBase64 username')
+      .populate('replies.userId', 'username')
+      .populate('likes.userId', 'username');
+    res.json({ ...rental.toObject(), comments });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
 });
-
+//  -----------------------------------------------------------------------------------------
 // Route để tạo mới một rental
 router.post('/rentals', authMiddleware, upload.array('images'), async (req, res) => {
   try {
     const imageUrls = req.files.map(file => `/uploads/${file.filename}`);
+
+    // Use authenticated user's details as default for contactInfo
+    const contactInfoName = req.body.contactInfoName || req.user.displayName || 'Chủ nhà';
+    const contactInfoPhone = req.body.contactInfoPhone || req.user.phoneNumber || 'Không có số điện thoại';
+
     const rental = new Rental({
       title: req.body.title,
       price: req.body.price,
@@ -107,8 +118,8 @@ router.post('/rentals', authMiddleware, upload.array('images'), async (req, res)
         renewalTerms: req.body.rentalTermsRenewalTerms,
       },
       contactInfo: {
-        name: req.body.contactInfoName,
-        phone: req.body.contactInfoPhone,
+        name: contactInfoName,
+        phone: contactInfoPhone,
         availableHours: req.body.contactInfoAvailableHours,
       },
       userId: req.userId,
@@ -256,5 +267,112 @@ router.get('/favorites', authMiddleware, async (req, res) => {
     res.status(500).json({ message: err.message });
   }
 });
+
+// -------------------------------------------------------------------------------------------------------------------
+// Route để lấy danh sách bình luận của một bài đăng
+router.get('/comments/:rentalId', async (req, res) => {
+  try {
+    const { rentalId } = req.params;
+    const comments = await Comment.find({ rentalId })
+      .populate('userId', 'avatarBase64 username')
+      .populate('replies.userId', 'username')
+      .populate('likes.userId', 'username');
+    res.json(comments);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+// Route để thêm bình luận vào bài đăng
+router.post('/comments', authMiddleware, async (req, res) => {
+  try {
+    const { rentalId, content } = req.body;
+    if (!rentalId || !content) {
+      return res.status(400).json({ message: 'Missing required fields' });
+    }
+
+    const rental = await Rental.findById(rentalId);
+    if (!rental) {
+      return res.status(404).json({ message: 'Rental not found' });
+    }
+
+    const comment = new Comment({
+      rentalId,
+      userId: req.userId,
+      content,
+    });
+    await comment.save();
+
+    res.status(201).json(comment);
+  } catch (err) {
+    res.status(400).json({ message: err.message });
+  }
+});
+
+// Route để thêm phản hồi (reply) cho bình luận
+router.post('/comments/:commentId/replies', authMiddleware, async (req, res) => {
+  try {
+    const { commentId } = req.params;
+    const { content } = req.body;
+    if (!content) {
+      return res.status(400).json({ message: 'Missing content' });
+    }
+
+    const comment = await Comment.findById(commentId);
+    if (!comment) {
+      return res.status(404).json({ message: 'Comment not found' });
+    }
+
+    comment.replies.push({ userId: req.userId, content });
+    await comment.save();
+
+    res.status(201).json(comment);
+  } catch (err) {
+    res.status(400).json({ message: err.message });
+  }
+});
+
+
+// Route để like một bình luận
+router.post('/comments/:commentId/like', authMiddleware, async (req, res) => {
+  try {
+    const { commentId } = req.params;
+    const comment = await Comment.findById(commentId);
+    if (!comment) {
+      return res.status(404).json({ message: 'Comment not found' });
+    }
+
+    const existingLike = comment.likes.find(like => like.userId.toString() === req.userId);
+    if (existingLike) {
+      return res.status(400).json({ message: 'Already liked' });
+    }
+
+    comment.likes.push({ userId: req.userId });
+    await comment.save();
+
+    res.status(200).json({ message: 'Liked', likesCount: comment.likes.length });
+  } catch (err) {
+    res.status(400).json({ message: err.message });
+  }
+});
+
+// Route để unlike một bình luận
+router.delete('/comments/:commentId/unlike', authMiddleware, async (req, res) => {
+  try {
+    const { commentId } = req.params;
+    const comment = await Comment.findById(commentId);
+    if (!comment) {
+      return res.status(404).json({ message: 'Comment not found' });
+    }
+
+    comment.likes = comment.likes.filter(like => like.userId.toString() !== req.userId);
+    await comment.save();
+
+    res.status(200).json({ message: 'Unliked', likesCount: comment.likes.length });
+  } catch (err) {
+    res.status(400).json({ message: err.message });
+  }
+});
+
 
 module.exports = router;

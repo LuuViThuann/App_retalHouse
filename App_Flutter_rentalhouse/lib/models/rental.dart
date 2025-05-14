@@ -1,22 +1,23 @@
 class Rental {
-  final String? id;
+  final String id;
   final String title;
   final double price;
-  final Map<String, dynamic> area; // total, livingRoom, bedrooms, bathrooms
-  final Map<String, dynamic> location; // short, fullAddress
+  final Map<String, dynamic> area;
+  final Map<String, dynamic> location;
   final String propertyType;
   final List<String> furniture;
   final List<String> amenities;
   final List<String> surroundings;
-  final Map<String, dynamic> rentalTerms; // minimumLease, deposit, paymentMethod, renewalTerms
-  final Map<String, dynamic> contactInfo; // name, phone, availableHours
+  final Map<String, dynamic> rentalTerms;
+  final Map<String, dynamic> contactInfo;
   final String userId;
   final List<String> images;
   final String status;
   final DateTime createdAt;
+  final String landlord; // Changed from dynamic to String
 
   Rental({
-    this.id,
+    required this.id,
     required this.title,
     required this.price,
     required this.area,
@@ -31,6 +32,7 @@ class Rental {
     required this.images,
     required this.status,
     required this.createdAt,
+    required this.landlord,
   });
 
   Map<String, dynamic> toJson() => {
@@ -66,10 +68,11 @@ class Rental {
     'images': images,
     'status': status,
     'createdAt': createdAt.toIso8601String(),
+    'landlord': landlord,
   };
 
   factory Rental.fromJson(Map<String, dynamic> json) => Rental(
-    id: json['_id'] as String?,
+    id: json['_id'] as String? ?? (throw Exception('Rental ID is missing in JSON response')),
     title: json['title'] as String,
     price: (json['price'] as num?)?.toDouble() ?? 0.0,
     area: {
@@ -101,5 +104,6 @@ class Rental {
     images: List<String>.from(json['images'] as List),
     status: json['status'] as String? ?? 'available',
     createdAt: DateTime.parse(json['createdAt'] as String),
+    landlord: json['userId'] as String, // Use userId as landlord
   );
 }

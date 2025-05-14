@@ -13,34 +13,33 @@ const userSchema = new mongoose.Schema({
   },
   password: {
     type: String,
-    required: true,
+    required: false, // Changed to optional since Firebase manages passwords
   },
   email: {
     type: String,
-    required: true,
+    required: false, // Changed to optional with a fallback in the endpoint
     unique: true,
+    sparse: true, // Allows multiple documents with no email field
   },
   phoneNumber: {
     type: String,
     required: true,
   },
-  avatarBase64: { // Ensure this is avatarBase64, not avatar
+  avatarBase64: {
     type: String,
     default: null, // Store Base64 string of the profile image
   },
 });
 
+// Remove pre-save middleware for password hashing since Firebase manages authentication
 userSchema.pre('save', async function (next) {
-  if (this.isModified('password')) {
-    this.password = await bcrypt.hash(this.password, 10);
-  }
   next();
 });
 
-// So sánh mật khẩu
-userSchema.methods.comparePassword = async function (candidatePassword) {
-  return await bcrypt.compare(candidatePassword, this.password);
-};
+// Remove comparePassword method since it's not needed with Firebase
+// userSchema.methods.comparePassword = async function (candidatePassword) {
+//   return await bcrypt.compare(candidatePassword, this.password);
+// };
 
 // Tạo model từ schema và xuất nó
 module.exports = mongoose.model('User', userSchema);

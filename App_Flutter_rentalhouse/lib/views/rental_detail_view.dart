@@ -1,5 +1,6 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_rentalhouse/Widgets/comment_user.dart';
 import 'package:flutter_rentalhouse/Widgets/full_screen_image.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
@@ -7,6 +8,8 @@ import '../models/rental.dart';
 import '../services/auth_service.dart';
 import '../viewmodels/vm_auth.dart';
 import '../config/api_routes.dart';
+import 'dart:convert';
+import 'package:http/http.dart' as http;
 
 class RentalDetailScreen extends StatefulWidget {
   final Rental rental;
@@ -18,33 +21,70 @@ class RentalDetailScreen extends StatefulWidget {
 }
 
 class _RentalDetailScreenState extends State<RentalDetailScreen> {
-  String? currentUserName;
-  String? currentUserPhone;
   int _selectedImageIndex = 0;
-  bool _isFavorite = false; // Trạng thái yêu thích
-  final double _rating = 4.5; // Giả lập số sao đánh giá
-  final int _reviewCount = 120; // Giả lập số lượt đánh giá
+  bool _isFavorite = false;
+  bool _isLoadingFavorite = true; // Track loading state for favorite check
+  final double _rating = 4.5;
+  final int _reviewCount = 120;
 
   @override
   void initState() {
     super.initState();
-    _loadCurrentUserInfo();
+    _checkFavoriteStatus();
   }
 
-  Future<void> _loadCurrentUserInfo() async {
-    final authService = Provider.of<AuthService>(context, listen: false);
+  Future<void> _checkFavoriteStatus() async {
     final authViewModel = Provider.of<AuthViewModel>(context, listen: false);
+    if (authViewModel.currentUser == null) {
+      setState(() {
+        _isFavorite = false;
+        _isLoadingFavorite = false;
+      });
+      return;
+    }
+
     try {
-      final currentUser = await authService.getCurrentUser();
-      if (currentUser != null) {
+      final token = await AuthService().getIdToken();
+      if (token == null) {
         setState(() {
-          currentUserName = authViewModel.currentUser?.email.split('@')[0] ?? 'Chủ nhà';
-          currentUserPhone = currentUser.phoneNumber ?? 'Không có số điện thoại';
+          _isFavorite = false;
+          _isLoadingFavorite = false;
         });
+        return;
+      }
+
+      final response = await http.get(
+        Uri.parse('${ApiRoutes.baseUrl}/favorites'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final List<dynamic> favorites = jsonDecode(response.body);
+        final isFavorited = favorites.any((favorite) =>
+        favorite['rentalId']['_id'] == widget.rental.id);
+        setState(() {
+          _isFavorite = isFavorited;
+          _isLoadingFavorite = false;
+        });
+      } else {
+        setState(() {
+          _isFavorite = false;
+          _isLoadingFavorite = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Không thể tải trạng thái yêu thích: ${response.statusCode}')),
+        );
       }
     } catch (e) {
+      setState(() {
+        _isFavorite = false;
+        _isLoadingFavorite = false;
+      });
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Lỗi khi lấy thông tin người dùng: $e')),
+        SnackBar(content: Text('Lỗi khi kiểm tra trạng thái yêu thích: $e')),
       );
     }
   }
@@ -56,16 +96,6 @@ class _RentalDetailScreenState extends State<RentalDetailScreen> {
         builder: (context) => FullScreenImageScreen(imageUrl: imageUrl),
       ),
     );
-  }
-
-  void _toggleFavorite() {
-    setState(() {
-      _isFavorite = !_isFavorite;
-      // Thêm logic lưu trạng thái yêu thích vào backend hoặc ViewModel nếu cần
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(_isFavorite ? 'Đã thêm vào yêu thích!' : 'Đã xóa khỏi yêu thích!')),
-      );
-    });
   }
 
   String formatCurrency(double amount) {
@@ -88,7 +118,6 @@ class _RentalDetailScreenState extends State<RentalDetailScreen> {
             pinned: true,
             flexibleSpace: FlexibleSpaceBar(
               background: ClipRRect(
-                borderRadius: const BorderRadius.vertical(bottom: Radius.circular(30)),
                 child: GestureDetector(
                   onTap: () => _showFullScreenImage(mainImageUrl),
                   child: CachedNetworkImage(
@@ -116,7 +145,6 @@ class _RentalDetailScreenState extends State<RentalDetailScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Tiêu đề và địa chỉ
                       Text(
                         widget.rental.title,
                         style: const TextStyle(
@@ -139,7 +167,6 @@ class _RentalDetailScreenState extends State<RentalDetailScreen> {
                         ],
                       ),
                       const SizedBox(height: 16),
-                      // Thông tin cơ bản
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
@@ -162,80 +189,82 @@ class _RentalDetailScreenState extends State<RentalDetailScreen> {
                         ],
                       ),
                       const SizedBox(height: 16),
-                     Row(
-                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                       children: [
-                         Column(
-                           crossAxisAlignment: CrossAxisAlignment.start,
-                           children: [
-                             Row(
-                               children: [
-                                 const Text(
-                                   'Giá: ',
-                                   style: TextStyle(
-                                     fontSize: 20,
-                                     fontWeight: FontWeight.w500,
-                                     color: Colors.black87,
-                                   ),
-                                 ),
-                                 Text(
-                                   formatCurrency(widget.rental.price),
-                                   style: const TextStyle(
-                                     fontSize: 22,
-                                     fontWeight: FontWeight.bold,
-                                     color: Colors.green,
-                                   ),
-                                 ),
-                               ],
-                             ),
-                             const SizedBox(height: 8),
-                             // Đánh giá
-                             Row(
-                               children: [
-                                 Row(
-                                   children: List.generate(5, (index) {
-                                     return Icon(
-                                       index < _rating.floor()
-                                           ? Icons.star
-                                           : index < _rating
-                                           ? Icons.star_half
-                                           : Icons.star_border,
-                                       color: Colors.amber,
-                                       size: 20,
-                                     );
-                                   }),
-                                 ),
-                                 const SizedBox(width: 8),
-                                 Text(
-                                   '($_reviewCount lượt đánh giá)',
-                                   style: const TextStyle(fontSize: 16, color: Colors.grey),
-                                 ),
-                               ],
-                             ),
-                           ],
-                         ),
-                         GestureDetector(
-                           onTap: () {
-                             // Logic yêu thích
-                           },
-                           child: Container(
-                             padding: const EdgeInsets.all(10),
-                             margin: const EdgeInsets.only(right: 16),
-                             decoration: BoxDecoration(
-                               color: Colors.red.withOpacity(0.1),
-                               shape: BoxShape.circle,
-                             ),
-                             child: const Icon(
-                               Icons.favorite,
-                               color: Colors.red,
-                               size: 24,
-                             ),
-                           ),
-                         ),
-                       ],
-                     ),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  const Text(
+                                    'Giá: ',
+                                    style: TextStyle(
+                                      fontSize: 20,
+                                      fontWeight: FontWeight.w500,
+                                      color: Colors.black87,
+                                    ),
+                                  ),
+                                  Text(
+                                    formatCurrency(widget.rental.price),
+                                    style: const TextStyle(
+                                      fontSize: 22,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.green,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 8),
+                              Row(
+                                children: [
+                                  Row(
+                                    children: List.generate(5, (index) {
+                                      return Icon(
+                                        index < _rating.floor()
+                                            ? Icons.star
+                                            : index < _rating
+                                            ? Icons.star_half
+                                            : Icons.star_border,
+                                        color: Colors.amber,
+                                        size: 20,
+                                      );
+                                    }),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    '($_reviewCount lượt đánh giá)',
+                                    style: const TextStyle(fontSize: 16, color: Colors.grey),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                          Container(
+                            padding: const EdgeInsets.all(10),
+                            margin: const EdgeInsets.only(right: 16),
+                            decoration: BoxDecoration(
+                              color: Colors.red.withOpacity(0.1),
+                              shape: BoxShape.circle,
+                            ),
+                            child: _isLoadingFavorite
+                                ? const SizedBox(
+                              width: 24,
+                              height: 24,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.grey,
+                              ),
+                            )
+                                : Icon(
+                              _isFavorite ? Icons.favorite : Icons.favorite_border,
+                              color: _isFavorite ? Colors.red : Colors.grey,
+                              size: 24,
+                            ),
+                          ),
+                        ],
+                      ),
                       const SizedBox(height: 24),
-                      // Ảnh nhỏ bên dưới (nếu có nhiều ảnh)
                       if (widget.rental.images.length > 1)
                         Container(
                           height: 80,
@@ -275,8 +304,7 @@ class _RentalDetailScreenState extends State<RentalDetailScreen> {
                             },
                           ),
                         ),
-                      // Thông tin chi tiết
-                      _SectionTitle('Thông tin chi tiết :'),
+                      _SectionTitle('Thông tin chi tiết:'),
                       Container(
                         padding: const EdgeInsets.all(16.0),
                         decoration: BoxDecoration(
@@ -317,7 +345,7 @@ class _RentalDetailScreenState extends State<RentalDetailScreen> {
                               icon: Icons.description,
                               items: [
                                 'Thời hạn thuê tối thiểu: ${widget.rental.rentalTerms['minimumLease']}',
-                                'Cọc: ${widget.rental.rentalTerms['deposit']}',
+                                'Cọc: ${formatCurrency(double.parse(widget.rental.rentalTerms['deposit']))}',
                                 'Thanh toán: ${widget.rental.rentalTerms['paymentMethod']}',
                                 'Gia hạn hợp đồng: ${widget.rental.rentalTerms['renewalTerms']}',
                               ],
@@ -326,7 +354,6 @@ class _RentalDetailScreenState extends State<RentalDetailScreen> {
                         ),
                       ),
                       const SizedBox(height: 24),
-                      // Thông tin liên hệ
                       _SectionTitle('Thông tin liên hệ'),
                       Container(
                         padding: const EdgeInsets.all(16.0),
@@ -344,25 +371,26 @@ class _RentalDetailScreenState extends State<RentalDetailScreen> {
                             _DetailRow(
                               icon: Icons.person,
                               label: 'Chủ nhà',
-                              value: currentUserName ?? 'Đang tải...',
+                              value: widget.rental.contactInfo['name'] ?? 'Chủ nhà',
                             ),
                             const SizedBox(height: 8),
                             _DetailRow(
                               icon: Icons.phone,
                               label: 'SĐT/Zalo',
-                              value: currentUserPhone ?? 'Đang tải...',
+                              value: widget.rental.contactInfo['phone'] ?? 'Không có số điện thoại',
                             ),
                             const SizedBox(height: 8),
                             _DetailRow(
                               icon: Icons.access_time,
                               label: 'Giờ liên hệ',
-                              value: '9:00–20:00',
+                              value: widget.rental.contactInfo['availableHours'] ?? 'Không xác định',
                             ),
                           ],
                         ),
                       ),
                       const SizedBox(height: 24),
-                      // Nút đặt chỗ
+                      CommentSection(rentalId: widget.rental.id),
+                      const SizedBox(height: 24),
                       Center(
                         child: ElevatedButton(
                           onPressed: () {

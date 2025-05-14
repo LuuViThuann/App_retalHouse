@@ -12,11 +12,20 @@ router.post('/register', async (req, res) => {
   }
 
   try {
+    // Kiểm tra số điện thoai đã tồn tại
+    const usersSnapshot = await admin.firestore().collection('Users').where('phoneNumber', '==', phoneNumber).get();
+
+    if (!usersSnapshot.empty) {
+      return res.status(400).json({ message: 'Số điện thoại đã được sử dụng' });
+    }
+
+    // Kiểm tra email đã tồn tại
     const userRecord = await admin.auth().createUser({
       email,
       password,
     });
 
+    // Kiểm tra xem người dùng đã tồn tại trong Firestore
     await admin.firestore().collection('Users').doc(userRecord.uid).set({
       email,
       phoneNumber,
@@ -25,6 +34,7 @@ router.post('/register', async (req, res) => {
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
     });
 
+    // Kiểm tra xem người dùng đã tồn tại trong MongoDB
     res.status(201).json({
       id: userRecord.uid,
       email: userRecord.email,
@@ -43,18 +53,27 @@ router.post('/login', async (req, res) => {
   const { idToken } = req.body;
   if (!idToken) {
     return res.status(400).json({ message: 'Missing ID token' });
-  }
+}
 
   try {
+    // Xác nhận ID token
     const decodedToken = await admin.auth().verifyIdToken(idToken);
+
+    // Lấy thông tin người dùng từ Firebase Authentication
     const user = await admin.auth().getUser(decodedToken.uid);
 
+    // Kiểm tra xem người dùng đã tồn tại trong Firestore
     const userDoc = await admin.firestore().collection('Users').doc(user.uid).get();
+
+    // Nếu người dùng không tồn tại trong Firestore, trả về lỗi
     if (!userDoc.exists) {
       return res.status(404).json({ message: 'User not found in Firestore' });
     }
 
+    // Nếu người dùng không tồn tại trong MongoDB, tạo mới
     const userData = userDoc.data();
+
+    // Kiểm tra xem người dùng đã tồn tại trong MongoDB
     res.json({
       id: user.uid,
       email: user.email,
@@ -88,7 +107,7 @@ router.post('/change-password', async (req, res) => {
 
 // Cập nhật thông tin người dùng
 router.post('/update-profile', async (req, res) => {
-  const { idToken, phoneNumber, address } = req.body;
+  const { idToken, phoneNumber, address, username } = req.body;
   if (!idToken || !phoneNumber || !address) {
     return res.status(400).json({ message: 'Missing required fields' });
   }
@@ -97,11 +116,28 @@ router.post('/update-profile', async (req, res) => {
     const decodedToken = await admin.auth().verifyIdToken(idToken);
     const userId = decodedToken.uid;
 
-    await admin.firestore().collection('Users').doc(userId).update({
+    // Prepare the update object with all provided fields
+    const updateData = {
       phoneNumber,
       address,
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-    });
+    };
+
+    // Add username to update if it’s provided
+    if (username !== undefined) {
+      updateData.username = username;
+    }
+
+    await admin.firestore().collection('Users').doc(userId).update(updateData);
+
+    // Update MongoDB if username is provided
+    if (username !== undefined) {
+      await User.findOneAndUpdate(
+        { _id: userId },
+        { username, phoneNumber, address }, // Update username, phoneNumber, and address in MongoDB
+        { upsert: true, new: true }
+      ).exec();
+    }
 
     const userDoc = await admin.firestore().collection('Users').doc(userId).get();
     const userData = userDoc.data();
@@ -111,7 +147,7 @@ router.post('/update-profile', async (req, res) => {
       email: decodedToken.email,
       phoneNumber: userData.phoneNumber,
       address: userData.address,
-      username: userData.username, // Include username in response
+      username: userData.username ?? '', // Ensure username is returned
       updatedAt: userData.updatedAt?.toDate().toISOString(),
     });
   } catch (err) {
@@ -131,6 +167,7 @@ router.post('/upload-image', async (req, res) => {
     const userId = decodedToken.uid;
 
     console.log(`Attempting to update user ${userId} with image`);
+    console.log(`Decoded token email: ${decodedToken.email}`);
 
     let user = await User.findOne({ _id: userId });
     if (!user) {
@@ -140,16 +177,16 @@ router.post('/upload-image', async (req, res) => {
         return res.status(404).json({ message: 'User not found in Firestore' });
       }
       const userData = userDoc.data();
+      console.log(`Firestore user data: ${JSON.stringify(userData)}`);
 
       user = new User({
         _id: userId,
-        username: userData.username, // Use username from Firestore
-        email: decodedToken.email,
-        password: 'firebase-managed',
+        username: userData.username || '',
+        email: decodedToken.email || userData.email, // Fallback to Firestore email if decodedToken.email is undefined
         phoneNumber: userData.phoneNumber || '',
       });
       await user.save();
-      console.log(`New user ${userId} created with phoneNumber: ${user.phoneNumber}`);
+      console.log(`New user ${userId} created with email: ${user.email}, phoneNumber: ${user.phoneNumber}`);
     }
 
     console.log(`Updating avatarBase64 for user ${userId}`);

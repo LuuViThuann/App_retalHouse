@@ -101,6 +101,7 @@ class AuthViewModel extends ChangeNotifier {
   Future<void> updateUserProfile({
     required String phoneNumber,
     required String address,
+    required String username,
   }) async {
     _isLoading = true;
     _errorMessage = null;
@@ -110,9 +111,15 @@ class AuthViewModel extends ChangeNotifier {
       AppUser? updatedUser = await _authService.updateProfile(
         phoneNumber: phoneNumber,
         address: address,
+        username: username, // Update to 'username' as per API consistency
       );
       if (updatedUser != null) {
-        _currentUser = updatedUser;
+        _currentUser = _currentUser?.copyWith(
+          phoneNumber: phoneNumber,
+          address: address,
+          username: username,
+        ); // Immediate update
+        await fetchCurrentUser(); // Refresh with server data
         _errorMessage = null;
       } else {
         _errorMessage = 'Cập nhật hồ sơ thất bại. Vui lòng thử lại.';

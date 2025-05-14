@@ -53,13 +53,24 @@ class _CreateRentalScreenState extends State<CreateRentalScreen> {
     'Mặt bằng kinh doanh',
     'Khác'
   ];
-  final List<String> _statusOptionsVietnamese = ['Đang hoạt động', 'Đã được thuê']; // Danh sách trạng thái bằng tiếng Việt
+  final List<String> _statusOptionsVietnamese = ['Đang hoạt động', 'Đã được thuê'];
 
   List<File> _images = [];
 
   // Hàm ánh xạ từ tiếng Việt về giá trị gốc
   String _mapVietnameseToStatus(String vietnameseStatus) {
     return vietnameseStatus == 'Đang hoạt động' ? 'available' : 'rented';
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    // Pre-fill contact info with the authenticated user's details
+    final authViewModel = Provider.of<AuthViewModel>(context, listen: false);
+    if (authViewModel.currentUser != null) {
+      _contactInfoNameController.text = authViewModel.currentUser!.username ?? '';
+      _contactInfoPhoneController.text = authViewModel.currentUser!.phoneNumber ?? '';
+    }
   }
 
   @override
@@ -142,6 +153,7 @@ class _CreateRentalScreenState extends State<CreateRentalScreen> {
     int maxLines = 1,
     String? suffixText,
     bool isRequired = false,
+    bool showClearButton = false,
   }) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8.0),
@@ -151,6 +163,15 @@ class _CreateRentalScreenState extends State<CreateRentalScreen> {
           labelText: isRequired ? '$labelText *' : labelText,
           hintText: hintText,
           prefixIcon: prefixIcon != null ? Icon(prefixIcon, color: Theme.of(context).primaryColor.withOpacity(0.8)) : null,
+          suffixIcon: showClearButton && controller.text.isNotEmpty
+              ? IconButton(
+            icon: const Icon(Icons.clear, color: Colors.grey),
+            onPressed: () {
+              controller.clear();
+              setState(() {});
+            },
+          )
+              : null,
           border: OutlineInputBorder(borderRadius: BorderRadius.circular(10.0)),
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(10.0),
@@ -170,6 +191,9 @@ class _CreateRentalScreenState extends State<CreateRentalScreen> {
         minLines: minLines,
         maxLines: maxLines,
         textCapitalization: TextCapitalization.sentences,
+        onChanged: (value) {
+          setState(() {}); // Update the UI to show/hide the clear button
+        },
       ),
     );
   }
@@ -248,6 +272,7 @@ class _CreateRentalScreenState extends State<CreateRentalScreen> {
       final rawDeposit = _rentalTermsDepositController.text.replaceAll(RegExp(r'[^\d]'), '');
 
       final rental = Rental(
+        id: '',
         title: _titleController.text.trim(),
         price: double.tryParse(rawPrice) ?? 0.0,
         area: {
@@ -277,8 +302,9 @@ class _CreateRentalScreenState extends State<CreateRentalScreen> {
         },
         userId: authViewModel.currentUser!.id,
         images: [],
-        status: _mapVietnameseToStatus(_selectedStatus), // Chuyển đổi sang giá trị gốc trước khi gửi
+        status: _mapVietnameseToStatus(_selectedStatus),
         createdAt: DateTime.now(),
+        landlord: authViewModel.currentUser!.id,
       );
 
       final imagePaths = _images.map((file) => file.path).toList();
@@ -369,7 +395,7 @@ class _CreateRentalScreenState extends State<CreateRentalScreen> {
                 onChanged: (newValue) {
                   setState(() {
                     _selectedStatus = newValue ?? 'Đang hoạt động';
-                    print('Selected status: $_selectedStatus (mapped to: ${_mapVietnameseToStatus(_selectedStatus)})'); // Debug log
+                    print('Selected status: $_selectedStatus (mapped to: ${_mapVietnameseToStatus(_selectedStatus)})');
                   });
                 },
                 validator: (value) => value == null ? 'Vui lòng chọn trạng thái' : null,
@@ -460,7 +486,7 @@ class _CreateRentalScreenState extends State<CreateRentalScreen> {
                   setState(() {
                     _selectedPropertyType = newValue;
                     _propertyTypeController.text = newValue ?? 'Khác';
-                    print('Selected propertyType: $newValue'); // Debug log
+                    print('Selected propertyType: $newValue');
                   });
                 },
                 validator: (value) => value == null ? 'Vui lòng chọn loại hình' : null,
@@ -546,6 +572,7 @@ class _CreateRentalScreenState extends State<CreateRentalScreen> {
                 labelText: 'Tên người liên hệ',
                 prefixIcon: Icons.person_outline,
                 isRequired: true,
+                showClearButton: true,
                 validator: (value) => (value == null || value.isEmpty) ? 'Vui lòng nhập tên người liên hệ' : null,
               ),
               _buildTextField(
@@ -554,6 +581,7 @@ class _CreateRentalScreenState extends State<CreateRentalScreen> {
                 prefixIcon: Icons.phone_outlined,
                 keyboardType: TextInputType.phone,
                 isRequired: true,
+                showClearButton: true,
                 validator: (value) {
                   if (value == null || value.isEmpty) return 'Vui lòng nhập số điện thoại';
                   if (!RegExp(r'^(0|\+84)[0-9]{9,10}$').hasMatch(value)) return 'Số điện thoại không hợp lệ';
@@ -563,7 +591,7 @@ class _CreateRentalScreenState extends State<CreateRentalScreen> {
               _buildTextField(
                 controller: _contactInfoAvailableHoursController,
                 labelText: 'Giờ liên hệ thuận tiện',
-                hintText: 'VD: 8:00 - 17:00, hoặc ghi chú cụ thể',
+                hintText: 'VD: 9:00 - 20:00, hoặc ghi chú cụ thể',
                 prefixIcon: Icons.access_time_outlined,
                 isRequired: true,
                 validator: (value) => (value == null || value.isEmpty) ? 'Vui lòng nhập giờ liên hệ' : null,
