@@ -16,6 +16,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _passwordController = TextEditingController();
   final _phoneNumberController = TextEditingController();
   final _addressController = TextEditingController();
+  final _usernameController = TextEditingController(); // Add username controller
 
   @override
   void dispose() {
@@ -23,6 +24,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     _passwordController.dispose();
     _phoneNumberController.dispose();
     _addressController.dispose();
+    _usernameController.dispose(); // Dispose username controller
     super.dispose();
   }
 
@@ -39,6 +41,23 @@ class _RegisterScreenState extends State<RegisterScreen> {
           child: SingleChildScrollView(
             child: Column(
               children: [
+                TextFormField(
+                  controller: _usernameController,
+                  decoration: const InputDecoration(
+                    labelText: 'Tên người dùng',
+                    border: OutlineInputBorder(),
+                  ),
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'Vui lòng nhập tên người dùng';
+                    }
+                    if (value.length < 3) {
+                      return 'Tên người dùng phải có ít nhất 3 ký tự';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 16),
                 TextFormField(
                   controller: _emailController,
                   decoration: const InputDecoration(
@@ -121,6 +140,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                           password: _passwordController.text,
                           phoneNumber: _phoneNumberController.text,
                           address: _addressController.text,
+                          username: _usernameController.text, // Pass username
                         );
                         if (authViewModel.errorMessage == null) {
                           ScaffoldMessenger.of(context).showSnackBar(

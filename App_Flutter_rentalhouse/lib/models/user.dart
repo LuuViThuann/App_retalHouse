@@ -8,6 +8,7 @@ class AppUser {
   final DateTime createdAt;
   final String? token;
   final String? avatarBase64;
+  final String username;
 
   AppUser({
     required this.id,
@@ -17,6 +18,7 @@ class AppUser {
     required this.createdAt,
     this.token,
     this.avatarBase64,
+    required this.username,
   });
 
   factory AppUser.fromFirestore(Map<String, dynamic>? data, String id) {
@@ -31,6 +33,7 @@ class AppUser {
       createdAt: (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
       token: data['token'] as String?,
       avatarBase64: data['avatarBase64'] as String?,
+      username: data?['username'] ?? '',
     );
   }
 

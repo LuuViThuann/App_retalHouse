@@ -14,6 +14,7 @@ class AuthService {
     required String password,
     required String phoneNumber,
     required String address,
+    required String username,
   }) async {
     try {
       final response = await http.post(
@@ -24,6 +25,7 @@ class AuthService {
           'password': password,
           'phoneNumber': phoneNumber,
           'address': address,
+          'username': username,
         }),
       );
 
@@ -36,6 +38,7 @@ class AuthService {
           address: data['address'] as String,
           createdAt: DateTime.parse(data['createdAt'] as String),
           token: data['token'] ?? '',
+          username: data['username'] as String,
         );
       } else {
         throw Exception('Đăng ký thất bại: ${response.body}');
@@ -74,6 +77,7 @@ class AuthService {
           address: data['address'] as String,
           createdAt: DateTime.parse(data['createdAt'] as String),
           token: data['token'] ?? idToken,
+          username: data['username'] as String? ?? '',
         );
       } else {
         throw Exception('Đăng nhập thất bại: ${response.body}');
@@ -143,6 +147,7 @@ class AuthService {
           address: data['address'] as String,
           createdAt: DateTime.parse(data['createdAt'] as String? ?? DateTime.now().toIso8601String()),
           token: idToken,
+          username: data['username'] as String? ?? '',
         );
       } else {
         throw Exception('Cập nhật hồ sơ thất bại: ${response.body}');
@@ -186,23 +191,28 @@ class AuthService {
   // Fetch avatarBase64 from MongoDB
   Future<String?> fetchAvatarBase64(String userId, String idToken) async {
     try {
+      print('Fetching avatarBase64 for userId: $userId');
       final response = await http.get(
-        Uri.parse('${ApiRoutes.baseUrl}/user/$userId/avatar'),
+        Uri.parse('${ApiRoutes.baseUrl}/auth/user/$userId/avatar'),
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $idToken',
         },
       );
 
+      print('Avatar fetch response status: ${response.statusCode}, body: ${response.body}');
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        return data['avatarBase64'] as String?;
+        final avatarBase64 = data['avatarBase64'] as String?;
+        print('Fetched avatarBase64: $avatarBase64');
+        return avatarBase64;
       } else {
-        throw Exception('Không thể lấy avatarBase64: ${response.body}');
+        print('Failed to fetch avatarBase64: ${response.body}');
+        return null;
       }
     } catch (e) {
       print('Error fetching avatarBase64: $e');
-      return null; // Return null if fetch fails, we'll handle it gracefully
+      return null;
     }
   }
 
@@ -230,7 +240,7 @@ class AuthService {
         final avatarBase64 = await fetchAvatarBase64(user.uid, idToken!);
         return AppUser.fromFirestore(doc.data(), doc.id).copyWith(
           token: idToken,
-          avatarBase64: avatarBase64, // Include avatarBase64
+          avatarBase64: avatarBase64, // This line caused the error
         );
       }
       // If document doesn't exist, create it with basic data
@@ -238,6 +248,7 @@ class AuthService {
         'email': user.email ?? '',
         'phoneNumber': '',
         'address': '',
+        'username': '',
         'createdAt': FieldValue.serverTimestamp(),
       });
       return AppUser(
@@ -247,6 +258,7 @@ class AuthService {
         address: '',
         createdAt: DateTime.now(),
         token: idToken,
+        username: '',
       );
     } catch (e) {
       print('Error getting current user: $e');
@@ -267,7 +279,8 @@ extension AppUserExtension on AppUser {
     String? address,
     DateTime? createdAt,
     String? token,
-    String? avatarBase64,
+    String? avatarBase64, // Ensure this is nullable
+    String? username,
   }) {
     return AppUser(
       id: id ?? this.id,
@@ -277,6 +290,7 @@ extension AppUserExtension on AppUser {
       createdAt: createdAt ?? this.createdAt,
       token: token ?? this.token,
       avatarBase64: avatarBase64 ?? this.avatarBase64,
+      username: username ?? this.username,
     );
   }
 }

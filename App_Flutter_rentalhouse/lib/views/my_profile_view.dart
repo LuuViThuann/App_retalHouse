@@ -174,6 +174,23 @@ class _MyProfileViewState extends State<MyProfileView> {
                 const SizedBox(height: 24),
                 Row(
                   children: [
+                    const Icon(Icons.person_outline, color: Colors.grey),
+                    const SizedBox(width: 16),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text('Tên người dùng', style: TextStyle(color: Colors.grey, fontSize: 12)),
+                        Text(
+                          user.username.isEmpty ? 'Chưa cập nhật' : user.username,
+                          style: const TextStyle(fontSize: 16),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 24),
+                Row(
+                  children: [
                     const Icon(Icons.phone_outlined, color: Colors.grey),
                     const SizedBox(width: 16),
                     Expanded(

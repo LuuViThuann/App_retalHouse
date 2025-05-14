@@ -6,8 +6,8 @@ const User = require('../models/usermodel'); // Import your Mongoose User model
 
 // Đăng ký người dùng
 router.post('/register', async (req, res) => {
-  const { email, password, phoneNumber, address } = req.body;
-  if (!email || !password || !phoneNumber || !address) {
+  const { email, password, phoneNumber, address, username } = req.body; // Add username
+  if (!email || !password || !phoneNumber || !address || !username) {
     return res.status(400).json({ message: 'Missing required fields' });
   }
 
@@ -21,6 +21,7 @@ router.post('/register', async (req, res) => {
       email,
       phoneNumber,
       address,
+      username, // Save username to Firestore
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
     });
 
@@ -29,6 +30,7 @@ router.post('/register', async (req, res) => {
       email: userRecord.email,
       phoneNumber,
       address,
+      username, // Return username in response
       createdAt: new Date().toISOString(),
     });
   } catch (err) {
@@ -58,6 +60,7 @@ router.post('/login', async (req, res) => {
       email: user.email,
       phoneNumber: userData.phoneNumber,
       address: userData.address,
+      username: userData.username, // Include username in login response
       createdAt: userData.createdAt.toDate().toISOString(),
     });
   } catch (err) {
@@ -108,6 +111,7 @@ router.post('/update-profile', async (req, res) => {
       email: decodedToken.email,
       phoneNumber: userData.phoneNumber,
       address: userData.address,
+      username: userData.username, // Include username in response
       updatedAt: userData.updatedAt?.toDate().toISOString(),
     });
   } catch (err) {
@@ -139,7 +143,7 @@ router.post('/upload-image', async (req, res) => {
 
       user = new User({
         _id: userId,
-        username: decodedToken.email.split('@')[0],
+        username: userData.username, // Use username from Firestore
         email: decodedToken.email,
         password: 'firebase-managed',
         phoneNumber: userData.phoneNumber || '',

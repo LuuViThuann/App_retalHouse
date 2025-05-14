@@ -18,6 +18,7 @@ class AuthViewModel extends ChangeNotifier {
     required String password,
     required String phoneNumber,
     required String address,
+    required String username,
   }) async {
     _isLoading = true;
     _errorMessage = null;
@@ -29,6 +30,7 @@ class AuthViewModel extends ChangeNotifier {
         password: password,
         phoneNumber: phoneNumber,
         address: address,
+        username: username,
       );
       if (user != null) {
         _currentUser = user;
