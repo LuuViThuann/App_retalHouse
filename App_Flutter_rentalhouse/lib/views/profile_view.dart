@@ -86,6 +86,13 @@ class _ProfileViewState extends State<ProfileView> {
                     },
                   ),
                   ProfileMenuItem(
+                    icon: Icons.my_library_books,
+                    text: 'Danh sách đặt chỗ',
+                    onTap: () {
+                      // Handle My Orders tap
+                    },
+                  ),
+                  ProfileMenuItem(
                     icon: Icons.shopping_bag_outlined,
                     text: 'Hợp đồng của tôi',
                     onTap: () {

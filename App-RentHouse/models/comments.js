@@ -20,7 +20,17 @@ const commentSchema = new mongoose.Schema({
     type: String,
     required: true,
   },
-
+// * Đánh giá sao (1-5)
+  rating: {
+    type: Number,
+    min: 1,
+    max: 5,
+    default: 0,
+  },
+    // * Hình ảnh đính kèm
+  images: [{
+    type: String,
+  }],
   // * Thông tin thời gian tạo bình luận
   createdAt: {
     type: Date,

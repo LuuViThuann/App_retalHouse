@@ -20,17 +20,45 @@ class RentalDetailScreen extends StatefulWidget {
   _RentalDetailScreenState createState() => _RentalDetailScreenState();
 }
 
-class _RentalDetailScreenState extends State<RentalDetailScreen> {
+class _RentalDetailScreenState extends State<RentalDetailScreen> with SingleTickerProviderStateMixin {
   int _selectedImageIndex = 0;
   bool _isFavorite = false;
   bool _isLoadingFavorite = true;
-  final double _rating = 4.5;
-  final int _reviewCount = 120;
+  double _averageRating = 0.0;
+  int _reviewCount = 0;
+  late TabController _tabController;
 
   @override
   void initState() {
     super.initState();
+    _tabController = TabController(length: 2, vsync: this);
+    // Lắng nghe sự kiện thay đổi tab để cập nhật giao diện
+    _tabController.addListener(() {
+      if (!_tabController.indexIsChanging) {
+        setState(() {
+          // Cập nhật trạng thái khi tab thay đổi
+        });
+      }
+    });
     _checkFavoriteStatus();
+    _fetchRentalDetails();
+  }
+
+  Future<void> _fetchRentalDetails() async {
+    try {
+      final response = await http.get(Uri.parse('${ApiRoutes.rentals}/${widget.rental.id}'));
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        setState(() {
+          _averageRating = (data['averageRating'] as num?)?.toDouble() ?? 0.0;
+          _reviewCount = (data['reviewCount'] as num?)?.toInt() ?? 0;
+        });
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Lỗi khi tải thông tin: $e')),
+      );
+    }
   }
 
   Future<void> _checkFavoriteStatus() async {
@@ -101,6 +129,12 @@ class _RentalDetailScreenState extends State<RentalDetailScreen> {
   String formatCurrency(double amount) {
     final formatter = NumberFormat.currency(locale: 'vi_VN', symbol: 'VNĐ', decimalDigits: 0);
     return formatter.format(amount);
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
   }
 
   @override
@@ -220,10 +254,11 @@ class _RentalDetailScreenState extends State<RentalDetailScreen> {
                                 children: [
                                   Row(
                                     children: List.generate(5, (index) {
+                                      final starValue = (index + 1).toDouble();
                                       return Icon(
-                                        index < _rating.floor()
+                                        starValue <= _averageRating
                                             ? Icons.star
-                                            : index < _rating
+                                            : starValue - 0.5 <= _averageRating
                                             ? Icons.star_half
                                             : Icons.star_border,
                                         color: Colors.amber,
@@ -304,92 +339,6 @@ class _RentalDetailScreenState extends State<RentalDetailScreen> {
                             },
                           ),
                         ),
-                      _SectionTitle('Thông tin chi tiết:'),
-                      Container(
-                        padding: const EdgeInsets.all(16.0),
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                            colors: [Colors.white, Colors.grey[50]!],
-                          ),
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            _DetailRow(
-                              icon: Icons.square_foot,
-                              label: 'Diện tích',
-                              value:
-                              '${widget.rental.area['total']} m² (Phòng khách ${widget.rental.area['livingRoom']} m², 2PN ~${widget.rental.area['bedrooms']} m², 2WC ~${widget.rental.area['bathrooms']} m²)',
-                            ),
-                            const SizedBox(height: 16),
-                            _DetailSection(
-                              title: 'Nội thất & Tiện ích',
-                              icon: Icons.chair,
-                              items: [
-                                ...widget.rental.furniture.map((item) => '• $item'),
-                                ...widget.rental.amenities.map((item) => '• $item'),
-                              ],
-                            ),
-                            const SizedBox(height: 16),
-                            _DetailSection(
-                              title: 'Kết nối & Môi trường xung quanh',
-                              icon: Icons.place,
-                              items: widget.rental.surroundings.map((item) => '• $item').toList(),
-                            ),
-                            const SizedBox(height: 16),
-                            _DetailSection(
-                              title: 'Điều khoản thuê',
-                              icon: Icons.description,
-                              items: [
-                                'Thời hạn thuê tối thiểu: ${widget.rental.rentalTerms['minimumLease']}',
-                                'Cọc: ${formatCurrency(double.parse(widget.rental.rentalTerms['deposit']))}',
-                                'Thanh toán: ${widget.rental.rentalTerms['paymentMethod']}',
-                                'Gia hạn hợp đồng: ${widget.rental.rentalTerms['renewalTerms']}',
-                              ],
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 24),
-                      _SectionTitle('Thông tin liên hệ'),
-                      Container(
-                        padding: const EdgeInsets.all(16.0),
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                            colors: [Colors.white, Colors.grey[50]!],
-                          ),
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            _DetailRow(
-                              icon: Icons.person,
-                              label: 'Chủ nhà',
-                              value: widget.rental.contactInfo['name'] ?? 'Chủ nhà',
-                            ),
-                            const SizedBox(height: 8),
-                            _DetailRow(
-                              icon: Icons.phone,
-                              label: 'SĐT/Zalo',
-                              value: widget.rental.contactInfo['phone'] ?? 'Không có số điện thoại',
-                            ),
-                            const SizedBox(height: 8),
-                            _DetailRow(
-                              icon: Icons.access_time,
-                              label: 'Giờ liên hệ',
-                              value: widget.rental.contactInfo['availableHours'] ?? 'Không xác định',
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 24),
-                      CommentSection(rentalId: widget.rental.id),
                       const SizedBox(height: 24),
                       Center(
                         child: ElevatedButton(
@@ -410,15 +359,169 @@ class _RentalDetailScreenState extends State<RentalDetailScreen> {
                           ),
                         ),
                       ),
-                      const SizedBox(height: 16),
+                      const SizedBox(height: 25),
                     ],
                   ),
                 ),
               ),
             ),
           ),
+          SliverPersistentHeader(
+            pinned: true,
+            delegate: _SliverAppBarDelegate(
+              TabBar(
+                controller: _tabController,
+                labelColor: Colors.blue[700],
+                unselectedLabelColor: Colors.grey,
+                indicatorColor: Colors.blue[700],
+                tabs: const [
+                  Tab(text: 'Thông tin chi tiết'),
+                  Tab(text: 'Bình luận'),
+                ],
+              ),
+            ),
+          ),
+          SliverToBoxAdapter(
+            child: Container(
+              color: Colors.white,
+              padding: const EdgeInsets.all(16.0),
+              child: IndexedStack(
+                index: _tabController.index,
+                children: [
+                  _DetailsTab(rental: widget.rental, formatCurrency: formatCurrency),
+                  CommentSection(rentalId: widget.rental.id),
+                ],
+              ),
+            ),
+          ),
         ],
       ),
+    );
+  }
+}
+
+// Delegate for SliverPersistentHeader to handle TabBar
+class _SliverAppBarDelegate extends SliverPersistentHeaderDelegate {
+  final TabBar _tabBar;
+
+  _SliverAppBarDelegate(this._tabBar);
+
+  @override
+  double get minExtent => _tabBar.preferredSize.height;
+
+  @override
+  double get maxExtent => _tabBar.preferredSize.height;
+
+  @override
+  Widget build(BuildContext context, double shrinkOffset, bool overlapsContent) {
+    return Container(
+      color: Colors.white,
+      child: _tabBar,
+    );
+  }
+
+  @override
+  bool shouldRebuild(_SliverAppBarDelegate oldDelegate) {
+    return false;
+  }
+}
+
+class _DetailsTab extends StatelessWidget {
+  final Rental rental;
+  final String Function(double) formatCurrency;
+
+  const _DetailsTab({required this.rental, required this.formatCurrency});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _SectionTitle('Thông tin chi tiết:'),
+        Container(
+          padding: const EdgeInsets.all(16.0),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [Colors.white, Colors.grey[50]!],
+            ),
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _DetailRow(
+                icon: Icons.square_foot,
+                label: 'Diện tích',
+                value:
+                '${rental.area['total']} m² (Phòng khách ${rental.area['livingRoom']} m², 2PN ~${rental.area['bedrooms']} m², 2WC ~${rental.area['bathrooms']} m²)',
+              ),
+              const SizedBox(height: 16),
+              _DetailSection(
+                title: 'Nội thất & Tiện ích',
+                icon: Icons.chair,
+                items: [
+                  ...rental.furniture.map((item) => '• $item'),
+                  ...rental.amenities.map((item) => '• $item'),
+                ],
+              ),
+              const SizedBox(height: 16),
+              _DetailSection(
+                title: 'Kết nối & Môi trường xung quanh',
+                icon: Icons.place,
+                items: rental.surroundings.map((item) => '• $item').toList(),
+              ),
+              const SizedBox(height: 16),
+              _DetailSection(
+                title: 'Điều khoản thuê',
+                icon: Icons.description,
+                items: [
+                  'Thời hạn thuê tối thiểu: ${rental.rentalTerms['minimumLease']}',
+                  'Cọc: ${formatCurrency(double.parse(rental.rentalTerms['deposit']))}',
+                  'Thanh toán: ${rental.rentalTerms['paymentMethod']}',
+                  'Gia hạn hợp đồng: ${rental.rentalTerms['renewalTerms']}',
+                ],
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 24),
+        _SectionTitle('Thông tin liên hệ'),
+        Container(
+          padding: const EdgeInsets.all(16.0),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [Colors.white, Colors.grey[50]!],
+            ),
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _DetailRow(
+                icon: Icons.person,
+                label: 'Chủ nhà',
+                value: rental.contactInfo['name'] ?? 'Chủ nhà',
+              ),
+              const SizedBox(height: 8),
+              _DetailRow(
+                icon: Icons.phone,
+                label: 'SĐT/Zalo',
+                value: rental.contactInfo['phone'] ?? 'Không có số điện thoại',
+              ),
+              const SizedBox(height: 8),
+              _DetailRow(
+                icon: Icons.access_time,
+                label: 'Giờ liên hệ',
+                value: rental.contactInfo['availableHours'] ?? 'Không xác định',
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }

@@ -80,7 +80,12 @@ router.get('/rentals/:id', async (req, res) => {
       .populate('userId', 'avatarBase64 username')
       .populate('replies.userId', 'username')
       .populate('likes.userId', 'username');
-    res.json({ ...rental.toObject(), comments });
+    
+    // Calculate average rating from comments
+    const totalRatings = comments.reduce((sum, comment) => sum + (comment.rating || 0), 0);
+    const averageRating = comments.length > 0 ? totalRatings / comments.length : 0;
+    
+    res.json({ ...rental.toObject(), comments, averageRating, reviewCount: comments.length });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
@@ -288,12 +293,13 @@ router.get('/comments/:rentalId', async (req, res) => {
   }
 });
 
-// Route để thêm bình luận vào bài đăng
-router.post('/comments', authMiddleware, async (req, res) => {
+// Route để thêm bình luận vào bài đăng (hỗ trợ upload ảnh)
+router.post('/comments', authMiddleware, upload.array('images'), async (req, res) => {
   try {
-    const { rentalId, content } = req.body;
+    const { rentalId, content, rating } = req.body;
     console.log('Request body:', req.body);
     console.log('Request userId:', req.userId);
+    console.log('Uploaded files:', req.files);
 
     if (!rentalId || !content) {
       console.log('Missing required fields');
@@ -314,10 +320,14 @@ router.post('/comments', authMiddleware, async (req, res) => {
       return res.status(404).json({ message: 'Rental not found' });
     }
 
+    const imageUrls = req.files.map(file => `/uploads/${file.filename}`);
+
     const comment = new Comment({
       rentalId: new mongoose.Types.ObjectId(rentalId),
       userId: req.userId,
       content,
+      rating: rating ? Number(rating) : 0,
+      images: imageUrls,
     });
 
     const savedComment = await comment.save();
@@ -332,6 +342,43 @@ router.post('/comments', authMiddleware, async (req, res) => {
     res.status(201).json(populatedComment);
   } catch (err) {
     console.error('Error saving comment:', err);
+    res.status(400).json({ message: err.message });
+  }
+});
+
+// Route để chỉnh sửa bình luận
+router.put('/comments/:commentId', authMiddleware, async (req, res) => {
+  try {
+    const { commentId } = req.params;
+    const { content } = req.body;
+
+    if (!mongoose.Types.ObjectId.isValid(commentId)) {
+      return res.status(400).json({ message: 'Invalid commentId format' });
+    }
+    if (!content) {
+      return res.status(400).json({ message: 'Content is required' });
+    }
+
+    const comment = await Comment.findById(commentId);
+    if (!comment) {
+      return res.status(404).json({ message: 'Comment not found' });
+    }
+
+    if (comment.userId !== req.userId) {
+      return res.status(403).json({ message: 'You are not authorized to edit this comment' });
+    }
+
+    comment.content = content;
+    const updatedComment = await comment.save();
+
+    const populatedComment = await Comment.findById(commentId)
+      .populate('userId', 'avatarBase64 username')
+      .populate('replies.userId', 'username')
+      .populate('likes.userId', 'username');
+
+    res.status(200).json(populatedComment);
+  } catch (err) {
+    console.error('Error editing comment:', err);
     res.status(400).json({ message: err.message });
   }
 });
@@ -389,6 +436,51 @@ router.post('/comments/:commentId/replies', authMiddleware, async (req, res) => 
     res.status(201).json(populatedComment);
   } catch (err) {
     console.error('Error adding reply:', err);
+    res.status(400).json({ message: err.message });
+  }
+});
+
+// Route để chỉnh sửa phản hồi (reply)
+router.put('/comments/:commentId/replies/:replyId', authMiddleware, async (req, res) => {
+  try {
+    const { commentId, replyId } = req.params;
+    const { content } = req.body;
+
+    if (!mongoose.Types.ObjectId.isValid(commentId)) {
+      return res.status(400).json({ message: 'Invalid commentId format' });
+    }
+    if (!mongoose.Types.ObjectId.isValid(replyId)) {
+      return res.status(400).json({ message: 'Invalid replyId format' });
+    }
+    if (!content) {
+      return res.status(400).json({ message: 'Content is required' });
+    }
+
+    const comment = await Comment.findById(commentId);
+    if (!comment) {
+      return res.status(404).json({ message: 'Comment not found' });
+    }
+
+    const reply = comment.replies.id(replyId);
+    if (!reply) {
+      return res.status(404).json({ message: 'Reply not found' });
+    }
+
+    if (reply.userId !== req.userId) {
+      return res.status(403).json({ message: 'You are not authorized to edit this reply' });
+    }
+
+    reply.content = content;
+    const updatedComment = await comment.save();
+
+    const populatedComment = await Comment.findById(commentId)
+      .populate('userId', 'avatarBase64 username')
+      .populate('replies.userId', 'username')
+      .populate('likes.userId', 'username');
+
+    res.status(200).json(populatedComment);
+  } catch (err) {
+    console.error('Error editing reply:', err);
     res.status(400).json({ message: err.message });
   }
 });
