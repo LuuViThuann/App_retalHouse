@@ -473,54 +473,31 @@ class HomeContent extends StatelessWidget {
               ),
             ),
           ),
+          floatingActionButton: Column(
+            mainAxisAlignment: MainAxisAlignment.end,
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              // --- BUTTON SPIN  -------------------------------------------------------
+              RawMaterialButton(
+                onPressed: () {
+                  // logic chatBox
+                },
+                constraints: const BoxConstraints.tightFor(
+                  width: 145,
+                  height: 145,
+                ),
+                shape: const CircleBorder(),
+                child: ClipOval(
+                  child: Image.asset(
+                    "assets/img/chatbox.png",
+                    fit: BoxFit.cover,
+                  ),
+                ),
+              ),
+            ],
+          ),
         );
       },
-    );
-  }
-
-  Widget _buildMiniPropertyImage(String imagePath, String line1, String line2, String line3, double screenHeight) {
-    return Container(
-      width: screenHeight * 0.1,
-      height: screenHeight * 0.18,
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(12),
-        color: Colors.grey[300],
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.1),
-            blurRadius: 5,
-            offset: const Offset(2, 2),
-          )
-        ],
-      ),
-      child: Stack(
-        children: [
-          ClipRRect(
-            borderRadius: BorderRadius.circular(12),
-            child: Center(child: Icon(Icons.house, size: 30, color: Colors.grey[700])),
-          ),
-          Positioned(
-            bottom: 5,
-            left: 5,
-            right: 5,
-            child: Container(
-              padding: const EdgeInsets.all(4),
-              decoration: BoxDecoration(
-                color: Colors.black.withOpacity(0.4),
-                borderRadius: BorderRadius.circular(5),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(line1, style: const TextStyle(color: Colors.white, fontSize: 7, fontWeight: FontWeight.bold)),
-                  Text(line2, style: const TextStyle(color: Colors.white, fontSize: 6)),
-                  Text(line3, style: const TextStyle(color: Colors.white, fontSize: 6)),
-                ],
-              ),
-            ),
-          ),
-        ],
-      ),
     );
   }
 

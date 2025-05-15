@@ -70,6 +70,7 @@ const rentalSchema = new mongoose.Schema({
   // *  thông tin người cho thuê
   userId: {
     type: String,
+    ref: 'User',
     required: true,
   },
   // *  thông tin danh sách hình ảnh của nhà cho thuê

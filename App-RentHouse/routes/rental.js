@@ -2,9 +2,10 @@ require('dotenv').config();
 
 const express = require('express');
 const router = express.Router();
+const mongoose = require('mongoose');
 const Rental = require('../models/Rental');
-const Favorite = require('../models/favorite'); // Import the Favorite model
-const Comment = require('../models/comments'); // Import the Comment model
+const Favorite = require('../models/favorite');
+const Comment = require('../models/comments');
 const admin = require('firebase-admin');
 const multer = require('multer');
 const path = require('path');
@@ -67,7 +68,7 @@ router.get('/rentals', async (req, res) => {
   }
 });
 
-// Route để lấy thông tin chi tiết của một rental theo ID ----------------------------------------------
+// Route để lấy thông tin chi tiết của một rental theo ID
 router.get('/rentals/:id', async (req, res) => {
   try {
     const rental = await Rental.findById(req.params.id);
@@ -84,7 +85,7 @@ router.get('/rentals/:id', async (req, res) => {
     res.status(500).json({ message: err.message });
   }
 });
-//  -----------------------------------------------------------------------------------------
+
 // Route để tạo mới một rental
 router.post('/rentals', authMiddleware, upload.array('images'), async (req, res) => {
   try {
@@ -268,17 +269,21 @@ router.get('/favorites', authMiddleware, async (req, res) => {
   }
 });
 
-// -------------------------------------------------------------------------------------------------------------------
 // Route để lấy danh sách bình luận của một bài đăng
 router.get('/comments/:rentalId', async (req, res) => {
   try {
     const { rentalId } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(rentalId)) {
+      return res.status(400).json({ message: 'Invalid rentalId format' });
+    }
     const comments = await Comment.find({ rentalId })
       .populate('userId', 'avatarBase64 username')
       .populate('replies.userId', 'username')
       .populate('likes.userId', 'username');
+    console.log('Fetched comments:', comments);
     res.json(comments);
   } catch (err) {
+    console.error('Error fetching comments:', err);
     res.status(500).json({ message: err.message });
   }
 });
@@ -287,25 +292,72 @@ router.get('/comments/:rentalId', async (req, res) => {
 router.post('/comments', authMiddleware, async (req, res) => {
   try {
     const { rentalId, content } = req.body;
+    console.log('Request body:', req.body);
+    console.log('Request userId:', req.userId);
+
     if (!rentalId || !content) {
+      console.log('Missing required fields');
       return res.status(400).json({ message: 'Missing required fields' });
+    }
+    if (!req.userId) {
+      console.log('User not authenticated');
+      return res.status(401).json({ message: 'User not authenticated' });
+    }
+    if (!mongoose.Types.ObjectId.isValid(rentalId)) {
+      console.log('Invalid rentalId format:', rentalId);
+      return res.status(400).json({ message: 'Invalid rentalId format' });
     }
 
     const rental = await Rental.findById(rentalId);
     if (!rental) {
+      console.log('Rental not found for rentalId:', rentalId);
       return res.status(404).json({ message: 'Rental not found' });
     }
 
     const comment = new Comment({
-      rentalId,
+      rentalId: new mongoose.Types.ObjectId(rentalId),
       userId: req.userId,
       content,
     });
-    await comment.save();
 
-    res.status(201).json(comment);
+    const savedComment = await comment.save();
+    console.log('Saved comment:', savedComment);
+
+    const populatedComment = await Comment.findById(savedComment._id)
+      .populate('userId', 'avatarBase64 username')
+      .populate('replies.userId', 'username')
+      .populate('likes.userId', 'username');
+    console.log('Populated comment:', populatedComment);
+
+    res.status(201).json(populatedComment);
   } catch (err) {
+    console.error('Error saving comment:', err);
     res.status(400).json({ message: err.message });
+  }
+});
+
+// Route để xóa bình luận
+router.delete('/comments/:commentId', authMiddleware, async (req, res) => {
+  try {
+    const { commentId } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(commentId)) {
+      return res.status(400).json({ message: 'Invalid commentId format' });
+    }
+
+    const comment = await Comment.findById(commentId);
+    if (!comment) {
+      return res.status(404).json({ message: 'Comment not found' });
+    }
+
+    if (comment.userId !== req.userId) {
+      return res.status(403).json({ message: 'You are not authorized to delete this comment' });
+    }
+
+    await Comment.findByIdAndDelete(commentId);
+    res.json({ message: 'Comment deleted successfully' });
+  } catch (err) {
+    console.error('Error deleting comment:', err);
+    res.status(500).json({ message: err.message });
   }
 });
 
@@ -317,6 +369,9 @@ router.post('/comments/:commentId/replies', authMiddleware, async (req, res) => 
     if (!content) {
       return res.status(400).json({ message: 'Missing content' });
     }
+    if (!mongoose.Types.ObjectId.isValid(commentId)) {
+      return res.status(400).json({ message: 'Invalid commentId format' });
+    }
 
     const comment = await Comment.findById(commentId);
     if (!comment) {
@@ -324,25 +379,34 @@ router.post('/comments/:commentId/replies', authMiddleware, async (req, res) => 
     }
 
     comment.replies.push({ userId: req.userId, content });
-    await comment.save();
+    const savedComment = await comment.save();
 
-    res.status(201).json(comment);
+    const populatedComment = await Comment.findById(commentId)
+      .populate('userId', 'avatarBase64 username')
+      .populate('replies.userId', 'username')
+      .populate('likes.userId', 'username');
+
+    res.status(201).json(populatedComment);
   } catch (err) {
+    console.error('Error adding reply:', err);
     res.status(400).json({ message: err.message });
   }
 });
-
 
 // Route để like một bình luận
 router.post('/comments/:commentId/like', authMiddleware, async (req, res) => {
   try {
     const { commentId } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(commentId)) {
+      return res.status(400).json({ message: 'Invalid commentId format' });
+    }
+
     const comment = await Comment.findById(commentId);
     if (!comment) {
       return res.status(404).json({ message: 'Comment not found' });
     }
 
-    const existingLike = comment.likes.find(like => like.userId.toString() === req.userId);
+    const existingLike = comment.likes.find(like => like.userId === req.userId);
     if (existingLike) {
       return res.status(400).json({ message: 'Already liked' });
     }
@@ -350,8 +414,14 @@ router.post('/comments/:commentId/like', authMiddleware, async (req, res) => {
     comment.likes.push({ userId: req.userId });
     await comment.save();
 
-    res.status(200).json({ message: 'Liked', likesCount: comment.likes.length });
+    const populatedComment = await Comment.findById(commentId)
+      .populate('userId', 'avatarBase64 username')
+      .populate('replies.userId', 'username')
+      .populate('likes.userId', 'username');
+
+    res.status(200).json({ message: 'Liked', likesCount: comment.likes.length, comment: populatedComment });
   } catch (err) {
+    console.error('Error liking comment:', err);
     res.status(400).json({ message: err.message });
   }
 });
@@ -360,19 +430,28 @@ router.post('/comments/:commentId/like', authMiddleware, async (req, res) => {
 router.delete('/comments/:commentId/unlike', authMiddleware, async (req, res) => {
   try {
     const { commentId } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(commentId)) {
+      return res.status(400).json({ message: 'Invalid commentId format' });
+    }
+
     const comment = await Comment.findById(commentId);
     if (!comment) {
       return res.status(404).json({ message: 'Comment not found' });
     }
 
-    comment.likes = comment.likes.filter(like => like.userId.toString() !== req.userId);
+    comment.likes = comment.likes.filter(like => like.userId !== req.userId);
     await comment.save();
 
-    res.status(200).json({ message: 'Unliked', likesCount: comment.likes.length });
+    const populatedComment = await Comment.findById(commentId)
+      .populate('userId', 'avatarBase64 username')
+      .populate('replies.userId', 'username')
+      .populate('likes.userId', 'username');
+
+    res.status(200).json({ message: 'Unliked', likesCount: comment.likes.length, comment: populatedComment });
   } catch (err) {
+    console.error('Error unliking comment:', err);
     res.status(400).json({ message: err.message });
   }
 });
-
 
 module.exports = router;

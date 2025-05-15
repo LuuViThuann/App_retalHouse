@@ -100,6 +100,27 @@ class _ProfileViewState extends State<ProfileView> {
                     },
                   ),
                   ProfileMenuItem(
+                    icon: Icons.comment,
+                    text: 'Bình luận gần đây',
+                    onTap: () {
+                      // Handle My Cards tap
+                    },
+                  ),
+                  ProfileMenuItem(
+                    icon: Icons.notifications,
+                    text: 'Thông báo',
+                    onTap: () {
+                      // Handle My Cards tap
+                    },
+                  ),
+                  ProfileMenuItem(
+                    icon: Icons.password,
+                    text: 'Thay đổi mật khẩu',
+                    onTap: () {
+                      // Handle My Cards tap
+                    },
+                  ),
+                  ProfileMenuItem(
                     icon: Icons.settings_outlined,
                     text: 'Cài đặt',
                     onTap: () {

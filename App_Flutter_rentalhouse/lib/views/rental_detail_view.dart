@@ -23,7 +23,7 @@ class RentalDetailScreen extends StatefulWidget {
 class _RentalDetailScreenState extends State<RentalDetailScreen> {
   int _selectedImageIndex = 0;
   bool _isFavorite = false;
-  bool _isLoadingFavorite = true; // Track loading state for favorite check
+  bool _isLoadingFavorite = true;
   final double _rating = 4.5;
   final int _reviewCount = 120;
 
