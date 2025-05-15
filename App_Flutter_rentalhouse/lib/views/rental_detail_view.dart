@@ -341,24 +341,26 @@ class _RentalDetailScreenState extends State<RentalDetailScreen> with SingleTick
                         ),
                       const SizedBox(height: 24),
                       Center(
-                        child: ElevatedButton(
+                        child: ElevatedButton.icon(
                           onPressed: () {
                             ScaffoldMessenger.of(context).showSnackBar(
                               const SnackBar(content: Text('Chức năng đặt chỗ đang phát triển')),
                             );
                           },
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.blue[700],
-                            padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 16),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-                            elevation: 3,
-                          ),
-                          child: const Text(
+                          icon: const Icon(Icons.event_available, size: 24, color: Colors.white),
+                          label: const Text(
                             'Đặt chỗ ngay',
                             style: TextStyle(fontSize: 18, color: Colors.white),
                           ),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.blue[700],
+                            padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                            elevation: 3,
+                          ),
                         ),
                       ),
+
                       const SizedBox(height: 25),
                     ],
                   ),

@@ -53,7 +53,7 @@ class Like {
 }
 
 class Reply {
-  final String id; // Add id for replies
+  final String id;
   final User userId;
   final String content;
   final DateTime createdAt;
@@ -84,7 +84,7 @@ class Comment {
   final User userId;
   final String content;
   final double rating;
-  final List<String> images; // Add images field
+  final List<String> images;
   final DateTime createdAt;
   final List<Reply> replies;
   final List<Like> likes;
@@ -109,7 +109,7 @@ class Comment {
         userId: User.fromJson(json['userId'] ?? {}),
         content: json['content']?.toString() ?? '',
         rating: (json['rating'] as num?)?.toDouble() ?? 0.0,
-        images: (json['images'] as List<dynamic>?)?.cast<String>() ?? [],
+        images: (json['images'] as List<dynamic>?)?.map((e) => e.toString()).toList() ?? [],
         createdAt: DateTime.tryParse(json['createdAt']?.toString() ?? '') ?? DateTime.now(),
         replies: (json['replies'] as List<dynamic>?)
             ?.map((reply) => Reply.fromJson(reply))
