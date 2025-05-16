@@ -31,5 +31,4 @@ class ApiRoutes {
   static String reply(String commentId, String replyId) => '$comments/$commentId/replies/$replyId';
   static String likeReply(String commentId, String replyId) => '$comments/$commentId/replies/$replyId/like';
   static String unlikeReply(String commentId, String replyId) => '$comments/$commentId/replies/$replyId/unlike';
-  static String nestedReplies(String commentId, String replyId) => '$comments/$commentId/replies/$replyId/nested-replies';
 }
