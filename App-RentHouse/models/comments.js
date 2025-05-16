@@ -32,6 +32,10 @@ const commentSchema = new mongoose.Schema({
     userId: { type: String, ref: 'User', required: true },
     content: { type: String, required: true },
     createdAt: { type: Date, default: Date.now },
+    likes: [{  // Added likes field for replies
+      userId: { type: String, ref: 'User', required: true },
+      createdAt: { type: Date, default: Date.now },
+    }],
   }],
   likes: [{
     userId: { type: String, ref: 'User', required: true },

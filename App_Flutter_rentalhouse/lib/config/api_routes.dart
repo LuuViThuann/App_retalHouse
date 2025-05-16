@@ -1,5 +1,5 @@
 class ApiRoutes {
-  static const String rootUrl = 'http://192.168.1.38:3000';
+  static const String rootUrl = 'http://192.168.1.82:3000';
   static const String baseUrl = '$rootUrl/api';
   static const String serverBaseUrl = rootUrl;
 
@@ -19,8 +19,10 @@ class ApiRoutes {
   // Các endpoint bình luận cho bài viết
   static const String avatar = '$baseUrl/auth/user';
   static const String comments = '$baseUrl/comments';
-  static String commentReplies(String commentId) => '$comments/$commentId/replies';
+  static String commentReplies(String commentId) =>
+      '$comments/$commentId/replies';
   static String likeComment(String commentId) => '$comments/$commentId/like';
-  static String unlikeComment(String commentId) => '$comments/$commentId/unlike';
+  static String unlikeComment(String commentId) =>
+      '$comments/$commentId/unlike';
   static String getAvatar(String userId) => '$avatar/$userId/avatar';
 }

@@ -57,12 +57,14 @@ class Reply {
   final User userId;
   final String content;
   final DateTime createdAt;
+  final List<Like> likes; // Added likes field
 
   const Reply({
     required this.id,
     required this.userId,
     required this.content,
     required this.createdAt,
+    required this.likes,
   });
 
   factory Reply.fromJson(Map<String, dynamic> json) {
@@ -71,11 +73,12 @@ class Reply {
       userId: User.fromJson(json['userId'] is String ? {'_id': json['userId']} : (json['userId'] ?? {})),
       content: json['content']?.toString() ?? '',
       createdAt: DateTime.tryParse(json['createdAt']?.toString() ?? '') ?? DateTime.now(),
+      likes: (json['likes'] as List<dynamic>?)?.map((like) => Like.fromJson(like)).toList() ?? [], // Handle likes field
     );
   }
 
   @override
-  String toString() => 'Reply(id: $id, userId: $userId, content: $content, createdAt: $createdAt)';
+  String toString() => 'Reply(id: $id, userId: $userId, content: $content, createdAt: $createdAt, likes: $likes)';
 }
 
 class Comment {

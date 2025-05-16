@@ -9,11 +9,13 @@ import '../config/api_routes.dart';
 import '../viewmodels/vm_auth.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
+import 'package:photo_view/photo_view.dart';
 
 class CommentSection extends StatefulWidget {
   final String rentalId;
+  final ValueChanged<int>? onCommentCountChanged;
 
-  const CommentSection({super.key, required this.rentalId});
+  const CommentSection({super.key, required this.rentalId, this.onCommentCountChanged});
 
   @override
   State<CommentSection> createState() => _CommentSectionState();
@@ -30,6 +32,7 @@ class _CommentSectionState extends State<CommentSection> {
   bool _isPostingComment = false;
   bool _isPostingReply = false;
   bool _isTogglingLike = false;
+  bool _isTogglingReplyLike = false;
   String? _selectedCommentId;
   String? _editingCommentId;
   String? _editingReplyId;
@@ -50,7 +53,8 @@ class _CommentSectionState extends State<CommentSection> {
     if (user != null) {
       setState(() {
         _currentUsername = user.username.isEmpty ? 'không có' : user.username;
-        _currentUserAvatar = user.avatarBase64 != null && user.avatarBase64!.isNotEmpty
+        _currentUserAvatar =
+        user.avatarBase64 != null && user.avatarBase64!.isNotEmpty
             ? 'data:image/jpeg;base64,${user.avatarBase64}'
             : null;
       });
@@ -60,15 +64,21 @@ class _CommentSectionState extends State<CommentSection> {
   Future<void> _fetchComments() async {
     setState(() => _isLoading = true);
     try {
-      final response = await http.get(Uri.parse('${ApiRoutes.rentals}/${widget.rentalId}'));
-      if (response.statusCode != 200) throw Exception('Failed to load comments: ${response.statusCode} - ${response.body}');
+      final response =
+      await http.get(Uri.parse('${ApiRoutes.rentals}/${widget.rentalId}'));
+      if (response.statusCode != 200)
+        throw Exception(
+            'Failed to load comments: ${response.statusCode} - ${response.body}');
       final data = jsonDecode(response.body);
       final commentsData = data['comments'] as List<dynamic>? ?? [];
       final comments = commentsData
           .map((json) => Comment.fromJson(json))
           .where((comment) => comment.userId.id.isNotEmpty)
           .toList();
-      setState(() => _comments = comments);
+      setState(() {
+        _comments = comments;
+        widget.onCommentCountChanged?.call(_comments.length);
+      });
     } catch (e) {
       _showErrorSnackBar('Lỗi khi tải bình luận: $e');
     } finally {
@@ -79,7 +89,9 @@ class _CommentSectionState extends State<CommentSection> {
   Future<void> _pickImages() async {
     final picker = ImagePicker();
     final pickedFiles = await picker.pickMultiImage();
-    if (pickedFiles != null) setState(() => _selectedImages = pickedFiles);
+    if (pickedFiles != null && pickedFiles.isNotEmpty) {
+      setState(() => _selectedImages.addAll(pickedFiles));
+    }
   }
 
   Future<void> _postComment() async {
@@ -91,24 +103,32 @@ class _CommentSectionState extends State<CommentSection> {
     setState(() => _isPostingComment = true);
     try {
       final token = authViewModel.currentUser!.token;
-      if (token == null || token.isEmpty) throw Exception('No valid token found');
-      var request = http.MultipartRequest('POST', Uri.parse(ApiRoutes.comments));
+      if (token == null || token.isEmpty)
+        throw Exception('No valid token found');
+      var request =
+      http.MultipartRequest('POST', Uri.parse(ApiRoutes.comments));
       request.headers['Authorization'] = 'Bearer $token';
       request.fields['rentalId'] = widget.rentalId;
       request.fields['content'] = _commentController.text;
       request.fields['rating'] = _selectedRating.toString();
-      for (var image in _selectedImages) request.files.add(await http.MultipartFile.fromPath('images', image.path));
+      for (var image in _selectedImages)
+        request.files
+            .add(await http.MultipartFile.fromPath('images', image.path));
       final response = await request.send();
       final responseBody = await response.stream.bytesToString();
-      if (response.statusCode != 201) throw Exception(jsonDecode(responseBody)['message'] ?? 'Đăng bình luận thất bại');
+      if (response.statusCode != 201)
+        throw Exception(
+            jsonDecode(responseBody)['message'] ?? 'Đăng bình luận thất bại');
       final data = jsonDecode(responseBody);
-      if (data is! Map<String, dynamic> || !data.containsKey('_id')) throw Exception('Invalid response structure: $data');
+      if (data is! Map<String, dynamic> || !data.containsKey('_id'))
+        throw Exception('Invalid response structure: $data');
       final newComment = Comment.fromJson(data);
       setState(() {
         _comments.insert(0, newComment);
         _commentController.clear();
         _selectedRating = 0.0;
         _selectedImages.clear();
+        widget.onCommentCountChanged?.call(_comments.length);
       });
     } catch (e) {
       _showErrorSnackBar('Lỗi khi đăng bình luận: $e');
@@ -126,13 +146,19 @@ class _CommentSectionState extends State<CommentSection> {
     setState(() => _isLoading = true);
     try {
       final token = authViewModel.currentUser!.token;
-      if (token == null || token.isEmpty) throw Exception('No valid token found');
+      if (token == null || token.isEmpty)
+        throw Exception('No valid token found');
       final response = await http.put(
         Uri.parse('${ApiRoutes.comments}/$commentId'),
-        headers: {'Content-Type': 'application/json', 'Authorization': 'Bearer $token'},
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token'
+        },
         body: jsonEncode({'content': newContent}),
       );
-      if (response.statusCode != 200) throw Exception(jsonDecode(response.body)['message'] ?? 'Chỉnh sửa bình luận thất bại');
+      if (response.statusCode != 200)
+        throw Exception(jsonDecode(response.body)['message'] ??
+            'Chỉnh sửa bình luận thất bại');
       await _fetchComments();
       setState(() => _editingCommentId = null);
       _showSuccessSnackBar('Chỉnh sửa bình luận thành công');
@@ -152,13 +178,22 @@ class _CommentSectionState extends State<CommentSection> {
     setState(() => _isLoading = true);
     try {
       final token = authViewModel.currentUser!.token;
-      if (token == null || token.isEmpty) throw Exception('No valid token found');
+      if (token == null || token.isEmpty)
+        throw Exception('No valid token found');
       final response = await http.delete(
         Uri.parse('${ApiRoutes.comments}/$commentId'),
-        headers: {'Content-Type': 'application/json', 'Authorization': 'Bearer $token'},
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token'
+        },
       );
-      if (response.statusCode != 200) throw Exception(jsonDecode(response.body)['message'] ?? 'Xóa bình luận thất bại');
-      setState(() => _comments.removeWhere((comment) => comment.id == commentId));
+      if (response.statusCode != 200)
+        throw Exception(
+            jsonDecode(response.body)['message'] ?? 'Xóa bình luận thất bại');
+      setState(() {
+        _comments.removeWhere((comment) => comment.id == commentId);
+        widget.onCommentCountChanged?.call(_comments.length);
+      });
       _showSuccessSnackBar('Xóa bình luận thành công');
     } catch (e) {
       _showErrorSnackBar('Lỗi khi xóa bình luận: $e');
@@ -173,13 +208,18 @@ class _CommentSectionState extends State<CommentSection> {
     try {
       final authViewModel = Provider.of<AuthViewModel>(context, listen: false);
       final token = authViewModel.currentUser?.token;
-      if (token == null || token.isEmpty) throw Exception('No valid token found');
+      if (token == null || token.isEmpty)
+        throw Exception('No valid token found');
       final response = await http.post(
         Uri.parse(ApiRoutes.commentReplies(commentId)),
-        headers: {'Content-Type': 'application/json', 'Authorization': 'Bearer $token'},
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token'
+        },
         body: jsonEncode({'content': _replyController.text}),
       );
-      if (response.statusCode != 201) throw Exception('Đăng phản hồi thất bại: ${response.body}');
+      if (response.statusCode != 201)
+        throw Exception('Đăng phản hồi thất bại: ${response.body}');
       setState(() {
         _replyController.clear();
         _selectedCommentId = null;
@@ -192,7 +232,8 @@ class _CommentSectionState extends State<CommentSection> {
     }
   }
 
-  Future<void> _editReply(String commentId, String replyId, String newContent) async {
+  Future<void> _editReply(
+      String commentId, String replyId, String newContent) async {
     final authViewModel = Provider.of<AuthViewModel>(context, listen: false);
     if (authViewModel.currentUser == null) {
       _showErrorSnackBar('Vui lòng đăng nhập để chỉnh sửa phản hồi');
@@ -201,13 +242,19 @@ class _CommentSectionState extends State<CommentSection> {
     setState(() => _isLoading = true);
     try {
       final token = authViewModel.currentUser!.token;
-      if (token == null || token.isEmpty) throw Exception('No valid token found');
+      if (token == null || token.isEmpty)
+        throw Exception('No valid token found');
       final response = await http.put(
         Uri.parse('${ApiRoutes.comments}/$commentId/replies/$replyId'),
-        headers: {'Content-Type': 'application/json', 'Authorization': 'Bearer $token'},
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token'
+        },
         body: jsonEncode({'content': newContent}),
       );
-      if (response.statusCode != 200) throw Exception(jsonDecode(response.body)['message'] ?? 'Chỉnh sửa phản hồi thất bại');
+      if (response.statusCode != 200)
+        throw Exception(jsonDecode(response.body)['message'] ??
+            'Chỉnh sửa phản hồi thất bại');
       await _fetchComments();
       setState(() => _editingReplyId = null);
       _showSuccessSnackBar('Chỉnh sửa phản hồi thành công');
@@ -227,12 +274,18 @@ class _CommentSectionState extends State<CommentSection> {
     setState(() => _isLoading = true);
     try {
       final token = authViewModel.currentUser!.token;
-      if (token == null || token.isEmpty) throw Exception('No valid token found');
+      if (token == null || token.isEmpty)
+        throw Exception('No valid token found');
       final response = await http.delete(
         Uri.parse('${ApiRoutes.comments}/$commentId/replies/$replyId'),
-        headers: {'Content-Type': 'application/json', 'Authorization': 'Bearer $token'},
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token'
+        },
       );
-      if (response.statusCode != 200) throw Exception(jsonDecode(response.body)['message'] ?? 'Xóa phản hồi thất bại');
+      if (response.statusCode != 200)
+        throw Exception(
+            jsonDecode(response.body)['message'] ?? 'Xóa phản hồi thất bại');
       await _fetchComments();
       _showSuccessSnackBar('Xóa phản hồi thành công');
     } catch (e) {
@@ -246,17 +299,30 @@ class _CommentSectionState extends State<CommentSection> {
     final authViewModel = Provider.of<AuthViewModel>(context, listen: false);
     final userId = authViewModel.currentUser?.id;
     final comment = _comments.firstWhere((c) => c.id == commentId,
-        orElse: () => Comment(id: '', rentalId: '', userId: const User(id: ''), content: '', rating: 0.0, images: [], createdAt: DateTime.now(), replies: const [], likes: const []));
+        orElse: () => Comment(
+            id: '',
+            rentalId: '',
+            userId: const User(id: ''),
+            content: '',
+            rating: 0.0,
+            images: [],
+            createdAt: DateTime.now(),
+            replies: const [],
+            likes: const []));
     final hasLiked = comment.likes.any((like) => like.userId == userId);
     setState(() => _isTogglingLike = true);
     try {
       final token = authViewModel.currentUser?.token;
-      if (token == null || token.isEmpty) throw Exception('No valid token found');
-      final url = hasLiked ? ApiRoutes.unlikeComment(commentId) : ApiRoutes.likeComment(commentId);
-      final response = hasLiked
-          ? await http.delete(Uri.parse(url), headers: {'Content-Type': 'application/json', 'Authorization': 'Bearer $token'})
-          : await http.post(Uri.parse(url), headers: {'Content-Type': 'application/json', 'Authorization': 'Bearer $token'});
-      if (response.statusCode != 200) throw Exception('Thao tác like thất bại: ${response.body}');
+      if (token == null || token.isEmpty)
+        throw Exception('No valid token found');
+      final url = ApiRoutes.likeComment(commentId);
+      final response = await http.post(Uri.parse(url), headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token'
+      });
+      if (response.statusCode != 200)
+        throw Exception('Thao tác like thất bại: ${response.body}');
+      final data = jsonDecode(response.body);
       await _fetchComments();
     } catch (e) {
       _showErrorSnackBar('Lỗi khi thao tác like: $e');
@@ -265,12 +331,72 @@ class _CommentSectionState extends State<CommentSection> {
     }
   }
 
+  Future<void> _toggleReplyLike(String commentId, String replyId) async {
+    final authViewModel = Provider.of<AuthViewModel>(context, listen: false);
+    final userId = authViewModel.currentUser?.id;
+    final comment = _comments.firstWhere((c) => c.id == commentId);
+    final reply = comment.replies.firstWhere((r) => r.id == replyId);
+    final hasLiked = reply.likes.any((like) => like.userId == userId);
+    setState(() => _isTogglingReplyLike = true);
+    try {
+      final token = authViewModel.currentUser?.token;
+      if (token == null || token.isEmpty)
+        throw Exception('No valid token found');
+      final url = '${ApiRoutes.comments}/$commentId/replies/$replyId/like';
+      final response = await http.post(Uri.parse(url), headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token'
+      });
+      if (response.statusCode != 200)
+        throw Exception('Thao tác like phản hồi thất bại: ${response.body}');
+      final data = jsonDecode(response.body);
+      await _fetchComments();
+    } catch (e) {
+      _showErrorSnackBar('Lỗi khi thao tác like phản hồi: $e');
+    } finally {
+      setState(() => _isTogglingReplyLike = false);
+    }
+  }
+
   void _showErrorSnackBar(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(message)));
   }
 
   void _showSuccessSnackBar(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  void _showFullScreenImage(String imageUrl) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => Scaffold(
+          backgroundColor: Colors.black,
+          body: Stack(
+            children: [
+              Center(
+                child: PhotoView(
+                  imageProvider: NetworkImage(
+                      '${ApiRoutes.baseUrl.replaceAll('/api', '')}$imageUrl'),
+                  minScale: PhotoViewComputedScale.contained * 0.8,
+                  maxScale: PhotoViewComputedScale.covered * 2.0,
+                ),
+              ),
+              Positioned(
+                top: 40,
+                left: 20,
+                child: IconButton(
+                  icon: const Icon(Icons.close, color: Colors.white),
+                  onPressed: () => Navigator.pop(context),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   @override
@@ -299,7 +425,13 @@ class _CommentSectionState extends State<CommentSection> {
           onRatingChanged: (rating) => setState(() => _selectedRating = rating),
           selectedImages: _selectedImages,
           onPickImages: _pickImages,
-          onRemoveImage: (index) => setState(() => _selectedImages.removeAt(index)),
+          onRemoveImage: (index) =>
+              setState(() => _selectedImages.removeAt(index)),
+          onCancel: () => setState(() {
+            _commentController.clear();
+            _selectedRating = 0.0;
+            _selectedImages.clear();
+          }),
         ),
         const SizedBox(height: 16),
         if (_isLoading) const Center(child: CircularProgressIndicator()),
@@ -311,7 +443,8 @@ class _CommentSectionState extends State<CommentSection> {
             itemBuilder: (context, index) {
               final comment = _comments[index];
               final user = comment.userId;
-              final hasLiked = comment.likes.any((like) => like.userId == currentUserId);
+              final hasLiked =
+              comment.likes.any((like) => like.userId == currentUserId);
               final isOwnComment = user.id == currentUserId;
               final isExpanded = _expandedReplies.contains(comment.id);
               return _CommentItem(
@@ -320,6 +453,7 @@ class _CommentSectionState extends State<CommentSection> {
                 hasLiked: hasLiked,
                 isOwnComment: isOwnComment,
                 isTogglingLike: _isTogglingLike,
+                isTogglingReplyLike: _isTogglingReplyLike,
                 isPostingReply: _isPostingReply,
                 selectedCommentId: _selectedCommentId,
                 editingCommentId: _editingCommentId,
@@ -329,7 +463,12 @@ class _CommentSectionState extends State<CommentSection> {
                 isExpanded: isExpanded,
                 onDelete: () => _deleteComment(comment.id),
                 onToggleLike: () => _toggleLike(comment.id),
+                onToggleReplyLike: (replyId) => _toggleReplyLike(comment.id, replyId),
                 onReply: () => setState(() => _selectedCommentId = comment.id),
+                onCancelReply: () => setState(() {
+                  _selectedCommentId = null;
+                  _replyController.clear();
+                }),
                 onSubmitReply: () => _postReply(comment.id),
                 onEditComment: () {
                   setState(() {
@@ -337,14 +476,17 @@ class _CommentSectionState extends State<CommentSection> {
                     _editController.text = comment.content;
                   });
                 },
-                onSaveEditComment: (newContent) => _editComment(comment.id, newContent),
+                onSaveEditComment: (newContent) =>
+                    _editComment(comment.id, newContent),
                 onCancelEdit: () => setState(() {
                   _editingCommentId = null;
                   _editingReplyId = null;
                 }),
                 onToggleReplies: () => setState(() {
-                  if (isExpanded) _expandedReplies.remove(comment.id);
-                  else _expandedReplies.add(comment.id);
+                  if (isExpanded)
+                    _expandedReplies.remove(comment.id);
+                  else
+                    _expandedReplies.add(comment.id);
                 }),
                 onEditReply: (replyId, content) {
                   setState(() {
@@ -352,8 +494,11 @@ class _CommentSectionState extends State<CommentSection> {
                     _editController.text = content;
                   });
                 },
-                onSaveEditReply: (replyId, newContent) => _editReply(comment.id, replyId, newContent),
-                onDeleteReply: (commentId, replyId) => _deleteReply(commentId, replyId),
+                onSaveEditReply: (replyId, newContent) =>
+                    _editReply(comment.id, replyId, newContent),
+                onDeleteReply: (commentId, replyId) =>
+                    _deleteReply(commentId, replyId),
+                onImageTap: _showFullScreenImage,
               );
             },
           ),
@@ -378,7 +523,8 @@ class _SectionTitle extends StatelessWidget {
       padding: const EdgeInsets.only(bottom: 8.0),
       child: Text(
         title,
-        style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.black87),
+        style: const TextStyle(
+            fontSize: 20, fontWeight: FontWeight.bold, color: Colors.black87),
       ),
     );
   }
@@ -393,6 +539,7 @@ class _CommentInputField extends StatelessWidget {
   final List<XFile> selectedImages;
   final VoidCallback onPickImages;
   final ValueChanged<int> onRemoveImage;
+  final VoidCallback onCancel;
 
   const _CommentInputField({
     required this.controller,
@@ -403,6 +550,7 @@ class _CommentInputField extends StatelessWidget {
     required this.selectedImages,
     required this.onPickImages,
     required this.onRemoveImage,
+    required this.onCancel,
   });
 
   @override
@@ -418,11 +566,12 @@ class _CommentInputField extends StatelessWidget {
             suffixIcon: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                IconButton(icon: const Icon(Icons.image), onPressed: onPickImages, tooltip: 'Thêm ảnh (không giới hạn)'),
                 if (!isPosting)
                   IconButton(icon: const Icon(Icons.send), onPressed: onSubmit),
                 if (isPosting)
-                  const Padding(padding: EdgeInsets.all(8.0), child: CircularProgressIndicator(strokeWidth: 2)),
+                  const Padding(
+                      padding: EdgeInsets.all(8.0),
+                      child: CircularProgressIndicator(strokeWidth: 2)),
               ],
             ),
           ),
@@ -430,7 +579,22 @@ class _CommentInputField extends StatelessWidget {
           enabled: !isPosting,
         ),
         const SizedBox(height: 8),
-        _StarRating(rating: rating, onRatingChanged: onRatingChanged),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            _StarRating(rating: rating, onRatingChanged: onRatingChanged),
+            GestureDetector(
+              onTap: onPickImages,
+              child: Row(
+                children: [
+                  Icon(Icons.add , size: 13,),
+                  const SizedBox(width: 4,),
+                  Text("Thêm ảnh minh họa", style: TextStyle(fontSize: 13),),
+                ],
+              ),
+            ),
+          ],
+        ),
         const SizedBox(height: 8),
         if (selectedImages.isNotEmpty)
           SingleChildScrollView(
@@ -441,8 +605,14 @@ class _CommentInputField extends StatelessWidget {
                   padding: const EdgeInsets.only(right: 8.0),
                   child: Stack(
                     children: [
-                      Image.file(File(selectedImages[index].path), width: 100, height: 100, fit: BoxFit.cover),
-                      Positioned(top: 0, right: 0, child: IconButton(icon: const Icon(Icons.close, color: Colors.red), onPressed: () => onRemoveImage(index))),
+                      Image.file(File(selectedImages[index].path),
+                          width: 100, height: 100, fit: BoxFit.cover),
+                      Positioned(
+                          top: 0,
+                          right: 0,
+                          child: IconButton(
+                              icon: const Icon(Icons.close, color: Colors.red),
+                              onPressed: () => onRemoveImage(index))),
                     ],
                   ),
                 );
@@ -452,7 +622,9 @@ class _CommentInputField extends StatelessWidget {
         if (selectedImages.isNotEmpty)
           const Padding(
             padding: EdgeInsets.only(top: 8.0),
-            child: Text('Bạn có thể thêm nhiều ảnh hơn bằng cách nhấn vào biểu tượng ảnh.', style: TextStyle(color: Colors.grey, fontSize: 12)),
+            child: Text(
+                'Bạn có thể thêm nhiều ảnh hơn bằng cách nhấn vào biểu tượng ảnh.',
+                style: TextStyle(color: Colors.grey, fontSize: 12)),
           ),
       ],
     );
@@ -489,7 +661,11 @@ class _StarRating extends StatelessWidget {
         children: List.generate(5, (index) {
           final starValue = (index + 1).toDouble();
           return Icon(
-            starValue <= rating ? Icons.star : starValue - 0.5 <= rating ? Icons.star_half : Icons.star_border,
+            starValue <= rating
+                ? Icons.star
+                : starValue - 0.5 <= rating
+                ? Icons.star_half
+                : Icons.star_border,
             color: Colors.amber,
             size: 30,
           );
@@ -505,6 +681,7 @@ class _CommentItem extends StatelessWidget {
   final bool hasLiked;
   final bool isOwnComment;
   final bool isTogglingLike;
+  final bool isTogglingReplyLike;
   final bool isPostingReply;
   final String? selectedCommentId;
   final String? editingCommentId;
@@ -514,7 +691,9 @@ class _CommentItem extends StatelessWidget {
   final bool isExpanded;
   final VoidCallback onDelete;
   final VoidCallback onToggleLike;
+  final Function(String) onToggleReplyLike;
   final VoidCallback onReply;
+  final VoidCallback onCancelReply;
   final VoidCallback onSubmitReply;
   final VoidCallback onEditComment;
   final ValueChanged<String> onSaveEditComment;
@@ -523,6 +702,7 @@ class _CommentItem extends StatelessWidget {
   final Function(String, String) onEditReply;
   final Function(String, String) onSaveEditReply;
   final Function(String, String) onDeleteReply;
+  final Function(String) onImageTap;
 
   const _CommentItem({
     required this.comment,
@@ -530,6 +710,7 @@ class _CommentItem extends StatelessWidget {
     required this.hasLiked,
     required this.isOwnComment,
     required this.isTogglingLike,
+    required this.isTogglingReplyLike,
     required this.isPostingReply,
     required this.selectedCommentId,
     required this.editingCommentId,
@@ -539,7 +720,9 @@ class _CommentItem extends StatelessWidget {
     required this.isExpanded,
     required this.onDelete,
     required this.onToggleLike,
+    required this.onToggleReplyLike,
     required this.onReply,
+    required this.onCancelReply,
     required this.onSubmitReply,
     required this.onEditComment,
     required this.onSaveEditComment,
@@ -548,6 +731,7 @@ class _CommentItem extends StatelessWidget {
     required this.onEditReply,
     required this.onSaveEditReply,
     required this.onDeleteReply,
+    required this.onImageTap,
   });
 
   void _showCommentDropdownMenu(BuildContext context) {
@@ -555,15 +739,32 @@ class _CommentItem extends StatelessWidget {
     final Offset buttonPosition = button.localToGlobal(Offset.zero);
     showMenu(
       context: context,
-      position: RelativeRect.fromLTRB(buttonPosition.dx, buttonPosition.dy + button.size.height, buttonPosition.dx + button.size.width, buttonPosition.dy),
+      position: RelativeRect.fromLTRB(
+          buttonPosition.dx,
+          buttonPosition.dy + button.size.height,
+          buttonPosition.dx + button.size.width,
+          buttonPosition.dy),
       items: [
         PopupMenuItem(
           value: 'edit',
-          child: ListTile(leading: const Icon(Icons.edit, color: Colors.blue), title: const Text('Chỉnh sửa', style: TextStyle(color: Colors.blue)), onTap: () { Navigator.pop(context); onEditComment(); }),
+          child: ListTile(
+              leading: const Icon(Icons.edit, color: Colors.blue),
+              title:
+              const Text('Chỉnh sửa', style: TextStyle(color: Colors.blue)),
+              onTap: () {
+                Navigator.pop(context);
+                onEditComment();
+              }),
         ),
         PopupMenuItem(
           value: 'delete',
-          child: ListTile(leading: const Icon(Icons.delete, color: Colors.red), title: const Text('Xóa', style: TextStyle(color: Colors.red)), onTap: () { Navigator.pop(context); onDelete(); }),
+          child: ListTile(
+              leading: const Icon(Icons.delete, color: Colors.red),
+              title: const Text('Xóa', style: TextStyle(color: Colors.red)),
+              onTap: () {
+                Navigator.pop(context);
+                onDelete();
+              }),
         ),
       ],
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -577,15 +778,34 @@ class _CommentItem extends StatelessWidget {
     final Offset buttonPosition = button.localToGlobal(Offset.zero);
     showMenu(
       context: context,
-      position: RelativeRect.fromLTRB(buttonPosition.dx, buttonPosition.dy + button.size.height, buttonPosition.dx + button.size.width, buttonPosition.dy),
+      position: RelativeRect.fromLTRB(
+          buttonPosition.dx,
+          buttonPosition.dy + button.size.height,
+          buttonPosition.dx + button.size.width,
+          buttonPosition.dy),
       items: [
         PopupMenuItem(
           value: 'edit',
-          child: ListTile(leading: const Icon(Icons.edit, color: Colors.blue), title: const Text('Chỉnh sửa', style: TextStyle(color: Colors.blue)), onTap: () { Navigator.pop(context); final reply = comment.replies.firstWhere((r) => r.id == replyId); onEditReply(replyId, reply.content); }),
+          child: ListTile(
+              leading: const Icon(Icons.edit, color: Colors.blue),
+              title:
+              const Text('Chỉnh sửa', style: TextStyle(color: Colors.blue)),
+              onTap: () {
+                Navigator.pop(context);
+                final reply =
+                comment.replies.firstWhere((r) => r.id == replyId);
+                onEditReply(replyId, reply.content);
+              }),
         ),
         PopupMenuItem(
           value: 'delete',
-          child: ListTile(leading: const Icon(Icons.delete, color: Colors.red), title: const Text('Xóa', style: TextStyle(color: Colors.red)), onTap: () { Navigator.pop(context); onDeleteReply(comment.id, replyId); }),
+          child: ListTile(
+              leading: const Icon(Icons.delete, color: Colors.red),
+              title: const Text('Xóa', style: TextStyle(color: Colors.red)),
+              onTap: () {
+                Navigator.pop(context);
+                onDeleteReply(comment.id, replyId);
+              }),
         ),
       ],
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -596,6 +816,7 @@ class _CommentItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final currentUserId = Provider.of<AuthViewModel>(context, listen: false).currentUser?.id;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -606,8 +827,10 @@ class _CommentItem extends StatelessWidget {
               radius: 20,
               backgroundImage: user.avatarBytes != null
                   ? MemoryImage(user.avatarBytes!)
-                  : const AssetImage('assets/img/imageuser.png') as ImageProvider,
-              onBackgroundImageError: (exception, stackTrace) => print('Error loading avatar for user ${user.id}: $exception'),
+                  : const AssetImage('assets/img/imageuser.png')
+              as ImageProvider,
+              onBackgroundImageError: (exception, stackTrace) =>
+                  print('Error loading avatar for user ${user.id}: $exception'),
             ),
             const SizedBox(width: 8),
             Expanded(
@@ -617,14 +840,23 @@ class _CommentItem extends StatelessWidget {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text(user.username.isEmpty ? 'không có' : user.username, style: const TextStyle(fontWeight: FontWeight.bold)),
+                      Text(user.username.isEmpty ? 'không có' : user.username,
+                          style: const TextStyle(fontWeight: FontWeight.bold)),
                       Row(
                         children: [
-                          Text(DateFormat('dd/MM/yyyy HH:mm').format(comment.createdAt), style: const TextStyle(color: Colors.grey, fontSize: 12)),
+                          Text(
+                              DateFormat('dd/MM/yyyy HH:mm')
+                                  .format(comment.createdAt),
+                              style: const TextStyle(
+                                  color: Colors.grey, fontSize: 12)),
                           if (isOwnComment)
                             GestureDetector(
                               onTap: () => _showCommentDropdownMenu(context),
-                              child: const Padding(padding: EdgeInsets.symmetric(horizontal: 8.0), child: Icon(Icons.more_horiz, color: Colors.grey)),
+                              child: const Padding(
+                                  padding:
+                                  EdgeInsets.symmetric(horizontal: 8.0),
+                                  child: Icon(Icons.more_horiz,
+                                      color: Colors.grey)),
                             ),
                         ],
                       ),
@@ -635,7 +867,11 @@ class _CommentItem extends StatelessWidget {
                       children: List.generate(5, (index) {
                         final starValue = (index + 1).toDouble();
                         return Icon(
-                          starValue <= comment.rating ? Icons.star : starValue - 0.5 <= comment.rating ? Icons.star_half : Icons.star_border,
+                          starValue <= comment.rating
+                              ? Icons.star
+                              : starValue - 0.5 <= comment.rating
+                              ? Icons.star_half
+                              : Icons.star_border,
                           color: Colors.amber,
                           size: 16,
                         );
@@ -648,11 +884,18 @@ class _CommentItem extends StatelessWidget {
                         Expanded(
                           child: TextField(
                             controller: editController,
-                            decoration: const InputDecoration(hintText: 'Chỉnh sửa bình luận...', border: OutlineInputBorder()),
+                            decoration: const InputDecoration(
+                                hintText: 'Chỉnh sửa bình luận...',
+                                border: OutlineInputBorder()),
                           ),
                         ),
-                        IconButton(icon: const Icon(Icons.check, color: Colors.green), onPressed: () => onSaveEditComment(editController.text)),
-                        IconButton(icon: const Icon(Icons.cancel, color: Colors.red), onPressed: onCancelEdit),
+                        IconButton(
+                            icon: const Icon(Icons.check, color: Colors.green),
+                            onPressed: () =>
+                                onSaveEditComment(editController.text)),
+                        IconButton(
+                            icon: const Icon(Icons.cancel, color: Colors.red),
+                            onPressed: onCancelEdit),
                       ],
                     )
                   else
@@ -663,14 +906,21 @@ class _CommentItem extends StatelessWidget {
                         if (comment.images.isNotEmpty)
                           Wrap(
                             spacing: 8,
+                            runSpacing: 8,
                             children: comment.images.map((imageUrl) {
-                              return CachedNetworkImage(
-                                imageUrl: '${ApiRoutes.baseUrl.replaceAll('/api', '')}$imageUrl',
-                                width: 100,
-                                height: 100,
-                                fit: BoxFit.cover,
-                                placeholder: (context, url) => const CircularProgressIndicator(),
-                                errorWidget: (context, url, error) => const Icon(Icons.error),
+                              return GestureDetector(
+                                onTap: () => onImageTap(imageUrl),
+                                child: CachedNetworkImage(
+                                  imageUrl:
+                                  '${ApiRoutes.baseUrl.replaceAll('/api', '')}$imageUrl',
+                                  width: 100,
+                                  height: 100,
+                                  fit: BoxFit.cover,
+                                  placeholder: (context, url) =>
+                                  const CircularProgressIndicator(),
+                                  errorWidget: (context, url, error) =>
+                                  const Icon(Icons.error),
+                                ),
                               );
                             }).toList(),
                           ),
@@ -681,20 +931,30 @@ class _CommentItem extends StatelessWidget {
                     children: [
                       IconButton(
                         icon: isTogglingLike
-                            ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2))
-                            : Icon(hasLiked ? Icons.favorite : Icons.favorite_border, color: hasLiked ? Colors.red : null),
+                            ? const SizedBox(
+                            width: 24,
+                            height: 24,
+                            child:
+                            CircularProgressIndicator(strokeWidth: 2))
+                            : Icon(
+                          hasLiked ? Icons.favorite : Icons.favorite_border,
+                          color: hasLiked ? Colors.red : Colors.grey,
+                        ),
                         onPressed: onToggleLike,
                       ),
                       Text('${comment.likes.length} lượt thích'),
                       const SizedBox(width: 16),
-                      TextButton(onPressed: onReply, child: const Text('Phản hồi')),
+                      TextButton(
+                          onPressed: onReply, child: const Text('Phản hồi')),
                     ],
                   ),
                   if (comment.replies.isNotEmpty)
                     TextButton(
                       onPressed: onToggleReplies,
                       child: Text(
-                        isExpanded ? 'Ẩn phản hồi' : 'Xem tất cả phản hồi (${comment.replies.length})',
+                        isExpanded
+                            ? 'Ẩn phản hồi'
+                            : 'Xem tất cả phản hồi (${comment.replies.length})',
                         style: const TextStyle(color: Colors.blue),
                       ),
                     ),
@@ -710,7 +970,8 @@ class _CommentItem extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: comment.replies.map((reply) {
                 final replyUser = reply.userId;
-                final isOwnReply = replyUser.id == Provider.of<AuthViewModel>(context, listen: false).currentUser?.id;
+                final isOwnReply = replyUser.id == currentUserId;
+                final hasLikedReply = reply.likes.any((like) => like.userId == currentUserId);
                 return Padding(
                   padding: const EdgeInsets.only(left: 16.0, top: 8.0),
                   child: Row(
@@ -724,22 +985,68 @@ class _CommentItem extends StatelessWidget {
                             Expanded(
                               child: TextField(
                                 controller: editController,
-                                decoration: const InputDecoration(hintText: 'Chỉnh sửa phản hồi...', border: OutlineInputBorder()),
+                                decoration: const InputDecoration(
+                                    hintText: 'Chỉnh sửa phản hồi...',
+                                    border: OutlineInputBorder()),
                               ),
                             ),
-                            IconButton(icon: const Icon(Icons.check, color: Colors.green), onPressed: () => onSaveEditReply(reply.id, editController.text)),
-                            IconButton(icon: const Icon(Icons.cancel, color: Colors.red), onPressed: onCancelEdit),
+                            IconButton(
+                                icon: const Icon(Icons.check,
+                                    color: Colors.green),
+                                onPressed: () => onSaveEditReply(
+                                    reply.id, editController.text)),
+                            IconButton(
+                                icon: const Icon(Icons.cancel,
+                                    color: Colors.red),
+                                onPressed: onCancelEdit),
                           ],
                         )
                             : Row(
                           children: [
-                            Expanded(child: Text('${replyUser.username.isEmpty ? 'không có' : replyUser.username}: ${reply.content}')),
-                            Text(' - ${DateFormat('dd/MM/yyyy HH:mm').format(reply.createdAt)}', style: const TextStyle(color: Colors.grey, fontSize: 12)),
-                            if (isOwnReply)
-                              GestureDetector(
-                                onTap: () => _showReplyDropdownMenu(context, reply.id),
-                                child: const Padding(padding: EdgeInsets.symmetric(horizontal: 8.0), child: Icon(Icons.more_horiz, color: Colors.grey)),
-                              ),
+                            Expanded(
+                                child: Text('${replyUser.username.isEmpty ? 'không có' : replyUser.username}: ${reply.content}')),
+
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.end,
+                              children: [
+                                Row(
+                                  children: [
+                                    Text('${DateFormat('dd/MM/yyyy HH:mm').format(reply.createdAt)}',
+                                        style: const TextStyle(
+                                            color: Colors.grey, fontSize: 12)),
+
+                                    if (isOwnReply)
+                                      GestureDetector(
+                                        onTap: () => _showReplyDropdownMenu(
+                                            context, reply.id),
+                                        child: const Padding(
+                                            padding: EdgeInsets.symmetric(
+                                                horizontal: 8.0),
+                                            child: Icon(Icons.more_horiz,
+                                                color: Colors.grey)),
+                                      ),
+                                  ],
+                                ),
+                                Row(
+                                  children: [
+                                    IconButton(
+                                      icon: isTogglingReplyLike
+                                          ? const SizedBox(
+                                          width: 20,
+                                          height: 20,
+                                          child: CircularProgressIndicator(strokeWidth: 2))
+                                          : Icon(
+                                        hasLikedReply ? Icons.favorite : Icons.favorite_border,
+                                        color: hasLikedReply ? Colors.red : Colors.grey,
+                                        size: 20,
+                                      ),
+                                      onPressed: () => onToggleReplyLike(reply.id),
+                                    ),
+                                    Text('${reply.likes.length}', style: const TextStyle(fontSize: 12)),
+                                  ],
+                                )
+                              ],
+                            ),
                           ],
                         ),
                       ),
@@ -752,15 +1059,26 @@ class _CommentItem extends StatelessWidget {
         if (selectedCommentId == comment.id)
           Padding(
             padding: const EdgeInsets.only(left: 48.0),
-            child: _CommentInputField(
-              controller: replyController,
-              isPosting: isPostingReply,
-              onSubmit: onSubmitReply,
-              rating: 0.0,
-              onRatingChanged: (_) {},
-              selectedImages: const [],
-              onPickImages: () {},
-              onRemoveImage: (_) {},
+            child: Row(
+              children: [
+                Expanded(
+                  child: _CommentInputField(
+                    controller: replyController,
+                    isPosting: isPostingReply,
+                    onSubmit: onSubmitReply,
+                    rating: 0.0,
+                    onRatingChanged: (_) {},
+                    selectedImages: const [],
+                    onPickImages: () {},
+                    onRemoveImage: (_) {},
+                    onCancel: onCancelReply,
+                  ),
+                ),
+                TextButton(
+                  onPressed: onCancelReply,
+                  child: const Text('Hủy', style: TextStyle(color: Colors.red)),
+                ),
+              ],
             ),
           ),
         const Divider(),

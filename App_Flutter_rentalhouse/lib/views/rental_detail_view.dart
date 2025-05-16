@@ -10,6 +10,7 @@ import '../viewmodels/vm_auth.dart';
 import '../config/api_routes.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:photo_view/photo_view.dart';
 
 class RentalDetailScreen extends StatefulWidget {
   final Rental rental;
@@ -32,12 +33,9 @@ class _RentalDetailScreenState extends State<RentalDetailScreen> with SingleTick
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
-    // Lắng nghe sự kiện thay đổi tab để cập nhật giao diện
     _tabController.addListener(() {
       if (!_tabController.indexIsChanging) {
-        setState(() {
-          // Cập nhật trạng thái khi tab thay đổi
-        });
+        setState(() {});
       }
     });
     _checkFavoriteStatus();
@@ -51,7 +49,7 @@ class _RentalDetailScreenState extends State<RentalDetailScreen> with SingleTick
         final data = jsonDecode(response.body);
         setState(() {
           _averageRating = (data['averageRating'] as num?)?.toDouble() ?? 0.0;
-          _reviewCount = (data['reviewCount'] as num?)?.toInt() ?? 0;
+          _reviewCount = (data['comments'] as List<dynamic>?)?.length ?? 0;
         });
       }
     } catch (e) {
@@ -117,11 +115,86 @@ class _RentalDetailScreenState extends State<RentalDetailScreen> with SingleTick
     }
   }
 
+  Future<void> _toggleFavorite() async {
+    final authViewModel = Provider.of<AuthViewModel>(context, listen: false);
+    if (authViewModel.currentUser == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Vui lòng đăng nhập để thêm vào yêu thích')),
+      );
+      return;
+    }
+
+    setState(() => _isLoadingFavorite = true);
+    try {
+      final token = await AuthService().getIdToken();
+      if (token == null) throw Exception('No valid token found');
+
+      final url = _isFavorite
+          ? '${ApiRoutes.baseUrl}/favorites/${widget.rental.id}'
+          : '${ApiRoutes.baseUrl}/favorites';
+      final response = _isFavorite
+          ? await http.delete(
+        Uri.parse(url),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      )
+          : await http.post(
+        Uri.parse(url),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode({'rentalId': widget.rental.id}),
+      );
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        setState(() => _isFavorite = !_isFavorite);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+              content: Text(_isFavorite
+                  ? 'Đã thêm vào yêu thích'
+                  : 'Đã xóa khỏi yêu thích')),
+        );
+      } else {
+        throw Exception('Failed to toggle favorite: ${response.body}');
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Lỗi khi cập nhật yêu thích: $e')),
+      );
+    } finally {
+      setState(() => _isLoadingFavorite = false);
+    }
+  }
+
   void _showFullScreenImage(String imageUrl) {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => FullScreenImageScreen(imageUrl: imageUrl),
+        builder: (context) => Scaffold(
+          backgroundColor: Colors.black,
+          body: Stack(
+            children: [
+              Center(
+                child: PhotoView(
+                  imageProvider: NetworkImage(imageUrl),
+                  minScale: PhotoViewComputedScale.contained * 0.8,
+                  maxScale: PhotoViewComputedScale.covered * 2.0,
+                ),
+              ),
+              Positioned(
+                top: 40,
+                left: 20,
+                child: IconButton(
+                  icon: const Icon(Icons.close, color: Colors.white),
+                  onPressed: () => Navigator.pop(context),
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -129,6 +202,12 @@ class _RentalDetailScreenState extends State<RentalDetailScreen> with SingleTick
   String formatCurrency(double amount) {
     final formatter = NumberFormat.currency(locale: 'vi_VN', symbol: 'VNĐ', decimalDigits: 0);
     return formatter.format(amount);
+  }
+
+  void _updateReviewCount(int count) {
+    setState(() {
+      _reviewCount = count;
+    });
   }
 
   @override
@@ -201,26 +280,31 @@ class _RentalDetailScreenState extends State<RentalDetailScreen> with SingleTick
                         ],
                       ),
                       const SizedBox(height: 16),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          _InfoChip(
-                            label: 'Loại chỗ ở',
-                            value: widget.rental.propertyType,
-                          ),
-                          _InfoChip(
-                            label: 'Phong cách',
-                            value: 'Hiện đại',
-                          ),
-                          _InfoChip(
-                            label: 'Chi phí',
-                            value: 'Phù hợp',
-                          ),
-                          _InfoChip(
-                            label: 'Hợp đồng',
-                            value: 'Đơn giản',
-                          ),
-                        ],
+                      SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: Row(
+                          children: [
+                            _InfoChip(
+                              label: 'Loại chỗ ở',
+                              value: widget.rental.propertyType,
+                            ),
+                            SizedBox(width: 4),
+                            _InfoChip(
+                              label: 'Phong cách',
+                              value: 'Hiện đại',
+                            ),
+                            SizedBox(width: 4),
+                            _InfoChip(
+                              label: 'Chi phí',
+                              value: 'Phù hợp',
+                            ),
+                            SizedBox(width: 4),
+                            _InfoChip(
+                              label: 'Hợp đồng',
+                              value: 'Đơn giản',
+                            ),
+                          ],
+                        ),
                       ),
                       const SizedBox(height: 16),
                       Row(
@@ -275,26 +359,29 @@ class _RentalDetailScreenState extends State<RentalDetailScreen> with SingleTick
                               ),
                             ],
                           ),
-                          Container(
-                            padding: const EdgeInsets.all(10),
-                            margin: const EdgeInsets.only(right: 16),
-                            decoration: BoxDecoration(
-                              color: Colors.red.withOpacity(0.1),
-                              shape: BoxShape.circle,
-                            ),
-                            child: _isLoadingFavorite
-                                ? const SizedBox(
-                              width: 24,
-                              height: 24,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: Colors.grey,
+                          GestureDetector(
+                            onTap: _toggleFavorite,
+                            child: Container(
+                              padding: const EdgeInsets.all(10),
+                              margin: const EdgeInsets.only(right: 16),
+                              decoration: BoxDecoration(
+                                color: Colors.red.withOpacity(0.1),
+                                shape: BoxShape.circle,
                               ),
-                            )
-                                : Icon(
-                              _isFavorite ? Icons.favorite : Icons.favorite_border,
-                              color: _isFavorite ? Colors.red : Colors.grey,
-                              size: 24,
+                              child: _isLoadingFavorite
+                                  ? const SizedBox(
+                                width: 24,
+                                height: 24,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.grey,
+                                ),
+                              )
+                                  : Icon(
+                                _isFavorite ? Icons.favorite : Icons.favorite_border,
+                                color: _isFavorite ? Colors.red : Colors.grey,
+                                size: 24,
+                              ),
                             ),
                           ),
                         ],
@@ -360,7 +447,6 @@ class _RentalDetailScreenState extends State<RentalDetailScreen> with SingleTick
                           ),
                         ),
                       ),
-
                       const SizedBox(height: 25),
                     ],
                   ),
@@ -376,9 +462,9 @@ class _RentalDetailScreenState extends State<RentalDetailScreen> with SingleTick
                 labelColor: Colors.blue[700],
                 unselectedLabelColor: Colors.grey,
                 indicatorColor: Colors.blue[700],
-                tabs: const [
-                  Tab(text: 'Thông tin chi tiết'),
-                  Tab(text: 'Bình luận'),
+                tabs: [
+                  const Tab(text: 'Thông tin chi tiết'),
+                  Tab(text: 'Bình luận ($_reviewCount)'),
                 ],
               ),
             ),
@@ -391,7 +477,10 @@ class _RentalDetailScreenState extends State<RentalDetailScreen> with SingleTick
                 index: _tabController.index,
                 children: [
                   _DetailsTab(rental: widget.rental, formatCurrency: formatCurrency),
-                  CommentSection(rentalId: widget.rental.id),
+                  CommentSection(
+                    rentalId: widget.rental.id,
+                    onCommentCountChanged: _updateReviewCount,
+                  ),
                 ],
               ),
             ),
