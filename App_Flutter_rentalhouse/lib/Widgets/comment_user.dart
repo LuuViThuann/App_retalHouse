@@ -34,10 +34,12 @@ class _CommentSectionState extends State<CommentSection> {
   bool _isTogglingLike = false;
   bool _isTogglingReplyLike = false;
   String? _selectedCommentId;
+  String? _selectedReplyId;
   String? _editingCommentId;
   String? _editingReplyId;
   double _selectedRating = 0.0;
   List<XFile> _selectedImages = [];
+  List<XFile> _selectedReplyImages = [];
   Set<String> _expandedReplies = {};
 
   @override
@@ -53,8 +55,7 @@ class _CommentSectionState extends State<CommentSection> {
     if (user != null) {
       setState(() {
         _currentUsername = user.username.isEmpty ? 'không có' : user.username;
-        _currentUserAvatar =
-        user.avatarBase64 != null && user.avatarBase64!.isNotEmpty
+        _currentUserAvatar = user.avatarBase64 != null && user.avatarBase64!.isNotEmpty
             ? 'data:image/jpeg;base64,${user.avatarBase64}'
             : null;
       });
@@ -64,11 +65,10 @@ class _CommentSectionState extends State<CommentSection> {
   Future<void> _fetchComments() async {
     setState(() => _isLoading = true);
     try {
-      final response =
-      await http.get(Uri.parse('${ApiRoutes.rentals}/${widget.rentalId}'));
-      if (response.statusCode != 200)
-        throw Exception(
-            'Failed to load comments: ${response.statusCode} - ${response.body}');
+      final response = await http.get(Uri.parse('${ApiRoutes.rentals}/${widget.rentalId}'));
+      if (response.statusCode != 200) {
+        throw Exception('Failed to load comments: ${response.statusCode} - ${response.body}');
+      }
       final data = jsonDecode(response.body);
       final commentsData = data['comments'] as List<dynamic>? ?? [];
       final comments = commentsData
@@ -86,11 +86,17 @@ class _CommentSectionState extends State<CommentSection> {
     }
   }
 
-  Future<void> _pickImages() async {
+  Future<void> _pickImages({bool forReply = false}) async {
     final picker = ImagePicker();
     final pickedFiles = await picker.pickMultiImage();
-    if (pickedFiles != null && pickedFiles.isNotEmpty) {
-      setState(() => _selectedImages.addAll(pickedFiles));
+    if (pickedFiles.isNotEmpty) {
+      setState(() {
+        if (forReply) {
+          _selectedReplyImages.addAll(pickedFiles);
+        } else {
+          _selectedImages.addAll(pickedFiles);
+        }
+      });
     }
   }
 
@@ -103,25 +109,21 @@ class _CommentSectionState extends State<CommentSection> {
     setState(() => _isPostingComment = true);
     try {
       final token = authViewModel.currentUser!.token;
-      if (token == null || token.isEmpty)
-        throw Exception('No valid token found');
-      var request =
-      http.MultipartRequest('POST', Uri.parse(ApiRoutes.comments));
+      if (token == null || token.isEmpty) throw Exception('No valid token found');
+      var request = http.MultipartRequest('POST', Uri.parse(ApiRoutes.comments));
       request.headers['Authorization'] = 'Bearer $token';
       request.fields['rentalId'] = widget.rentalId;
       request.fields['content'] = _commentController.text;
       request.fields['rating'] = _selectedRating.toString();
-      for (var image in _selectedImages)
-        request.files
-            .add(await http.MultipartFile.fromPath('images', image.path));
+      for (var image in _selectedImages) {
+        request.files.add(await http.MultipartFile.fromPath('images', image.path));
+      }
       final response = await request.send();
       final responseBody = await response.stream.bytesToString();
-      if (response.statusCode != 201)
-        throw Exception(
-            jsonDecode(responseBody)['message'] ?? 'Đăng bình luận thất bại');
+      if (response.statusCode != 201) {
+        throw Exception(jsonDecode(responseBody)['message'] ?? 'Đăng bình luận thất bại');
+      }
       final data = jsonDecode(responseBody);
-      if (data is! Map<String, dynamic> || !data.containsKey('_id'))
-        throw Exception('Invalid response structure: $data');
       final newComment = Comment.fromJson(data);
       setState(() {
         _comments.insert(0, newComment);
@@ -146,19 +148,15 @@ class _CommentSectionState extends State<CommentSection> {
     setState(() => _isLoading = true);
     try {
       final token = authViewModel.currentUser!.token;
-      if (token == null || token.isEmpty)
-        throw Exception('No valid token found');
+      if (token == null || token.isEmpty) throw Exception('No valid token found');
       final response = await http.put(
         Uri.parse('${ApiRoutes.comments}/$commentId'),
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $token'
-        },
+        headers: {'Content-Type': 'application/json', 'Authorization': 'Bearer $token'},
         body: jsonEncode({'content': newContent}),
       );
-      if (response.statusCode != 200)
-        throw Exception(jsonDecode(response.body)['message'] ??
-            'Chỉnh sửa bình luận thất bại');
+      if (response.statusCode != 200) {
+        throw Exception(jsonDecode(response.body)['message'] ?? 'Chỉnh sửa bình luận thất bại');
+      }
       await _fetchComments();
       setState(() => _editingCommentId = null);
       _showSuccessSnackBar('Chỉnh sửa bình luận thành công');
@@ -178,18 +176,14 @@ class _CommentSectionState extends State<CommentSection> {
     setState(() => _isLoading = true);
     try {
       final token = authViewModel.currentUser!.token;
-      if (token == null || token.isEmpty)
-        throw Exception('No valid token found');
+      if (token == null || token.isEmpty) throw Exception('No valid token found');
       final response = await http.delete(
         Uri.parse('${ApiRoutes.comments}/$commentId'),
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $token'
-        },
+        headers: {'Content-Type': 'application/json', 'Authorization': 'Bearer $token'},
       );
-      if (response.statusCode != 200)
-        throw Exception(
-            jsonDecode(response.body)['message'] ?? 'Xóa bình luận thất bại');
+      if (response.statusCode != 200) {
+        throw Exception(jsonDecode(response.body)['message'] ?? 'Xóa bình luận thất bại');
+      }
       setState(() {
         _comments.removeWhere((comment) => comment.id == commentId);
         widget.onCommentCountChanged?.call(_comments.length);
@@ -202,27 +196,34 @@ class _CommentSectionState extends State<CommentSection> {
     }
   }
 
-  Future<void> _postReply(String commentId) async {
+  Future<void> _postReply(String commentId, {String? parentReplyId}) async {
     if (_replyController.text.isEmpty) return;
     setState(() => _isPostingReply = true);
     try {
       final authViewModel = Provider.of<AuthViewModel>(context, listen: false);
       final token = authViewModel.currentUser?.token;
-      if (token == null || token.isEmpty)
-        throw Exception('No valid token found');
-      final response = await http.post(
-        Uri.parse(ApiRoutes.commentReplies(commentId)),
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $token'
-        },
-        body: jsonEncode({'content': _replyController.text}),
+      if (token == null || token.isEmpty) throw Exception('No valid token found');
+      var request = http.MultipartRequest(
+        'POST',
+        Uri.parse(parentReplyId != null
+            ? ApiRoutes.nestedReplies(commentId, parentReplyId)
+            : ApiRoutes.commentReplies(commentId)),
       );
-      if (response.statusCode != 201)
-        throw Exception('Đăng phản hồi thất bại: ${response.body}');
+      request.headers['Authorization'] = 'Bearer $token';
+      request.fields['content'] = _replyController.text;
+      for (var image in _selectedReplyImages) {
+        request.files.add(await http.MultipartFile.fromPath('images', image.path));
+      }
+      final response = await request.send();
+      final responseBody = await response.stream.bytesToString();
+      if (response.statusCode != 201) {
+        throw Exception(jsonDecode(responseBody)['message'] ?? 'Đăng phản hồi thất bại');
+      }
       setState(() {
         _replyController.clear();
         _selectedCommentId = null;
+        _selectedReplyId = null;
+        _selectedReplyImages.clear();
       });
       await _fetchComments();
     } catch (e) {
@@ -232,8 +233,7 @@ class _CommentSectionState extends State<CommentSection> {
     }
   }
 
-  Future<void> _editReply(
-      String commentId, String replyId, String newContent) async {
+  Future<void> _editReply(String commentId, String replyId, String newContent) async {
     final authViewModel = Provider.of<AuthViewModel>(context, listen: false);
     if (authViewModel.currentUser == null) {
       _showErrorSnackBar('Vui lòng đăng nhập để chỉnh sửa phản hồi');
@@ -242,19 +242,18 @@ class _CommentSectionState extends State<CommentSection> {
     setState(() => _isLoading = true);
     try {
       final token = authViewModel.currentUser!.token;
-      if (token == null || token.isEmpty)
-        throw Exception('No valid token found');
-      final response = await http.put(
-        Uri.parse('${ApiRoutes.comments}/$commentId/replies/$replyId'),
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $token'
-        },
-        body: jsonEncode({'content': newContent}),
+      if (token == null || token.isEmpty) throw Exception('No valid token found');
+      var request = http.MultipartRequest(
+        'PUT',
+        Uri.parse(ApiRoutes.reply(commentId, replyId)),
       );
-      if (response.statusCode != 200)
-        throw Exception(jsonDecode(response.body)['message'] ??
-            'Chỉnh sửa phản hồi thất bại');
+      request.headers['Authorization'] = 'Bearer $token';
+      request.fields['content'] = newContent;
+      final response = await request.send();
+      final responseBody = await response.stream.bytesToString();
+      if (response.statusCode != 200) {
+        throw Exception(jsonDecode(responseBody)['message'] ?? 'Chỉnh sửa phản hồi thất bại');
+      }
       await _fetchComments();
       setState(() => _editingReplyId = null);
       _showSuccessSnackBar('Chỉnh sửa phản hồi thành công');
@@ -274,18 +273,14 @@ class _CommentSectionState extends State<CommentSection> {
     setState(() => _isLoading = true);
     try {
       final token = authViewModel.currentUser!.token;
-      if (token == null || token.isEmpty)
-        throw Exception('No valid token found');
+      if (token == null || token.isEmpty) throw Exception('No valid token found');
       final response = await http.delete(
-        Uri.parse('${ApiRoutes.comments}/$commentId/replies/$replyId'),
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $token'
-        },
+        Uri.parse(ApiRoutes.reply(commentId, replyId)),
+        headers: {'Content-Type': 'application/json', 'Authorization': 'Bearer $token'},
       );
-      if (response.statusCode != 200)
-        throw Exception(
-            jsonDecode(response.body)['message'] ?? 'Xóa phản hồi thất bại');
+      if (response.statusCode != 200) {
+        throw Exception(jsonDecode(response.body)['message'] ?? 'Xóa phản hồi thất bại');
+      }
       await _fetchComments();
       _showSuccessSnackBar('Xóa phản hồi thành công');
     } catch (e) {
@@ -297,32 +292,29 @@ class _CommentSectionState extends State<CommentSection> {
 
   Future<void> _toggleLike(String commentId) async {
     final authViewModel = Provider.of<AuthViewModel>(context, listen: false);
-    final userId = authViewModel.currentUser?.id;
-    final comment = _comments.firstWhere((c) => c.id == commentId,
-        orElse: () => Comment(
-            id: '',
-            rentalId: '',
-            userId: const User(id: ''),
-            content: '',
-            rating: 0.0,
-            images: [],
-            createdAt: DateTime.now(),
-            replies: const [],
-            likes: const []));
-    final hasLiked = comment.likes.any((like) => like.userId == userId);
+    if (authViewModel.currentUser == null) {
+      _showErrorSnackBar('Vui lòng đăng nhập để thích bình luận');
+      return;
+    }
     setState(() => _isTogglingLike = true);
     try {
-      final token = authViewModel.currentUser?.token;
-      if (token == null || token.isEmpty)
-        throw Exception('No valid token found');
-      final url = ApiRoutes.likeComment(commentId);
-      final response = await http.post(Uri.parse(url), headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer $token'
-      });
-      if (response.statusCode != 200)
-        throw Exception('Thao tác like thất bại: ${response.body}');
-      final data = jsonDecode(response.body);
+      final token = authViewModel.currentUser!.token;
+      if (token == null || token.isEmpty) throw Exception('No valid token found');
+      final comment = _comments.firstWhere((c) => c.id == commentId, orElse: () => throw Exception('Comment not found'));
+      final hasLiked = comment.likes.any((like) => like.userId == authViewModel.currentUser!.id);
+      final url = hasLiked ? ApiRoutes.unlikeComment(commentId) : ApiRoutes.likeComment(commentId);
+      final response = hasLiked
+          ? await http.delete(
+        Uri.parse(url),
+        headers: {'Content-Type': 'application/json', 'Authorization': 'Bearer $token'},
+      )
+          : await http.post(
+        Uri.parse(url),
+        headers: {'Content-Type': 'application/json', 'Authorization': 'Bearer $token'},
+      );
+      if (response.statusCode != 200) {
+        throw Exception(jsonDecode(response.body)['message'] ?? 'Thao tác like thất bại');
+      }
       await _fetchComments();
     } catch (e) {
       _showErrorSnackBar('Lỗi khi thao tác like: $e');
@@ -333,23 +325,39 @@ class _CommentSectionState extends State<CommentSection> {
 
   Future<void> _toggleReplyLike(String commentId, String replyId) async {
     final authViewModel = Provider.of<AuthViewModel>(context, listen: false);
-    final userId = authViewModel.currentUser?.id;
-    final comment = _comments.firstWhere((c) => c.id == commentId);
-    final reply = comment.replies.firstWhere((r) => r.id == replyId);
-    final hasLiked = reply.likes.any((like) => like.userId == userId);
+    if (authViewModel.currentUser == null) {
+      _showErrorSnackBar('Vui lòng đăng nhập để thích phản hồi');
+      return;
+    }
     setState(() => _isTogglingReplyLike = true);
     try {
-      final token = authViewModel.currentUser?.token;
-      if (token == null || token.isEmpty)
-        throw Exception('No valid token found');
-      final url = '${ApiRoutes.comments}/$commentId/replies/$replyId/like';
-      final response = await http.post(Uri.parse(url), headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer $token'
-      });
-      if (response.statusCode != 200)
-        throw Exception('Thao tác like phản hồi thất bại: ${response.body}');
-      final data = jsonDecode(response.body);
+      final token = authViewModel.currentUser!.token;
+      if (token == null || token.isEmpty) throw Exception('No valid token found');
+      final comment = _comments.firstWhere((c) => c.id == commentId, orElse: () => throw Exception('Comment not found'));
+      Reply? findReply(List<Reply> replies) {
+        for (var reply in replies) {
+          if (reply.id == replyId) return reply;
+          final nestedReply = findReply(reply.replies);
+          if (nestedReply != null) return nestedReply;
+        }
+        return null;
+      }
+      final reply = findReply(comment.replies);
+      if (reply == null) throw Exception('Reply not found');
+      final hasLiked = reply.likes.any((like) => like.userId == authViewModel.currentUser!.id);
+      final url = hasLiked ? ApiRoutes.unlikeReply(commentId, replyId) : ApiRoutes.likeReply(commentId, replyId);
+      final response = hasLiked
+          ? await http.delete(
+        Uri.parse(url),
+        headers: {'Content-Type': 'application/json', 'Authorization': 'Bearer $token'},
+      )
+          : await http.post(
+        Uri.parse(url),
+        headers: {'Content-Type': 'application/json', 'Authorization': 'Bearer $token'},
+      );
+      if (response.statusCode != 200) {
+        throw Exception(jsonDecode(response.body)['message'] ?? 'Thao tác like phản hồi thất bại');
+      }
       await _fetchComments();
     } catch (e) {
       _showErrorSnackBar('Lỗi khi thao tác like phản hồi: $e');
@@ -359,13 +367,11 @@ class _CommentSectionState extends State<CommentSection> {
   }
 
   void _showErrorSnackBar(String message) {
-    ScaffoldMessenger.of(context)
-        .showSnackBar(SnackBar(content: Text(message)));
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
   }
 
   void _showSuccessSnackBar(String message) {
-    ScaffoldMessenger.of(context)
-        .showSnackBar(SnackBar(content: Text(message)));
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
   }
 
   void _showFullScreenImage(String imageUrl) {
@@ -378,8 +384,7 @@ class _CommentSectionState extends State<CommentSection> {
             children: [
               Center(
                 child: PhotoView(
-                  imageProvider: NetworkImage(
-                      '${ApiRoutes.baseUrl.replaceAll('/api', '')}$imageUrl'),
+                  imageProvider: NetworkImage('${ApiRoutes.baseUrl.replaceAll('/api', '')}$imageUrl'),
                   minScale: PhotoViewComputedScale.contained * 0.8,
                   maxScale: PhotoViewComputedScale.covered * 2.0,
                 ),
@@ -412,102 +417,118 @@ class _CommentSectionState extends State<CommentSection> {
     final authViewModel = Provider.of<AuthViewModel>(context, listen: false);
     final currentUserId = authViewModel.currentUser?.id;
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const _SectionTitle('Bình luận'),
-        const SizedBox(height: 16),
-        _CommentInputField(
-          controller: _commentController,
-          isPosting: _isPostingComment,
-          onSubmit: _postComment,
-          rating: _selectedRating,
-          onRatingChanged: (rating) => setState(() => _selectedRating = rating),
-          selectedImages: _selectedImages,
-          onPickImages: _pickImages,
-          onRemoveImage: (index) =>
-              setState(() => _selectedImages.removeAt(index)),
-          onCancel: () => setState(() {
-            _commentController.clear();
-            _selectedRating = 0.0;
-            _selectedImages.clear();
-          }),
-        ),
-        const SizedBox(height: 16),
-        if (_isLoading) const Center(child: CircularProgressIndicator()),
-        if (!_isLoading && _comments.isNotEmpty)
-          ListView.builder(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            itemCount: _comments.length,
-            itemBuilder: (context, index) {
-              final comment = _comments[index];
-              final user = comment.userId;
-              final hasLiked =
-              comment.likes.any((like) => like.userId == currentUserId);
-              final isOwnComment = user.id == currentUserId;
-              final isExpanded = _expandedReplies.contains(comment.id);
-              return _CommentItem(
-                comment: comment,
-                user: user,
-                hasLiked: hasLiked,
-                isOwnComment: isOwnComment,
-                isTogglingLike: _isTogglingLike,
-                isTogglingReplyLike: _isTogglingReplyLike,
-                isPostingReply: _isPostingReply,
-                selectedCommentId: _selectedCommentId,
-                editingCommentId: _editingCommentId,
-                editingReplyId: _editingReplyId,
-                editController: _editController,
-                replyController: _replyController,
-                isExpanded: isExpanded,
-                onDelete: () => _deleteComment(comment.id),
-                onToggleLike: () => _toggleLike(comment.id),
-                onToggleReplyLike: (replyId) => _toggleReplyLike(comment.id, replyId),
-                onReply: () => setState(() => _selectedCommentId = comment.id),
-                onCancelReply: () => setState(() {
-                  _selectedCommentId = null;
-                  _replyController.clear();
-                }),
-                onSubmitReply: () => _postReply(comment.id),
-                onEditComment: () {
-                  setState(() {
-                    _editingCommentId = comment.id;
-                    _editController.text = comment.content;
-                  });
-                },
-                onSaveEditComment: (newContent) =>
-                    _editComment(comment.id, newContent),
-                onCancelEdit: () => setState(() {
-                  _editingCommentId = null;
-                  _editingReplyId = null;
-                }),
-                onToggleReplies: () => setState(() {
-                  if (isExpanded)
-                    _expandedReplies.remove(comment.id);
-                  else
-                    _expandedReplies.add(comment.id);
-                }),
-                onEditReply: (replyId, content) {
-                  setState(() {
-                    _editingReplyId = replyId;
-                    _editController.text = content;
-                  });
-                },
-                onSaveEditReply: (replyId, newContent) =>
-                    _editReply(comment.id, replyId, newContent),
-                onDeleteReply: (commentId, replyId) =>
-                    _deleteReply(commentId, replyId),
-                onImageTap: _showFullScreenImage,
-              );
-            },
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.grey[100],
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const _SectionTitle('Bình luận / đánh giá'),
+          const SizedBox(height: 16),
+          _CommentInputField(
+            controller: _commentController,
+            isPosting: _isPostingComment,
+            onSubmit: _postComment,
+            rating: _selectedRating,
+            onRatingChanged: (rating) => setState(() => _selectedRating = rating),
+            selectedImages: _selectedImages,
+            onPickImages: () => _pickImages(),
+            onRemoveImage: (index) => setState(() => _selectedImages.removeAt(index)),
+            onCancel: () => setState(() {
+              _commentController.clear();
+              _selectedRating = 0.0;
+              _selectedImages.clear();
+            }),
           ),
-        if (!_isLoading && _comments.isEmpty)
-          const Padding(
-            padding: EdgeInsets.all(16.0),
-            child: Text('Chưa có bình luận nào.'),
-          ),
-      ],
+          const SizedBox(height: 16),
+          if (_isLoading) const Center(child: CircularProgressIndicator()),
+          if (!_isLoading && _comments.isNotEmpty)
+            ListView.separated(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: _comments.length,
+              separatorBuilder: (context, index) => const SizedBox(height: 12),
+              itemBuilder: (context, index) {
+                final comment = _comments[index];
+                final user = comment.userId;
+                final hasLiked = comment.likes.any((like) => like.userId == currentUserId);
+                final isOwnComment = user.id == currentUserId;
+                final isExpanded = _expandedReplies.contains(comment.id);
+                return _CommentItem(
+                  comment: comment,
+                  user: user,
+                  hasLiked: hasLiked,
+                  isOwnComment: isOwnComment,
+                  isTogglingLike: _isTogglingLike,
+                  isTogglingReplyLike: _isTogglingReplyLike,
+                  isPostingReply: _isPostingReply,
+                  selectedCommentId: _selectedCommentId,
+                  selectedReplyId: _selectedReplyId,
+                  editingCommentId: _editingCommentId,
+                  editingReplyId: _editingReplyId,
+                  editController: _editController,
+                  replyController: _replyController,
+                  isExpanded: isExpanded,
+                  selectedReplyImages: _selectedReplyImages,
+                  onDelete: () => _deleteComment(comment.id),
+                  onToggleLike: () => _toggleLike(comment.id),
+                  onToggleReplyLike: (replyId) => _toggleReplyLike(comment.id, replyId),
+                  onReply: () => setState(() => _selectedCommentId = comment.id),
+                  onReplyToReply: (replyId) => setState(() => _selectedReplyId = replyId),
+                  onCancelReply: () => setState(() {
+                    _selectedCommentId = null;
+                    _selectedReplyId = null;
+                    _replyController.clear();
+                    _selectedReplyImages.clear();
+                  }),
+                  onSubmitReply: () => _postReply(comment.id, parentReplyId: _selectedReplyId),
+                  onEditComment: () {
+                    setState(() {
+                      _editingCommentId = comment.id;
+                      _editController.text = comment.content;
+                    });
+                  },
+                  onSaveEditComment: (newContent) => _editComment(comment.id, newContent),
+                  onCancelEdit: () => setState(() {
+                    _editingCommentId = null;
+                    _editingReplyId = null;
+                  }),
+                  onToggleReplies: () => setState(() {
+                    if (isExpanded) {
+                      _expandedReplies.remove(comment.id);
+                    } else {
+                      _expandedReplies.add(comment.id);
+                    }
+                  }),
+                  onEditReply: (replyId, content) {
+                    setState(() {
+                      _editingReplyId = replyId;
+                      _editController.text = content;
+                    });
+                  },
+                  onSaveEditReply: (replyId, newContent) => _editReply(comment.id, replyId, newContent),
+                  onDeleteReply: (replyId) => _deleteReply(comment.id, replyId),
+                  onImageTap: _showFullScreenImage,
+                  onPickReplyImages: () => _pickImages(forReply: true),
+                  onRemoveReplyImage: (index) => setState(() => _selectedReplyImages.removeAt(index)),
+                );
+              },
+            ),
+          if (!_isLoading && _comments.isEmpty)
+            Container(
+              width: MediaQuery.of(context).size.width,
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Center(child: Text('Chưa có bình luận nào!', style: TextStyle(color: Colors.grey))),
+            ),
+        ],
+      ),
     );
   }
 }
@@ -519,12 +540,13 @@ class _SectionTitle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8.0),
-      child: Text(
-        title,
-        style: const TextStyle(
-            fontSize: 20, fontWeight: FontWeight.bold, color: Colors.black87),
+    return Text(
+      title,
+      style: const TextStyle(
+        fontSize: 16,
+        fontWeight: FontWeight.w600,
+        color: Colors.black87,
+        letterSpacing: 0.5,
       ),
     );
   }
@@ -555,78 +577,119 @@ class _CommentInputField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        TextField(
-          controller: controller,
-          decoration: InputDecoration(
-            hintText: 'Viết bình luận...',
-            border: const OutlineInputBorder(),
-            suffixIcon: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                if (!isPosting)
-                  IconButton(icon: const Icon(Icons.send), onPressed: onSubmit),
-                if (isPosting)
-                  const Padding(
-                      padding: EdgeInsets.all(8.0),
-                      child: CircularProgressIndicator(strokeWidth: 2)),
-              ],
-            ),
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withOpacity(0.1),
+            spreadRadius: 1,
+            blurRadius: 4,
+            offset: const Offset(0, 2),
           ),
-          onSubmitted: (_) => onSubmit(),
-          enabled: !isPosting,
-        ),
-        const SizedBox(height: 8),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            _StarRating(rating: rating, onRatingChanged: onRatingChanged),
-            GestureDetector(
-              onTap: onPickImages,
-              child: Row(
-                children: [
-                  Icon(Icons.add , size: 13,),
-                  const SizedBox(width: 4,),
-                  Text("Thêm ảnh minh họa", style: TextStyle(fontSize: 13),),
-                ],
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          TextField(
+            controller: controller,
+            maxLines: 3,
+            decoration: InputDecoration(
+              hintText: 'Nhập bình luận của bạn...',
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: BorderSide(color: Colors.grey[300]!),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: BorderSide(color: Colors.grey[300]!),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: const BorderSide(color: Colors.blue),
               ),
             ),
-          ],
-        ),
-        const SizedBox(height: 8),
-        if (selectedImages.isNotEmpty)
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Row(
-              children: List.generate(selectedImages.length, (index) {
-                return Padding(
-                  padding: const EdgeInsets.only(right: 8.0),
-                  child: Stack(
-                    children: [
-                      Image.file(File(selectedImages[index].path),
-                          width: 100, height: 100, fit: BoxFit.cover),
-                      Positioned(
+            enabled: !isPosting,
+          ),
+          const SizedBox(height: 8),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              if (rating >= 0) // Only show rating for comments, not replies
+                _StarRating(
+                  rating: rating,
+                  onRatingChanged: onRatingChanged,
+                ),
+              IconButton(
+                icon: const Icon(Icons.image, color: Colors.blue),
+                onPressed: onPickImages,
+              ),
+            ],
+          ),
+          if (selectedImages.isNotEmpty)
+            SizedBox(
+              height: 80,
+              child: ListView.builder(
+                scrollDirection: Axis.horizontal,
+                itemCount: selectedImages.length,
+                itemBuilder: (context, index) {
+                  return Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: Stack(
+                      children: [
+                        Image.file(
+                          File(selectedImages[index].path),
+                          width: 80,
+                          height: 80,
+                          fit: BoxFit.cover,
+                        ),
+                        Positioned(
                           top: 0,
                           right: 0,
-                          child: IconButton(
-                              icon: const Icon(Icons.close, color: Colors.red),
-                              onPressed: () => onRemoveImage(index))),
-                    ],
-                  ),
-                );
-              }),
+                          child: GestureDetector(
+                            onTap: () => onRemoveImage(index),
+                            child: Container(
+                              color: Colors.black54,
+                              child: const Icon(Icons.close, color: Colors.white, size: 16),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
             ),
+          const SizedBox(height: 8),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              TextButton(
+                onPressed: onCancel,
+                child: const Text('Hủy', style: TextStyle(color: Colors.grey)),
+              ),
+              const SizedBox(width: 8),
+              ElevatedButton(
+                onPressed: isPosting ? null : onSubmit,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.blue,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                ),
+                child: isPosting
+                    ? const SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                )
+                    : const Text('Đăng', style: TextStyle(color: Colors.white)),
+              ),
+            ],
           ),
-        if (selectedImages.isNotEmpty)
-          const Padding(
-            padding: EdgeInsets.only(top: 8.0),
-            child: Text(
-                'Bạn có thể thêm nhiều ảnh hơn bằng cách nhấn vào biểu tượng ảnh.',
-                style: TextStyle(color: Colors.grey, fontSize: 12)),
-          ),
-      ],
+        ],
+      ),
     );
   }
 }
@@ -667,7 +730,7 @@ class _StarRating extends StatelessWidget {
                 ? Icons.star_half
                 : Icons.star_border,
             color: Colors.amber,
-            size: 30,
+            size: 24,
           );
         }),
       ),
@@ -684,25 +747,30 @@ class _CommentItem extends StatelessWidget {
   final bool isTogglingReplyLike;
   final bool isPostingReply;
   final String? selectedCommentId;
+  final String? selectedReplyId;
   final String? editingCommentId;
   final String? editingReplyId;
   final TextEditingController editController;
   final TextEditingController replyController;
   final bool isExpanded;
+  final List<XFile> selectedReplyImages;
   final VoidCallback onDelete;
   final VoidCallback onToggleLike;
-  final Function(String) onToggleReplyLike;
+  final ValueChanged<String> onToggleReplyLike;
   final VoidCallback onReply;
+  final ValueChanged<String> onReplyToReply;
   final VoidCallback onCancelReply;
   final VoidCallback onSubmitReply;
   final VoidCallback onEditComment;
   final ValueChanged<String> onSaveEditComment;
   final VoidCallback onCancelEdit;
   final VoidCallback onToggleReplies;
-  final Function(String, String) onEditReply;
+  final void Function(String, String) onEditReply;
   final Function(String, String) onSaveEditReply;
-  final Function(String, String) onDeleteReply;
-  final Function(String) onImageTap;
+  final ValueChanged<String> onDeleteReply;
+  final ValueChanged<String> onImageTap;
+  final VoidCallback onPickReplyImages;
+  final ValueChanged<int> onRemoveReplyImage;
 
   const _CommentItem({
     required this.comment,
@@ -713,15 +781,18 @@ class _CommentItem extends StatelessWidget {
     required this.isTogglingReplyLike,
     required this.isPostingReply,
     required this.selectedCommentId,
+    required this.selectedReplyId,
     required this.editingCommentId,
     required this.editingReplyId,
     required this.editController,
     required this.replyController,
     required this.isExpanded,
+    required this.selectedReplyImages,
     required this.onDelete,
     required this.onToggleLike,
     required this.onToggleReplyLike,
     required this.onReply,
+    required this.onReplyToReply,
     required this.onCancelReply,
     required this.onSubmitReply,
     required this.onEditComment,
@@ -732,6 +803,8 @@ class _CommentItem extends StatelessWidget {
     required this.onSaveEditReply,
     required this.onDeleteReply,
     required this.onImageTap,
+    required this.onPickReplyImages,
+    required this.onRemoveReplyImage,
   });
 
   void _showCommentDropdownMenu(BuildContext context) {
@@ -740,31 +813,33 @@ class _CommentItem extends StatelessWidget {
     showMenu(
       context: context,
       position: RelativeRect.fromLTRB(
-          buttonPosition.dx,
-          buttonPosition.dy + button.size.height,
-          buttonPosition.dx + button.size.width,
-          buttonPosition.dy),
+        buttonPosition.dx,
+        buttonPosition.dy + button.size.height,
+        buttonPosition.dx + button.size.width,
+        buttonPosition.dy,
+      ),
       items: [
         PopupMenuItem(
           value: 'edit',
           child: ListTile(
-              leading: const Icon(Icons.edit, color: Colors.blue),
-              title:
-              const Text('Chỉnh sửa', style: TextStyle(color: Colors.blue)),
-              onTap: () {
-                Navigator.pop(context);
-                onEditComment();
-              }),
+            leading: const Icon(Icons.edit, color: Colors.blue),
+            title: const Text('Chỉnh sửa', style: TextStyle(color: Colors.blue)),
+            onTap: () {
+              Navigator.pop(context);
+              onEditComment();
+            },
+          ),
         ),
         PopupMenuItem(
           value: 'delete',
           child: ListTile(
-              leading: const Icon(Icons.delete, color: Colors.red),
-              title: const Text('Xóa', style: TextStyle(color: Colors.red)),
-              onTap: () {
-                Navigator.pop(context);
-                onDelete();
-              }),
+            leading: const Icon(Icons.delete, color: Colors.red),
+            title: const Text('Xóa', style: TextStyle(color: Colors.red)),
+            onTap: () {
+              Navigator.pop(context);
+              onDelete();
+            },
+          ),
         ),
       ],
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -779,33 +854,44 @@ class _CommentItem extends StatelessWidget {
     showMenu(
       context: context,
       position: RelativeRect.fromLTRB(
-          buttonPosition.dx,
-          buttonPosition.dy + button.size.height,
-          buttonPosition.dx + button.size.width,
-          buttonPosition.dy),
+        buttonPosition.dx,
+        buttonPosition.dy + button.size.height,
+        buttonPosition.dx + button.size.width,
+        buttonPosition.dy,
+      ),
       items: [
         PopupMenuItem(
           value: 'edit',
           child: ListTile(
-              leading: const Icon(Icons.edit, color: Colors.blue),
-              title:
-              const Text('Chỉnh sửa', style: TextStyle(color: Colors.blue)),
-              onTap: () {
-                Navigator.pop(context);
-                final reply =
-                comment.replies.firstWhere((r) => r.id == replyId);
+            leading: const Icon(Icons.edit, color: Colors.blue),
+            title: const Text('Chỉnh sửa', style: TextStyle(color: Colors.blue)),
+            onTap: () {
+              Navigator.pop(context);
+              Reply? findReply(List<Reply> replies) {
+                for (var reply in replies) {
+                  if (reply.id == replyId) return reply;
+                  final nestedReply = findReply(reply.replies);
+                  if (nestedReply != null) return nestedReply;
+                }
+                return null;
+              }
+              final reply = findReply(comment.replies);
+              if (reply != null) {
                 onEditReply(replyId, reply.content);
-              }),
+              }
+            },
+          ),
         ),
         PopupMenuItem(
           value: 'delete',
           child: ListTile(
-              leading: const Icon(Icons.delete, color: Colors.red),
-              title: const Text('Xóa', style: TextStyle(color: Colors.red)),
-              onTap: () {
-                Navigator.pop(context);
-                onDeleteReply(comment.id, replyId);
-              }),
+            leading: const Icon(Icons.delete, color: Colors.red),
+            title: const Text('Xóa', style: TextStyle(color: Colors.red)),
+            onTap: () {
+              Navigator.pop(context);
+              onDeleteReply(replyId);
+            },
+          ),
         ),
       ],
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -817,272 +903,356 @@ class _CommentItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final currentUserId = Provider.of<AuthViewModel>(context, listen: false).currentUser?.id;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
+    final isEditing = editingCommentId == comment.id;
+    return Card(
+      color: Colors.white,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            CircleAvatar(
-              radius: 20,
-              backgroundImage: user.avatarBytes != null
-                  ? MemoryImage(user.avatarBytes!)
-                  : const AssetImage('assets/img/imageuser.png')
-              as ImageProvider,
-              onBackgroundImageError: (exception, stackTrace) =>
-                  print('Error loading avatar for user ${user.id}: $exception'),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                CircleAvatar(
+                  radius: 20,
+                  backgroundImage: user.avatarBytes != null
+                      ? MemoryImage(user.avatarBytes!)
+                      : const AssetImage('assets/img/imageuser.png') as ImageProvider,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(user.username.isEmpty ? 'không có' : user.username,
-                          style: const TextStyle(fontWeight: FontWeight.bold)),
                       Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           Text(
-                              DateFormat('dd/MM/yyyy HH:mm')
-                                  .format(comment.createdAt),
-                              style: const TextStyle(
-                                  color: Colors.grey, fontSize: 12)),
-                          if (isOwnComment)
-                            GestureDetector(
-                              onTap: () => _showCommentDropdownMenu(context),
-                              child: const Padding(
-                                  padding:
-                                  EdgeInsets.symmetric(horizontal: 8.0),
-                                  child: Icon(Icons.more_horiz,
-                                      color: Colors.grey)),
-                            ),
+                            user.username.isEmpty ? 'không có' : user.username,
+                            style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16),
+                          ),
+                          Row(
+                            children: [
+                              Text(
+                                DateFormat('dd/MM/yyyy HH:mm').format(comment.createdAt),
+                                style: TextStyle(color: Colors.grey[600], fontSize: 12),
+                              ),
+                              if (isOwnComment)
+                                GestureDetector(
+                                  onTap: () => _showCommentDropdownMenu(context),
+                                  child: Padding(
+                                    padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                                    child: Icon(Icons.more_horiz, color: Colors.grey[600], size: 20),
+                                  ),
+                                ),
+                            ],
+                          ),
                         ],
                       ),
-                    ],
-                  ),
-                  if (comment.rating > 0)
-                    Row(
-                      children: List.generate(5, (index) {
-                        final starValue = (index + 1).toDouble();
-                        return Icon(
-                          starValue <= comment.rating
-                              ? Icons.star
-                              : starValue - 0.5 <= comment.rating
-                              ? Icons.star_half
-                              : Icons.star_border,
-                          color: Colors.amber,
-                          size: 16,
-                        );
-                      }),
-                    ),
-                  const SizedBox(height: 4),
-                  if (editingCommentId == comment.id)
-                    Row(
-                      children: [
-                        Expanded(
-                          child: TextField(
-                            controller: editController,
-                            decoration: const InputDecoration(
-                                hintText: 'Chỉnh sửa bình luận...',
-                                border: OutlineInputBorder()),
+                      if (comment.rating > 0)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 4),
+                          child: Row(
+                            children: List.generate(5, (index) {
+                              return Icon(
+                                index < comment.rating ? Icons.star : Icons.star_border,
+                                color: Colors.amber,
+                                size: 16,
+                              );
+                            }),
                           ),
                         ),
-                        IconButton(
-                            icon: const Icon(Icons.check, color: Colors.green),
-                            onPressed: () =>
-                                onSaveEditComment(editController.text)),
-                        IconButton(
-                            icon: const Icon(Icons.cancel, color: Colors.red),
-                            onPressed: onCancelEdit),
-                      ],
-                    )
-                  else
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(comment.content),
-                        if (comment.images.isNotEmpty)
-                          Wrap(
-                            spacing: 8,
-                            runSpacing: 8,
-                            children: comment.images.map((imageUrl) {
-                              return GestureDetector(
-                                onTap: () => onImageTap(imageUrl),
-                                child: CachedNetworkImage(
-                                  imageUrl:
-                                  '${ApiRoutes.baseUrl.replaceAll('/api', '')}$imageUrl',
-                                  width: 100,
-                                  height: 100,
-                                  fit: BoxFit.cover,
-                                  placeholder: (context, url) =>
-                                  const CircularProgressIndicator(),
-                                  errorWidget: (context, url, error) =>
-                                  const Icon(Icons.error),
-                                ),
-                              );
-                            }).toList(),
-                          ),
-                      ],
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            if (isEditing)
+              Column(
+                children: [
+                  TextField(
+                    controller: editController,
+                    maxLines: 3,
+                    decoration: InputDecoration(
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
                     ),
+                  ),
                   const SizedBox(height: 8),
                   Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
                     children: [
-                      IconButton(
-                        icon: isTogglingLike
-                            ? const SizedBox(
-                            width: 24,
-                            height: 24,
-                            child:
-                            CircularProgressIndicator(strokeWidth: 2))
-                            : Icon(
-                          hasLiked ? Icons.favorite : Icons.favorite_border,
-                          color: hasLiked ? Colors.red : Colors.grey,
-                        ),
-                        onPressed: onToggleLike,
-                      ),
-                      Text('${comment.likes.length} lượt thích'),
-                      const SizedBox(width: 16),
                       TextButton(
-                          onPressed: onReply, child: const Text('Phản hồi')),
+                        onPressed: onCancelEdit,
+                        child: const Text('Hủy'),
+                      ),
+                      ElevatedButton(
+                        onPressed: () => onSaveEditComment(editController.text),
+                        child: const Text('Lưu'),
+                      ),
                     ],
                   ),
-                  if (comment.replies.isNotEmpty)
-                    TextButton(
-                      onPressed: onToggleReplies,
-                      child: Text(
-                        isExpanded
-                            ? 'Ẩn phản hồi'
-                            : 'Xem tất cả phản hồi (${comment.replies.length})',
-                        style: const TextStyle(color: Colors.blue),
+                ],
+              )
+            else
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(comment.content, style: const TextStyle(fontSize: 14)),
+                  if (comment.images.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 8),
+                      child: SizedBox(
+                        height: 80,
+                        child: ListView.builder(
+                          scrollDirection: Axis.horizontal,
+                          itemCount: comment.images.length,
+                          itemBuilder: (context, index) {
+                            return GestureDetector(
+                              onTap: () => onImageTap(comment.images[index]),
+                              child: Padding(
+                                padding: const EdgeInsets.only(right: 8),
+                                child: CachedNetworkImage(
+                                  imageUrl: '${ApiRoutes.baseUrl.replaceAll('/api', '')}${comment.images[index]}',
+                                  width: 80,
+                                  height: 80,
+                                  fit: BoxFit.cover,
+                                  placeholder: (context, url) => const CircularProgressIndicator(),
+                                  errorWidget: (context, url, error) => const Icon(Icons.error),
+                                ),
+                              ),
+                            );
+                          },
+                        ),
                       ),
                     ),
                 ],
               ),
-            ),
-          ],
-        ),
-        if (isExpanded)
-          Padding(
-            padding: const EdgeInsets.only(left: 48.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: comment.replies.map((reply) {
-                final replyUser = reply.userId;
-                final isOwnReply = replyUser.id == currentUserId;
-                final hasLikedReply = reply.likes.any((like) => like.userId == currentUserId);
-                return Padding(
-                  padding: const EdgeInsets.only(left: 16.0, top: 8.0),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: editingReplyId == reply.id
-                            ? Row(
-                          children: [
-                            Expanded(
-                              child: TextField(
-                                controller: editController,
-                                decoration: const InputDecoration(
-                                    hintText: 'Chỉnh sửa phản hồi...',
-                                    border: OutlineInputBorder()),
-                              ),
-                            ),
-                            IconButton(
-                                icon: const Icon(Icons.check,
-                                    color: Colors.green),
-                                onPressed: () => onSaveEditReply(
-                                    reply.id, editController.text)),
-                            IconButton(
-                                icon: const Icon(Icons.cancel,
-                                    color: Colors.red),
-                                onPressed: onCancelEdit),
-                          ],
-                        )
-                            : Row(
-                          children: [
-                            Expanded(
-                                child: Text('${replyUser.username.isEmpty ? 'không có' : replyUser.username}: ${reply.content}')),
-
-                            Column(
-                              crossAxisAlignment: CrossAxisAlignment.end,
-                              children: [
-                                Row(
-                                  children: [
-                                    Text('${DateFormat('dd/MM/yyyy HH:mm').format(reply.createdAt)}',
-                                        style: const TextStyle(
-                                            color: Colors.grey, fontSize: 12)),
-
-                                    if (isOwnReply)
-                                      GestureDetector(
-                                        onTap: () => _showReplyDropdownMenu(
-                                            context, reply.id),
-                                        child: const Padding(
-                                            padding: EdgeInsets.symmetric(
-                                                horizontal: 8.0),
-                                            child: Icon(Icons.more_horiz,
-                                                color: Colors.grey)),
-                                      ),
-                                  ],
-                                ),
-                                Row(
-                                  children: [
-                                    IconButton(
-                                      icon: isTogglingReplyLike
-                                          ? const SizedBox(
-                                          width: 20,
-                                          height: 20,
-                                          child: CircularProgressIndicator(strokeWidth: 2))
-                                          : Icon(
-                                        hasLikedReply ? Icons.favorite : Icons.favorite_border,
-                                        color: hasLikedReply ? Colors.red : Colors.grey,
-                                        size: 20,
-                                      ),
-                                      onPressed: () => onToggleReplyLike(reply.id),
-                                    ),
-                                    Text('${reply.likes.length}', style: const TextStyle(fontSize: 12)),
-                                  ],
-                                )
-                              ],
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                );
-              }).toList(),
-            ),
-          ),
-        if (selectedCommentId == comment.id)
-          Padding(
-            padding: const EdgeInsets.only(left: 48.0),
-            child: Row(
+            const SizedBox(height: 8),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Expanded(
-                  child: _CommentInputField(
-                    controller: replyController,
-                    isPosting: isPostingReply,
-                    onSubmit: onSubmitReply,
-                    rating: 0.0,
-                    onRatingChanged: (_) {},
-                    selectedImages: const [],
-                    onPickImages: () {},
-                    onRemoveImage: (_) {},
-                    onCancel: onCancelReply,
-                  ),
-                ),
-                TextButton(
-                  onPressed: onCancelReply,
-                  child: const Text('Hủy', style: TextStyle(color: Colors.red)),
+                Row(
+                  children: [
+                    IconButton(
+                      icon: Icon(
+                        hasLiked ? Icons.favorite : Icons.favorite_border,
+                        color: hasLiked ? Colors.red : Colors.grey,
+                      ),
+                      onPressed: isTogglingLike ? null : onToggleLike,
+                    ),
+                    Text('${comment.likes.length}'),
+                    const SizedBox(width: 16),
+                    TextButton(
+                      onPressed: onReply,
+                      child: const Text('Phản hồi'),
+                    ),
+                  ],
                 ),
               ],
             ),
+            if (selectedCommentId == comment.id || selectedReplyId != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: Column(
+                  children: [
+                    _CommentInputField(
+                      controller: replyController,
+                      isPosting: isPostingReply,
+                      onSubmit: onSubmitReply,
+                      rating: -1, // Hide rating for replies
+                      onRatingChanged: (_) {},
+                      selectedImages: selectedReplyImages,
+                      onPickImages: onPickReplyImages,
+                      onRemoveImage: onRemoveReplyImage,
+                      onCancel: onCancelReply,
+                    ),
+                  ],
+                ),
+              ),
+            if (comment.replies.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: TextButton(
+                  onPressed: onToggleReplies,
+                  child: Text(
+                    isExpanded ? 'Ẩn ${comment.replies.length} phản hồi' : 'Xem ${comment.replies.length} phản hồi',
+                    style: const TextStyle(color: Colors.blue),
+                  ),
+                ),
+              ),
+            if (isExpanded && comment.replies.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(left: 16, top: 8),
+                child: _buildReplies(context, comment.replies, comment.id, 0),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildReplies(BuildContext context, List<Reply> replies, String commentId, int level) {
+    final currentUserId = Provider.of<AuthViewModel>(context, listen: false).currentUser?.id;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: replies.map((reply) {
+        final isEditingReply = editingReplyId == reply.id;
+        final hasLikedReply = reply.likes.any((like) => like.userId == currentUserId);
+        final isOwnReply = reply.userId.id == currentUserId;
+        return Padding(
+          padding: EdgeInsets.only(left: level * 16.0, bottom: 8),
+          child: Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: Colors.grey[50],
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: Colors.grey[200]!),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    CircleAvatar(
+                      radius: 16,
+                      backgroundImage: reply.userId.avatarBytes != null
+                          ? MemoryImage(reply.userId.avatarBytes!)
+                          : const AssetImage('assets/img/imageuser.png') as ImageProvider,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                reply.userId.username.isEmpty ? 'không có' : reply.userId.username,
+                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+                              ),
+                              Row(
+                                children: [
+                                  Text(
+                                    DateFormat('dd/MM/yyyy HH:mm').format(reply.createdAt),
+                                    style: TextStyle(color: Colors.grey[600], fontSize: 10),
+                                  ),
+                                  if (isOwnReply)
+                                    GestureDetector(
+                                      onTap: () => _showReplyDropdownMenu(context, reply.id),
+                                      child: Padding(
+                                        padding: const EdgeInsets.symmetric(horizontal: 4.0),
+                                        child: Icon(Icons.more_horiz, color: Colors.grey[600], size: 16),
+                                      ),
+                                    ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                if (isEditingReply)
+                  Column(
+                    children: [
+                      TextField(
+                        controller: editController,
+                        maxLines: 2,
+                        decoration: InputDecoration(
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          TextButton(
+                            onPressed: onCancelEdit,
+                            child: const Text('Hủy'),
+                          ),
+                          ElevatedButton(
+                            onPressed: () => onSaveEditReply(reply.id, editController.text),
+                            child: const Text('Lưu'),
+                          ),
+                        ],
+                      ),
+                    ],
+                  )
+                else
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(reply.content, style: const TextStyle(fontSize: 12)),
+                      if (reply.images.isNotEmpty)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 4),
+                          child: SizedBox(
+                            height: 60,
+                            child: ListView.builder(
+                              scrollDirection: Axis.horizontal,
+                              itemCount: reply.images.length,
+                              itemBuilder: (context, index) {
+                                return GestureDetector(
+                                  onTap: () => onImageTap(reply.images[index]),
+                                  child: Padding(
+                                    padding: const EdgeInsets.only(right: 8),
+                                    child: CachedNetworkImage(
+                                      imageUrl: '${ApiRoutes.baseUrl.replaceAll('/api', '')}${reply.images[index]}',
+                                      width: 60,
+                                      height: 60,
+                                      fit: BoxFit.cover,
+                                      placeholder: (context, url) => const CircularProgressIndicator(),
+                                      errorWidget: (context, url, error) => const Icon(Icons.error),
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                const SizedBox(height: 4),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Row(
+                      children: [
+                        IconButton(
+                          icon: Icon(
+                            hasLikedReply ? Icons.favorite : Icons.favorite_border,
+                            color: hasLikedReply ? Colors.red : Colors.grey,
+                            size: 20,
+                          ),
+                          onPressed: isTogglingReplyLike ? null : () => onToggleReplyLike(reply.id),
+                        ),
+                        Text('${reply.likes.length}', style: const TextStyle(fontSize: 12)),
+                        const SizedBox(width: 8),
+                        TextButton(
+                          onPressed: () => onReplyToReply(reply.id),
+                          child: const Text('Phản hồi', style: TextStyle(fontSize: 12)),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+                if (reply.replies.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(left: 16, top: 4),
+                    child: _buildReplies(context, reply.replies, commentId, level + 1),
+                  ),
+              ],
+            ),
           ),
-        const Divider(),
-      ],
+        );
+      }).toList(),
     );
   }
 }

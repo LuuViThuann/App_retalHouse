@@ -31,10 +31,21 @@ const commentSchema = new mongoose.Schema({
   replies: [{
     userId: { type: String, ref: 'User', required: true },
     content: { type: String, required: true },
+    images: [{ type: String }], // Added images field for replies
     createdAt: { type: Date, default: Date.now },
-    likes: [{  // Added likes field for replies
+    likes: [{
       userId: { type: String, ref: 'User', required: true },
       createdAt: { type: Date, default: Date.now },
+    }],
+    replies: [{ // Added nested replies
+      userId: { type: String, ref: 'User', required: true },
+      content: { type: String, required: true },
+      images: [{ type: String }],
+      createdAt: { type: Date, default: Date.now },
+      likes: [{
+        userId: { type: String, ref: 'User', required: true },
+        createdAt: { type: Date, default: Date.now },
+      }],
     }],
   }],
   likes: [{

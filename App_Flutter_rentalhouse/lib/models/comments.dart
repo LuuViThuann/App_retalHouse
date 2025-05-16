@@ -56,15 +56,19 @@ class Reply {
   final String id;
   final User userId;
   final String content;
+  final List<String> images; // Added images field
   final DateTime createdAt;
-  final List<Like> likes; // Added likes field
+  final List<Like> likes;
+  final List<Reply> replies; // Added nested replies
 
   const Reply({
     required this.id,
     required this.userId,
     required this.content,
+    required this.images,
     required this.createdAt,
     required this.likes,
+    required this.replies,
   });
 
   factory Reply.fromJson(Map<String, dynamic> json) {
@@ -72,13 +76,15 @@ class Reply {
       id: json['_id']?.toString() ?? '',
       userId: User.fromJson(json['userId'] is String ? {'_id': json['userId']} : (json['userId'] ?? {})),
       content: json['content']?.toString() ?? '',
+      images: (json['images'] as List<dynamic>?)?.map((e) => e.toString()).toList() ?? [],
       createdAt: DateTime.tryParse(json['createdAt']?.toString() ?? '') ?? DateTime.now(),
-      likes: (json['likes'] as List<dynamic>?)?.map((like) => Like.fromJson(like)).toList() ?? [], // Handle likes field
+      likes: (json['likes'] as List<dynamic>?)?.map((like) => Like.fromJson(like)).toList() ?? [],
+      replies: (json['replies'] as List<dynamic>?)?.map((reply) => Reply.fromJson(reply)).toList() ?? [],
     );
   }
 
   @override
-  String toString() => 'Reply(id: $id, userId: $userId, content: $content, createdAt: $createdAt, likes: $likes)';
+  String toString() => 'Reply(id: $id, userId: $userId, content: $content, images: $images, createdAt: $createdAt, likes: $likes, replies: $replies)';
 }
 
 class Comment {

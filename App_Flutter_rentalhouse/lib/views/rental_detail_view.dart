@@ -464,7 +464,7 @@ class _RentalDetailScreenState extends State<RentalDetailScreen> with SingleTick
                 indicatorColor: Colors.blue[700],
                 tabs: [
                   const Tab(text: 'Thông tin chi tiết'),
-                  Tab(text: 'Bình luận ($_reviewCount)'),
+                  Tab(text: 'Bình luận / đánh giá ($_reviewCount)'),
                 ],
               ),
             ),
