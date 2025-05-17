@@ -49,6 +49,8 @@ class _CommentSectionState extends State<CommentSection> {
   int _totalComments = 0;
   bool _isLoadingMore = false;
 
+  int _visibleCommentCount = 5;
+
   @override
   void initState() {
     super.initState();
@@ -107,11 +109,18 @@ class _CommentSectionState extends State<CommentSection> {
     }
   }
 
+
   Future<void> _loadMoreComments() async {
-    if (_currentPage < _totalPages) {
-      await _fetchComments(page: _currentPage + 1);
+    if (_visibleCommentCount < _totalComments) {
+      setState(() {
+        _visibleCommentCount = (_visibleCommentCount + 5).clamp(0, _totalComments);
+      });
+      if (_visibleCommentCount > _comments.length && _currentPage < _totalPages) {
+        await _fetchComments(page: _currentPage + 1);
+      }
     }
   }
+
 
   Future<void> _pickImages({bool forReply = false, bool forEdit = false}) async {
     final picker = ImagePicker();
@@ -167,6 +176,7 @@ class _CommentSectionState extends State<CommentSection> {
         _comments.insert(0, newComment);
         _totalComments++;
         _totalPages = (_totalComments / 5).ceil();
+        _visibleCommentCount = _visibleCommentCount.clamp(0, _totalComments + 1);
         _commentController.clear();
         _selectedRating = 0.0;
         _selectedImages.clear();
@@ -238,6 +248,7 @@ class _CommentSectionState extends State<CommentSection> {
         _comments.removeWhere((comment) => comment.id == commentId);
         _totalComments--;
         _totalPages = (_totalComments / 5).ceil();
+        _visibleCommentCount = _visibleCommentCount.clamp(0, _totalComments);
         widget.onCommentCountChanged?.call(_totalComments);
       });
       _showSuccessSnackBar('Xóa bình luận thành công');
@@ -510,13 +521,14 @@ class _CommentSectionState extends State<CommentSection> {
             ListView.separated(
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
-              itemCount: _comments.length + (_currentPage < _totalPages ? 1 : 0),
+              itemCount: _visibleCommentCount.clamp(0, _comments.length) + (_visibleCommentCount < _totalComments ? 1 : 0),
               separatorBuilder: (context, index) => const SizedBox(height: 12),
               itemBuilder: (context, index) {
-                if (index == _comments.length && _currentPage < _totalPages) {
+                if (index == _visibleCommentCount.clamp(0, _comments.length) && _visibleCommentCount < _totalComments) {
                   return _LoadMoreButton(
                     isLoading: _isLoadingMore,
                     onPressed: _loadMoreComments,
+                    label: 'Hiển thị thêm bình luận',
                   );
                 }
                 final comment = _comments[index];
@@ -638,8 +650,9 @@ class _SectionTitle extends StatelessWidget {
 class _LoadMoreButton extends StatelessWidget {
   final bool isLoading;
   final VoidCallback onPressed;
+  final String label;
 
-  const _LoadMoreButton({required this.isLoading, required this.onPressed});
+  const _LoadMoreButton({required this.isLoading, required this.onPressed, required this.label});
 
   @override
   Widget build(BuildContext context) {
@@ -648,7 +661,7 @@ class _LoadMoreButton extends StatelessWidget {
           ? const CircularProgressIndicator()
           : TextButton(
         onPressed: onPressed,
-        child: const Text('Xem thêm bình luận', style: TextStyle(color: Colors.blue)),
+        child: Text(label, style: const TextStyle(color: Colors.blue)),
       ),
     );
   }
