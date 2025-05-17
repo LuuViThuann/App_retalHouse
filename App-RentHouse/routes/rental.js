@@ -202,14 +202,23 @@ router.get('/favorites', authMiddleware, async (req, res) => {
 router.get('/comments/:rentalId', async (req, res) => {
   try {
     const { rentalId } = req.params;
+    const { page = 1, limit = 5 } = req.query; // Default to 5 comments per page
     if (!mongoose.Types.ObjectId.isValid(rentalId)) return res.status(400).json({ message: 'Invalid rentalId format' });
+    
+    const skip = (parseInt(page) - 1) * parseInt(limit);
     const comments = await Comment.find({ rentalId })
+      .sort({ createdAt: -1 }) // Sort by newest first
+      .skip(skip)
+      .limit(parseInt(limit))
       .populate('userId', 'avatarBase64 username')
       .populate('replies.userId', 'username')
       .populate('likes.userId', 'username')
       .populate('replies.replies.userId', 'username')
       .populate('replies.likes.userId', 'username')
       .populate('replies.replies.likes.userId', 'username');
+    
+    const totalComments = await Comment.countDocuments({ rentalId });
+    
     const adjustedComments = comments.map(comment => {
       const commentObj = comment.toObject();
       commentObj.createdAt = new Date(comment.createdAt.getTime() + 7 * 60 * 60 * 1000);
@@ -232,7 +241,13 @@ router.get('/comments/:rentalId', async (req, res) => {
       commentObj.likes = commentObj.likes.map(like => ({ ...like, createdAt: new Date(like.createdAt.getTime() + 7 * 60 * 60 * 1000) }));
       return commentObj;
     });
-    res.json(adjustedComments);
+    
+    res.json({
+      comments: adjustedComments,
+      totalComments,
+      currentPage: parseInt(page),
+      totalPages: Math.ceil(totalComments / parseInt(limit))
+    });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
@@ -288,14 +303,28 @@ router.post('/comments', authMiddleware, upload.array('images'), async (req, res
   }
 });
 
-router.put('/comments/:commentId', authMiddleware, async (req, res) => {
+router.put('/comments/:commentId', authMiddleware, upload.array('images'), async (req, res) => {
   try {
     const { commentId } = req.params;
-    const { content } = req.body;
+    const { content, imagesToRemove } = req.body;
     if (!mongoose.Types.ObjectId.isValid(commentId) || !content) return res.status(400).json({ message: 'Invalid format or missing content' });
     const comment = await Comment.findById(commentId);
     if (!comment || comment.userId !== req.userId) return res.status(403).json({ message: 'Unauthorized or not found' });
+    
     comment.content = content;
+    
+    // Handle image removal
+    if (imagesToRemove) {
+      const imagesToRemoveArray = Array.isArray(imagesToRemove) ? imagesToRemove : JSON.parse(imagesToRemove || '[]');
+      comment.images = comment.images.filter(img => !imagesToRemoveArray.includes(img));
+    }
+    
+    // Handle new image uploads
+    if (req.files.length > 0) {
+      const newImageUrls = req.files.map(file => `/uploads/${file.filename}`);
+      comment.images = [...comment.images, ...newImageUrls];
+    }
+    
     const updatedComment = await comment.save();
     const populatedComment = await Comment.findById(commentId)
       .populate('userId', 'avatarBase64 username')
@@ -304,6 +333,7 @@ router.put('/comments/:commentId', authMiddleware, async (req, res) => {
       .populate('replies.replies.userId', 'username')
       .populate('replies.likes.userId', 'username')
       .populate('replies.replies.likes.userId', 'username');
+    
     const adjustedComment = {
       ...populatedComment.toObject(),
       createdAt: new Date(populatedComment.createdAt.getTime() + 7 * 60 * 60 * 1000),
@@ -325,11 +355,13 @@ router.put('/comments/:commentId', authMiddleware, async (req, res) => {
       })),
       likes: populatedComment.likes.map(like => ({ ...like.toObject(), createdAt: new Date(like.createdAt.getTime() + 7 * 60 * 60 * 1000) })),
     };
+    
     res.status(200).json(adjustedComment);
   } catch (err) {
     res.status(400).json({ message: err.message });
   }
 });
+
 
 router.delete('/comments/:commentId', authMiddleware, async (req, res) => {
   try {
@@ -439,16 +471,27 @@ router.post('/comments/:commentId/replies/:replyId/nested-replies', authMiddlewa
 router.put('/comments/:commentId/replies/:replyId', authMiddleware, upload.array('images'), async (req, res) => {
   try {
     const { commentId, replyId } = req.params;
-    const { content } = req.body;
+    const { content, imagesToRemove } = req.body;
     if (!mongoose.Types.ObjectId.isValid(commentId) || !mongoose.Types.ObjectId.isValid(replyId) || !content) return res.status(400).json({ message: 'Invalid format or missing content' });
     const comment = await Comment.findById(commentId);
     if (!comment) return res.status(404).json({ message: 'Comment not found' });
     const reply = comment.replies.id(replyId);
     if (!reply || reply.userId !== req.userId) return res.status(403).json({ message: 'Unauthorized or reply not found' });
+    
     reply.content = content;
-    if (req.files.length > 0) {
-      reply.images = req.files.map(file => `/uploads/${file.filename}`);
+    
+    // Handle image removal
+    if (imagesToRemove) {
+      const imagesToRemoveArray = Array.isArray(imagesToRemove) ? imagesToRemove : JSON.parse(imagesToRemove || '[]');
+      reply.images = reply.images.filter(img => !imagesToRemoveArray.includes(img));
     }
+    
+    // Handle new image uploads
+    if (req.files.length > 0) {
+      const newImageUrls = req.files.map(file => `/uploads/${file.filename}`);
+      reply.images = [...reply.images, ...newImageUrls];
+    }
+    
     const updatedComment = await comment.save();
     const populatedComment = await Comment.findById(commentId)
       .populate('userId', 'avatarBase64 username')
@@ -457,6 +500,7 @@ router.put('/comments/:commentId/replies/:replyId', authMiddleware, upload.array
       .populate('replies.replies.userId', 'username')
       .populate('replies.likes.userId', 'username')
       .populate('replies.replies.likes.userId', 'username');
+    
     const adjustedComment = {
       ...populatedComment.toObject(),
       createdAt: new Date(populatedComment.createdAt.getTime() + 7 * 60 * 60 * 1000),
@@ -478,6 +522,7 @@ router.put('/comments/:commentId/replies/:replyId', authMiddleware, upload.array
       })),
       likes: populatedComment.likes.map(like => ({ ...like.toObject(), createdAt: new Date(like.createdAt.getTime() + 7 * 60 * 60 * 1000) })),
     };
+    
     res.status(200).json(adjustedComment);
   } catch (err) {
     res.status(400).json({ message: err.message });

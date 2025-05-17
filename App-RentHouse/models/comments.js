@@ -31,13 +31,13 @@ const commentSchema = new mongoose.Schema({
   replies: [{
     userId: { type: String, ref: 'User', required: true },
     content: { type: String, required: true },
-    images: [{ type: String }], // Added images field for replies
+    images: [{ type: String }],
     createdAt: { type: Date, default: Date.now },
     likes: [{
       userId: { type: String, ref: 'User', required: true },
       createdAt: { type: Date, default: Date.now },
     }],
-    replies: [{ // Added nested replies
+    replies: [{
       userId: { type: String, ref: 'User', required: true },
       content: { type: String, required: true },
       images: [{ type: String }],
@@ -47,11 +47,13 @@ const commentSchema = new mongoose.Schema({
         createdAt: { type: Date, default: Date.now },
       }],
     }],
+    icon: { type: String, default: '/assets/img/arr.jpg' }, // Added specific icon for reply source identification
   }],
   likes: [{
     userId: { type: String, ref: 'User', required: true },
     createdAt: { type: Date, default: Date.now },
   }],
+  isHidden: { type: Boolean, default: false }, // Added to handle hiding comments
 });
 
 module.exports = mongoose.model('Comment', commentSchema);

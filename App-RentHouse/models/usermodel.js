@@ -2,8 +2,8 @@ const mongoose = require('mongoose');
 const bcrypt = require('bcrypt');
 
 const userSchema = new mongoose.Schema({
-  _id: {
-    type: String, // Explicitly define _id as String to match Firebase UID
+  _id: { // sử dụng ObjectId tự động
+    type: String, 
     required: true,
   },
   username: {
@@ -13,13 +13,13 @@ const userSchema = new mongoose.Schema({
   },
   password: {
     type: String,
-    required: false, // Changed to optional since Firebase manages passwords
-  },
+    required: false, 
+  },  
   email: {
     type: String,
-    required: false, // Changed to optional with a fallback in the endpoint
+    required: false, 
     unique: true,
-    sparse: true, // Allows multiple documents with no email field
+    sparse: true, // cho phép nhiều bản ghi có giá trị null
   },
   phoneNumber: {
     type: String,
@@ -27,11 +27,11 @@ const userSchema = new mongoose.Schema({
   },
   avatarBase64: {
     type: String,
-    default: null, // Store Base64 string of the profile image
+    default: null, // lưu trữ ảnh đại diện dưới dạng base64
   },
 });
 
-// Remove pre-save middleware for password hashing since Firebase manages authentication
+// Không cần mã hóa mật khẩu vì Firebase đã xử lý điều đó
 userSchema.pre('save', async function (next) {
   next();
 });

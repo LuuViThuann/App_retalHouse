@@ -41,7 +41,13 @@ class _CommentSectionState extends State<CommentSection> {
   String? _ratingError;
   List<XFile> _selectedImages = [];
   List<XFile> _selectedReplyImages = [];
+  List<XFile> _editSelectedImages = [];
+  List<String> _editImagesToRemove = [];
   Set<String> _expandedReplies = {};
+  int _currentPage = 1;
+  int _totalPages = 1;
+  int _totalComments = 0;
+  bool _isLoadingMore = false;
 
   @override
   void initState() {
@@ -63,10 +69,14 @@ class _CommentSectionState extends State<CommentSection> {
     }
   }
 
-  Future<void> _fetchComments() async {
-    setState(() => _isLoading = true);
+  Future<void> _fetchComments({int page = 1}) async {
+    if (page == 1) {
+      setState(() => _isLoading = true);
+    } else {
+      setState(() => _isLoadingMore = true);
+    }
     try {
-      final response = await http.get(Uri.parse('${ApiRoutes.rentals}/${widget.rentalId}'));
+      final response = await http.get(Uri.parse('${ApiRoutes.comments}/${widget.rentalId}?page=$page&limit=5'));
       if (response.statusCode != 200) {
         throw Exception('Failed to load comments: ${response.statusCode} - ${response.body}');
       }
@@ -77,23 +87,41 @@ class _CommentSectionState extends State<CommentSection> {
           .where((comment) => comment.userId.id.isNotEmpty)
           .toList();
       setState(() {
-        _comments = comments;
-        widget.onCommentCountChanged?.call(_comments.length);
+        if (page == 1) {
+          _comments = comments;
+        } else {
+          _comments.addAll(comments);
+        }
+        _totalComments = data['totalComments'] ?? 0;
+        _currentPage = data['currentPage'] ?? 1;
+        _totalPages = data['totalPages'] ?? 1;
+        widget.onCommentCountChanged?.call(_totalComments);
       });
     } catch (e) {
       _showErrorSnackBar('Lỗi khi tải bình luận: $e');
     } finally {
-      setState(() => _isLoading = false);
+      setState(() {
+        _isLoading = false;
+        _isLoadingMore = false;
+      });
     }
   }
 
-  Future<void> _pickImages({bool forReply = false}) async {
+  Future<void> _loadMoreComments() async {
+    if (_currentPage < _totalPages) {
+      await _fetchComments(page: _currentPage + 1);
+    }
+  }
+
+  Future<void> _pickImages({bool forReply = false, bool forEdit = false}) async {
     final picker = ImagePicker();
     final pickedFiles = await picker.pickMultiImage();
     if (pickedFiles.isNotEmpty) {
       setState(() {
         if (forReply) {
           _selectedReplyImages.addAll(pickedFiles);
+        } else if (forEdit) {
+          _editSelectedImages.addAll(pickedFiles);
         } else {
           _selectedImages.addAll(pickedFiles);
         }
@@ -137,10 +165,12 @@ class _CommentSectionState extends State<CommentSection> {
       final newComment = Comment.fromJson(data);
       setState(() {
         _comments.insert(0, newComment);
+        _totalComments++;
+        _totalPages = (_totalComments / 5).ceil();
         _commentController.clear();
         _selectedRating = 0.0;
         _selectedImages.clear();
-        widget.onCommentCountChanged?.call(_comments.length);
+        widget.onCommentCountChanged?.call(_totalComments);
       });
     } catch (e) {
       _showErrorSnackBar('Lỗi khi đăng bình luận: $e');
@@ -159,19 +189,25 @@ class _CommentSectionState extends State<CommentSection> {
     try {
       final token = authViewModel.currentUser!.token;
       if (token == null || token.isEmpty) throw Exception('No valid token found');
-      final response = await http.put(
-        Uri.parse('${ApiRoutes.comments}/$commentId'),
-        headers: {'Content-Type': 'application/json', 'Authorization': 'Bearer $token'},
-        body: jsonEncode({'content': newContent}),
-      );
-      if (response.statusCode != 200) {
-        throw Exception(jsonDecode(response.body)['message'] ?? 'Chỉnh sửa bình luận thất bại');
+      var request = http.MultipartRequest('PUT', Uri.parse('${ApiRoutes.comments}/$commentId'));
+      request.headers['Authorization'] = 'Bearer $token';
+      request.fields['content'] = newContent;
+      request.fields['imagesToRemove'] = jsonEncode(_editImagesToRemove);
+      for (var image in _editSelectedImages) {
+        request.files.add(await http.MultipartFile.fromPath('images', image.path));
       }
-      final updatedComment = Comment.fromJson(jsonDecode(response.body));
+      final response = await request.send();
+      final responseBody = await response.stream.bytesToString();
+      if (response.statusCode != 200) {
+        throw Exception(jsonDecode(responseBody)['message'] ?? 'Chỉnh sửa bình luận thất bại');
+      }
+      final updatedComment = Comment.fromJson(jsonDecode(responseBody));
       setState(() {
         final index = _comments.indexWhere((c) => c.id == commentId);
         if (index != -1) _comments[index] = updatedComment;
         _editingCommentId = null;
+        _editSelectedImages.clear();
+        _editImagesToRemove.clear();
       });
       _showSuccessSnackBar('Chỉnh sửa bình luận thành công');
     } catch (e) {
@@ -200,7 +236,9 @@ class _CommentSectionState extends State<CommentSection> {
       }
       setState(() {
         _comments.removeWhere((comment) => comment.id == commentId);
-        widget.onCommentCountChanged?.call(_comments.length);
+        _totalComments--;
+        _totalPages = (_totalComments / 5).ceil();
+        widget.onCommentCountChanged?.call(_totalComments);
       });
       _showSuccessSnackBar('Xóa bình luận thành công');
     } catch (e) {
@@ -270,6 +308,10 @@ class _CommentSectionState extends State<CommentSection> {
       );
       request.headers['Authorization'] = 'Bearer $token';
       request.fields['content'] = newContent;
+      request.fields['imagesToRemove'] = jsonEncode(_editImagesToRemove);
+      for (var image in _editSelectedImages) {
+        request.files.add(await http.MultipartFile.fromPath('images', image.path));
+      }
       final response = await request.send();
       final responseBody = await response.stream.bytesToString();
       if (response.statusCode != 200) {
@@ -280,6 +322,8 @@ class _CommentSectionState extends State<CommentSection> {
         final index = _comments.indexWhere((c) => c.id == commentId);
         if (index != -1) _comments[index] = updatedComment;
         _editingReplyId = null;
+        _editSelectedImages.clear();
+        _editImagesToRemove.clear();
       });
       _showSuccessSnackBar('Chỉnh sửa phản hồi thành công');
     } catch (e) {
@@ -466,9 +510,15 @@ class _CommentSectionState extends State<CommentSection> {
             ListView.separated(
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
-              itemCount: _comments.length,
+              itemCount: _comments.length + (_currentPage < _totalPages ? 1 : 0),
               separatorBuilder: (context, index) => const SizedBox(height: 12),
               itemBuilder: (context, index) {
+                if (index == _comments.length && _currentPage < _totalPages) {
+                  return _LoadMoreButton(
+                    isLoading: _isLoadingMore,
+                    onPressed: _loadMoreComments,
+                  );
+                }
                 final comment = _comments[index];
                 final user = comment.userId;
                 final hasLiked = comment.likes.any((like) => like.userId == currentUserId);
@@ -490,6 +540,8 @@ class _CommentSectionState extends State<CommentSection> {
                   replyController: _replyController,
                   isExpanded: isExpanded,
                   selectedReplyImages: _selectedReplyImages,
+                  editSelectedImages: _editSelectedImages,
+                  editImagesToRemove: _editImagesToRemove,
                   onDelete: () => _deleteComment(comment.id),
                   onToggleLike: () => _toggleLike(comment.id),
                   onToggleReplyLike: (replyId) => _toggleReplyLike(comment.id, replyId),
@@ -509,12 +561,16 @@ class _CommentSectionState extends State<CommentSection> {
                     setState(() {
                       _editingCommentId = comment.id;
                       _editController.text = comment.content;
+                      _editImagesToRemove.clear();
+                      _editSelectedImages.clear();
                     });
                   },
                   onSaveEditComment: (newContent) => _editComment(comment.id, newContent),
                   onCancelEdit: () => setState(() {
                     _editingCommentId = null;
                     _editingReplyId = null;
+                    _editImagesToRemove.clear();
+                    _editSelectedImages.clear();
                   }),
                   onToggleReplies: () => setState(() {
                     if (isExpanded) {
@@ -527,6 +583,8 @@ class _CommentSectionState extends State<CommentSection> {
                     setState(() {
                       _editingReplyId = replyId;
                       _editController.text = content;
+                      _editImagesToRemove.clear();
+                      _editSelectedImages.clear();
                     });
                   },
                   onSaveEditReply: (replyId, newContent) => _editReply(comment.id, replyId, newContent),
@@ -534,6 +592,11 @@ class _CommentSectionState extends State<CommentSection> {
                   onImageTap: _showFullScreenImage,
                   onPickReplyImages: () => _pickImages(forReply: true),
                   onRemoveReplyImage: (index) => setState(() => _selectedReplyImages.removeAt(index)),
+                  onPickEditImages: () => _pickImages(forEdit: true),
+                  onRemoveEditImage: (index) => setState(() => _editSelectedImages.removeAt(index)),
+                  onRemoveExistingImage: (imageUrl) => setState(() {
+                    _editImagesToRemove.add(imageUrl);
+                  }),
                 );
               },
             ),
@@ -567,6 +630,25 @@ class _SectionTitle extends StatelessWidget {
         fontWeight: FontWeight.w600,
         color: Colors.black87,
         letterSpacing: 0.5,
+      ),
+    );
+  }
+}
+
+class _LoadMoreButton extends StatelessWidget {
+  final bool isLoading;
+  final VoidCallback onPressed;
+
+  const _LoadMoreButton({required this.isLoading, required this.onPressed});
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: isLoading
+          ? const CircularProgressIndicator()
+          : TextButton(
+        onPressed: onPressed,
+        child: const Text('Xem thêm bình luận', style: TextStyle(color: Colors.blue)),
       ),
     );
   }
@@ -805,6 +887,8 @@ class _CommentItem extends StatelessWidget {
   final TextEditingController replyController;
   final bool isExpanded;
   final List<XFile> selectedReplyImages;
+  final List<XFile> editSelectedImages;
+  final List<String> editImagesToRemove;
   final VoidCallback onDelete;
   final VoidCallback onToggleLike;
   final ValueChanged<String> onToggleReplyLike;
@@ -822,6 +906,9 @@ class _CommentItem extends StatelessWidget {
   final ValueChanged<String> onImageTap;
   final VoidCallback onPickReplyImages;
   final ValueChanged<int> onRemoveReplyImage;
+  final VoidCallback onPickEditImages;
+  final ValueChanged<int> onRemoveEditImage;
+  final ValueChanged<String> onRemoveExistingImage;
 
   const _CommentItem({
     required this.comment,
@@ -839,6 +926,8 @@ class _CommentItem extends StatelessWidget {
     required this.replyController,
     required this.isExpanded,
     required this.selectedReplyImages,
+    required this.editSelectedImages,
+    required this.editImagesToRemove,
     required this.onDelete,
     required this.onToggleLike,
     required this.onToggleReplyLike,
@@ -856,6 +945,9 @@ class _CommentItem extends StatelessWidget {
     required this.onImageTap,
     required this.onPickReplyImages,
     required this.onRemoveReplyImage,
+    required this.onPickEditImages,
+    required this.onRemoveEditImage,
+    required this.onRemoveExistingImage,
   });
 
   void _showCommentDropdownMenu(BuildContext context) {
@@ -1023,6 +1115,7 @@ class _CommentItem extends StatelessWidget {
             const SizedBox(height: 8),
             if (isEditing)
               Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   TextField(
                     controller: editController,
@@ -1031,6 +1124,97 @@ class _CommentItem extends StatelessWidget {
                       border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
                     ),
                   ),
+                  const SizedBox(height: 8),
+                  GestureDetector(
+                    onTap: onPickEditImages,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: Colors.blue.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.add_a_photo, size: 16, color: Colors.blue),
+                          SizedBox(width: 6),
+                          Text(
+                            "Thêm ảnh",
+                            style: TextStyle(fontSize: 14, color: Colors.blue),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  if (comment.images.isNotEmpty || editSelectedImages.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 8),
+                      child: SizedBox(
+                        height: 80,
+                        child: ListView.builder(
+                          scrollDirection: Axis.horizontal,
+                          itemCount: comment.images.length + editSelectedImages.length,
+                          itemBuilder: (context, index) {
+                            if (index < comment.images.length) {
+                              final imageUrl = comment.images[index];
+                              if (editImagesToRemove.contains(imageUrl)) return const SizedBox.shrink();
+                              return Padding(
+                                padding: const EdgeInsets.only(right: 8),
+                                child: Stack(
+                                  children: [
+                                    CachedNetworkImage(
+                                      imageUrl: '${ApiRoutes.serverBaseUrl}$imageUrl',
+                                      width: 80,
+                                      height: 80,
+                                      fit: BoxFit.cover,
+                                      placeholder: (context, url) => const CircularProgressIndicator(),
+                                      errorWidget: (context, url, error) => const Icon(Icons.error),
+                                    ),
+                                    Positioned(
+                                      top: 0,
+                                      right: 0,
+                                      child: GestureDetector(
+                                        onTap: () => onRemoveExistingImage(imageUrl),
+                                        child: Container(
+                                          color: Colors.black54,
+                                          child: const Icon(Icons.close, color: Colors.white, size: 16),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              );
+                            } else {
+                              final newImageIndex = index - comment.images.length;
+                              return Padding(
+                                padding: const EdgeInsets.only(right: 8),
+                                child: Stack(
+                                  children: [
+                                    Image.file(
+                                      File(editSelectedImages[newImageIndex].path),
+                                      width: 80,
+                                      height: 80,
+                                      fit: BoxFit.cover,
+                                    ),
+                                    Positioned(
+                                      top: 0,
+                                      right: 0,
+                                      child: GestureDetector(
+                                        onTap: () => onRemoveEditImage(newImageIndex),
+                                        child: Container(
+                                          color: Colors.black54,
+                                          child: const Icon(Icons.close, color: Colors.white, size: 16),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              );
+                            }
+                          },
+                        ),
+                      ),
+                    ),
                   const SizedBox(height: 8),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.end,
@@ -1209,6 +1393,7 @@ class _CommentItem extends StatelessWidget {
                 const SizedBox(height: 4),
                 if (isEditingReply)
                   Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       TextField(
                         controller: editController,
@@ -1217,6 +1402,97 @@ class _CommentItem extends StatelessWidget {
                           border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
                         ),
                       ),
+                      const SizedBox(height: 8),
+                      GestureDetector(
+                        onTap: onPickEditImages,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: Colors.blue.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          child: const Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.add_a_photo, size: 16, color: Colors.blue),
+                              SizedBox(width: 6),
+                              Text(
+                                "Thêm ảnh",
+                                style: TextStyle(fontSize: 14, color: Colors.blue),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      if (reply.images.isNotEmpty || editSelectedImages.isNotEmpty)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 8),
+                          child: SizedBox(
+                            height: 60,
+                            child: ListView.builder(
+                              scrollDirection: Axis.horizontal,
+                              itemCount: reply.images.length + editSelectedImages.length,
+                              itemBuilder: (context, index) {
+                                if (index < reply.images.length) {
+                                  final imageUrl = reply.images[index];
+                                  if (editImagesToRemove.contains(imageUrl)) return const SizedBox.shrink();
+                                  return Padding(
+                                    padding: const EdgeInsets.only(right: 8),
+                                    child: Stack(
+                                      children: [
+                                        CachedNetworkImage(
+                                          imageUrl: '${ApiRoutes.serverBaseUrl}$imageUrl',
+                                          width: 60,
+                                          height: 60,
+                                          fit: BoxFit.cover,
+                                          placeholder: (context, url) => const CircularProgressIndicator(),
+                                          errorWidget: (context, url, error) => const Icon(Icons.error),
+                                        ),
+                                        Positioned(
+                                          top: 0,
+                                          right: 0,
+                                          child: GestureDetector(
+                                            onTap: () => onRemoveExistingImage(imageUrl),
+                                            child: Container(
+                                              color: Colors.black54,
+                                              child: const Icon(Icons.close, color: Colors.white, size: 16),
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  );
+                                } else {
+                                  final newImageIndex = index - reply.images.length;
+                                  return Padding(
+                                    padding: const EdgeInsets.only(right: 8),
+                                    child: Stack(
+                                      children: [
+                                        Image.file(
+                                          File(editSelectedImages[newImageIndex].path),
+                                          width: 60,
+                                          height: 60,
+                                          fit: BoxFit.cover,
+                                        ),
+                                        Positioned(
+                                          top: 0,
+                                          right: 0,
+                                          child: GestureDetector(
+                                            onTap: () => onRemoveEditImage(newImageIndex),
+                                            child: Container(
+                                              color: Colors.black54,
+                                              child: const Icon(Icons.close, color: Colors.white, size: 16),
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  );
+                                }
+                              },
+                            ),
+                          ),
+                        ),
                       const SizedBox(height: 8),
                       Row(
                         mainAxisAlignment: MainAxisAlignment.end,
