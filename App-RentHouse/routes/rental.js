@@ -211,15 +211,23 @@ router.post('/favorites', authMiddleware, async (req, res) => {
 router.delete('/favorites/:rentalId', authMiddleware, async (req, res) => {
   try {
     const rentalId = req.params.rentalId;
+
     const rental = await Rental.findById(rentalId);
-    if (!rental) return res.status(404).json({ message: 'Rental not found' });
+    if (!rental) {
+      return res.status(404).json({ message: 'Rental not found' });
+    }
+
     const result = await Favorite.findOneAndDelete({ userId: req.userId, rentalId });
-    if (!result) return res.status(404).json({ message: 'Favorite not found' });
+    if (!result) {
+      return res.status(404).json({ message: 'Favorite not found' });
+    }
+
     res.json({ message: 'Removed from favorites' });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
 });
+
 
 router.get('/favorites', authMiddleware, async (req, res) => {
   try {

@@ -1,16 +1,16 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+
 import 'package:flutter_rentalhouse/Widgets/comment_user.dart';
-import 'package:flutter_rentalhouse/Widgets/full_screen_image.dart';
+import 'package:flutter_rentalhouse/Widgets/detail_tab.dart';
+import 'package:flutter_rentalhouse/models/rental.dart';
+import 'package:flutter_rentalhouse/services/rental_service.dart';
+import 'package:flutter_rentalhouse/widgets/info_chip.dart';
+
 import 'package:intl/intl.dart';
-import 'package:provider/provider.dart';
-import '../models/rental.dart';
-import '../services/auth_service.dart';
-import '../viewmodels/vm_auth.dart';
-import '../config/api_routes.dart';
-import 'dart:convert';
-import 'package:http/http.dart' as http;
 import 'package:photo_view/photo_view.dart';
+
+import '../config/api_routes.dart';
 
 class RentalDetailScreen extends StatefulWidget {
   final Rental rental;
@@ -21,13 +21,15 @@ class RentalDetailScreen extends StatefulWidget {
   _RentalDetailScreenState createState() => _RentalDetailScreenState();
 }
 
-class _RentalDetailScreenState extends State<RentalDetailScreen> with SingleTickerProviderStateMixin {
+class _RentalDetailScreenState extends State<RentalDetailScreen>
+    with SingleTickerProviderStateMixin {
   int _selectedImageIndex = 0;
   bool _isFavorite = false;
   bool _isLoadingFavorite = true;
   double _averageRating = 0.0;
   int _reviewCount = 0;
   late TabController _tabController;
+  final RentalService _rentalService = RentalService();
 
   @override
   void initState() {
@@ -38,135 +40,75 @@ class _RentalDetailScreenState extends State<RentalDetailScreen> with SingleTick
         setState(() {});
       }
     });
-    _checkFavoriteStatus();
-    _fetchRentalDetails();
+    _initializeData();
   }
 
-  Future<void> _fetchRentalDetails() async {
-    try {
-      final response = await http.get(Uri.parse('${ApiRoutes.rentals}/${widget.rental.id}'));
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
+  Future<void> _initializeData() async {
+    await _rentalService.fetchRentalDetails(
+      rental: widget.rental,
+      onSuccess: (averageRating, reviewCount) {
         setState(() {
-          _averageRating = (data['averageRating'] as num?)?.toDouble() ?? 0.0;
-          _reviewCount = (data['comments'] as List<dynamic>?)?.length ?? 0;
+          _averageRating = averageRating;
+          _reviewCount = reviewCount;
         });
-      }
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Lỗi khi tải thông tin: $e')),
-      );
-    }
-  }
+      },
+      onError: (error) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(error)),
+        );
+      },
+      context: context,
+    );
 
-  Future<void> _checkFavoriteStatus() async {
-    final authViewModel = Provider.of<AuthViewModel>(context, listen: false);
-    if (authViewModel.currentUser == null) {
-      setState(() {
-        _isFavorite = false;
-        _isLoadingFavorite = false;
-      });
-      return;
-    }
-
-    try {
-      final token = await AuthService().getIdToken();
-      if (token == null) {
-        setState(() {
-          _isFavorite = false;
-          _isLoadingFavorite = false;
-        });
-        return;
-      }
-
-      final response = await http.get(
-        Uri.parse('${ApiRoutes.baseUrl}/favorites'),
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $token',
-        },
-      );
-
-      if (response.statusCode == 200) {
-        final List<dynamic> favorites = jsonDecode(response.body);
-        final isFavorited = favorites.any((favorite) =>
-        favorite['rentalId']['_id'] == widget.rental.id);
+    await _rentalService.checkFavoriteStatus(
+      rental: widget.rental,
+      onSuccess: (isFavorited) {
         setState(() {
           _isFavorite = isFavorited;
           _isLoadingFavorite = false;
         });
-      } else {
+      },
+      onError: (error) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(error)),
+        );
         setState(() {
           _isFavorite = false;
           _isLoadingFavorite = false;
         });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Không thể tải trạng thái yêu thích: ${response.statusCode}')),
-        );
-      }
-    } catch (e) {
-      setState(() {
-        _isFavorite = false;
-        _isLoadingFavorite = false;
-      });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Lỗi khi kiểm tra trạng thái yêu thích: $e')),
-      );
-    }
+      },
+      context: context,
+    );
   }
 
   Future<void> _toggleFavorite() async {
-    final authViewModel = Provider.of<AuthViewModel>(context, listen: false);
-    if (authViewModel.currentUser == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Vui lòng đăng nhập để thêm vào yêu thích')),
-      );
-      return;
-    }
-
     setState(() => _isLoadingFavorite = true);
-    try {
-      final token = await AuthService().getIdToken();
-      if (token == null) throw Exception('No valid token found');
-
-      final url = _isFavorite
-          ? '${ApiRoutes.baseUrl}/favorites/${widget.rental.id}'
-          : '${ApiRoutes.baseUrl}/favorites';
-      final response = _isFavorite
-          ? await http.delete(
-        Uri.parse(url),
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $token',
-        },
-      )
-          : await http.post(
-        Uri.parse(url),
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $token',
-        },
-        body: jsonEncode({'rentalId': widget.rental.id}),
-      );
-
-      if (response.statusCode == 200 || response.statusCode == 201) {
-        setState(() => _isFavorite = !_isFavorite);
+    await _rentalService.toggleFavorite(
+      rental: widget.rental,
+      isFavorite: _isFavorite,
+      onSuccess: (newFavoriteStatus) {
+        setState(() {
+          _isFavorite = newFavoriteStatus;
+          _isLoadingFavorite = false;
+        });
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-              content: Text(_isFavorite
+            content: Text(
+              newFavoriteStatus
                   ? 'Đã thêm vào yêu thích'
-                  : 'Đã xóa khỏi yêu thích')),
+                  : 'Đã xóa khỏi yêu thích',
+            ),
+          ),
         );
-      } else {
-        throw Exception('Failed to toggle favorite: ${response.body}');
-      }
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Lỗi khi cập nhật yêu thích: $e')),
-      );
-    } finally {
-      setState(() => _isLoadingFavorite = false);
-    }
+      },
+      onError: (error) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(error)),
+        );
+        setState(() => _isLoadingFavorite = false);
+      },
+      context: context,
+    );
   }
 
   void _showFullScreenImage(String imageUrl) {
@@ -200,7 +142,8 @@ class _RentalDetailScreenState extends State<RentalDetailScreen> with SingleTick
   }
 
   String formatCurrency(double amount) {
-    final formatter = NumberFormat.currency(locale: 'vi_VN', symbol: 'VNĐ', decimalDigits: 0);
+    final formatter =
+    NumberFormat.currency(locale: 'vi_VN', symbol: 'VNĐ', decimalDigits: 0);
     return formatter.format(amount);
   }
 
@@ -236,8 +179,10 @@ class _RentalDetailScreenState extends State<RentalDetailScreen> with SingleTick
                   child: CachedNetworkImage(
                     imageUrl: mainImageUrl,
                     fit: BoxFit.cover,
-                    placeholder: (context, url) => const Center(child: CircularProgressIndicator()),
-                    errorWidget: (context, url, error) => const Icon(Icons.error, size: 50),
+                    placeholder: (context, url) =>
+                    const Center(child: CircularProgressIndicator()),
+                    errorWidget: (context, url, error) =>
+                    const Icon(Icons.error, size: 50),
                   ),
                 ),
               ),
@@ -269,12 +214,14 @@ class _RentalDetailScreenState extends State<RentalDetailScreen> with SingleTick
                       const SizedBox(height: 8),
                       Row(
                         children: [
-                          const Icon(Icons.location_on, size: 16, color: Colors.grey),
+                          const Icon(Icons.location_on,
+                              size: 16, color: Colors.grey),
                           const SizedBox(width: 4),
                           Expanded(
                             child: Text(
                               widget.rental.location['fullAddress'],
-                              style: const TextStyle(fontSize: 16, color: Colors.grey),
+                              style: const TextStyle(
+                                  fontSize: 16, color: Colors.grey),
                             ),
                           ),
                         ],
@@ -284,22 +231,22 @@ class _RentalDetailScreenState extends State<RentalDetailScreen> with SingleTick
                         scrollDirection: Axis.horizontal,
                         child: Row(
                           children: [
-                            _InfoChip(
+                            InfoChip(
                               label: 'Loại chỗ ở',
                               value: widget.rental.propertyType,
                             ),
-                            SizedBox(width: 4),
-                            _InfoChip(
+                            const SizedBox(width: 4),
+                            const InfoChip(
                               label: 'Phong cách',
                               value: 'Hiện đại',
                             ),
-                            SizedBox(width: 4),
-                            _InfoChip(
+                            const SizedBox(width: 4),
+                            const InfoChip(
                               label: 'Chi phí',
                               value: 'Phù hợp',
                             ),
-                            SizedBox(width: 4),
-                            _InfoChip(
+                            const SizedBox(width: 4),
+                            const InfoChip(
                               label: 'Hợp đồng',
                               value: 'Đơn giản',
                             ),
@@ -353,14 +300,15 @@ class _RentalDetailScreenState extends State<RentalDetailScreen> with SingleTick
                                   const SizedBox(width: 8),
                                   Text(
                                     '($_reviewCount lượt đánh giá)',
-                                    style: const TextStyle(fontSize: 16, color: Colors.grey),
+                                    style: const TextStyle(
+                                        fontSize: 16, color: Colors.grey),
                                   ),
                                 ],
                               ),
                             ],
                           ),
                           GestureDetector(
-                            onTap: _toggleFavorite,
+                            onTap: () {},
                             child: Container(
                               padding: const EdgeInsets.all(10),
                               margin: const EdgeInsets.only(right: 16),
@@ -378,8 +326,11 @@ class _RentalDetailScreenState extends State<RentalDetailScreen> with SingleTick
                                 ),
                               )
                                   : Icon(
-                                _isFavorite ? Icons.favorite : Icons.favorite_border,
-                                color: _isFavorite ? Colors.red : Colors.grey,
+                                _isFavorite
+                                    ? Icons.favorite
+                                    : Icons.favorite_border,
+                                color:
+                                _isFavorite ? Colors.red : Colors.grey,
                                 size: 24,
                               ),
                             ),
@@ -395,7 +346,8 @@ class _RentalDetailScreenState extends State<RentalDetailScreen> with SingleTick
                             scrollDirection: Axis.horizontal,
                             itemCount: widget.rental.images.length,
                             itemBuilder: (context, index) {
-                              final imageUrl = '${ApiRoutes.baseUrl.replaceAll('/api', '')}${widget.rental.images[index]}';
+                              final imageUrl =
+                                  '${ApiRoutes.baseUrl.replaceAll('/api', '')}${widget.rental.images[index]}';
                               return GestureDetector(
                                 onTap: () {
                                   setState(() {
@@ -403,12 +355,16 @@ class _RentalDetailScreenState extends State<RentalDetailScreen> with SingleTick
                                   });
                                 },
                                 child: Container(
-                                  margin: const EdgeInsets.symmetric(horizontal: 4.0),
+                                  margin: const EdgeInsets.symmetric(
+                                      horizontal: 4.0),
                                   width: 80,
                                   decoration: BoxDecoration(
                                     border: Border.all(
-                                      color: _selectedImageIndex == index ? Colors.blue[700]! : Colors.grey[300]!,
-                                      width: _selectedImageIndex == index ? 2 : 1,
+                                      color: _selectedImageIndex == index
+                                          ? Colors.blue[700]!
+                                          : Colors.grey[300]!,
+                                      width:
+                                      _selectedImageIndex == index ? 2 : 1,
                                     ),
                                     borderRadius: BorderRadius.circular(12),
                                   ),
@@ -417,8 +373,10 @@ class _RentalDetailScreenState extends State<RentalDetailScreen> with SingleTick
                                     child: CachedNetworkImage(
                                       imageUrl: imageUrl,
                                       fit: BoxFit.cover,
-                                      placeholder: (context, url) => const Center(child: CircularProgressIndicator()),
-                                      errorWidget: (context, url, error) => const Icon(Icons.error),
+                                      placeholder: (context, url) => const Center(
+                                          child: CircularProgressIndicator()),
+                                      errorWidget: (context, url, error) =>
+                                      const Icon(Icons.error),
                                     ),
                                   ),
                                 ),
@@ -431,18 +389,23 @@ class _RentalDetailScreenState extends State<RentalDetailScreen> with SingleTick
                         child: ElevatedButton.icon(
                           onPressed: () {
                             ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('Chức năng đặt chỗ đang phát triển')),
+                              const SnackBar(
+                                  content:
+                                  Text('Chức năng đặt chỗ đang phát triển')),
                             );
                           },
-                          icon: const Icon(Icons.event_available, size: 24, color: Colors.white),
+                          icon: const Icon(Icons.event_available,
+                              size: 24, color: Colors.white),
                           label: const Text(
                             'Đặt chỗ ngay',
                             style: TextStyle(fontSize: 18, color: Colors.white),
                           ),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: Colors.blue[700],
-                            padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 32, vertical: 16),
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(20)),
                             elevation: 3,
                           ),
                         ),
@@ -476,7 +439,10 @@ class _RentalDetailScreenState extends State<RentalDetailScreen> with SingleTick
               child: IndexedStack(
                 index: _tabController.index,
                 children: [
-                  _DetailsTab(rental: widget.rental, formatCurrency: formatCurrency),
+                  DetailsTab(
+                    rental: widget.rental,
+                    formatCurrency: formatCurrency,
+                  ),
                   CommentSection(
                     rentalId: widget.rental.id,
                     onCommentCountChanged: _updateReviewCount,
@@ -504,7 +470,8 @@ class _SliverAppBarDelegate extends SliverPersistentHeaderDelegate {
   double get maxExtent => _tabBar.preferredSize.height;
 
   @override
-  Widget build(BuildContext context, double shrinkOffset, bool overlapsContent) {
+  Widget build(
+      BuildContext context, double shrinkOffset, bool overlapsContent) {
     return Container(
       color: Colors.white,
       child: _tabBar,
@@ -514,259 +481,5 @@ class _SliverAppBarDelegate extends SliverPersistentHeaderDelegate {
   @override
   bool shouldRebuild(_SliverAppBarDelegate oldDelegate) {
     return false;
-  }
-}
-
-class _DetailsTab extends StatelessWidget {
-  final Rental rental;
-  final String Function(double) formatCurrency;
-
-  const _DetailsTab({required this.rental, required this.formatCurrency});
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _SectionTitle('Thông tin chi tiết:'),
-        Container(
-          padding: const EdgeInsets.all(16.0),
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [Colors.white, Colors.grey[50]!],
-            ),
-            borderRadius: BorderRadius.circular(20),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _DetailRow(
-                icon: Icons.square_foot,
-                label: 'Diện tích',
-                value:
-                '${rental.area['total']} m² (Phòng khách ${rental.area['livingRoom']} m², 2PN ~${rental.area['bedrooms']} m², 2WC ~${rental.area['bathrooms']} m²)',
-              ),
-              const SizedBox(height: 16),
-              _DetailSection(
-                title: 'Nội thất & Tiện ích',
-                icon: Icons.chair,
-                items: [
-                  ...rental.furniture.map((item) => '• $item'),
-                  ...rental.amenities.map((item) => '• $item'),
-                ],
-              ),
-              const SizedBox(height: 16),
-              _DetailSection(
-                title: 'Kết nối & Môi trường xung quanh',
-                icon: Icons.place,
-                items: rental.surroundings.map((item) => '• $item').toList(),
-              ),
-              const SizedBox(height: 16),
-              _DetailSection(
-                title: 'Điều khoản thuê',
-                icon: Icons.description,
-                items: [
-                  'Thời hạn thuê tối thiểu: ${rental.rentalTerms['minimumLease']}',
-                  'Cọc: ${formatCurrency(double.parse(rental.rentalTerms['deposit']))}',
-                  'Thanh toán: ${rental.rentalTerms['paymentMethod']}',
-                  'Gia hạn hợp đồng: ${rental.rentalTerms['renewalTerms']}',
-                ],
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 24),
-        _SectionTitle('Thông tin liên hệ'),
-        Container(
-          padding: const EdgeInsets.all(16.0),
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [Colors.white, Colors.grey[50]!],
-            ),
-            borderRadius: BorderRadius.circular(20),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _DetailRow(
-                icon: Icons.person,
-                label: 'Chủ nhà',
-                value: rental.contactInfo['name'] ?? 'Chủ nhà',
-              ),
-              const SizedBox(height: 8),
-              _DetailRow(
-                icon: Icons.phone,
-                label: 'SĐT/Zalo',
-                value: rental.contactInfo['phone'] ?? 'Không có số điện thoại',
-              ),
-              const SizedBox(height: 8),
-              _DetailRow(
-                icon: Icons.access_time,
-                label: 'Giờ liên hệ',
-                value: rental.contactInfo['availableHours'] ?? 'Không xác định',
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _SectionTitle extends StatelessWidget {
-  final String title;
-
-  const _SectionTitle(this.title);
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8.0),
-      child: Text(
-        title,
-        style: const TextStyle(
-          fontSize: 20,
-          fontWeight: FontWeight.bold,
-          color: Colors.black87,
-        ),
-      ),
-    );
-  }
-}
-
-class _InfoChip extends StatelessWidget {
-  final String label;
-  final String value;
-  final IconData? icon;
-
-  const _InfoChip({
-    required this.label,
-    required this.value,
-    this.icon,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.02),
-            blurRadius: 6,
-            offset: const Offset(0, 3),
-          ),
-        ],
-        border: Border.all(color: Colors.grey.shade200),
-      ),
-      child: Row(
-        children: [
-          if (icon != null) ...[
-            Icon(icon, size: 20, color: Colors.blueAccent),
-            const SizedBox(width: 8),
-          ],
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                label,
-                style: TextStyle(
-                  fontSize: 13,
-                  color: Colors.grey[600],
-                ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                value,
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.black87,
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _DetailRow extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final String value;
-
-  const _DetailRow({required this.icon, required this.label, required this.value});
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Icon(icon, size: 20, color: Colors.blue[700]),
-        const SizedBox(width: 8),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                label,
-                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Colors.black87),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                value,
-                style: const TextStyle(fontSize: 16, color: Colors.black54),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _DetailSection extends StatelessWidget {
-  final String title;
-  final IconData icon;
-  final List<String> items;
-
-  const _DetailSection({required this.title, required this.icon, required this.items});
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Icon(icon, size: 20, color: Colors.blue[700]),
-            const SizedBox(width: 8),
-            Text(
-              title,
-              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.black87),
-            ),
-          ],
-        ),
-        const SizedBox(height: 8),
-        ...items.map(
-              (item) => Padding(
-            padding: const EdgeInsets.only(left: 28.0, bottom: 4.0),
-            child: Text(
-              item,
-              style: const TextStyle(fontSize: 16, color: Colors.black54),
-            ),
-          ),
-        ),
-      ],
-    );
   }
 }
