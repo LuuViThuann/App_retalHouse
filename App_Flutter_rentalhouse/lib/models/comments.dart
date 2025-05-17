@@ -16,7 +16,7 @@ class User {
   factory User.fromJson(Map<String, dynamic> json) {
     final avatarBase64 = json['avatarBase64']?.toString();
     return User(
-      id: json['_id']?.toString() ?? '',
+      id: json['_id']?.toString() ?? json['id']?.toString() ?? '',
       username: json['username']?.toString() ?? '',
       avatarBase64: avatarBase64 != null && avatarBase64.isNotEmpty ? avatarBase64 : null,
     );
@@ -54,18 +54,24 @@ class Like {
 
 class Reply {
   final String id;
+  final String commentId;
+  final String? parentReplyId;
   final User userId;
   final String content;
-  final List<String> images; // Added images field
+  final List<String> images;
+  final String icon;
   final DateTime createdAt;
   final List<Like> likes;
-  final List<Reply> replies; // Added nested replies
+  final List<Reply> replies;
 
   const Reply({
     required this.id,
+    required this.commentId,
+    this.parentReplyId,
     required this.userId,
     required this.content,
     required this.images,
+    required this.icon,
     required this.createdAt,
     required this.likes,
     required this.replies,
@@ -74,9 +80,12 @@ class Reply {
   factory Reply.fromJson(Map<String, dynamic> json) {
     return Reply(
       id: json['_id']?.toString() ?? '',
+      commentId: json['commentId']?.toString() ?? '',
+      parentReplyId: json['parentReplyId']?.toString(),
       userId: User.fromJson(json['userId'] is String ? {'_id': json['userId']} : (json['userId'] ?? {})),
       content: json['content']?.toString() ?? '',
       images: (json['images'] as List<dynamic>?)?.map((e) => e.toString()).toList() ?? [],
+      icon: json['icon']?.toString() ?? '/assets/img/arr.jpg',
       createdAt: DateTime.tryParse(json['createdAt']?.toString() ?? '') ?? DateTime.now(),
       likes: (json['likes'] as List<dynamic>?)?.map((like) => Like.fromJson(like)).toList() ?? [],
       replies: (json['replies'] as List<dynamic>?)?.map((reply) => Reply.fromJson(reply)).toList() ?? [],
@@ -84,7 +93,7 @@ class Reply {
   }
 
   @override
-  String toString() => 'Reply(id: $id, userId: $userId, content: $content, images: $images, createdAt: $createdAt, likes: $likes, replies: $replies)';
+  String toString() => 'Reply(id: $id, commentId: $commentId, parentReplyId: $parentReplyId, userId: $userId, content: $content, images: $images, icon: $icon, createdAt: $createdAt, likes: $likes, replies: $replies)';
 }
 
 class Comment {
@@ -94,6 +103,7 @@ class Comment {
   final String content;
   final double rating;
   final List<String> images;
+  final bool isHidden;
   final DateTime createdAt;
   final List<Reply> replies;
   final List<Like> likes;
@@ -105,6 +115,7 @@ class Comment {
     required this.content,
     required this.rating,
     required this.images,
+    required this.isHidden,
     required this.createdAt,
     required this.replies,
     required this.likes,
@@ -119,6 +130,7 @@ class Comment {
         content: json['content']?.toString() ?? '',
         rating: (json['rating'] as num?)?.toDouble() ?? 0.0,
         images: (json['images'] as List<dynamic>?)?.map((e) => e.toString()).toList() ?? [],
+        isHidden: json['isHidden']?.toString() == 'true',
         createdAt: DateTime.tryParse(json['createdAt']?.toString() ?? '') ?? DateTime.now(),
         replies: (json['replies'] as List<dynamic>?)
             ?.map((reply) => Reply.fromJson(reply))
@@ -134,5 +146,5 @@ class Comment {
   }
 
   @override
-  String toString() => 'Comment(id: $id, rentalId: $rentalId, userId: $userId, content: $content, rating: $rating, images: $images, createdAt: $createdAt, replies: $replies, likes: $likes)';
+  String toString() => 'Comment(id: $id, rentalId: $rentalId, userId: $userId, content: $content, rating: $rating, images: $images, isHidden: $isHidden, createdAt: $createdAt, replies: $replies, likes: $likes)';
 }

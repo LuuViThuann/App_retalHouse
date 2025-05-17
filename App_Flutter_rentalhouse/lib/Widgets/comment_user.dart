@@ -49,8 +49,6 @@ class _CommentSectionState extends State<CommentSection> {
   int _totalComments = 0;
   bool _isLoadingMore = false;
 
-  int _visibleCommentCount = 5;
-
   @override
   void initState() {
     super.initState();
@@ -78,7 +76,9 @@ class _CommentSectionState extends State<CommentSection> {
       setState(() => _isLoadingMore = true);
     }
     try {
-      final response = await http.get(Uri.parse('${ApiRoutes.comments}/${widget.rentalId}?page=$page&limit=5'));
+      final response = await http.get(
+        Uri.parse('${ApiRoutes.comments}/${widget.rentalId}?page=$page&limit=5'),
+      );
       if (response.statusCode != 200) {
         throw Exception('Failed to load comments: ${response.statusCode} - ${response.body}');
       }
@@ -109,18 +109,11 @@ class _CommentSectionState extends State<CommentSection> {
     }
   }
 
-
   Future<void> _loadMoreComments() async {
-    if (_visibleCommentCount < _totalComments) {
-      setState(() {
-        _visibleCommentCount = (_visibleCommentCount + 5).clamp(0, _totalComments);
-      });
-      if (_visibleCommentCount > _comments.length && _currentPage < _totalPages) {
-        await _fetchComments(page: _currentPage + 1);
-      }
+    if (_currentPage < _totalPages) {
+      await _fetchComments(page: _currentPage + 1);
     }
   }
-
 
   Future<void> _pickImages({bool forReply = false, bool forEdit = false}) async {
     final picker = ImagePicker();
@@ -176,7 +169,6 @@ class _CommentSectionState extends State<CommentSection> {
         _comments.insert(0, newComment);
         _totalComments++;
         _totalPages = (_totalComments / 5).ceil();
-        _visibleCommentCount = _visibleCommentCount.clamp(0, _totalComments + 1);
         _commentController.clear();
         _selectedRating = 0.0;
         _selectedImages.clear();
@@ -248,7 +240,6 @@ class _CommentSectionState extends State<CommentSection> {
         _comments.removeWhere((comment) => comment.id == commentId);
         _totalComments--;
         _totalPages = (_totalComments / 5).ceil();
-        _visibleCommentCount = _visibleCommentCount.clamp(0, _totalComments);
         widget.onCommentCountChanged?.call(_totalComments);
       });
       _showSuccessSnackBar('Xóa bình luận thành công');
@@ -386,8 +377,11 @@ class _CommentSectionState extends State<CommentSection> {
       if (token == null || token.isEmpty) throw Exception('No valid token found');
       final comment = _comments.firstWhere((c) => c.id == commentId);
       final hasLiked = comment.likes.any((like) => like.userId == authViewModel.currentUser!.id);
-      final url = hasLiked ? ApiRoutes.unlikeComment(commentId) : ApiRoutes.likeComment(commentId);
-      final response = await http.post(
+      final method = hasLiked ? http.delete : http.post;
+      final url = hasLiked
+          ? ApiRoutes.unlikeComment(commentId)
+          : ApiRoutes.likeComment(commentId);
+      final response = await method(
         Uri.parse(url),
         headers: {'Authorization': 'Bearer $token'},
       );
@@ -416,8 +410,23 @@ class _CommentSectionState extends State<CommentSection> {
     try {
       final token = authViewModel.currentUser!.token;
       if (token == null || token.isEmpty) throw Exception('No valid token found');
-      final url = ApiRoutes.likeReply(commentId, replyId);
-      final response = await http.post(
+      final comment = _comments.firstWhere((c) => c.id == commentId);
+      Reply? findReply(List<Reply> replies) {
+        for (var reply in replies) {
+          if (reply.id == replyId) return reply;
+          final nestedReply = findReply(reply.replies);
+          if (nestedReply != null) return nestedReply;
+        }
+        return null;
+      }
+      final reply = findReply(comment.replies);
+      if (reply == null) throw Exception('Reply not found');
+      final hasLiked = reply.likes.any((like) => like.userId == authViewModel.currentUser!.id);
+      final method = hasLiked ? http.delete : http.post;
+      final url = hasLiked
+          ? ApiRoutes.unlikeReply(commentId, replyId)
+          : ApiRoutes.likeReply(commentId, replyId);
+      final response = await method(
         Uri.parse(url),
         headers: {'Authorization': 'Bearer $token'},
       );
@@ -454,7 +463,7 @@ class _CommentSectionState extends State<CommentSection> {
             children: [
               Center(
                 child: PhotoView(
-                  imageProvider: NetworkImage('${ApiRoutes.serverBaseUrl}${imageUrl}'),
+                  imageProvider: NetworkImage('${ApiRoutes.serverBaseUrl}$imageUrl'),
                   minScale: PhotoViewComputedScale.contained * 0.8,
                   maxScale: PhotoViewComputedScale.covered * 2.0,
                 ),
@@ -521,10 +530,10 @@ class _CommentSectionState extends State<CommentSection> {
             ListView.separated(
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
-              itemCount: _visibleCommentCount.clamp(0, _comments.length) + (_visibleCommentCount < _totalComments ? 1 : 0),
+              itemCount: _comments.length + (_currentPage < _totalPages ? 1 : 0),
               separatorBuilder: (context, index) => const SizedBox(height: 12),
               itemBuilder: (context, index) {
-                if (index == _visibleCommentCount.clamp(0, _comments.length) && _visibleCommentCount < _totalComments) {
+                if (index == _comments.length && _currentPage < _totalPages) {
                   return _LoadMoreButton(
                     isLoading: _isLoadingMore,
                     onPressed: _loadMoreComments,
@@ -848,37 +857,38 @@ class _StarRating extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onHorizontalDragUpdate: (details) {
-        final RenderBox box = context.findRenderObject() as RenderBox;
-        final localPosition = box.globalToLocal(details.globalPosition);
-        final starWidth = box.size.width / 5;
-        double newRating = (localPosition.dx / starWidth).clamp(0, 5);
-        newRating = (newRating * 2).roundToDouble() / 2;
-        onRatingChanged(newRating);
-      },
-      onTapDown: (details) {
-        final RenderBox box = context.findRenderObject() as RenderBox;
-        final localPosition = box.globalToLocal(details.globalPosition);
-        final starWidth = box.size.width / 5;
-        double newRating = (localPosition.dx / starWidth).clamp(0, 5);
-        newRating = (newRating * 2).roundToDouble() / 2;
-        onRatingChanged(newRating);
-      },
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: List.generate(5, (index) {
-          final starValue = (index + 1).toDouble();
-          return Icon(
-            starValue <= rating
-                ? Icons.star
-                : starValue - 0.5 <= rating
-                ? Icons.star_half
-                : Icons.star_border,
-            color: Colors.amber,
-            size: 24,
-          );
-        }),
+    return SizedBox(
+      width: 120,
+      child: GestureDetector(
+        onHorizontalDragUpdate: (details) {
+          final boxWidth = 120.0;
+          final starWidth = boxWidth / 5;
+          double newRating = (details.localPosition.dx / starWidth).clamp(0, 5);
+          newRating = (newRating * 2).roundToDouble() / 2;
+          onRatingChanged(newRating);
+        },
+        onTapDown: (details) {
+          final boxWidth = 120.0;
+          final starWidth = boxWidth / 5;
+          double newRating = (details.localPosition.dx / starWidth).clamp(0, 5);
+          newRating = (newRating * 2).roundToDouble() / 2;
+          onRatingChanged(newRating);
+        },
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: List.generate(5, (index) {
+            final starValue = (index + 1).toDouble();
+            return Icon(
+              starValue <= rating
+                  ? Icons.star
+                  : starValue - 0.5 <= rating
+                  ? Icons.star_half
+                  : Icons.star_border,
+              color: Colors.amber,
+              size: 24,
+            );
+          }),
+        ),
       ),
     );
   }
@@ -963,16 +973,18 @@ class _CommentItem extends StatelessWidget {
     required this.onRemoveExistingImage,
   });
 
-  void _showCommentDropdownMenu(BuildContext context) {
-    final RenderBox button = context.findRenderObject() as RenderBox;
-    final Offset buttonPosition = button.localToGlobal(Offset.zero);
+  void _showCommentDropdownMenu(BuildContext context, GlobalKey iconKey) {
+    final RenderBox renderBox = iconKey.currentContext!.findRenderObject() as RenderBox;
+    final position = renderBox.localToGlobal(Offset.zero);
+    final size = renderBox.size;
+
     showMenu(
       context: context,
       position: RelativeRect.fromLTRB(
-        buttonPosition.dx,
-        buttonPosition.dy + button.size.height,
-        buttonPosition.dx + button.size.width,
-        buttonPosition.dy,
+        position.dx,
+        position.dy + size.height, // Hiển thị ngay dưới icon
+        position.dx + size.width,
+        position.dy,
       ),
       items: [
         PopupMenuItem(
@@ -1004,16 +1016,18 @@ class _CommentItem extends StatelessWidget {
     );
   }
 
-  void _showReplyDropdownMenu(BuildContext context, String replyId, String parentCommentId) {
-    final RenderBox button = context.findRenderObject() as RenderBox;
-    final Offset buttonPosition = button.localToGlobal(Offset.zero);
+  void _showReplyDropdownMenu(BuildContext context, String replyId, String parentCommentId, GlobalKey iconKey) {
+    final RenderBox renderBox = iconKey.currentContext!.findRenderObject() as RenderBox;
+    final position = renderBox.localToGlobal(Offset.zero);
+    final size = renderBox.size;
+
     showMenu(
       context: context,
       position: RelativeRect.fromLTRB(
-        buttonPosition.dx,
-        buttonPosition.dy + button.size.height,
-        buttonPosition.dx + button.size.width,
-        buttonPosition.dy,
+        position.dx,
+        position.dy + size.height, // Hiển thị ngay dưới icon
+        position.dx + size.width,
+        position.dy,
       ),
       items: [
         PopupMenuItem(
@@ -1060,6 +1074,8 @@ class _CommentItem extends StatelessWidget {
   Widget build(BuildContext context) {
     final currentUserId = Provider.of<AuthViewModel>(context, listen: false).currentUser?.id;
     final isEditing = editingCommentId == comment.id;
+    final GlobalKey commentMoreIconKey = GlobalKey(); // Key cho icon của comment
+
     return Card(
       color: Colors.white,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -1097,10 +1113,11 @@ class _CommentItem extends StatelessWidget {
                               ),
                               if (isOwnComment)
                                 GestureDetector(
-                                  onTap: () => _showCommentDropdownMenu(context),
+                                  key: commentMoreIconKey, // Gắn key vào GestureDetector
+                                  onTap: () => _showCommentDropdownMenu(context, commentMoreIconKey),
                                   child: Padding(
                                     padding: const EdgeInsets.symmetric(horizontal: 8.0),
-                                    child: Icon(Icons.more_horiz, color: Colors.grey[600], size: 20),
+                                    child: Icon(Icons.more_horiz, color: Colors.grey[600], size: 27),
                                   ),
                                 ),
                             ],
@@ -1137,28 +1154,32 @@ class _CommentItem extends StatelessWidget {
                       border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
                     ),
                   ),
-                  const SizedBox(height: 8),
-                  GestureDetector(
-                    onTap: onPickEditImages,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: Colors.blue.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      child: const Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(Icons.add_a_photo, size: 16, color: Colors.blue),
-                          SizedBox(width: 6),
-                          Text(
-                            "Thêm ảnh",
-                            style: TextStyle(fontSize: 14, color: Colors.blue),
-                          ),
-                        ],
+                  const SizedBox(height: 15),
+                  Align(
+                    alignment: Alignment.center,
+                    child: GestureDetector(
+                      onTap: onPickEditImages,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: Colors.blue.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        child: const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.add_a_photo, size: 16, color: Colors.blue),
+                            SizedBox(width: 6),
+                            Text(
+                              "Thêm ảnh",
+                              style: TextStyle(fontSize: 14, color: Colors.blue),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   ),
+                  const SizedBox(height: 15,),
                   if (comment.images.isNotEmpty || editSelectedImages.isNotEmpty)
                     Padding(
                       padding: const EdgeInsets.only(top: 8),
@@ -1175,13 +1196,16 @@ class _CommentItem extends StatelessWidget {
                                 padding: const EdgeInsets.only(right: 8),
                                 child: Stack(
                                   children: [
-                                    CachedNetworkImage(
-                                      imageUrl: '${ApiRoutes.serverBaseUrl}$imageUrl',
-                                      width: 80,
-                                      height: 80,
-                                      fit: BoxFit.cover,
-                                      placeholder: (context, url) => const CircularProgressIndicator(),
-                                      errorWidget: (context, url, error) => const Icon(Icons.error),
+                                    GestureDetector(
+                                      onTap: () => onImageTap(imageUrl),
+                                      child: CachedNetworkImage(
+                                        imageUrl: '${ApiRoutes.serverBaseUrl}$imageUrl',
+                                        width: 80,
+                                        height: 80,
+                                        fit: BoxFit.cover,
+                                        placeholder: (context, url) => const CircularProgressIndicator(),
+                                        errorWidget: (context, url, error) => const Icon(Icons.error),
+                                      ),
                                     ),
                                     Positioned(
                                       top: 0,
@@ -1238,7 +1262,23 @@ class _CommentItem extends StatelessWidget {
                       ),
                       ElevatedButton(
                         onPressed: () => onSaveEditComment(editController.text),
-                        child: const Text('Lưu'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.blue, // Màu nền
+                          foregroundColor: Colors.white, // Màu chữ/icon
+                          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(30), // Bo tròn nút
+                          ),
+                          elevation: 3,
+                        ),
+                        child: const Text(
+                          'Lưu',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                            letterSpacing: 0.5,
+                          ),
+                        ),
                       ),
                     ],
                   ),
@@ -1330,8 +1370,8 @@ class _CommentItem extends StatelessWidget {
               ),
             if (isExpanded && comment.replies.isNotEmpty)
               Padding(
-                padding: const EdgeInsets.only(left: 16, top: 8),
-                child: _buildReplies(context, comment.replies, comment.id, 0),
+                padding: const EdgeInsets.only(top: 8),
+                child: _buildReplies(context, comment.replies, comment.id),
               ),
           ],
         ),
@@ -1339,16 +1379,35 @@ class _CommentItem extends StatelessWidget {
     );
   }
 
-  Widget _buildReplies(BuildContext context, List<Reply> replies, String commentId, int level) {
+  List<Reply> _flattenReplies(List<Reply> replies) {
+    List<Reply> flattened = [];
+    void flatten(List<Reply> replies) {
+      for (var reply in replies) {
+        flattened.add(reply);
+        flatten(reply.replies);
+      }
+    }
+    flatten(replies);
+    return flattened;
+  }
+
+  Widget _buildReplies(BuildContext context, List<Reply> replies, String commentId) {
     final currentUserId = Provider.of<AuthViewModel>(context, listen: false).currentUser?.id;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: replies.map((reply) {
+    final flattenedReplies = _flattenReplies(replies);
+
+    return ListView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      itemCount: flattenedReplies.length,
+      itemBuilder: (context, index) {
+        final reply = flattenedReplies[index];
         final isEditingReply = editingReplyId == reply.id;
         final hasLikedReply = reply.likes.any((like) => like.userId == currentUserId);
         final isOwnReply = reply.userId.id == currentUserId;
+        final GlobalKey replyMoreIconKey = GlobalKey(); // Key cho icon của reply
+
         return Padding(
-          padding: EdgeInsets.only(left: level * 16.0, bottom: 8),
+          padding: const EdgeInsets.only(left: 16, top: 8),
           child: Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
@@ -1362,11 +1421,21 @@ class _CommentItem extends StatelessWidget {
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    CircleAvatar(
-                      radius: 16,
-                      backgroundImage: reply.userId.avatarBytes != null
-                          ? MemoryImage(reply.userId.avatarBytes!)
-                          : const AssetImage('assets/img/imageuser.png') as ImageProvider,
+                    Row(
+                      children: [
+                        const Icon(
+                          Icons.subdirectory_arrow_right,
+                          size: 16,
+                          color: Colors.grey,
+                        ),
+                        const SizedBox(width: 4),
+                        CircleAvatar(
+                          radius: 16,
+                          backgroundImage: reply.userId.avatarBytes != null
+                              ? MemoryImage(reply.userId.avatarBytes!)
+                              : const AssetImage('assets/img/imageuser.png') as ImageProvider,
+                        ),
+                      ],
                     ),
                     const SizedBox(width: 8),
                     Expanded(
@@ -1388,10 +1457,11 @@ class _CommentItem extends StatelessWidget {
                                   ),
                                   if (isOwnReply)
                                     GestureDetector(
-                                      onTap: () => _showReplyDropdownMenu(context, reply.id, commentId),
+                                      key: replyMoreIconKey, // Gắn key vào GestureDetector
+                                      onTap: () => _showReplyDropdownMenu(context, reply.id, commentId, replyMoreIconKey),
                                       child: Padding(
                                         padding: const EdgeInsets.symmetric(horizontal: 4.0),
-                                        child: Icon(Icons.more_horiz, color: Colors.grey[600], size: 16),
+                                        child: Icon(Icons.more_horiz, color: Colors.grey[600], size: 22),
                                       ),
                                     ),
                                 ],
@@ -1415,28 +1485,32 @@ class _CommentItem extends StatelessWidget {
                           border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
                         ),
                       ),
-                      const SizedBox(height: 8),
-                      GestureDetector(
-                        onTap: onPickEditImages,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                          decoration: BoxDecoration(
-                            color: Colors.blue.withOpacity(0.1),
-                            borderRadius: BorderRadius.circular(16),
-                          ),
-                          child: const Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(Icons.add_a_photo, size: 16, color: Colors.blue),
-                              SizedBox(width: 6),
-                              Text(
-                                "Thêm ảnh",
-                                style: TextStyle(fontSize: 14, color: Colors.blue),
-                              ),
-                            ],
+                      const SizedBox(height: 15),
+                      Align(
+                        alignment: Alignment.center,
+                        child: GestureDetector(
+                          onTap: onPickEditImages,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: Colors.blue.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                            child: const Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.add_a_photo, size: 16, color: Colors.blue),
+                                SizedBox(width: 6),
+                                Text(
+                                  "Thêm ảnh",
+                                  style: TextStyle(fontSize: 14, color: Colors.blue),
+                                ),
+                              ],
+                            ),
                           ),
                         ),
                       ),
+                      const SizedBox(height: 15,),
                       if (reply.images.isNotEmpty || editSelectedImages.isNotEmpty)
                         Padding(
                           padding: const EdgeInsets.only(top: 8),
@@ -1453,13 +1527,16 @@ class _CommentItem extends StatelessWidget {
                                     padding: const EdgeInsets.only(right: 8),
                                     child: Stack(
                                       children: [
-                                        CachedNetworkImage(
-                                          imageUrl: '${ApiRoutes.serverBaseUrl}$imageUrl',
-                                          width: 60,
-                                          height: 60,
-                                          fit: BoxFit.cover,
-                                          placeholder: (context, url) => const CircularProgressIndicator(),
-                                          errorWidget: (context, url, error) => const Icon(Icons.error),
+                                        GestureDetector(
+                                          onTap: () => onImageTap(imageUrl),
+                                          child: CachedNetworkImage(
+                                            imageUrl: '${ApiRoutes.serverBaseUrl}$imageUrl',
+                                            width: 60,
+                                            height: 60,
+                                            fit: BoxFit.cover,
+                                            placeholder: (context, url) => const CircularProgressIndicator(),
+                                            errorWidget: (context, url, error) => const Icon(Icons.error),
+                                          ),
                                         ),
                                         Positioned(
                                           top: 0,
@@ -1516,7 +1593,23 @@ class _CommentItem extends StatelessWidget {
                           ),
                           ElevatedButton(
                             onPressed: () => onSaveEditReply(reply.id, editController.text),
-                            child: const Text('Lưu'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.blue, // Màu nền
+                              foregroundColor: Colors.white, // Màu chữ/icon
+                              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(30), // Bo tròn nút
+                              ),
+                              elevation: 3,
+                            ),
+                            child: const Text(
+                              'Lưu',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                                letterSpacing: 0.5,
+                              ),
+                            ),
                           ),
                         ],
                       ),
@@ -1596,16 +1689,11 @@ class _CommentItem extends StatelessWidget {
                       ratingError: null,
                     ),
                   ),
-                if (reply.replies.isNotEmpty)
-                  Padding(
-                    padding: const EdgeInsets.only(left: 16, top: 4),
-                    child: _buildReplies(context, reply.replies, commentId, level + 1),
-                  ),
               ],
             ),
           ),
         );
-      }).toList(),
+      },
     );
   }
 }

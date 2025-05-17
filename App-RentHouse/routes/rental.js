@@ -5,7 +5,7 @@ const router = express.Router();
 const mongoose = require('mongoose');
 const Rental = require('../models/Rental');
 const Favorite = require('../models/favorite');
-const Comment = require('../models/comments');
+const { Comment, Reply, LikeComment } = require('../models/comments');
 const admin = require('firebase-admin');
 const multer = require('multer');
 const path = require('path');
@@ -30,8 +30,14 @@ const authMiddleware = async (req, res, next) => {
   }
 };
 
-// Existing routes remain unchanged until comments section
+// Helper function to adjust timestamps for +7 timezone
+const adjustTimestamps = (obj) => {
+  const adjusted = { ...obj.toObject() };
+  adjusted.createdAt = new Date(adjusted.createdAt.getTime() + 7 * 60 * 60 * 1000);
+  return adjusted;
+};
 
+// Rental routes
 router.get('/rentals', async (req, res) => {
   try {
     const { search, minPrice, maxPrice, propertyType, status } = req.query;
@@ -55,38 +61,62 @@ router.get('/rentals/:id', async (req, res) => {
   try {
     const rental = await Rental.findById(req.params.id);
     if (!rental) return res.status(404).json({ message: 'Rental not found' });
+
     const comments = await Comment.find({ rentalId: req.params.id })
-      .populate('userId', 'avatarBase64 username')
-      .populate('replies.userId', 'username')
-      .populate('likes.userId', 'username')
-      .populate('replies.replies.userId', 'username') // Populate nested replies
-      .populate('replies.likes.userId', 'username')
-      .populate('replies.replies.likes.userId', 'username'); // Populate nested reply likes
+      .populate('userId', 'avatarBase64 username');
+    
+    const commentIds = comments.map(c => c._id);
+    const replies = await Reply.find({ commentId: { $in: commentIds } })
+      .populate('userId', 'username')
+      .lean();
+    
+    const likes = await LikeComment.find({
+      $or: [
+        { targetId: { $in: commentIds }, targetType: 'Comment' },
+        { targetId: { $in: replies.map(r => r._id) }, targetType: 'Reply' },
+      ]
+    }).populate('userId', 'username').lean();
+
+    // Build reply hierarchy
+    const replyMap = new Map();
+    replies.forEach(reply => {
+      reply.createdAt = new Date(reply.createdAt.getTime() + 7 * 60 * 60 * 1000);
+      reply.likes = likes.filter(like => like.targetId.toString() === reply._id.toString() && like.targetType === 'Reply')
+        .map(like => ({ ...like, createdAt: new Date(like.createdAt.getTime() + 7 * 60 * 60 * 1000) }));
+      const commentIdStr = reply.commentId.toString();
+      if (!replyMap.has(commentIdStr)) {
+        replyMap.set(commentIdStr, []);
+      }
+      replyMap.get(commentIdStr).push(reply);
+    });
+
+    // Build nested replies
+    const buildReplyTree = (replyList, parentId = null) => {
+      return replyList
+        .filter(reply => (parentId ? reply.parentReplyId?.toString() === parentId : !reply.parentReplyId))
+        .map(reply => ({
+          ...reply,
+          replies: buildReplyTree(replyList, reply._id.toString())
+        }));
+    };
+
     const adjustedComments = comments.map(comment => {
-      const commentObj = comment.toObject();
-      commentObj.createdAt = new Date(comment.createdAt.getTime() + 7 * 60 * 60 * 1000);
-      commentObj.replies = commentObj.replies.map(reply => ({
-        ...reply,
-        createdAt: new Date(reply.createdAt.getTime() + 7 * 60 * 60 * 1000),
-        likes: reply.likes.map(like => ({
-          ...like,
-          createdAt: new Date(like.createdAt.getTime() + 7 * 60 * 60 * 1000)
-        })),
-        replies: reply.replies.map(nestedReply => ({
-          ...nestedReply,
-          createdAt: new Date(nestedReply.createdAt.getTime() + 7 * 60 * 60 * 1000),
-          likes: nestedReply.likes.map(like => ({
-            ...like,
-            createdAt: new Date(like.createdAt.getTime() + 7 * 60 * 60 * 1000)
-          }))
-        }))
-      }));
-      commentObj.likes = commentObj.likes.map(like => ({ ...like, createdAt: new Date(like.createdAt.getTime() + 7 * 60 * 60 * 1000) }));
+      const commentObj = adjustTimestamps(comment);
+      commentObj.replies = buildReplyTree(replyMap.get(comment._id.toString()) || []);
+      commentObj.likes = likes.filter(like => like.targetId.toString() === comment._id.toString() && like.targetType === 'Comment')
+        .map(like => ({ ...like, createdAt: new Date(like.createdAt.getTime() + 7 * 60 * 60 * 1000) }));
       return commentObj;
     });
+
     const totalRatings = adjustedComments.reduce((sum, comment) => sum + (comment.rating || 0), 0);
     const averageRating = adjustedComments.length > 0 ? totalRatings / adjustedComments.length : 0;
-    res.json({ ...rental.toObject(), comments: adjustedComments, averageRating, reviewCount: adjustedComments.length });
+
+    res.json({
+      ...rental.toObject(),
+      comments: adjustedComments,
+      averageRating,
+      reviewCount: adjustedComments.length
+    });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
@@ -162,6 +192,7 @@ router.delete('/rentals/:id', authMiddleware, async (req, res) => {
   }
 });
 
+// Favorite routes
 router.post('/favorites', authMiddleware, async (req, res) => {
   try {
     const { rentalId } = req.body;
@@ -199,49 +230,63 @@ router.get('/favorites', authMiddleware, async (req, res) => {
   }
 });
 
+// Comment routes
 router.get('/comments/:rentalId', async (req, res) => {
   try {
     const { rentalId } = req.params;
-    const { page = 1, limit = 5 } = req.query; // Default to 5 comments per page
+    const { page = 1, limit = 5 } = req.query;
     if (!mongoose.Types.ObjectId.isValid(rentalId)) return res.status(400).json({ message: 'Invalid rentalId format' });
-    
+
     const skip = (parseInt(page) - 1) * parseInt(limit);
     const comments = await Comment.find({ rentalId })
-      .sort({ createdAt: -1 }) // Sort by newest first
+      .sort({ createdAt: -1 })
       .skip(skip)
       .limit(parseInt(limit))
-      .populate('userId', 'avatarBase64 username')
-      .populate('replies.userId', 'username')
-      .populate('likes.userId', 'username')
-      .populate('replies.replies.userId', 'username')
-      .populate('replies.likes.userId', 'username')
-      .populate('replies.replies.likes.userId', 'username');
-    
+      .populate('userId', 'avatarBase64 username');
+
+    const commentIds = comments.map(c => c._id);
+    const replies = await Reply.find({ commentId: { $in: commentIds } })
+      .populate('userId', 'username')
+      .lean();
+
+    const likes = await LikeComment.find({
+      $or: [
+        { targetId: { $in: commentIds }, targetType: 'Comment' },
+        { targetId: { $in: replies.map(r => r._id) }, targetType: 'Reply' },
+      ]
+    }).populate('userId', 'username').lean();
+
     const totalComments = await Comment.countDocuments({ rentalId });
-    
+
+    const replyMap = new Map();
+    replies.forEach(reply => {
+      reply.createdAt = new Date(reply.createdAt.getTime() + 7 * 60 * 60 * 1000);
+      reply.likes = likes.filter(like => like.targetId.toString() === reply._id.toString() && like.targetType === 'Reply')
+        .map(like => ({ ...like, createdAt: new Date(like.createdAt.getTime() + 7 * 60 * 60 * 1000) }));
+      const commentIdStr = reply.commentId.toString();
+      if (!replyMap.has(commentIdStr)) {
+        replyMap.set(commentIdStr, []);
+      }
+      replyMap.get(commentIdStr).push(reply);
+    });
+
+    const buildReplyTree = (replyList, parentId = null) => {
+      return replyList
+        .filter(reply => (parentId ? reply.parentReplyId?.toString() === parentId : !reply.parentReplyId))
+        .map(reply => ({
+          ...reply,
+          replies: buildReplyTree(replyList, reply._id.toString())
+        }));
+    };
+
     const adjustedComments = comments.map(comment => {
-      const commentObj = comment.toObject();
-      commentObj.createdAt = new Date(comment.createdAt.getTime() + 7 * 60 * 60 * 1000);
-      commentObj.replies = commentObj.replies.map(reply => ({
-        ...reply,
-        createdAt: new Date(reply.createdAt.getTime() + 7 * 60 * 60 * 1000),
-        likes: reply.likes.map(like => ({
-          ...like,
-          createdAt: new Date(like.createdAt.getTime() + 7 * 60 * 60 * 1000)
-        })),
-        replies: reply.replies.map(nestedReply => ({
-          ...nestedReply,
-          createdAt: new Date(nestedReply.createdAt.getTime() + 7 * 60 * 60 * 1000),
-          likes: nestedReply.likes.map(like => ({
-            ...like,
-            createdAt: new Date(like.createdAt.getTime() + 7 * 60 * 60 * 1000)
-          }))
-        }))
-      }));
-      commentObj.likes = commentObj.likes.map(like => ({ ...like, createdAt: new Date(like.createdAt.getTime() + 7 * 60 * 60 * 1000) }));
+      const commentObj = adjustTimestamps(comment);
+      commentObj.replies = buildReplyTree(replyMap.get(comment._id.toString()) || []);
+      commentObj.likes = likes.filter(like => like.targetId.toString() === comment._id.toString() && like.targetType === 'Comment')
+        .map(like => ({ ...like, createdAt: new Date(like.createdAt.getTime() + 7 * 60 * 60 * 1000) }));
       return commentObj;
     });
-    
+
     res.json({
       comments: adjustedComments,
       totalComments,
@@ -270,33 +315,10 @@ router.post('/comments', authMiddleware, upload.array('images'), async (req, res
     });
     const savedComment = await comment.save();
     const populatedComment = await Comment.findById(savedComment._id)
-      .populate('userId', 'avatarBase64 username')
-      .populate('replies.userId', 'username')
-      .populate('likes.userId', 'username')
-      .populate('replies.replies.userId', 'username')
-      .populate('replies.likes.userId', 'username')
-      .populate('replies.replies.likes.userId', 'username');
-    const adjustedComment = {
-      ...populatedComment.toObject(),
-      createdAt: new Date(populatedComment.createdAt.getTime() + 7 * 60 * 60 * 1000),
-      replies: populatedComment.replies.map(reply => ({
-        ...reply.toObject(),
-        createdAt: new Date(reply.createdAt.getTime() + 7 * 60 * 60 * 1000),
-        likes: reply.likes.map(like => ({
-          ...like,
-          createdAt: new Date(like.createdAt.getTime() + 7 * 60 * 60 * 1000)
-        })),
-        replies: reply.replies.map(nestedReply => ({
-          ...nestedReply,
-          createdAt: new Date(nestedReply.createdAt.getTime() + 7 * 60 * 60 * 1000),
-          likes: nestedReply.likes.map(like => ({
-            ...like,
-            createdAt: new Date(like.createdAt.getTime() + 7 * 60 * 60 * 1000)
-          }))
-        }))
-      })),
-      likes: populatedComment.likes.map(like => ({ ...like.toObject(), createdAt: new Date(like.createdAt.getTime() + 7 * 60 * 60 * 1000) })),
-    };
+      .populate('userId', 'avatarBase64 username');
+    const adjustedComment = adjustTimestamps(populatedComment);
+    adjustedComment.replies = [];
+    adjustedComment.likes = [];
     res.status(201).json(adjustedComment);
   } catch (err) {
     res.status(400).json({ message: err.message });
@@ -310,58 +332,60 @@ router.put('/comments/:commentId', authMiddleware, upload.array('images'), async
     if (!mongoose.Types.ObjectId.isValid(commentId) || !content) return res.status(400).json({ message: 'Invalid format or missing content' });
     const comment = await Comment.findById(commentId);
     if (!comment || comment.userId !== req.userId) return res.status(403).json({ message: 'Unauthorized or not found' });
-    
+
     comment.content = content;
-    
-    // Handle image removal
     if (imagesToRemove) {
       const imagesToRemoveArray = Array.isArray(imagesToRemove) ? imagesToRemove : JSON.parse(imagesToRemove || '[]');
       comment.images = comment.images.filter(img => !imagesToRemoveArray.includes(img));
     }
-    
-    // Handle new image uploads
     if (req.files.length > 0) {
       const newImageUrls = req.files.map(file => `/uploads/${file.filename}`);
       comment.images = [...comment.images, ...newImageUrls];
     }
-    
+
     const updatedComment = await comment.save();
     const populatedComment = await Comment.findById(commentId)
-      .populate('userId', 'avatarBase64 username')
-      .populate('replies.userId', 'username')
-      .populate('likes.userId', 'username')
-      .populate('replies.replies.userId', 'username')
-      .populate('replies.likes.userId', 'username')
-      .populate('replies.replies.likes.userId', 'username');
+      .populate('userId', 'avatarBase64 username');
     
-    const adjustedComment = {
-      ...populatedComment.toObject(),
-      createdAt: new Date(populatedComment.createdAt.getTime() + 7 * 60 * 60 * 1000),
-      replies: populatedComment.replies.map(reply => ({
-        ...reply.toObject(),
-        createdAt: new Date(reply.createdAt.getTime() + 7 * 60 * 60 * 1000),
-        likes: reply.likes.map(like => ({
-          ...like,
-          createdAt: new Date(like.createdAt.getTime() + 7 * 60 * 60 * 1000)
-        })),
-        replies: reply.replies.map(nestedReply => ({
-          ...nestedReply,
-          createdAt: new Date(nestedReply.createdAt.getTime() + 7 * 60 * 60 * 1000),
-          likes: nestedReply.likes.map(like => ({
-            ...like,
-            createdAt: new Date(like.createdAt.getTime() + 7 * 60 * 60 * 1000)
-          }))
-        }))
-      })),
-      likes: populatedComment.likes.map(like => ({ ...like.toObject(), createdAt: new Date(like.createdAt.getTime() + 7 * 60 * 60 * 1000) })),
+    const replies = await Reply.find({ commentId }).populate('userId', 'username').lean();
+    const likes = await LikeComment.find({
+      $or: [
+        { targetId: commentId, targetType: 'Comment' },
+        { targetId: { $in: replies.map(r => r._id) }, targetType: 'Reply' },
+      ]
+    }).populate('userId', 'username').lean();
+
+    const replyMap = new Map();
+    replies.forEach(reply => {
+      reply.createdAt = new Date(reply.createdAt.getTime() + 7 * 60 * 60 * 1000);
+      reply.likes = likes.filter(like => like.targetId.toString() === reply._id.toString() && like.targetType === 'Reply')
+        .map(like => ({ ...like, createdAt: new Date(like.createdAt.getTime() + 7 * 60 * 60 * 1000) }));
+      const commentIdStr = reply.commentId.toString();
+      if (!replyMap.has(commentIdStr)) {
+        replyMap.set(commentIdStr, []);
+      }
+      replyMap.get(commentIdStr).push(reply);
+    });
+
+    const buildReplyTree = (replyList, parentId = null) => {
+      return replyList
+        .filter(reply => (parentId ? reply.parentReplyId?.toString() === parentId : !reply.parentReplyId))
+        .map(reply => ({
+          ...reply,
+          replies: buildReplyTree(replyList, reply._id.toString())
+        }));
     };
-    
+
+    const adjustedComment = adjustTimestamps(populatedComment);
+    adjustedComment.replies = buildReplyTree(replyMap.get(commentId) || []);
+    adjustedComment.likes = likes.filter(like => like.targetId.toString() === commentId && like.targetType === 'Comment')
+      .map(like => ({ ...like, createdAt: new Date(like.createdAt.getTime() + 7 * 60 * 60 * 1000) }));
+
     res.status(200).json(adjustedComment);
   } catch (err) {
     res.status(400).json({ message: err.message });
   }
 });
-
 
 router.delete('/comments/:commentId', authMiddleware, async (req, res) => {
   try {
@@ -369,6 +393,8 @@ router.delete('/comments/:commentId', authMiddleware, async (req, res) => {
     if (!mongoose.Types.ObjectId.isValid(commentId)) return res.status(400).json({ message: 'Invalid commentId format' });
     const comment = await Comment.findById(commentId);
     if (!comment || comment.userId !== req.userId) return res.status(403).json({ message: 'Unauthorized or not found' });
+    await Reply.deleteMany({ commentId });
+    await LikeComment.deleteMany({ targetId: commentId, targetType: 'Comment' });
     await Comment.findByIdAndDelete(commentId);
     res.json({ message: 'Comment deleted successfully' });
   } catch (err) {
@@ -379,89 +405,67 @@ router.delete('/comments/:commentId', authMiddleware, async (req, res) => {
 router.post('/comments/:commentId/replies', authMiddleware, upload.array('images'), async (req, res) => {
   try {
     const { commentId } = req.params;
-    const { content } = req.body;
+    const { content, parentReplyId } = req.body;
     if (!content || !mongoose.Types.ObjectId.isValid(commentId)) return res.status(400).json({ message: 'Missing content or invalid format' });
     const comment = await Comment.findById(commentId);
     if (!comment) return res.status(404).json({ message: 'Comment not found' });
-    const imageUrls = req.files.map(file => `/uploads/${file.filename}`);
-    comment.replies.push({ userId: req.userId, content, images: imageUrls });
-    const savedComment = await comment.save();
-    const populatedComment = await Comment.findById(commentId)
-      .populate('userId', 'avatarBase64 username')
-      .populate('replies.userId', 'username')
-      .populate('likes.userId', 'username')
-      .populate('replies.replies.userId', 'username')
-      .populate('replies.likes.userId', 'username')
-      .populate('replies.replies.likes.userId', 'username');
-    const adjustedComment = {
-      ...populatedComment.toObject(),
-      createdAt: new Date(populatedComment.createdAt.getTime() + 7 * 60 * 60 * 1000),
-      replies: populatedComment.replies.map(reply => ({
-        ...reply.toObject(),
-        createdAt: new Date(reply.createdAt.getTime() + 7 * 60 * 60 * 1000),
-        likes: reply.likes.map(like => ({
-          ...like,
-          createdAt: new Date(like.createdAt.getTime() + 7 * 60 * 60 * 1000)
-        })),
-        replies: reply.replies.map(nestedReply => ({
-          ...nestedReply,
-          createdAt: new Date(nestedReply.createdAt.getTime() + 7 * 60 * 60 * 1000),
-          likes: nestedReply.likes.map(like => ({
-            ...like,
-            createdAt: new Date(like.createdAt.getTime() + 7 * 60 * 60 * 1000)
-          }))
-        }))
-      })),
-      likes: populatedComment.likes.map(like => ({ ...like.toObject(), createdAt: new Date(like.createdAt.getTime() + 7 * 60 * 60 * 1000) })),
-    };
-    res.status(201).json(adjustedComment);
-  } catch (err) {
-    res.status(400).json({ message: err.message });
-  }
-});
-
-router.post('/comments/:commentId/replies/:replyId/nested-replies', authMiddleware, upload.array('images'), async (req, res) => {
-  try {
-    const { commentId, replyId } = req.params;
-    const { content } = req.body;
-    if (!content || !mongoose.Types.ObjectId.isValid(commentId) || !mongoose.Types.ObjectId.isValid(replyId)) {
-      return res.status(400).json({ message: 'Missing content or invalid format' });
+    if (parentReplyId && !mongoose.Types.ObjectId.isValid(parentReplyId)) {
+      return res.status(400).json({ message: 'Invalid parentReplyId format' });
     }
-    const comment = await Comment.findById(commentId);
-    if (!comment) return res.status(404).json({ message: 'Comment not found' });
-    const reply = comment.replies.id(replyId);
-    if (!reply) return res.status(404).json({ message: 'Reply not found' });
+    if (parentReplyId) {
+      const parentReply = await Reply.findById(parentReplyId);
+      if (!parentReply || parentReply.commentId.toString() !== commentId) {
+        return res.status(404).json({ message: 'Parent reply not found or does not belong to this comment' });
+      }
+    }
     const imageUrls = req.files.map(file => `/uploads/${file.filename}`);
-    reply.replies.push({ userId: req.userId, content, images: imageUrls });
-    const savedComment = await comment.save();
-    const populatedComment = await Comment.findById(commentId)
-      .populate('userId', 'avatarBase64 username')
-      .populate('replies.userId', 'username')
-      .populate('likes.userId', 'username')
-      .populate('replies.replies.userId', 'username')
-      .populate('replies.likes.userId', 'username')
-      .populate('replies.replies.likes.userId', 'username');
-    const adjustedComment = {
-      ...populatedComment.toObject(),
-      createdAt: new Date(populatedComment.createdAt.getTime() + 7 * 60 * 60 * 1000),
-      replies: populatedComment.replies.map(reply => ({
-        ...reply.toObject(),
-        createdAt: new Date(reply.createdAt.getTime() + 7 * 60 * 60 * 1000),
-        likes: reply.likes.map(like => ({
-          ...like,
-          createdAt: new Date(like.createdAt.getTime() + 7 * 60 * 60 * 1000)
-        })),
-        replies: reply.replies.map(nestedReply => ({
-          ...nestedReply,
-          createdAt: new Date(nestedReply.createdAt.getTime() + 7 * 60 * 60 * 1000),
-          likes: nestedReply.likes.map(like => ({
-            ...like,
-            createdAt: new Date(like.createdAt.getTime() + 7 * 60 * 60 * 1000)
-          }))
-        }))
-      })),
-      likes: populatedComment.likes.map(like => ({ ...like.toObject(), createdAt: new Date(like.createdAt.getTime() + 7 * 60 * 60 * 1000) })),
+    const reply = new Reply({
+      commentId,
+      parentReplyId: parentReplyId || null,
+      userId: req.userId,
+      content,
+      images: imageUrls,
+    });
+    const savedReply = await reply.save();
+    const populatedReply = await Reply.findById(savedReply._id)
+      .populate('userId', 'username');
+    
+    const commentWithReplies = await Comment.findById(commentId)
+      .populate('userId', 'avatarBase64 username');
+    const replies = await Reply.find({ commentId }).populate('userId', 'username').lean();
+    const likes = await LikeComment.find({
+      $or: [
+        { targetId: commentId, targetType: 'Comment' },
+        { targetId: { $in: replies.map(r => r._id) }, targetType: 'Reply' },
+      ]
+    }).populate('userId', 'username').lean();
+
+    const replyMap = new Map();
+    replies.forEach(reply => {
+      reply.createdAt = new Date(reply.createdAt.getTime() + 7 * 60 * 60 * 1000);
+      reply.likes = likes.filter(like => like.targetId.toString() === reply._id.toString() && like.targetType === 'Reply')
+        .map(like => ({ ...like, createdAt: new Date(like.createdAt.getTime() + 7 * 60 * 60 * 1000) }));
+      const commentIdStr = reply.commentId.toString();
+      if (!replyMap.has(commentIdStr)) {
+        replyMap.set(commentIdStr, []);
+      }
+      replyMap.get(commentIdStr).push(reply);
+    });
+
+    const buildReplyTree = (replyList, parentId = null) => {
+      return replyList
+        .filter(reply => (parentId ? reply.parentReplyId?.toString() === parentId : !reply.parentReplyId))
+        .map(reply => ({
+          ...reply,
+          replies: buildReplyTree(replyList, reply._id.toString())
+        }));
     };
+
+    const adjustedComment = adjustTimestamps(commentWithReplies);
+    adjustedComment.replies = buildReplyTree(replyMap.get(commentId) || []);
+    adjustedComment.likes = likes.filter(like => like.targetId.toString() === commentId && like.targetType === 'Comment')
+      .map(like => ({ ...like, createdAt: new Date(like.createdAt.getTime() + 7 * 60 * 60 * 1000) }));
+
     res.status(201).json(adjustedComment);
   } catch (err) {
     res.status(400).json({ message: err.message });
@@ -472,57 +476,61 @@ router.put('/comments/:commentId/replies/:replyId', authMiddleware, upload.array
   try {
     const { commentId, replyId } = req.params;
     const { content, imagesToRemove } = req.body;
-    if (!mongoose.Types.ObjectId.isValid(commentId) || !mongoose.Types.ObjectId.isValid(replyId) || !content) return res.status(400).json({ message: 'Invalid format or missing content' });
-    const comment = await Comment.findById(commentId);
-    if (!comment) return res.status(404).json({ message: 'Comment not found' });
-    const reply = comment.replies.id(replyId);
-    if (!reply || reply.userId !== req.userId) return res.status(403).json({ message: 'Unauthorized or reply not found' });
-    
+    if (!mongoose.Types.ObjectId.isValid(commentId) || !mongoose.Types.ObjectId.isValid(replyId) || !content) {
+      return res.status(400).json({ message: 'Invalid format or missing content' });
+    }
+    const reply = await Reply.findById(replyId);
+    if (!reply || reply.userId !== req.userId || reply.commentId.toString() !== commentId) {
+      return res.status(403).json({ message: 'Unauthorized or reply not found' });
+    }
+
     reply.content = content;
-    
-    // Handle image removal
     if (imagesToRemove) {
       const imagesToRemoveArray = Array.isArray(imagesToRemove) ? imagesToRemove : JSON.parse(imagesToRemove || '[]');
       reply.images = reply.images.filter(img => !imagesToRemoveArray.includes(img));
     }
-    
-    // Handle new image uploads
     if (req.files.length > 0) {
       const newImageUrls = req.files.map(file => `/uploads/${file.filename}`);
       reply.images = [...reply.images, ...newImageUrls];
     }
-    
-    const updatedComment = await comment.save();
-    const populatedComment = await Comment.findById(commentId)
-      .populate('userId', 'avatarBase64 username')
-      .populate('replies.userId', 'username')
-      .populate('likes.userId', 'username')
-      .populate('replies.replies.userId', 'username')
-      .populate('replies.likes.userId', 'username')
-      .populate('replies.replies.likes.userId', 'username');
-    
-    const adjustedComment = {
-      ...populatedComment.toObject(),
-      createdAt: new Date(populatedComment.createdAt.getTime() + 7 * 60 * 60 * 1000),
-      replies: populatedComment.replies.map(reply => ({
-        ...reply.toObject(),
-        createdAt: new Date(reply.createdAt.getTime() + 7 * 60 * 60 * 1000),
-        likes: reply.likes.map(like => ({
-          ...like,
-          createdAt: new Date(like.createdAt.getTime() + 7 * 60 * 60 * 1000)
-        })),
-        replies: reply.replies.map(nestedReply => ({
-          ...nestedReply,
-          createdAt: new Date(nestedReply.createdAt.getTime() + 7 * 60 * 60 * 1000),
-          likes: nestedReply.likes.map(like => ({
-            ...like,
-            createdAt: new Date(like.createdAt.getTime() + 7 * 60 * 60 * 1000)
-          }))
-        }))
-      })),
-      likes: populatedComment.likes.map(like => ({ ...like.toObject(), createdAt: new Date(like.createdAt.getTime() + 7 * 60 * 60 * 1000) })),
+
+    const updatedReply = await reply.save();
+    const comment = await Comment.findById(commentId)
+      .populate('userId', 'avatarBase64 username');
+    const replies = await Reply.find({ commentId }).populate('userId', 'username').lean();
+    const likes = await LikeComment.find({
+      $or: [
+        { targetId: commentId, targetType: 'Comment' },
+        { targetId: { $in: replies.map(r => r._id) }, targetType: 'Reply' },
+      ]
+    }).populate('userId', 'username').lean();
+
+    const replyMap = new Map();
+    replies.forEach(reply => {
+      reply.createdAt = new Date(reply.createdAt.getTime() + 7 * 60 * 60 * 1000);
+      reply.likes = likes.filter(like => like.targetId.toString() === reply._id.toString() && like.targetType === 'Reply')
+        .map(like => ({ ...like, createdAt: new Date(like.createdAt.getTime() + 7 * 60 * 60 * 1000) }));
+      const commentIdStr = reply.commentId.toString();
+      if (!replyMap.has(commentIdStr)) {
+        replyMap.set(commentIdStr, []);
+      }
+      replyMap.get(commentIdStr).push(reply);
+    });
+
+    const buildReplyTree = (replyList, parentId = null) => {
+      return replyList
+        .filter(reply => (parentId ? reply.parentReplyId?.toString() === parentId : !reply.parentReplyId))
+        .map(reply => ({
+          ...reply,
+          replies: buildReplyTree(replyList, reply._id.toString())
+        }));
     };
-    
+
+    const adjustedComment = adjustTimestamps(comment);
+    adjustedComment.replies = buildReplyTree(replyMap.get(commentId) || []);
+    adjustedComment.likes = likes.filter(like => like.targetId.toString() === commentId && like.targetType === 'Comment')
+      .map(like => ({ ...like, createdAt: new Date(like.createdAt.getTime() + 7 * 60 * 60 * 1000) }));
+
     res.status(200).json(adjustedComment);
   } catch (err) {
     res.status(400).json({ message: err.message });
@@ -532,41 +540,52 @@ router.put('/comments/:commentId/replies/:replyId', authMiddleware, upload.array
 router.delete('/comments/:commentId/replies/:replyId', authMiddleware, async (req, res) => {
   try {
     const { commentId, replyId } = req.params;
-    if (!mongoose.Types.ObjectId.isValid(commentId) || !mongoose.Types.ObjectId.isValid(replyId)) return res.status(400).json({ message: 'Invalid format' });
-    const comment = await Comment.findById(commentId);
-    if (!comment) return res.status(404).json({ message: 'Comment not found' });
-    const reply = comment.replies.id(replyId);
-    if (!reply || reply.userId !== req.userId) return res.status(403).json({ message: 'Unauthorized or reply not found' });
-    comment.replies = comment.replies.filter(r => r._id.toString() !== replyId);
-    const updatedComment = await comment.save();
-    const populatedComment = await Comment.findById(commentId)
-      .populate('userId', 'avatarBase64 username')
-      .populate('replies.userId', 'username')
-      .populate('likes.userId', 'username')
-      .populate('replies.replies.userId', 'username')
-      .populate('replies.likes.userId', 'username')
-      .populate('replies.replies.likes.userId', 'username');
-    const adjustedComment = {
-      ...populatedComment.toObject(),
-      createdAt: new Date(populatedComment.createdAt.getTime() + 7 * 60 * 60 * 1000),
-      replies: populatedComment.replies.map(reply => ({
-        ...reply.toObject(),
-        createdAt: new Date(reply.createdAt.getTime() + 7 * 60 * 60 * 1000),
-        likes: reply.likes.map(like => ({
-          ...like,
-          createdAt: new Date(like.createdAt.getTime() + 7 * 60 * 60 * 1000)
-        })),
-        replies: reply.replies.map(nestedReply => ({
-          ...nestedReply,
-          createdAt: new Date(nestedReply.createdAt.getTime() + 7 * 60 * 60 * 1000),
-          likes: nestedReply.likes.map(like => ({
-            ...like,
-            createdAt: new Date(like.createdAt.getTime() + 7 * 60 * 60 * 1000)
-          }))
-        }))
-      })),
-      likes: populatedComment.likes.map(like => ({ ...like.toObject(), createdAt: new Date(like.createdAt.getTime() + 7 * 60 * 60 * 1000) })),
+    if (!mongoose.Types.ObjectId.isValid(commentId) || !mongoose.Types.ObjectId.isValid(replyId)) {
+      return res.status(400).json({ message: 'Invalid format' });
+    }
+    const reply = await Reply.findById(replyId);
+    if (!reply || reply.userId !== req.userId || reply.commentId.toString() !== commentId) {
+      return res.status(403).json({ message: 'Unauthorized or reply not found' });
+    }
+    await Reply.deleteMany({ $or: [{ _id: replyId }, { parentReplyId: replyId }] });
+    await LikeComment.deleteMany({ targetId: replyId, targetType: 'Reply' });
+    
+    const comment = await Comment.findById(commentId)
+      .populate('userId', 'avatarBase64 username');
+    const replies = await Reply.find({ commentId }).populate('userId', 'username').lean();
+    const likes = await LikeComment.find({
+      $or: [
+        { targetId: commentId, targetType: 'Comment' },
+        { targetId: { $in: replies.map(r => r._id) }, targetType: 'Reply' },
+      ]
+    }).populate('userId', 'username').lean();
+
+    const replyMap = new Map();
+    replies.forEach(reply => {
+      reply.createdAt = new Date(reply.createdAt.getTime() + 7 * 60 * 60 * 1000);
+      reply.likes = likes.filter(like => like.targetId.toString() === reply._id.toString() && like.targetType === 'Reply')
+        .map(like => ({ ...like, createdAt: new Date(like.createdAt.getTime() + 7 * 60 * 60 * 1000) }));
+      const commentIdStr = reply.commentId.toString();
+      if (!replyMap.has(commentIdStr)) {
+        replyMap.set(commentIdStr, []);
+      }
+      replyMap.get(commentIdStr).push(reply);
+    });
+
+    const buildReplyTree = (replyList, parentId = null) => {
+      return replyList
+        .filter(reply => (parentId ? reply.parentReplyId?.toString() === parentId : !reply.parentReplyId))
+        .map(reply => ({
+          ...reply,
+          replies: buildReplyTree(replyList, reply._id.toString())
+        }));
     };
+
+    const adjustedComment = adjustTimestamps(comment);
+    adjustedComment.replies = buildReplyTree(replyMap.get(commentId) || []);
+    adjustedComment.likes = likes.filter(like => like.targetId.toString() === commentId && like.targetType === 'Comment')
+      .map(like => ({ ...like, createdAt: new Date(like.createdAt.getTime() + 7 * 60 * 60 * 1000) }));
+
     res.status(200).json({ message: 'Reply deleted successfully', comment: adjustedComment });
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -579,71 +598,93 @@ router.post('/comments/:commentId/like', authMiddleware, async (req, res) => {
     if (!mongoose.Types.ObjectId.isValid(commentId)) return res.status(400).json({ message: 'Invalid commentId format' });
     const comment = await Comment.findById(commentId);
     if (!comment) return res.status(404).json({ message: 'Comment not found' });
-    const existingLike = comment.likes.find(like => like.userId === req.userId);
+
+    const existingLike = await LikeComment.findOne({ targetId: commentId, targetType: 'Comment', userId: req.userId });
     if (existingLike) {
-      comment.likes = comment.likes.filter(like => like.userId !== req.userId);
-      await comment.save();
+      await LikeComment.deleteOne({ _id: existingLike._id });
       const populatedComment = await Comment.findById(commentId)
-        .populate('userId', 'avatarBase64 username')
-        .populate('replies.userId', 'username')
-        .populate('likes.userId', 'username')
-        .populate('replies.replies.userId', 'username')
-        .populate('replies.likes.userId', 'username')
-        .populate('replies.replies.likes.userId', 'username');
-      const adjustedComment = {
-        ...populatedComment.toObject(),
-        createdAt: new Date(populatedComment.createdAt.getTime() + 7 * 60 * 60 * 1000),
-        replies: populatedComment.replies.map(reply => ({
-          ...reply.toObject(),
-          createdAt: new Date(reply.createdAt.getTime() + 7 * 60 * 60 * 1000),
-          likes: reply.likes.map(like => ({
-            ...like,
-            createdAt: new Date(like.createdAt.getTime() + 7 * 60 * 60 * 1000)
-          })),
-          replies: reply.replies.map(nestedReply => ({
-            ...nestedReply,
-            createdAt: new Date(nestedReply.createdAt.getTime() + 7 * 60 * 60 * 1000),
-            likes: nestedReply.likes.map(like => ({
-              ...like,
-              createdAt: new Date(like.createdAt.getTime() + 7 * 60 * 60 * 1000)
-            }))
-          }))
-        })),
-        likes: populatedComment.likes.map(like => ({ ...like.toObject(), createdAt: new Date(like.createdAt.getTime() + 7 * 60 * 60 * 1000) })),
+        .populate('userId', 'avatarBase64 username');
+      const replies = await Reply.find({ commentId }).populate('userId', 'username').lean();
+      const likes = await LikeComment.find({
+        $or: [
+          { targetId: commentId, targetType: 'Comment' },
+          { targetId: { $in: replies.map(r => r._id) }, targetType: 'Reply' },
+        ]
+      }).populate('userId', 'username').lean();
+
+      const replyMap = new Map();
+      replies.forEach(reply => {
+        reply.createdAt = new Date(reply.createdAt.getTime() + 7 * 60 * 60 * 1000);
+        reply.likes = likes.filter(like => like.targetId.toString() === reply._id.toString() && like.targetType === 'Reply')
+          .map(like => ({ ...like, createdAt: new Date(like.createdAt.getTime() + 7 * 60 * 60 * 1000) }));
+        const commentIdStr = reply.commentId.toString();
+        if (!replyMap.has(commentIdStr)) {
+          replyMap.set(commentIdStr, []);
+        }
+        replyMap.get(commentIdStr).push(reply);
+      });
+
+      const buildReplyTree = (replyList, parentId = null) => {
+        return replyList
+          .filter(reply => (parentId ? reply.parentReplyId?.toString() === parentId : !reply.parentReplyId))
+          .map(reply => ({
+            ...reply,
+            replies: buildReplyTree(replyList, reply._id.toString())
+          }));
       };
-      return res.status(200).json({ message: 'Unliked', likesCount: comment.likes.length, comment: adjustedComment });
+
+      const adjustedComment = adjustTimestamps(populatedComment);
+      adjustedComment.replies = buildReplyTree(replyMap.get(commentId) || []);
+      adjustedComment.likes = likes.filter(like => like.targetId.toString() === commentId && like.targetType === 'Comment')
+        .map(like => ({ ...like, createdAt: new Date(like.createdAt.getTime() + 7 * 60 * 60 * 1000) }));
+
+      return res.status(200).json({ message: 'Unliked', likesCount: adjustedComment.likes.length, comment: adjustedComment });
     }
-    comment.likes.push({ userId: req.userId });
-    await comment.save();
+
+    const like = new LikeComment({
+      targetId: commentId,
+      targetType: 'Comment',
+      userId: req.userId,
+    });
+    await like.save();
+
     const populatedComment = await Comment.findById(commentId)
-      .populate('userId', 'avatarBase64 username')
-      .populate('replies.userId', 'username')
-      .populate('likes.userId', 'username')
-      .populate('replies.replies.userId', 'username')
-      .populate('replies.likes.userId', 'username')
-      .populate('replies.replies.likes.userId', 'username');
-    const adjustedComment = {
-      ...populatedComment.toObject(),
-      createdAt: new Date(populatedComment.createdAt.getTime() + 7 * 60 * 60 * 1000),
-      replies: populatedComment.replies.map(reply => ({
-        ...reply.toObject(),
-        createdAt: new Date(reply.createdAt.getTime() + 7 * 60 * 60 * 1000),
-        likes: reply.likes.map(like => ({
-          ...like,
-          createdAt: new Date(like.createdAt.getTime() + 7 * 60 * 60 * 1000)
-        })),
-        replies: reply.replies.map(nestedReply => ({
-          ...nestedReply,
-          createdAt: new Date(nestedReply.createdAt.getTime() + 7 * 60 * 60 * 1000),
-          likes: nestedReply.likes.map(like => ({
-            ...like,
-            createdAt: new Date(like.createdAt.getTime() + 7 * 60 * 60 * 1000)
-          }))
-        }))
-      })),
-      likes: populatedComment.likes.map(like => ({ ...like.toObject(), createdAt: new Date(like.createdAt.getTime() + 7 * 60 * 60 * 1000) })),
+      .populate('userId', 'avatarBase64 username');
+    const replies = await Reply.find({ commentId }).populate('userId', 'username').lean();
+    const likes = await LikeComment.find({
+      $or: [
+        { targetId: commentId, targetType: 'Comment' },
+        { targetId: { $in: replies.map(r => r._id) }, targetType: 'Reply' },
+      ]
+    }).populate('userId', 'username').lean();
+
+    const replyMap = new Map();
+    replies.forEach(reply => {
+      reply.createdAt = new Date(reply.createdAt.getTime() + 7 * 60 * 60 * 1000);
+      reply.likes = likes.filter(like => like.targetId.toString() === reply._id.toString() && like.targetType === 'Reply')
+        .map(like => ({ ...like, createdAt: new Date(like.createdAt.getTime() + 7 * 60 * 60 * 1000) }));
+      const commentIdStr = reply.commentId.toString();
+      if (!replyMap.has(commentIdStr)) {
+        replyMap.set(commentIdStr, []);
+      }
+      replyMap.get(commentIdStr).push(reply);
+    });
+
+    const buildReplyTree = (replyList, parentId = null) => {
+      return replyList
+        .filter(reply => (parentId ? reply.parentReplyId?.toString() === parentId : !reply.parentReplyId))
+        .map(reply => ({
+          ...reply,
+          replies: buildReplyTree(replyList, reply._id.toString())
+        }));
     };
-    res.status(200).json({ message: 'Liked', likesCount: comment.likes.length, comment: adjustedComment });
+
+    const adjustedComment = adjustTimestamps(populatedComment);
+    adjustedComment.replies = buildReplyTree(replyMap.get(commentId) || []);
+    adjustedComment.likes = likes.filter(like => like.targetId.toString() === commentId && like.targetType === 'Comment')
+      .map(like => ({ ...like, createdAt: new Date(like.createdAt.getTime() + 7 * 60 * 60 * 1000) }));
+
+    res.status(200).json({ message: 'Liked', likesCount: adjustedComment.likes.length, comment: adjustedComment });
   } catch (err) {
     res.status(400).json({ message: err.message });
   }
@@ -655,37 +696,46 @@ router.delete('/comments/:commentId/unlike', authMiddleware, async (req, res) =>
     if (!mongoose.Types.ObjectId.isValid(commentId)) return res.status(400).json({ message: 'Invalid commentId format' });
     const comment = await Comment.findById(commentId);
     if (!comment) return res.status(404).json({ message: 'Comment not found' });
-    comment.likes = comment.likes.filter(like => like.userId !== req.userId);
-    await comment.save();
+
+    await LikeComment.deleteOne({ targetId: commentId, targetType: 'Comment', userId: req.userId });
+
     const populatedComment = await Comment.findById(commentId)
-      .populate('userId', 'avatarBase64 username')
-      .populate('replies.userId', 'username')
-      .populate('likes.userId', 'username')
-      .populate('replies.replies.userId', 'username')
-      .populate('replies.likes.userId', 'username')
-      .populate('replies.replies.likes.userId', 'username');
-    const adjustedComment = {
-      ...populatedComment.toObject(),
-      createdAt: new Date(populatedComment.createdAt.getTime() + 7 * 60 * 60 * 1000),
-      replies: populatedComment.replies.map(reply => ({
-        ...reply.toObject(),
-        createdAt: new Date(reply.createdAt.getTime() + 7 * 60 * 60 * 1000),
-        likes: reply.likes.map(like => ({
-          ...like,
-          createdAt: new Date(like.createdAt.getTime() + 7 * 60 * 60 * 1000)
-        })),
-        replies: reply.replies.map(nestedReply => ({
-          ...nestedReply,
-          createdAt: new Date(nestedReply.createdAt.getTime() + 7 * 60 * 60 * 1000),
-          likes: nestedReply.likes.map(like => ({
-            ...like,
-            createdAt: new Date(like.createdAt.getTime() + 7 * 60 * 60 * 1000)
-          }))
-        }))
-      })),
-      likes: populatedComment.likes.map(like => ({ ...like.toObject(), createdAt: new Date(like.createdAt.getTime() + 7 * 60 * 60 * 1000) })),
+      .populate('userId', 'avatarBase64 username');
+    const replies = await Reply.find({ commentId }).populate('userId', 'username').lean();
+    const likes = await LikeComment.find({
+      $or: [
+        { targetId: commentId, targetType: 'Comment' },
+        { targetId: { $in: replies.map(r => r._id) }, targetType: 'Reply' },
+      ]
+    }).populate('userId', 'username').lean();
+
+    const replyMap = new Map();
+    replies.forEach(reply => {
+      reply.createdAt = new Date(reply.createdAt.getTime() + 7 * 60 * 60 * 1000);
+      reply.likes = likes.filter(like => like.targetId.toString() === reply._id.toString() && like.targetType === 'Reply')
+        .map(like => ({ ...like, createdAt: new Date(like.createdAt.getTime() + 7 * 60 * 60 * 1000) }));
+      const commentIdStr = reply.commentId.toString();
+      if (!replyMap.has(commentIdStr)) {
+        replyMap.set(commentIdStr, []);
+      }
+      replyMap.get(commentIdStr).push(reply);
+    });
+
+    const buildReplyTree = (replyList, parentId = null) => {
+      return replyList
+        .filter(reply => (parentId ? reply.parentReplyId?.toString() === parentId : !reply.parentReplyId))
+        .map(reply => ({
+          ...reply,
+          replies: buildReplyTree(replyList, reply._id.toString())
+        }));
     };
-    res.status(200).json({ message: 'Unliked', likesCount: comment.likes.length, comment: adjustedComment });
+
+    const adjustedComment = adjustTimestamps(populatedComment);
+    adjustedComment.replies = buildReplyTree(replyMap.get(commentId) || []);
+    adjustedComment.likes = likes.filter(like => like.targetId.toString() === commentId && like.targetType === 'Comment')
+      .map(like => ({ ...like, createdAt: new Date(like.createdAt.getTime() + 7 * 60 * 60 * 1000) }));
+
+    res.status(200).json({ message: 'Unliked', likesCount: adjustedComment.likes.length, comment: adjustedComment });
   } catch (err) {
     res.status(400).json({ message: err.message });
   }
@@ -697,75 +747,95 @@ router.post('/comments/:commentId/replies/:replyId/like', authMiddleware, async 
     if (!mongoose.Types.ObjectId.isValid(commentId) || !mongoose.Types.ObjectId.isValid(replyId)) {
       return res.status(400).json({ message: 'Invalid format' });
     }
-    const comment = await Comment.findById(commentId);
-    if (!comment) return res.status(404).json({ message: 'Comment not found' });
-    const reply = comment.replies.id(replyId);
-    if (!reply) return res.status(404).json({ message: 'Reply not found' });
-    const existingLike = reply.likes.find(like => like.userId === req.userId);
+    const reply = await Reply.findById(replyId);
+    if (!reply || reply.commentId.toString() !== commentId) return res.status(404).json({ message: 'Reply not found' });
+
+    const existingLike = await LikeComment.findOne({ targetId: replyId, targetType: 'Reply', userId: req.userId });
     if (existingLike) {
-      reply.likes = reply.likes.filter(like => like.userId !== req.userId);
-      await comment.save();
-      const populatedComment = await Comment.findById(commentId)
-        .populate('userId', 'avatarBase64 username')
-        .populate('replies.userId', 'username')
-        .populate('likes.userId', 'username')
-        .populate('replies.replies.userId', 'username')
-        .populate('replies.likes.userId', 'username')
-        .populate('replies.replies.likes.userId', 'username');
-      const adjustedComment = {
-        ...populatedComment.toObject(),
-        createdAt: new Date(populatedComment.createdAt.getTime() + 7 * 60 * 60 * 1000),
-        replies: populatedComment.replies.map(reply => ({
-          ...reply.toObject(),
-          createdAt: new Date(reply.createdAt.getTime() + 7 * 60 * 60 * 1000),
-          likes: reply.likes.map(like => ({
-            ...like,
-            createdAt: new Date(like.createdAt.getTime() + 7 * 60 * 60 * 1000)
-          })),
-          replies: reply.replies.map(nestedReply => ({
-            ...nestedReply,
-            createdAt: new Date(nestedReply.createdAt.getTime() + 7 * 60 * 60 * 1000),
-            likes: nestedReply.likes.map(like => ({
-              ...like,
-              createdAt: new Date(like.createdAt.getTime() + 7 * 60 * 60 * 1000)
-            }))
-          }))
-        })),
-        likes: populatedComment.likes.map(like => ({ ...like.toObject(), createdAt: new Date(like.createdAt.getTime() + 7 * 60 * 60 * 1000) })),
+      await LikeComment.deleteOne({ _id: existingLike._id });
+      const comment = await Comment.findById(commentId)
+        .populate('userId', 'avatarBase64 username');
+      const replies = await Reply.find({ commentId }).populate('userId', 'username').lean();
+      const likes = await LikeComment.find({
+        $or: [
+          { targetId: commentId, targetType: 'Comment' },
+          { targetId: { $in: replies.map(r => r._id) }, targetType: 'Reply' },
+        ]
+      }).populate('userId', 'username').lean();
+
+      const replyMap = new Map();
+      replies.forEach(reply => {
+        reply.createdAt = new Date(reply.createdAt.getTime() + 7 * 60 * 60 * 1000);
+        reply.likes = likes.filter(like => like.targetId.toString() === reply._id.toString() && like.targetType === 'Reply')
+          .map(like => ({ ...like, createdAt: new Date(like.createdAt.getTime() + 7 * 60 * 60 * 1000) }));
+        const commentIdStr = reply.commentId.toString();
+        if (!replyMap.has(commentIdStr)) {
+          replyMap.set(commentIdStr, []);
+        }
+        replyMap.get(commentIdStr).push(reply);
+      });
+
+      const buildReplyTree = (replyList, parentId = null) => {
+        return replyList
+          .filter(reply => (parentId ? reply.parentReplyId?.toString() === parentId : !reply.parentReplyId))
+          .map(reply => ({
+            ...reply,
+            replies: buildReplyTree(replyList, reply._id.toString())
+          }));
       };
-      return res.status(200).json({ message: 'Unliked reply', likesCount: reply.likes.length, comment: adjustedComment });
+
+      const adjustedComment = adjustTimestamps(comment);
+      adjustedComment.replies = buildReplyTree(replyMap.get(commentId) || []);
+      adjustedComment.likes = likes.filter(like => like.targetId.toString() === commentId && like.targetType === 'Comment')
+        .map(like => ({ ...like, createdAt: new Date(like.createdAt.getTime() + 7 * 60 * 60 * 1000) }));
+
+      return res.status(200).json({ message: 'Unliked reply', likesCount: adjustedComment.replies.find(r => r._id.toString() === replyId).likes.length, comment: adjustedComment });
     }
-    reply.likes.push({ userId: req.userId });
-    await comment.save();
-    const populatedComment = await Comment.findById(commentId)
-      .populate('userId', 'avatarBase64 username')
-      .populate('replies.userId', 'username')
-      .populate('likes.userId', 'username')
-      .populate('replies.replies.userId', 'username')
-      .populate('replies.likes.userId', 'username')
-      .populate('replies.replies.likes.userId', 'username');
-    const adjustedComment = {
-      ...populatedComment.toObject(),
-      createdAt: new Date(populatedComment.createdAt.getTime() + 7 * 60 * 60 * 1000),
-      replies: populatedComment.replies.map(reply => ({
-        ...reply.toObject(),
-        createdAt: new Date(reply.createdAt.getTime() + 7 * 60 * 60 * 1000),
-        likes: reply.likes.map(like => ({
-          ...like,
-          createdAt: new Date(like.createdAt.getTime() + 7 * 60 * 60 * 1000)
-        })),
-        replies: reply.replies.map(nestedReply => ({
-          ...nestedReply,
-          createdAt: new Date(nestedReply.createdAt.getTime() + 7 * 60 * 60 * 1000),
-          likes: nestedReply.likes.map(like => ({
-            ...like,
-            createdAt: new Date(like.createdAt.getTime() + 7 * 60 * 60 * 1000)
-          }))
-        }))
-      })),
-      likes: populatedComment.likes.map(like => ({ ...like.toObject(), createdAt: new Date(like.createdAt.getTime() + 7 * 60 * 60 * 1000) })),
+
+    const like = new LikeComment({
+      targetId: replyId,
+      targetType: 'Reply',
+      userId: req.userId,
+    });
+    await like.save();
+
+    const comment = await Comment.findById(commentId)
+      .populate('userId', 'avatarBase64 username');
+    const replies = await Reply.find({ commentId }).populate('userId', 'username').lean();
+    const likes = await LikeComment.find({
+      $or: [
+        { targetId: commentId, targetType: 'Comment' },
+        { targetId: { $in: replies.map(r => r._id) }, targetType: 'Reply' },
+      ]
+    }).populate('userId', 'username').lean();
+
+    const replyMap = new Map();
+    replies.forEach(reply => {
+      reply.createdAt = new Date(reply.createdAt.getTime() + 7 * 60 * 60 * 1000);
+      reply.likes = likes.filter(like => like.targetId.toString() === reply._id.toString() && like.targetType === 'Reply')
+        .map(like => ({ ...like, createdAt: new Date(like.createdAt.getTime() + 7 * 60 * 60 * 1000) }));
+      const commentIdStr = reply.commentId.toString();
+      if (!replyMap.has(commentIdStr)) {
+        replyMap.set(commentIdStr, []);
+      }
+      replyMap.get(commentIdStr).push(reply);
+    });
+
+    const buildReplyTree = (replyList, parentId = null) => {
+      return replyList
+        .filter(reply => (parentId ? reply.parentReplyId?.toString() === parentId : !reply.parentReplyId))
+        .map(reply => ({
+          ...reply,
+          replies: buildReplyTree(replyList, reply._id.toString())
+        }));
     };
-    res.status(200).json({ message: 'Liked reply', likesCount: reply.likes.length, comment: adjustedComment });
+
+    const adjustedComment = adjustTimestamps(comment);
+    adjustedComment.replies = buildReplyTree(replyMap.get(commentId) || []);
+    adjustedComment.likes = likes.filter(like => like.targetId.toString() === commentId && like.targetType === 'Comment')
+      .map(like => ({ ...like, createdAt: new Date(like.createdAt.getTime() + 7 * 60 * 60 * 1000) }));
+
+    res.status(200).json({ message: 'Liked reply', likesCount: adjustedComment.replies.find(r => r._id.toString() === replyId).likes.length, comment: adjustedComment });
   } catch (err) {
     res.status(400).json({ message: err.message });
   }
@@ -777,41 +847,48 @@ router.delete('/comments/:commentId/replies/:replyId/unlike', authMiddleware, as
     if (!mongoose.Types.ObjectId.isValid(commentId) || !mongoose.Types.ObjectId.isValid(replyId)) {
       return res.status(400).json({ message: 'Invalid format' });
     }
-    const comment = await Comment.findById(commentId);
-    if (!comment) return res.status(404).json({ message: 'Comment not found' });
-    const reply = comment.replies.id(replyId);
-    if (!reply) return res.status(404).json({ message: 'Reply not found' });
-    reply.likes = reply.likes.filter(like => like.userId !== req.userId);
-    await comment.save();
-    const populatedComment = await Comment.findById(commentId)
-      .populate('userId', 'avatarBase64 username')
-      .populate('replies.userId', 'username')
-      .populate('likes.userId', 'username')
-      .populate('replies.replies.userId', 'username')
-      .populate('replies.likes.userId', 'username')
-      .populate('replies.replies.likes.userId', 'username');
-    const adjustedComment = {
-      ...populatedComment.toObject(),
-      createdAt: new Date(populatedComment.createdAt.getTime() + 7 * 60 * 60 * 1000),
-      replies: populatedComment.replies.map(reply => ({
-        ...reply.toObject(),
-        createdAt: new Date(reply.createdAt.getTime() + 7 * 60 * 60 * 1000),
-        likes: reply.likes.map(like => ({
-          ...like,
-          createdAt: new Date(like.createdAt.getTime() + 7 * 60 * 60 * 1000)
-        })),
-        replies: reply.replies.map(nestedReply => ({
-          ...nestedReply,
-          createdAt: new Date(nestedReply.createdAt.getTime() + 7 * 60 * 60 * 1000),
-          likes: nestedReply.likes.map(like => ({
-            ...like,
-            createdAt: new Date(like.createdAt.getTime() + 7 * 60 * 60 * 1000)
-          }))
-        }))
-      })),
-      likes: populatedComment.likes.map(like => ({ ...like.toObject(), createdAt: new Date(like.createdAt.getTime() + 7 * 60 * 60 * 1000) })),
+    const reply = await Reply.findById(replyId);
+    if (!reply || reply.commentId.toString() !== commentId) return res.status(404).json({ message: 'Reply not found' });
+
+    await LikeComment.deleteOne({ targetId: replyId, targetType: 'Reply', userId: req.userId });
+
+    const comment = await Comment.findById(commentId)
+      .populate('userId', 'avatarBase64 username');
+    const replies = await Reply.find({ commentId }).populate('userId', 'username').lean();
+    const likes = await LikeComment.find({
+      $or: [
+        { targetId: commentId, targetType: 'Comment' },
+        { targetId: { $in: replies.map(r => r._id) }, targetType: 'Reply' },
+      ]
+    }).populate('userId', 'username').lean();
+
+    const replyMap = new Map();
+    replies.forEach(reply => {
+      reply.createdAt = new Date(reply.createdAt.getTime() + 7 * 60 * 60 * 1000);
+      reply.likes = likes.filter(like => like.targetId.toString() === reply._id.toString() && like.targetType === 'Reply')
+        .map(like => ({ ...like, createdAt: new Date(like.createdAt.getTime() + 7 * 60 * 60 * 1000) }));
+      const commentIdStr = reply.commentId.toString();
+      if (!replyMap.has(commentIdStr)) {
+        replyMap.set(commentIdStr, []);
+      }
+      replyMap.get(commentIdStr).push(reply);
+    });
+
+    const buildReplyTree = (replyList, parentId = null) => {
+      return replyList
+        .filter(reply => (parentId ? reply.parentReplyId?.toString() === parentId : !reply.parentReplyId))
+        .map(reply => ({
+          ...reply,
+          replies: buildReplyTree(replyList, reply._id.toString())
+        }));
     };
-    res.status(200).json({ message: 'Unliked reply', likesCount: reply.likes.length, comment: adjustedComment });
+
+    const adjustedComment = adjustTimestamps(comment);
+    adjustedComment.replies = buildReplyTree(replyMap.get(commentId) || []);
+    adjustedComment.likes = likes.filter(like => like.targetId.toString() === commentId && like.targetType === 'Comment')
+      .map(like => ({ ...like, createdAt: new Date(like.createdAt.getTime() + 7 * 60 * 60 * 1000) }));
+
+    res.status(200).json({ message: 'Unliked reply', likesCount: adjustedComment.replies.find(r => r._id.toString() === replyId).likes.length, comment: adjustedComment });
   } catch (err) {
     res.status(400).json({ message: err.message });
   }
