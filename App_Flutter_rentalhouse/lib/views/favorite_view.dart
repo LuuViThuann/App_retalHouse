@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_rentalhouse/viewmodels/vm_auth.dart';
 import 'package:flutter_rentalhouse/viewmodels/vm_favorite.dart';
-import 'package:flutter_rentalhouse/widgets/favorite_list_body.dart';
 import 'package:provider/provider.dart';
+
+import '../Widgets/Favorite/favorite_list_body.dart';
 
 class FavoriteView extends StatefulWidget {
   const FavoriteView({super.key});

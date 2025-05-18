@@ -6,10 +6,24 @@ const mongoose = require('mongoose');
 const Rental = require('../models/Rental');
 const Favorite = require('../models/favorite');
 const { Comment, Reply, LikeComment } = require('../models/comments');
+
+const Conversation = require('../models/conversation');
+const Message = require('../models/message');
+
 const admin = require('firebase-admin');
 const multer = require('multer');
 const path = require('path');
+const redis = require('redis');
 
+// sử dụng redis để lưu trữ các thông tin tạm thời
+const redisClient = redis.createClient({
+  url: process.env.REDIS_URL || 'redis://localhost:6379',
+});
+redisClient.on('error', (err) => console.log('Redis Client Error', err));
+redisClient.connect();
+
+
+// Cấu hình multer để lưu trữ file upload
 const storage = multer.diskStorage({
   destination: './uploads/',
   filename: (req, file, cb) => {
@@ -901,5 +915,119 @@ router.delete('/comments/:commentId/replies/:replyId/unlike', authMiddleware, as
     res.status(400).json({ message: err.message });
   }
 });
+
+
+// ----------------------------------------------------------------------
+// Phần code xử lý đoạn chat 
+// Chat routes
+router.post('/conversations', authMiddleware, async (req, res) => {
+  try {
+    const { rentalId, recipientId } = req.body;
+    const rental = await Rental.findById(rentalId);
+    if (!rental) return res.status(404).json({ message: 'Rental not found' });
+
+    // Check if conversation already exists
+    let conversation = await Conversation.findOne({
+      participants: { $all: [req.userId, recipientId] },
+      rentalId,
+    });
+
+    if (!conversation) {
+      conversation = new Conversation({
+        participants: [req.userId, recipientId],
+        rentalId,
+      });
+      await conversation.save();
+    }
+
+    res.status(201).json(conversation);
+  } catch (err) {
+    res.status(400).json({ message: err.message });
+  }
+});
+
+router.get('/conversations', authMiddleware, async (req, res) => {
+  try {
+    const conversations = await Conversation.find({
+      participants: req.userId,
+    })
+      .populate('participants', 'username avatarBase64')
+      .populate('lastMessage')
+      .sort({ updatedAt: -1 });
+
+    const adjustedConversations = conversations.map(conv => adjustTimestamps(conv));
+    res.json(adjustedConversations);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+router.get('/conversations/pending', authMiddleware, async (req, res) => {
+  try {
+    const conversations = await Conversation.find({
+      participants: req.userId,
+    }).populate('lastMessage');
+
+    const pendingConversations = [];
+    for (const conv of conversations) {
+      if (conv.lastMessage && !conv.lastMessage.read && conv.lastMessage.senderId !== req.userId) {
+        const adjustedConv = adjustTimestamps(conv);
+        pendingConversations.push(adjustedConv);
+      }
+    }
+
+    res.json(pendingConversations);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+router.get('/messages/:conversationId', authMiddleware, async (req, res) => {
+  try {
+    const { conversationId } = req.params;
+    const { cursor, limit = 10 } = req.query;
+
+    // Check Redis cache first
+    const cacheKey = `messages:${conversationId}:${cursor || 'latest'}:${limit}`;
+    const cachedMessages = await redisClient.get(cacheKey);
+    if (cachedMessages) {
+      return res.json(JSON.parse(cachedMessages));
+    }
+
+    const conversation = await Conversation.findById(conversationId);
+    if (!conversation) return res.status(404).json({ message: 'Conversation not found' });
+    if (!conversation.participants.includes(req.userId)) {
+      return res.status(403).json({ message: 'Unauthorized' });
+    }
+
+    let query = { conversationId };
+    if (cursor) {
+      query.createdAt = { $lt: new Date(cursor) };
+    }
+
+    const messages = await Message.find(query)
+      .sort({ createdAt: -1 })
+      .limit(parseInt(limit))
+      .populate('senderId', 'username avatarBase64');
+
+    const adjustedMessages = messages.map(msg => adjustTimestamps(msg));
+    const nextCursor = adjustedMessages.length > 0 ? adjustedMessages[adjustedMessages.length - 1].createdAt : null;
+
+    // Cache the result in Redis for 5 minutes
+    const response = { messages: adjustedMessages, nextCursor };
+    await redisClient.setEx(cacheKey, 300, JSON.stringify(response));
+
+    // Mark messages as read
+    await Message.updateMany(
+      { conversationId, senderId: { $ne: req.userId }, read: false },
+      { read: true }
+    );
+
+    res.json(response);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
 
 module.exports = router;

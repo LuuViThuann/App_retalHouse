@@ -8,7 +8,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:provider/provider.dart';
 import 'dart:io';
-import '../Widgets/full_screen_image.dart';
+import '../Widgets/Detail/full_screen_image.dart';
 import '../Widgets/thousand_format.dart';
 
 class CreateRentalScreen extends StatefulWidget {

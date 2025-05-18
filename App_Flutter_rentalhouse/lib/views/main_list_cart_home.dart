@@ -1,8 +1,10 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_rentalhouse/models/rental.dart';
+import 'package:flutter_rentalhouse/services/rental_service.dart';
 import 'package:flutter_rentalhouse/viewmodels/vm_auth.dart';
 import 'package:flutter_rentalhouse/viewmodels/vm_favorite.dart';
+import 'package:flutter_rentalhouse/views/chat_user.dart';
 import 'package:flutter_rentalhouse/views/rental_detail_view.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
@@ -29,22 +31,62 @@ class RentalItemWidget extends StatelessWidget {
     return formatter.format(amount);
   }
 
+  Route _createRoute(Widget page) {
+    return PageRouteBuilder(
+      pageBuilder: (context, animation, secondaryAnimation) => page,
+      transitionsBuilder: (context, animation, secondaryAnimation, child) {
+        const begin = Offset(0.0, 1.0);
+        const end = Offset.zero;
+        const curve = Curves.easeInOut;
+
+        var tween = Tween(begin: begin, end: end).chain(CurveTween(curve: curve));
+        var offsetAnimation = animation.drive(tween);
+
+        return SlideTransition(
+          position: offsetAnimation,
+          child: child,
+        );
+      },
+      transitionDuration: const Duration(milliseconds: 300),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final authViewModel = Provider.of<AuthViewModel>(context);
     final favoriteViewModel = Provider.of<FavoriteViewModel>(context);
+    final rentalService = RentalService();
 
     final rentalId = rental.id ?? '';
     final isFavorite = favoriteViewModel.isFavorite(rentalId);
     final isLoading = favoriteViewModel.isLoading(rentalId);
+    // Check if the rental belongs to the current user
+    final isOwnRental = authViewModel.currentUser?.id == rental.userId;
+
+    final ValueNotifier<double> averageRating = ValueNotifier(0.0);
+    final ValueNotifier<int> reviewCount = ValueNotifier(0);
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      rentalService.fetchRentalDetails(
+        rental: rental,
+        onSuccess: (rating, count) {
+          averageRating.value = rating;
+          reviewCount.value = count;
+        },
+        onError: (error) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(error)),
+          );
+        },
+        context: context,
+      );
+    });
 
     return GestureDetector(
       onTap: () {
         Navigator.push(
           context,
-          MaterialPageRoute(
-            builder: (context) => RentalDetailScreen(rental: rental),
-          ),
+          _createRoute(RentalDetailScreen(rental: rental)),
         );
       },
       child: Padding(
@@ -79,20 +121,46 @@ class RentalItemWidget extends StatelessWidget {
                     Positioned(
                       top: 8,
                       right: 8,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: (rental.status == 'available' ? Colors.green : Colors.red).withOpacity(0.9),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Text(
-                          rental.status == 'available' ? 'Đang hoạt động' : 'Đã được thuê',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: (rental.status == 'available' ? Colors.green : Colors.red).withOpacity(0.9),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Text(
+                              rental.status == 'available' ? 'Đang hoạt động' : 'Đã được thuê',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
                           ),
-                        ),
+                          const SizedBox(width: 5,),
+                          // Display "Bài viết của bạn" if the rental belongs to the current user
+                          if (isOwnRental)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 4),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: Colors.blue.withOpacity(0.9),
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: const Text(
+                                  'Bài viết của bạn',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                            ),
+                        ],
                       ),
                     ),
                   ],
@@ -119,92 +187,113 @@ class RentalItemWidget extends StatelessWidget {
                           Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              GestureDetector(
-                                onTap: isLoading
-                                    ? null
-                                    : () async {
-                                  if (authViewModel.currentUser == null) {
+                              // Conditionally show the favorite button only if the rental does not belong to the current user
+                              if (!isOwnRental)
+                                GestureDetector(
+                                  onTap: isLoading
+                                      ? null
+                                      : () async {
+                                    if (authViewModel.currentUser == null) {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        const SnackBar(
+                                          content: Text('Vui lòng đăng nhập để thêm vào yêu thích!'),
+                                          backgroundColor: Colors.redAccent,
+                                        ),
+                                      );
+                                      return;
+                                    }
+
+                                    bool success;
+                                    String message;
+
+                                    if (isFavorite) {
+                                      success = await favoriteViewModel.removeFavorite(
+                                        rentalId,
+                                        authViewModel.currentUser!.token!,
+                                      );
+                                      message = success ? 'Đã xóa khỏi yêu thích!' : (favoriteViewModel.errorMessage ?? 'Lỗi khi xóa');
+                                    } else {
+                                      success = await favoriteViewModel.addFavorite(
+                                        authViewModel.currentUser!.id,
+                                        rentalId,
+                                        authViewModel.currentUser!.token!,
+                                      );
+                                      message = success ? 'Đã thêm vào yêu thích!' : (favoriteViewModel.errorMessage ?? 'Lỗi khi thêm');
+                                    }
+
                                     ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(
-                                        content: Text('Vui lòng đăng nhập để thêm vào yêu thích!'),
-                                        backgroundColor: Colors.redAccent,
+                                      SnackBar(
+                                        content: Text(message),
+                                        backgroundColor: success ? Colors.green : Colors.redAccent,
                                       ),
                                     );
-                                    return;
-                                  }
-
-                                  bool success;
-                                  String message;
-
-                                  if (isFavorite) {
-                                    success = await favoriteViewModel.removeFavorite(
-                                      rentalId,
-                                      authViewModel.currentUser!.token!,
-                                    );
-                                    message = success ? 'Đã xóa khỏi yêu thích!' : (favoriteViewModel.errorMessage ?? 'Lỗi khi xóa');
-                                  } else {
-                                    success = await favoriteViewModel.addFavorite(
-                                      authViewModel.currentUser!.id,
-                                      rentalId,
-                                      authViewModel.currentUser!.token!,
-                                    );
-                                    message = success ? 'Đã thêm vào yêu thích!' : (favoriteViewModel.errorMessage ?? 'Lỗi khi thêm');
-                                  }
-
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                                      content: Text(message),
-                                      backgroundColor: success ? Colors.green : Colors.redAccent,
+                                  },
+                                  child: Container(
+                                    padding: const EdgeInsets.all(10),
+                                    margin: const EdgeInsets.only(right: 16),
+                                    decoration: BoxDecoration(
+                                      color: isFavorite ? Colors.red.withOpacity(0.1) : Colors.grey.withOpacity(0.1),
+                                      shape: BoxShape.circle,
                                     ),
-                                  );
-                                },
-                                child: Container(
-                                  padding: const EdgeInsets.all(10),
-                                  margin: const EdgeInsets.only(right: 16),
-                                  decoration: BoxDecoration(
-                                    color: isFavorite ? Colors.red.withOpacity(0.1) : Colors.grey.withOpacity(0.1),
-                                    shape: BoxShape.circle,
-                                  ),
-                                  child: isLoading
-                                      ? const SizedBox(
-                                    height: 24,
-                                    width: 24,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                      valueColor: AlwaysStoppedAnimation<Color>(Colors.grey),
+                                    child: isLoading
+                                        ? const SizedBox(
+                                      height: 24,
+                                      width: 24,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        valueColor: AlwaysStoppedAnimation<Color>(Colors.grey),
+                                      ),
+                                    )
+                                        : Icon(
+                                      Icons.favorite,
+                                      color: isFavorite ? Colors.red : Colors.grey,
+                                      size: 24,
                                     ),
-                                  )
-                                      : Icon(
-                                    Icons.favorite,
-                                    color: isFavorite ? Colors.red : Colors.grey,
-                                    size: 24,
                                   ),
                                 ),
-                              ),
-                              GestureDetector(
-                                onTap: () {
-                                  // Logic nhắn tin
-                                },
-                                child: Container(
-                                  padding: const EdgeInsets.all(10),
-                                  decoration: BoxDecoration(
-                                    color: Colors.blue.withOpacity(0.1),
-                                    shape: BoxShape.circle,
-                                  ),
-                                  child: const Icon(
-                                    Icons.chat,
-                                    color: Colors.blue,
-                                    size: 24,
+                              // Conditionally show the chat button only if the rental does not belong to the current user
+                              if (!isOwnRental)
+                                GestureDetector(
+                                  onTap: () {
+                                    if (authViewModel.currentUser == null) {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        const SnackBar(
+                                          content: Text('Vui lòng đăng nhập để nhắn tin!'),
+                                          backgroundColor: Colors.redAccent,
+                                        ),
+                                      );
+                                      return;
+                                    }
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (context) => ChatScreen(
+                                          rentalId: rental.id,
+                                          recipientId: rental.userId, // Landlord's ID
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                  child: Container(
+                                    padding: const EdgeInsets.all(10),
+                                    decoration: BoxDecoration(
+                                      color: Colors.blue.withOpacity(0.1),
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: const Icon(
+                                      Icons.chat,
+                                      color: Colors.blue,
+                                      size: 24,
+                                    ),
                                   ),
                                 ),
-                              ),
                             ],
                           ),
                         ],
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        'Diện tích: ${rental.area['total']?.toString() ?? '0.0'} m² | ${(rental.area['bedrooms'] ?? 0) > 0 ? '2PN' : ''}, ${(rental.area['bathrooms'] ?? 0) > 0 ? '2WC' : ''}',
+                        'Diện tích: ${rental.area['total']?.toString() ?? '0.0'} m² | ${(rental.area['bedrooms'] ?? 0) > 0 ? '${rental.area['bedrooms']}PN' : ''}, ${(rental.area['bathrooms'] ?? 0) > 0 ? '${rental.area['bathrooms']}WC' : ''}',
                         style: TextStyle(fontSize: 14, color: Colors.grey[600]),
                       ),
                       const SizedBox(height: 4),
@@ -219,28 +308,44 @@ class RentalItemWidget extends StatelessWidget {
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
-                      const SizedBox(height: 4),
+                      const SizedBox(height: 15),
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Row(
-                                children: List.generate(5, (starIndex) {
-                                  const rating = 4.5;
-                                  return Icon(
-                                    starIndex < rating.floor() ? Icons.star : Icons.star_border,
-                                    color: Colors.amber,
-                                    size: 16,
-                                  );
-                                }),
-                              ),
-                              const SizedBox(width: 4),
-                              Text(
-                                '(19 lượt đánh giá)',
-                                style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-                              ),
+                              ValueListenableBuilder(
+                                  valueListenable: averageRating,
+                                  builder: (context, rating, child) {
+                                    return ValueListenableBuilder(
+                                        valueListenable: reviewCount,
+                                        builder: (context, count, child) {
+                                          return Row(
+                                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                            children: [
+                                              Row(
+                                                children: List.generate(5, (starIndex) {
+                                                  final starValue = (starIndex + 1).toDouble();
+                                                  return Icon(
+                                                    starValue <= rating
+                                                        ? Icons.star
+                                                        : starValue - 0.5 <= rating
+                                                        ? Icons.star_half
+                                                        : Icons.star_border,
+                                                    color: Colors.amber,
+                                                    size: 16,
+                                                  );
+                                                }),
+                                              ),
+                                              Text(
+                                                '($count lượt đánh giá)',
+                                                style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                                              ),
+                                            ],
+                                          );
+                                        });
+                                  })
                             ],
                           ),
                           Container(
@@ -256,9 +361,7 @@ class RentalItemWidget extends StatelessWidget {
                               onPressed: () {
                                 Navigator.push(
                                   context,
-                                  MaterialPageRoute(
-                                    builder: (context) => RentalDetailScreen(rental: rental),
-                                  ),
+                                  _createRoute(RentalDetailScreen(rental: rental)),
                                 );
                               },
                               style: ElevatedButton.styleFrom(

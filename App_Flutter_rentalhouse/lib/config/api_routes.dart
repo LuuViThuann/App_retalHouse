@@ -1,7 +1,8 @@
 class ApiRoutes {
-  static const String rootUrl = 'http://192.168.1.19:3000';
+  static const String rootUrl = 'http://192.168.1.86:3000';
   static const String baseUrl = '$rootUrl/api';
   static const String serverBaseUrl = rootUrl;
+  static const String socketUrl = serverBaseUrl;
 
   // Định nghĩa các endpoint dữ liệu cụ thể ------------------------------------------
   static const String rentals = '$baseUrl/rentals';
@@ -31,4 +32,9 @@ class ApiRoutes {
   static String reply(String commentId, String replyId) => '$comments/$commentId/replies/$replyId';
   static String likeReply(String commentId, String replyId) => '$comments/$commentId/replies/$replyId/like';
   static String unlikeReply(String commentId, String replyId) => '$comments/$commentId/replies/$replyId/unlike';
+
+  // Chat Endpoints
+  static const String conversations = '$baseUrl/conversations';
+  static const String pendingConversations = '$conversations/pending';
+  static String messages(String conversationId) => '$baseUrl/messages/$conversationId';
 }

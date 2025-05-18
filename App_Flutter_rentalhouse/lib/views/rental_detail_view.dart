@@ -1,11 +1,12 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 
-import 'package:flutter_rentalhouse/Widgets/comment_user.dart';
-import 'package:flutter_rentalhouse/Widgets/detail_tab.dart';
+import 'package:flutter_rentalhouse/Widgets/Comment/comment_user.dart';
+import 'package:flutter_rentalhouse/Widgets/Detail/detail_tab.dart';
+import 'package:flutter_rentalhouse/Widgets/Detail/info_chip.dart';
 import 'package:flutter_rentalhouse/models/rental.dart';
 import 'package:flutter_rentalhouse/services/rental_service.dart';
-import 'package:flutter_rentalhouse/widgets/info_chip.dart';
+
 
 import 'package:intl/intl.dart';
 import 'package:photo_view/photo_view.dart';
