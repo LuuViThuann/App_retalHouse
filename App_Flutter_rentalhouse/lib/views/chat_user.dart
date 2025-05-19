@@ -1,199 +1,117 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_rentalhouse/services/chat_service.dart';
-import 'package:flutter_rentalhouse/viewmodels/vm_auth.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
-
+import '../viewmodels/vm_auth.dart';
+import '../viewmodels/vm_chat.dart';
 import '../models/message.dart';
 
 class ChatScreen extends StatefulWidget {
   final String rentalId;
-  final String recipientId;
+  final String landlordId;
+  final String conversationId;
 
   const ChatScreen({
-    super.key,
+    Key? key,
     required this.rentalId,
-    required this.recipientId,
-  });
+    required this.landlordId,
+    required this.conversationId,
+  }) : super(key: key);
 
   @override
   _ChatScreenState createState() => _ChatScreenState();
 }
 
 class _ChatScreenState extends State<ChatScreen> {
-  final ChatService _chatService = ChatService();
   final TextEditingController _messageController = TextEditingController();
-  List<ChatMessage> _messages = [];
-  String? _nextCursor;
-  bool _isLoading = false;
-  Conversation? _conversation;
   final ScrollController _scrollController = ScrollController();
 
   @override
   void initState() {
     super.initState();
-    _initializeChat();
-    _scrollController.addListener(_onScroll);
-  }
-
-  void _initializeChat() async {
     final authViewModel = Provider.of<AuthViewModel>(context, listen: false);
-    if (authViewModel.currentUser == null) return;
+    final chatViewModel = Provider.of<ChatViewModel>(context, listen: false);
 
-    setState(() => _isLoading = true);
-    try {
-      // Create or get conversation
-      _conversation = await _chatService.createConversation(
-        rentalId: widget.rentalId,
-        recipientId: widget.recipientId,
-        token: authViewModel.currentUser!.token!,
-      );
+    // Initialize Socket.IO
+    chatViewModel.initializeSocket(authViewModel.currentUser!.token!);
+    chatViewModel.joinConversation(widget.conversationId);
 
-      // Join the conversation room
-      _chatService.joinConversation(_conversation!.id);
-
-      // Fetch initial messages
-      await _fetchMessages();
-
-      // Listen for new messages
-      _chatService.onReceiveMessage((message) {
-        setState(() {
-          _messages.insert(0, message);
-        });
-        _scrollToBottom();
-      });
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: $e')),
-      );
-    } finally {
-      setState(() => _isLoading = false);
-    }
-  }
-
-  Future<void> _fetchMessages() async {
-    final authViewModel = Provider.of<AuthViewModel>(context, listen: false);
-    try {
-      final result = await _chatService.fetchMessages(
-        conversationId: _conversation!.id,
-        token: authViewModel.currentUser!.token!,
-        cursor: _nextCursor,
-      );
-      setState(() {
-        _messages.addAll(result['messages'] as List<ChatMessage>);
-        _nextCursor = result['nextCursor'] as String?;
-      });
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error fetching messages: $e')),
-      );
-    }
-  }
-
-  void _onScroll() {
-    if (_scrollController.position.pixels == _scrollController.position.maxScrollExtent && _nextCursor != null) {
-      _fetchMessages();
-    }
-  }
-
-  void _sendMessage() {
-    final authViewModel = Provider.of<AuthViewModel>(context, listen: false);
-    if (_messageController.text.isEmpty || _conversation == null) return;
-
-    _chatService.sendMessage(
-      _conversation!.id,
-      authViewModel.currentUser!.id,
-      _messageController.text,
+    // Fetch initial messages
+    chatViewModel.fetchMessages(
+      conversationId: widget.conversationId,
+      token: authViewModel.currentUser!.token!,
     );
-    _messageController.clear();
-    _scrollToBottom();
-  }
 
-  void _scrollToBottom() {
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (_scrollController.hasClients) {
-        _scrollController.animateTo(
-          0,
-          duration: const Duration(milliseconds: 300),
-          curve: Curves.easeOut,
-        );
+    // Load more messages when scrolling to the top
+    _scrollController.addListener(() {
+      if (_scrollController.position.pixels == _scrollController.position.maxScrollExtent) {
+        chatViewModel.loadMoreMessages(widget.conversationId, authViewModel.currentUser!.token!);
       }
     });
   }
 
   @override
   void dispose() {
-    _chatService.disconnect();
     _messageController.dispose();
     _scrollController.dispose();
+    Provider.of<ChatViewModel>(context, listen: false).disconnectSocket();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     final authViewModel = Provider.of<AuthViewModel>(context);
-    final currentUserId = authViewModel.currentUser?.id;
+    final chatViewModel = Provider.of<ChatViewModel>(context);
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(
-          _conversation?.participants.firstWhere((p) => p.id != currentUserId).username ?? 'Chat',
-        ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.info),
-            onPressed: () {
-              // Show rental info or conversation details
-            },
-          ),
-        ],
+        title: Text('Chat với chủ nhà'),
+        backgroundColor: Colors.blue,
       ),
       body: Column(
         children: [
-          Expanded(
-            child: _isLoading
-                ? const Center(child: CircularProgressIndicator())
-                : ListView.builder(
-              controller: _scrollController,
-              reverse: true,
-              itemCount: _messages.length,
-              itemBuilder: (context, index) {
-                final message = _messages[index];
-                final isMe = message.senderId == currentUserId;
-                return Align(
-                  alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
-                  child: Container(
-                    margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: isMe ? Colors.blue : Colors.grey[200],
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Column(
-                      crossAxisAlignment:
-                      isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          message.content,
-                          style: TextStyle(
-                            color: isMe ? Colors.white : Colors.black87,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          DateFormat('HH:mm').format(message.createdAt),
-                          style: TextStyle(
-                            fontSize: 10,
-                            color: isMe ? Colors.white70 : Colors.black54,
-                          ),
-                        ),
-                      ],
-                    ),
+          // Display pending conversations indicator for landlord
+          if (authViewModel.currentUser!.id == widget.landlordId)
+            Consumer<ChatViewModel>(
+              builder: (context, vm, child) {
+                return vm.pendingConversations.isNotEmpty
+                    ? Container(
+                  color: Colors.yellow[100],
+                  padding: const EdgeInsets.all(8.0),
+                  child: Text(
+                    'Bạn có ${vm.pendingConversations.length} cuộc trò chuyện đang chờ trả lời.',
+                    style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold),
                   ),
+                )
+                    : const SizedBox.shrink();
+              },
+            ),
+          // Message List
+          Expanded(
+            child: Consumer<ChatViewModel>(
+              builder: (context, vm, child) {
+                if (vm.isLoading && vm.messages.isEmpty) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+                if (vm.errorMessage != null) {
+                  return Center(child: Text(vm.errorMessage!));
+                }
+                return ListView.builder(
+                  controller: _scrollController,
+                  reverse: true,
+                  itemCount: vm.messages.length + (vm.isLoading ? 1 : 0),
+                  itemBuilder: (context, index) {
+                    if (index == vm.messages.length) {
+                      return const Center(child: CircularProgressIndicator());
+                    }
+                    final message = vm.messages[index];
+                    final isMe = message.senderId == authViewModel.currentUser!.id;
+                    return _buildMessageBubble(message, isMe);
+                  },
                 );
               },
             ),
           ),
+          // Message Input
           Padding(
             padding: const EdgeInsets.all(8.0),
             child: Row(
@@ -201,21 +119,73 @@ class _ChatScreenState extends State<ChatScreen> {
                 Expanded(
                   child: TextField(
                     controller: _messageController,
-                    decoration: const InputDecoration(
+                    decoration: InputDecoration(
                       hintText: 'Nhập tin nhắn...',
-                      border: OutlineInputBorder(),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      filled: true,
+                      fillColor: Colors.grey[200],
                     ),
-                    onSubmitted: (_) => _sendMessage(),
                   ),
                 ),
+                const SizedBox(width: 8),
                 IconButton(
-                  icon: const Icon(Icons.send),
-                  onPressed: _sendMessage,
+                  icon: const Icon(Icons.send, color: Colors.blue),
+                  onPressed: () {
+                    if (_messageController.text.trim().isNotEmpty) {
+                      chatViewModel.sendMessage(
+                        widget.conversationId,
+                        authViewModel.currentUser!.id,
+                        _messageController.text.trim(),
+                      );
+                      _messageController.clear();
+                      _scrollController.animateTo(
+                        0,
+                        duration: const Duration(milliseconds: 300),
+                        curve: Curves.easeOut,
+                      );
+                    }
+                  },
                 ),
               ],
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildMessageBubble(Message message, bool isMe) {
+    return Align(
+      alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
+      child: Container(
+        margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
+        padding: const EdgeInsets.all(10),
+        decoration: BoxDecoration(
+          color: isMe ? Colors.blue : Colors.grey[300],
+          borderRadius: BorderRadius.circular(15),
+        ),
+        child: Column(
+          crossAxisAlignment: isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+          children: [
+            Text(
+              message.content,
+              style: TextStyle(
+                color: isMe ? Colors.white : Colors.black,
+                fontSize: 16,
+              ),
+            ),
+            const SizedBox(height: 5),
+            Text(
+              DateFormat('HH:mm').format(message.createdAt),
+              style: TextStyle(
+                color: isMe ? Colors.white70 : Colors.black54,
+                fontSize: 12,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

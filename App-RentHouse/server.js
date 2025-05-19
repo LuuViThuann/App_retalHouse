@@ -67,19 +67,16 @@ app.use('/api', rentalRoutes);
 io.on('connection', (socket) => {
   console.log('A user connected:', socket.id);
 
-  // Join a conversation room
   socket.on('joinConversation', (conversationId) => {
     socket.join(conversationId);
     console.log(`User ${socket.id} joined conversation ${conversationId}`);
   });
 
-  // Handle sending a message
   socket.on('sendMessage', async ({ conversationId, senderId, content }) => {
     try {
       const Message = mongoose.model('Message');
       const Conversation = mongoose.model('Conversation');
 
-      // Save the message to MongoDB
       const message = new Message({
         conversationId,
         senderId,
@@ -88,23 +85,23 @@ io.on('connection', (socket) => {
       });
       await message.save();
 
-      // Update the conversation's last message
       await Conversation.findByIdAndUpdate(conversationId, {
         lastMessage: message._id,
         updatedAt: new Date(),
+        isPending: false, // Mark as not pending once a message is sent
       });
 
-      // Emit the message to the room
-      io.to(conversationId).emit('receiveMessage', {
-        _id: message._id,
-        conversationId,
-        senderId,
-        content,
-        createdAt: message.createdAt,
-      });
+      const populatedMessage = await Message.findById(message._id)
+        .populate('senderId', 'username avatarBase64')
+        .lean();
 
-      // Invalidate Redis cache for this conversation
-      await redisClient.del(`conversation:${conversationId}`);
+      io.to(conversationId).emit('receiveMessage', populatedMessage);
+
+      // Invalidate Redis cache for participants
+      const conversation = await Conversation.findById(conversationId);
+      for (const participant of conversation.participants) {
+        await redisClient.del(`conversations:${participant}`);
+      }
     } catch (err) {
       console.error('Error sending message:', err);
       socket.emit('error', { message: 'Failed to send message' });

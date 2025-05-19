@@ -24,7 +24,7 @@ class _HomeScreenState extends State<HomeScreen> {
     const HomeContent(),
     const FavoriteView(),
     const SizedBox(), // Placeholder cho nút tạo bài đăng
-    const MessageView(),
+    const ConversationsScreen(),
     const ProfileView(),
   ];
 

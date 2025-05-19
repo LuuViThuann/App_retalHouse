@@ -16,6 +16,8 @@ class Rental {
   final DateTime createdAt;
   final String landlord; // Changed from dynamic to String
 
+
+
   Rental({
     required this.id,
     required this.title,

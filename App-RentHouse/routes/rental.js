@@ -917,87 +917,91 @@ router.delete('/comments/:commentId/replies/:replyId/unlike', authMiddleware, as
 });
 
 
-// ----------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------
 // Phần code xử lý đoạn chat 
 // Chat routes
+router.get('/conversations', authMiddleware, async (req, res) => {
+  try {
+    const userId = req.userId;
+    const cacheKey = `conversations:${userId}`;
+    
+    // Check Redis cache
+    const cachedConversations = await redisClient.get(cacheKey);
+    if (cachedConversations) {
+      return res.status(200).json(JSON.parse(cachedConversations));
+    }
+
+    const conversations = await Conversation.find({ participants: userId })
+      .populate('participants', 'username avatarBase64')
+      .populate('lastMessage')
+      .sort({ updatedAt: -1 })
+      .lean();
+
+    // Cache the result in Redis (expire after 1 hour)
+    await redisClient.setEx(cacheKey, 3600, JSON.stringify(conversations));
+    res.status(200).json(conversations);
+  } catch (err) {
+    res.status(500).json({ message: 'Error fetching conversations', error: err.message });
+  }
+});
+
+// Get pending conversations (unanswered by landlord)
+router.get('/conversations/pending', authMiddleware, async (req, res) => {
+  try {
+    const userId = req.userId;
+    const conversations = await Conversation.find({ participants: userId, isPending: true })
+      .populate('participants', 'username avatarBase64')
+      .populate('lastMessage')
+      .sort({ updatedAt: -1 })
+      .lean();
+    res.status(200).json(conversations);
+  } catch (err) {
+    res.status(500).json({ message: 'Error fetching pending conversations', error: err.message });
+  }
+});
+
+// Get or create a conversation for a rental
 router.post('/conversations', authMiddleware, async (req, res) => {
   try {
-    const { rentalId, recipientId } = req.body;
-    const rental = await Rental.findById(rentalId);
-    if (!rental) return res.status(404).json({ message: 'Rental not found' });
+    const { rentalId, landlordId } = req.body;
+    const userId = req.userId;
 
-    // Check if conversation already exists
+    if (userId === landlordId) {
+      return res.status(400).json({ message: 'Cannot chat with yourself' });
+    }
+
     let conversation = await Conversation.findOne({
-      participants: { $all: [req.userId, recipientId] },
       rentalId,
+      participants: { $all: [userId, landlordId] },
     });
 
     if (!conversation) {
       conversation = new Conversation({
-        participants: [req.userId, recipientId],
+        participants: [userId, landlordId],
         rentalId,
       });
       await conversation.save();
     }
 
-    res.status(201).json(conversation);
+    // Invalidate Redis cache
+    await redisClient.del(`conversations:${userId}`);
+    await redisClient.del(`conversations:${landlordId}`);
+
+    res.status(200).json(conversation);
   } catch (err) {
-    res.status(400).json({ message: err.message });
+    res.status(500).json({ message: 'Error creating conversation', error: err.message });
   }
 });
 
-router.get('/conversations', authMiddleware, async (req, res) => {
-  try {
-    const conversations = await Conversation.find({
-      participants: req.userId,
-    })
-      .populate('participants', 'username avatarBase64')
-      .populate('lastMessage')
-      .sort({ updatedAt: -1 });
-
-    const adjustedConversations = conversations.map(conv => adjustTimestamps(conv));
-    res.json(adjustedConversations);
-  } catch (err) {
-    res.status(500).json({ message: err.message });
-  }
-});
-
-router.get('/conversations/pending', authMiddleware, async (req, res) => {
-  try {
-    const conversations = await Conversation.find({
-      participants: req.userId,
-    }).populate('lastMessage');
-
-    const pendingConversations = [];
-    for (const conv of conversations) {
-      if (conv.lastMessage && !conv.lastMessage.read && conv.lastMessage.senderId !== req.userId) {
-        const adjustedConv = adjustTimestamps(conv);
-        pendingConversations.push(adjustedConv);
-      }
-    }
-
-    res.json(pendingConversations);
-  } catch (err) {
-    res.status(500).json({ message: err.message });
-  }
-});
-
+// Get messages for a conversation with cursor-based pagination
 router.get('/messages/:conversationId', authMiddleware, async (req, res) => {
   try {
     const { conversationId } = req.params;
     const { cursor, limit = 10 } = req.query;
 
-    // Check Redis cache first
-    const cacheKey = `messages:${conversationId}:${cursor || 'latest'}:${limit}`;
-    const cachedMessages = await redisClient.get(cacheKey);
-    if (cachedMessages) {
-      return res.json(JSON.parse(cachedMessages));
-    }
-
     const conversation = await Conversation.findById(conversationId);
-    if (!conversation) return res.status(404).json({ message: 'Conversation not found' });
-    if (!conversation.participants.includes(req.userId)) {
-      return res.status(403).json({ message: 'Unauthorized' });
+    if (!conversation || !conversation.participants.includes(req.userId)) {
+      return res.status(403).json({ message: 'Unauthorized or conversation not found' });
     }
 
     let query = { conversationId };
@@ -1007,27 +1011,20 @@ router.get('/messages/:conversationId', authMiddleware, async (req, res) => {
 
     const messages = await Message.find(query)
       .sort({ createdAt: -1 })
-      .limit(parseInt(limit))
-      .populate('senderId', 'username avatarBase64');
+      .limit(Number(limit))
+      .populate('senderId', 'username avatarBase64')
+      .lean();
 
-    const adjustedMessages = messages.map(msg => adjustTimestamps(msg));
-    const nextCursor = adjustedMessages.length > 0 ? adjustedMessages[adjustedMessages.length - 1].createdAt : null;
+    const nextCursor = messages.length === Number(limit) ? messages[messages.length - 1].createdAt.toISOString() : null;
 
-    // Cache the result in Redis for 5 minutes
-    const response = { messages: adjustedMessages, nextCursor };
-    await redisClient.setEx(cacheKey, 300, JSON.stringify(response));
-
-    // Mark messages as read
-    await Message.updateMany(
-      { conversationId, senderId: { $ne: req.userId }, read: false },
-      { read: true }
-    );
-
-    res.json(response);
+    res.status(200).json({ messages, nextCursor });
   } catch (err) {
-    res.status(500).json({ message: err.message });
+    res.status(500).json({ message: 'Error fetching messages', error: err.message });
   }
 });
+
+
+
 
 
 module.exports = router;

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_rentalhouse/models/rental.dart';
 import 'package:flutter_rentalhouse/services/rental_service.dart';
 import 'package:flutter_rentalhouse/viewmodels/vm_auth.dart';
+import 'package:flutter_rentalhouse/viewmodels/vm_chat.dart';
 import 'package:flutter_rentalhouse/viewmodels/vm_favorite.dart';
 import 'package:flutter_rentalhouse/views/chat_user.dart';
 import 'package:flutter_rentalhouse/views/rental_detail_view.dart';
@@ -54,14 +55,14 @@ class RentalItemWidget extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final authViewModel = Provider.of<AuthViewModel>(context);
+    final chatViewModel = Provider.of<ChatViewModel>(context);
     final favoriteViewModel = Provider.of<FavoriteViewModel>(context);
     final rentalService = RentalService();
 
     final rentalId = rental.id ?? '';
     final isFavorite = favoriteViewModel.isFavorite(rentalId);
     final isLoading = favoriteViewModel.isLoading(rentalId);
-    // Check if the rental belongs to the current user
-    final isOwnRental = authViewModel.currentUser?.id == rental.userId;
+    final isMyPost = authViewModel.currentUser != null && rental.userId == authViewModel.currentUser!.id;
 
     final ValueNotifier<double> averageRating = ValueNotifier(0.0);
     final ValueNotifier<int> reviewCount = ValueNotifier(0);
@@ -118,11 +119,12 @@ class RentalItemWidget extends StatelessWidget {
                         child: const Icon(Icons.image, size: 50, color: Colors.grey),
                       ),
                     ),
+                    // Position status and "Bài viết của bạn" at the top right
                     Positioned(
                       top: 8,
                       right: 8,
                       child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.end,
+                        mainAxisSize: MainAxisSize.min,
                         children: [
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -139,24 +141,28 @@ class RentalItemWidget extends StatelessWidget {
                               ),
                             ),
                           ),
-                          const SizedBox(width: 5,),
-                          // Display "Bài viết của bạn" if the rental belongs to the current user
-                          if (isOwnRental)
-                            Padding(
-                              padding: const EdgeInsets.only(top: 4),
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                decoration: BoxDecoration(
-                                  color: Colors.blue.withOpacity(0.9),
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                child: const Text(
-                                  'Bài viết của bạn',
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.bold,
+                          if (isMyPost)
+                            Container(
+                              margin: const EdgeInsets.only(left: 8),
+                              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 5),
+                              decoration: BoxDecoration(
+                                color: Colors.deepOrange,
+                                borderRadius: BorderRadius.circular(16),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.deepOrange.withOpacity(0.5),
+                                    blurRadius: 8,
+                                    offset: const Offset(0, 4),
                                   ),
+                                ],
+                              ),
+                              child: const Text(
+                                'Bài viết của bạn',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                  letterSpacing: 0.5,
                                 ),
                               ),
                             ),
@@ -187,8 +193,7 @@ class RentalItemWidget extends StatelessWidget {
                           Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              // Conditionally show the favorite button only if the rental does not belong to the current user
-                              if (!isOwnRental)
+                              if (!isMyPost) // Hide favorite icon if it's my post
                                 GestureDetector(
                                   onTap: isLoading
                                       ? null
@@ -251,10 +256,9 @@ class RentalItemWidget extends StatelessWidget {
                                     ),
                                   ),
                                 ),
-                              // Conditionally show the chat button only if the rental does not belong to the current user
-                              if (!isOwnRental)
+                              if (!isMyPost) // Hide chat icon if it's my post
                                 GestureDetector(
-                                  onTap: () {
+                                  onTap: () async {
                                     if (authViewModel.currentUser == null) {
                                       ScaffoldMessenger.of(context).showSnackBar(
                                         const SnackBar(
@@ -264,15 +268,30 @@ class RentalItemWidget extends StatelessWidget {
                                       );
                                       return;
                                     }
-                                    Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (context) => ChatScreen(
-                                          rentalId: rental.id,
-                                          recipientId: rental.userId, // Landlord's ID
+
+                                    try {
+                                      await chatViewModel.getOrCreateConversation(
+                                        rentalId: rental.id!,
+                                        landlordId: rental.userId,
+                                        token: authViewModel.currentUser!.token!,
+                                      );
+                                      final conversation = chatViewModel.conversations.last;
+                                      Navigator.push(
+                                        context,
+                                        _createRoute(ChatScreen(
+                                          rentalId: rental.id!,
+                                          landlordId: rental.userId,
+                                          conversationId: conversation.id,
+                                        )),
+                                      );
+                                    } catch (e) {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(
+                                          content: Text('Lỗi khi mở cuộc trò chuyện: $e'),
+                                          backgroundColor: Colors.redAccent,
                                         ),
-                                      ),
-                                    );
+                                      );
+                                    }
                                   },
                                   child: Container(
                                     padding: const EdgeInsets.all(10),
@@ -316,36 +335,38 @@ class RentalItemWidget extends StatelessWidget {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               ValueListenableBuilder(
-                                  valueListenable: averageRating,
-                                  builder: (context, rating, child) {
-                                    return ValueListenableBuilder(
-                                        valueListenable: reviewCount,
-                                        builder: (context, count, child) {
-                                          return Row(
-                                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                            children: [
-                                              Row(
-                                                children: List.generate(5, (starIndex) {
-                                                  final starValue = (starIndex + 1).toDouble();
-                                                  return Icon(
-                                                    starValue <= rating
-                                                        ? Icons.star
-                                                        : starValue - 0.5 <= rating
-                                                        ? Icons.star_half
-                                                        : Icons.star_border,
-                                                    color: Colors.amber,
-                                                    size: 16,
-                                                  );
-                                                }),
-                                              ),
-                                              Text(
-                                                '($count lượt đánh giá)',
-                                                style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-                                              ),
-                                            ],
-                                          );
-                                        });
-                                  })
+                                valueListenable: averageRating,
+                                builder: (context, rating, child) {
+                                  return ValueListenableBuilder(
+                                    valueListenable: reviewCount,
+                                    builder: (context, count, child) {
+                                      return Row(
+                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                        children: [
+                                          Row(
+                                            children: List.generate(5, (starIndex) {
+                                              final starValue = (starIndex + 1).toDouble();
+                                              return Icon(
+                                                starValue <= rating
+                                                    ? Icons.star
+                                                    : starValue - 0.5 <= rating
+                                                    ? Icons.star_half
+                                                    : Icons.star_border,
+                                                color: Colors.amber,
+                                                size: 16,
+                                              );
+                                            }),
+                                          ),
+                                          Text(
+                                            '($count lượt đánh giá)',
+                                            style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                                          ),
+                                        ],
+                                      );
+                                    },
+                                  );
+                                },
+                              ),
                             ],
                           ),
                           Container(
