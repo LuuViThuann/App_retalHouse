@@ -14,6 +14,7 @@ class ChatViewModel extends ChangeNotifier {
   String? _errorMessage;
   int _messageLimit = 20;
   bool _hasMoreMessages = true;
+  String? _currentConversationId; // Track current conversation
 
   List<Conversation> get conversations => _conversations;
   List<Message> get messages => _messages;
@@ -44,8 +45,12 @@ class ChatViewModel extends ChangeNotifier {
     _socket?.on('receiveMessage', (data) {
       print('Received message: $data');
       final message = Message.fromJson(data);
-      _messages.add(message);
-      notifyListeners();
+      if (message.conversationId == _currentConversationId) { // Filter by conversationId
+        _messages.add(message);
+        notifyListeners();
+      } else {
+        print('Ignoring message for conversation ${message.conversationId}, current: $_currentConversationId');
+      }
     });
 
     _socket?.onDisconnect((_) {
@@ -193,6 +198,8 @@ class ChatViewModel extends ChangeNotifier {
     if (!_hasMoreMessages) return;
 
     _isLoading = true;
+    _currentConversationId = conversationId; // Set current conversation
+    _messages = []; // Clear messages for new conversation
     notifyListeners();
 
     try {
@@ -239,7 +246,7 @@ class ChatViewModel extends ChangeNotifier {
       var request = http.MultipartRequest('POST', Uri.parse(ApiRoutes.messages));
       request.headers['Authorization'] = 'Bearer $token';
       request.fields['conversationId'] = conversationId;
-      request.fields['content'] = content; // Can be empty string
+      request.fields['content'] = content;
 
       for (var imagePath in imagePaths) {
         request.files.add(await http.MultipartFile.fromPath(
@@ -257,7 +264,10 @@ class ChatViewModel extends ChangeNotifier {
       if (response.statusCode == 201) {
         final data = jsonDecode(responseBody);
         final message = Message.fromJson(data);
-        _messages.add(message);
+        if (message.conversationId == _currentConversationId) {
+          _messages.add(message);
+        }
+        notifyListeners();
       } else {
         _errorMessage = 'Không thể gửi tin nhắn: $responseBody';
       }
@@ -273,6 +283,7 @@ class ChatViewModel extends ChangeNotifier {
   void clearMessages() {
     _messages = [];
     _hasMoreMessages = true;
+    _currentConversationId = null;
     notifyListeners();
   }
 

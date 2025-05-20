@@ -1136,6 +1136,8 @@ module.exports = (io) => {
         .limit(parseInt(limit))
         .lean();
 
+      console.log(`Fetched ${messages.length} messages for conversation ${conversationId}`); // Debug log
+
       // Get all unique senderIds in this batch
       const senderIds = [...new Set(messages.map(msg => msg.senderId))];
       // Fetch avatars for all senders (from MongoDB User collection and Firestore fallback)
@@ -1184,7 +1186,7 @@ module.exports = (io) => {
   // Send a message in a conversation (support image upload)
   router.post('/messages', authMiddleware, upload.array('images'), async (req, res) => {
     try {
-      const { conversationId, content = '' } = req.body; // Default content to empty string
+      const { conversationId, content = '' } = req.body;
       if (!mongoose.Types.ObjectId.isValid(conversationId)) {
         return res.status(400).json({ message: 'Invalid conversationId' });
       }
@@ -1243,6 +1245,8 @@ module.exports = (io) => {
           avatarBase64: avatarBase64 || '',
         }
       };
+
+      console.log(`Emitting message to room ${conversationId}:`, messageData); // Debug log
       if (io) {
         io.to(conversationId).emit('receiveMessage', messageData);
       }
@@ -1338,6 +1342,7 @@ module.exports = (io) => {
       res.status(500).json({ message: err.message });
     }
   });
+
   return router;
 };
 

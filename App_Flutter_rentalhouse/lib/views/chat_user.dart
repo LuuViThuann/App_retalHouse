@@ -51,6 +51,8 @@ class _ChatScreenState extends State<ChatScreen> {
 
     try {
       print('Loading data for conversationId: ${widget.conversationId}');
+      // Clear messages before loading new ones
+      chatViewModel.clearMessages();
       if (chatViewModel.conversations.isEmpty ||
           !chatViewModel.conversations.any((c) => c.id == widget.conversationId)) {
         print('Conversations empty or missing conversation, fetching...');

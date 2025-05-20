@@ -55,87 +55,50 @@ app.use('/api', rentalRoutes(io));
 io.use(async (socket, next) => {
   const token = socket.handshake.headers.authorization?.replace('Bearer ', '');
   if (!token) {
+    console.log('Socket authentication failed: No token provided');
     return next(new Error('Authentication error: No token provided'));
   }
   try {
     const decodedToken = await admin.auth().verifyIdToken(token);
     socket.userId = decodedToken.uid;
+    console.log(`Socket authenticated: User ${socket.userId}, Socket ${socket.id}`);
     next();
   } catch (err) {
-    console.error('Socket authentication error:', err);
+    console.error('Socket authentication error:', err.message);
     next(new Error('Authentication error: Invalid token'));
   }
 });
 
+// Socket.IO connection handling
 io.on('connection', (socket) => {
-  console.log('New client connected:', socket.id, 'User:', socket.userId);
+  console.log(`New client connected: Socket ${socket.id}, User: ${socket.userId}`);
 
-  socket.on('joinConversation', (conversationId) => {
-    console.log(`User ${socket.userId} joined conversation: ${conversationId}`);
+  socket.on('joinConversation', async (conversationId) => {
     if (!mongoose.Types.ObjectId.isValid(conversationId)) {
+      console.log(`Invalid conversationId: ${conversationId} from user ${socket.userId}`);
       socket.emit('error', 'Invalid conversationId format');
-      return;
-    }
-    socket.join(conversationId);
-  });
-
-  socket.on('sendMessage', async (data) => {
-    console.log(`Received sendMessage from user ${socket.userId}: ${JSON.stringify(data)}`);
-    const { conversationId, senderId, content } = data;
-
-    if (!mongoose.Types.ObjectId.isValid(conversationId)) {
-      socket.emit('error', 'Invalid conversationId format');
-      return;
-    }
-
-    if (socket.userId !== senderId) {
-      socket.emit('error', 'Unauthorized: Sender ID does not match authenticated user');
       return;
     }
 
     try {
       const Conversation = mongoose.model('Conversation');
-      const Message = mongoose.model('Message');
       const conversation = await Conversation.findById(conversationId);
-      if (!conversation || !conversation.participants.includes(senderId)) {
+      if (!conversation || !conversation.participants.includes(socket.userId)) {
+        console.log(`Unauthorized join attempt by user ${socket.userId} for conversation ${conversationId}`);
         socket.emit('error', 'Unauthorized or conversation not found');
         return;
       }
 
-      const message = new Message({
-        conversationId,
-        senderId,
-        content,
-        images: [],
-      });
-
-      await message.save();
-
-      conversation.lastMessage = message._id;
-      conversation.isPending = false;
-      await conversation.save();
-
-      await redisClient.del(`conversations:${conversation.participants[0]}`);
-      await redisClient.del(`conversations:${conversation.participants[1]}`);
-
-      const messageData = {
-        _id: message._id.toString(),
-        conversationId: message.conversationId.toString(),
-        senderId: message.senderId,
-        content: message.content,
-        images: message.images,
-        createdAt: new Date(message.createdAt.getTime() + 7 * 60 * 60 * 1000), // Adjust for +7 timezone
-      };
-
-      io.to(conversationId).emit('receiveMessage', messageData);
+      socket.join(conversationId);
+      console.log(`User ${socket.userId} joined conversation room: ${conversationId}`);
     } catch (err) {
-      console.error('Error in sendMessage:', err);
-      socket.emit('error', 'Failed to send message');
+      console.error(`Error joining conversation ${conversationId}:`, err.message);
+      socket.emit('error', 'Failed to join conversation');
     }
   });
 
   socket.on('disconnect', () => {
-    console.log('Client disconnected:', socket.id, 'User:', socket.userId);
+    console.log(`Client disconnected: Socket ${socket.id}, User: ${socket.userId}`);
   });
 });
 
