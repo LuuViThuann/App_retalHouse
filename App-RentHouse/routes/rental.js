@@ -921,12 +921,6 @@ router.delete('/comments/:commentId/replies/:replyId/unlike', authMiddleware, as
 // -------------------------------------------------------------------------------------------
 // Phần code xử lý đoạn chat 
 
-
-// Lấy hoặc tạo cuộc trò chuyện
-
-// Lấy hoặc tạo cuộc trò chuyện
-
-// Export as a function for Socket.IO integration; otherwise, export the router directly for Express.
 module.exports = (io) => {
   // Create or get a conversation (only one conversation per user/landlord/rental)
   router.post('/conversations', authMiddleware, async (req, res) => {
@@ -1099,7 +1093,7 @@ module.exports = (io) => {
     }
   });
 
-  // Get messages in a conversation
+  // Get messages in a conversation (with sender avatar)
   router.get('/messages/:conversationId', authMiddleware, async (req, res) => {
     try {
       const { conversationId } = req.params;
@@ -1119,12 +1113,45 @@ module.exports = (io) => {
         .sort({ createdAt: -1 })
         .limit(parseInt(limit))
         .lean();
+
+      // Get all unique senderIds in this batch
+      const senderIds = [...new Set(messages.map(msg => msg.senderId))];
+      // Fetch avatars for all senders (from MongoDB User collection and Firestore fallback)
+      const senderAvatars = {};
+      for (const senderId of senderIds) {
+        let avatarBase64 = '';
+        let username = '';
+        try {
+          const userMongo = await mongoose.model('User').findOne({ _id: senderId }).select('avatarBase64 username');
+          if (userMongo) {
+            avatarBase64 = userMongo.avatarBase64 || '';
+            username = userMongo.username || '';
+          }
+        } catch (err) {}
+        if (!avatarBase64 || !username) {
+          try {
+            const userDoc = await admin.firestore().collection('Users').doc(senderId).get();
+            if (userDoc.exists) {
+              const data = userDoc.data();
+              avatarBase64 = avatarBase64 || data.avatarBase64 || '';
+              username = username || data.username || '';
+            }
+          } catch (err) {}
+        }
+        senderAvatars[senderId] = { avatarBase64, username };
+      }
+
       const nextCursor = messages.length === parseInt(limit) ? messages[messages.length - 1]._id : null;
       const adjustedMessages = messages.map((msg) => ({
         ...msg,
         _id: msg._id.toString(),
         conversationId: msg.conversationId.toString(),
         createdAt: new Date(msg.createdAt.getTime() + 7 * 60 * 60 * 1000),
+        sender: {
+          id: msg.senderId,
+          username: senderAvatars[msg.senderId]?.username || 'Unknown',
+          avatarBase64: senderAvatars[msg.senderId]?.avatarBase64 || '',
+        }
       }));
       res.json({ messages: adjustedMessages, nextCursor });
     } catch (err) {
@@ -1132,22 +1159,23 @@ module.exports = (io) => {
     }
   });
 
-  // Send a message in a conversation
+  // Send a message in a conversation (support image upload)
   router.post('/messages', authMiddleware, upload.array('images'), async (req, res) => {
     try {
       const { conversationId, content } = req.body;
-      if (!mongoose.Types.ObjectId.isValid(conversationId) || !content) {
-        return res.status(400).json({ message: 'Invalid conversationId or missing content' });
+      if (!mongoose.Types.ObjectId.isValid(conversationId) || (!content && (!req.files || req.files.length === 0))) {
+        return res.status(400).json({ message: 'Invalid conversationId or missing content/images' });
       }
       const conversation = await Conversation.findById(conversationId);
       if (!conversation || !conversation.participants.includes(req.userId)) {
         return res.status(403).json({ message: 'Unauthorized or conversation not found' });
       }
+      const imageUrls = req.files ? req.files.map(file => `/uploads/${file.filename}`) : [];
       const message = new Message({
         conversationId,
         senderId: req.userId,
         content,
-        images: req.files ? req.files.map(file => `/uploads/${file.filename}`) : [],
+        images: imageUrls,
       });
       await message.save();
       conversation.lastMessage = message._id;
@@ -1155,13 +1183,40 @@ module.exports = (io) => {
       await conversation.save();
       await redisClient.del(`conversations:${conversation.participants[0]}`);
       await redisClient.del(`conversations:${conversation.participants[1]}`);
+
+      // Get sender avatar and username
+      let avatarBase64 = '';
+      let username = '';
+      try {
+        const userMongo = await mongoose.model('User').findOne({ _id: req.userId }).select('avatarBase64 username');
+        if (userMongo) {
+          avatarBase64 = userMongo.avatarBase64 || '';
+          username = userMongo.username || '';
+        }
+      } catch (err) {}
+      if (!avatarBase64 || !username) {
+        try {
+          const userDoc = await admin.firestore().collection('Users').doc(req.userId).get();
+          if (userDoc.exists) {
+            const data = userDoc.data();
+            avatarBase64 = avatarBase64 || data.avatarBase64 || '';
+            username = username || data.username || '';
+          }
+        } catch (err) {}
+      }
+
       const messageData = {
         _id: message._id.toString(),
         conversationId: message.conversationId.toString(),
         senderId: message.senderId,
         content: message.content,
         images: message.images,
-        createdAt: message.createdAt,
+        createdAt: new Date(message.createdAt.getTime() + 7 * 60 * 60 * 1000),
+        sender: {
+          id: req.userId,
+          username: username || 'Unknown',
+          avatarBase64: avatarBase64 || '',
+        }
       };
       if (io) {
         io.to(conversationId).emit('receiveMessage', messageData);
@@ -1193,16 +1248,22 @@ module.exports = (io) => {
             if (participantDoc.exists) participantData = participantDoc.data();
           } catch (err) {}
           try {
-            const participantMongo = await mongoose.model('User').findOne({ _id: otherParticipantId }).select('avatarBase64');
-            if (participantMongo) participantData.avatarBase64 = participantMongo.avatarBase64 || '';
+            const participantMongo = await mongoose.model('User').findOne({ _id: otherParticipantId }).select('avatarBase64 username');
+            if (participantMongo) {
+              participantData.avatarBase64 = participantMongo.avatarBase64 || '';
+              participantData.username = participantMongo.username || participantData.username;
+            }
           } catch (err) {}
           try {
             const userDoc = await admin.firestore().collection('Users').doc(userId).get();
             if (userDoc.exists) userData = userDoc.data();
           } catch (err) {}
           try {
-            const userMongo = await mongoose.model('User').findOne({ _id: userId }).select('avatarBase64');
-            if (userMongo) userData.avatarBase64 = userMongo.avatarBase64 || '';
+            const userMongo = await mongoose.model('User').findOne({ _id: userId }).select('avatarBase64 username');
+            if (userMongo) {
+              userData.avatarBase64 = userMongo.avatarBase64 || '';
+              userData.username = userMongo.username || userData.username;
+            }
           } catch (err) {}
           try {
             const rental = await Rental.findById(conv.rentalId).select('title images');
@@ -1225,6 +1286,11 @@ module.exports = (io) => {
                   _id: conv.lastMessage._id.toString(),
                   conversationId: conv.lastMessage.conversationId.toString(),
                   createdAt: new Date(conv.lastMessage.createdAt.getTime() + 7 * 60 * 60 * 1000),
+                  sender: {
+                    id: conv.lastMessage.senderId,
+                    username: conv.lastMessage.senderId === userId ? userData.username : participantData.username,
+                    avatarBase64: conv.lastMessage.senderId === userId ? userData.avatarBase64 : participantData.avatarBase64,
+                  }
                 }
               : null,
             landlord: {
@@ -1254,4 +1320,3 @@ module.exports = (io) => {
 if (!module.parent) {
   module.exports = router;
 }
-

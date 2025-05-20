@@ -7,6 +7,8 @@ import 'package:flutter_rentalhouse/viewmodels/vm_auth.dart';
 import 'package:flutter_rentalhouse/viewmodels/vm_chat.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
+import 'package:image_picker/image_picker.dart';
+import 'dart:io';
 
 class ChatScreen extends StatefulWidget {
   final String rentalId;
@@ -27,6 +29,7 @@ class ChatScreen extends StatefulWidget {
 class _ChatScreenState extends State<ChatScreen> {
   bool _isLoading = true;
   String? _errorMessage;
+  final List<XFile> _selectedImages = [];
 
   @override
   void initState() {
@@ -48,12 +51,10 @@ class _ChatScreenState extends State<ChatScreen> {
 
     try {
       print('Loading data for conversationId: ${widget.conversationId}');
-      // Kiểm tra và tải conversations nếu cần
       if (chatViewModel.conversations.isEmpty ||
           !chatViewModel.conversations.any((c) => c.id == widget.conversationId)) {
         print('Conversations empty or missing conversation, fetching...');
         await chatViewModel.fetchConversations(authViewModel.currentUser!.token!);
-        // Thử tải cuộc trò chuyện cụ thể nếu vẫn không tìm thấy
         if (!chatViewModel.conversations.any((c) => c.id == widget.conversationId)) {
           print('Conversation ${widget.conversationId} not found in conversations, fetching by ID');
           final conversation = await chatViewModel.fetchConversationById(
@@ -105,6 +106,16 @@ class _ChatScreenState extends State<ChatScreen> {
     } catch (e) {
       print('Error in _fetchLandlordInfo: $e');
       return {'id': widget.landlordId, 'username': 'Unknown', 'avatarBase64': ''};
+    }
+  }
+
+  Future<void> _pickImages() async {
+    final ImagePicker picker = ImagePicker();
+    final List<XFile>? images = await picker.pickMultiImage();
+    if (images != null) {
+      setState(() {
+        _selectedImages.addAll(images);
+      });
     }
   }
 
@@ -183,49 +194,78 @@ class _ChatScreenState extends State<ChatScreen> {
                   itemBuilder: (context, index) {
                     final message = chatViewModel.messages[chatViewModel.messages.length - 1 - index];
                     final isMe = message.senderId == authViewModel.currentUser?.id;
-                    return Align(
-                      alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
-                      child: Container(
-                        margin: const EdgeInsets.symmetric(vertical: 5, horizontal: 10),
-                        padding: const EdgeInsets.all(10),
-                        decoration: BoxDecoration(
-                          color: isMe ? Colors.blue[100] : Colors.grey[200],
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
-                          children: [
-                            if (message.images.isNotEmpty)
-                              Wrap(
-                                spacing: 5,
-                                children: message.images
-                                    .map((img) => ClipRRect(
-                                  borderRadius: BorderRadius.circular(8),
-                                  child: CachedNetworkImage(
-                                    imageUrl: '${ApiRoutes.serverBaseUrl}$img',
-                                    width: 100,
-                                    height: 100,
-                                    fit: BoxFit.cover,
-                                    memCacheHeight: 200,
-                                    memCacheWidth: 200,
-                                    placeholder: (context, url) => const CircularProgressIndicator(),
-                                    errorWidget: (context, url, error) => const Icon(Icons.error),
+                    return Row(
+                      mainAxisAlignment: isMe ? MainAxisAlignment.end : MainAxisAlignment.start,
+                      children: [
+                        if (!isMe) ...[
+                          CircleAvatar(
+                            radius: 16,
+                            backgroundImage: message.sender['avatarBase64']?.isNotEmpty == true
+                                ? MemoryImage(base64Decode(message.sender['avatarBase64']))
+                                : null,
+                            child: message.sender['avatarBase64']?.isEmpty == true
+                                ? const Icon(Icons.person, size: 16)
+                                : null,
+                          ),
+                          const SizedBox(width: 8),
+                        ],
+                        Flexible(
+                          child: Container(
+                            margin: const EdgeInsets.symmetric(vertical: 5, horizontal: 10),
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(
+                              color: isMe ? Colors.blue[100] : Colors.grey[200],
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+                              children: [
+                                if (message.images.isNotEmpty)
+                                  Wrap(
+                                    spacing: 5,
+                                    children: message.images
+                                        .map((img) => ClipRRect(
+                                      borderRadius: BorderRadius.circular(8),
+                                      child: CachedNetworkImage(
+                                        imageUrl: '${ApiRoutes.serverBaseUrl}$img',
+                                        width: 100,
+                                        height: 100,
+                                        fit: BoxFit.cover,
+                                        memCacheHeight: 200,
+                                        memCacheWidth: 200,
+                                        placeholder: (context, url) => const CircularProgressIndicator(),
+                                        errorWidget: (context, url, error) => const Icon(Icons.error),
+                                      ),
+                                    ))
+                                        .toList(),
                                   ),
-                                ))
-                                    .toList(),
-                              ),
-                            Text(
-                              message.content,
-                              style: const TextStyle(fontSize: 16),
+                                if (message.content.isNotEmpty)
+                                  Text(
+                                    message.content,
+                                    style: const TextStyle(fontSize: 16),
+                                  ),
+                                const SizedBox(height: 5),
+                                Text(
+                                  DateFormat('HH:mm, dd/MM').format(message.createdAt),
+                                  style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                                ),
+                              ],
                             ),
-                            const SizedBox(height: 5),
-                            Text(
-                              DateFormat('HH:mm, dd/MM').format(message.createdAt),
-                              style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-                            ),
-                          ],
+                          ),
                         ),
-                      ),
+                        if (isMe) ...[
+                          const SizedBox(width: 8),
+                          CircleAvatar(
+                            radius: 16,
+                            backgroundImage: message.sender['avatarBase64']?.isNotEmpty == true
+                                ? MemoryImage(base64Decode(message.sender['avatarBase64']))
+                                : null,
+                            child: message.sender['avatarBase64']?.isEmpty == true
+                                ? const Icon(Icons.person, size: 16)
+                                : null,
+                          ),
+                        ],
+                      ],
                     );
                   },
                 );
@@ -236,27 +276,80 @@ class _ChatScreenState extends State<ChatScreen> {
             padding: const EdgeInsets.all(8.0),
             child: Row(
               children: [
+                IconButton(
+                  icon: const Icon(Icons.image),
+                  onPressed: _pickImages,
+                ),
                 Expanded(
-                  child: TextField(
-                    controller: messageController,
-                    decoration: InputDecoration(
-                      hintText: 'Nhập tin nhắn...',
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(20),
+                  child: Column(
+                    children: [
+                      if (_selectedImages.isNotEmpty)
+                        Container(
+                          height: 60,
+                          margin: const EdgeInsets.only(bottom: 8),
+                          child: ListView.builder(
+                            scrollDirection: Axis.horizontal,
+                            itemCount: _selectedImages.length,
+                            itemBuilder: (context, index) {
+                              return Stack(
+                                children: [
+                                  Padding(
+                                    padding: const EdgeInsets.only(right: 8),
+                                    child: Image.file(
+                                      File(_selectedImages[index].path),
+                                      width: 60,
+                                      height: 60,
+                                      fit: BoxFit.cover,
+                                    ),
+                                  ),
+                                  Positioned(
+                                    top: 0,
+                                    right: 0,
+                                    child: GestureDetector(
+                                      onTap: () {
+                                        setState(() {
+                                          _selectedImages.removeAt(index);
+                                        });
+                                      },
+                                      child: const Icon(
+                                        Icons.cancel,
+                                        color: Colors.red,
+                                        size: 20,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              );
+                            },
+                          ),
+                        ),
+                      TextField(
+                        controller: messageController,
+                        decoration: InputDecoration(
+                          hintText: 'Nhập tin nhắn...',
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                        ),
                       ),
-                    ),
+                    ],
                   ),
                 ),
                 IconButton(
                   icon: const Icon(Icons.send),
                   onPressed: () async {
-                    if (messageController.text.isNotEmpty && authViewModel.currentUser != null) {
+                    if ((messageController.text.isNotEmpty || _selectedImages.isNotEmpty) &&
+                        authViewModel.currentUser != null) {
                       await chatViewModel.sendMessage(
                         conversationId: widget.conversationId,
                         content: messageController.text,
                         token: authViewModel.currentUser!.token!,
+                        imagePaths: _selectedImages.map((x) => x.path).toList(),
                       );
                       messageController.clear();
+                      setState(() {
+                        _selectedImages.clear();
+                      });
                     }
                   },
                 ),

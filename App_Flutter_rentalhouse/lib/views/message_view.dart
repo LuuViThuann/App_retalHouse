@@ -1,5 +1,4 @@
 import 'dart:convert';
-
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_rentalhouse/config/api_routes.dart';
@@ -97,6 +96,14 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
             itemCount: chatViewModel.conversations.length,
             itemBuilder: (context, index) {
               final conversation = chatViewModel.conversations[index];
+              String subtitleText = 'Chưa có tin nhắn';
+              if (conversation.lastMessage != null) {
+                if (conversation.lastMessage!.content.isNotEmpty) {
+                  subtitleText = conversation.lastMessage!.content;
+                } else if (conversation.lastMessage!.images.isNotEmpty) {
+                  subtitleText = '[Hình ảnh]';
+                }
+              }
               return ListTile(
                 leading: CircleAvatar(
                   backgroundImage: conversation.landlord['avatarBase64']?.isNotEmpty == true
@@ -108,9 +115,7 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
                 ),
                 title: Text(conversation.landlord['username'] ?? 'Unknown'),
                 subtitle: Text(
-                  conversation.lastMessage != null
-                      ? conversation.lastMessage!.content
-                      : 'Chưa có tin nhắn',
+                  subtitleText,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
