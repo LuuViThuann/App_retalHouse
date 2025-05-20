@@ -1,7 +1,9 @@
 import 'dart:convert';
+
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_rentalhouse/config/api_routes.dart';
+import 'package:flutter_rentalhouse/models/conversation.dart';
 import 'package:flutter_rentalhouse/viewmodels/vm_auth.dart';
 import 'package:flutter_rentalhouse/viewmodels/vm_chat.dart';
 import 'package:flutter_rentalhouse/views/chat_user.dart';
@@ -16,9 +18,6 @@ class ConversationsScreen extends StatefulWidget {
 }
 
 class _ConversationsScreenState extends State<ConversationsScreen> {
-  bool _isLoading = true;
-  String? _errorMessage;
-
   @override
   void initState() {
     super.initState();
@@ -29,129 +28,108 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
     final authViewModel = Provider.of<AuthViewModel>(context, listen: false);
     final chatViewModel = Provider.of<ChatViewModel>(context, listen: false);
 
-    if (authViewModel.currentUser == null) {
-      setState(() {
-        _errorMessage = 'Vui lòng đăng nhập để xem tin nhắn';
-        _isLoading = false;
-      });
-      return;
-    }
-
-    try {
+    if (authViewModel.currentUser != null) {
       await chatViewModel.fetchConversations(authViewModel.currentUser!.token!);
-      setState(() {
-        _isLoading = false;
-      });
-    } catch (e) {
-      setState(() {
-        _errorMessage = 'Lỗi khi tải danh sách cuộc trò chuyện: $e';
-        _isLoading = false;
-      });
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Vui lòng đăng nhập để xem cuộc trò chuyện')),
+      );
     }
+  }
+
+  Route _createRoute(Widget page) {
+    return PageRouteBuilder(
+      pageBuilder: (context, animation, secondaryAnimation) => page,
+      transitionsBuilder: (context, animation, secondaryAnimation, child) {
+        const begin = Offset(0.0, 1.0);
+        const end = Offset.zero;
+        const curve = Curves.easeInOut;
+
+        var tween = Tween(begin: begin, end: end).chain(CurveTween(curve: curve));
+        var offsetAnimation = animation.drive(tween);
+
+        return SlideTransition(
+          position: offsetAnimation,
+          child: child,
+        );
+      },
+      transitionDuration: const Duration(milliseconds: 300),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    final authViewModel = Provider.of<AuthViewModel>(context);
-    final chatViewModel = Provider.of<ChatViewModel>(context);
-
-    if (_isLoading) {
-      return Scaffold(
-        appBar: AppBar(title: Text('Tin nhắn'), backgroundColor: Colors.blue),
-        body: const Center(child: CircularProgressIndicator()),
-      );
-    }
-
-    if (_errorMessage != null) {
-      return Scaffold(
-        appBar: AppBar(title: const Text('Tin nhắn'), backgroundColor: Colors.blue),
-        body: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Text(_errorMessage!),
-              ElevatedButton(
-                onPressed: _loadConversations,
-                child: const Text('Thử lại'),
-              ),
-            ],
-          ),
-        ),
-      );
-    }
-
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Tin nhắn'),
+        title: const Text('Cuộc trò chuyện'),
         backgroundColor: Colors.blue,
       ),
-      body: authViewModel.currentUser == null
-          ? const Center(child: Text('Vui lòng đăng nhập để xem tin nhắn'))
-          : Consumer<ChatViewModel>(
-        builder: (context, chatViewModel, child) {
+      body: Consumer2<AuthViewModel, ChatViewModel>(
+        builder: (context, authViewModel, chatViewModel, child) {
+          if (authViewModel.currentUser == null) {
+            return const Center(child: Text('Vui lòng đăng nhập để xem cuộc trò chuyện'));
+          }
+
+          if (chatViewModel.isLoading) {
+            return const Center(child: CircularProgressIndicator());
+          }
+
+          if (chatViewModel.errorMessage != null) {
+            return Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(chatViewModel.errorMessage!),
+                  ElevatedButton(
+                    onPressed: _loadConversations,
+                    child: const Text('Thử lại'),
+                  ),
+                ],
+              ),
+            );
+          }
+
           if (chatViewModel.conversations.isEmpty) {
             return const Center(child: Text('Chưa có cuộc trò chuyện nào'));
           }
 
           return ListView.builder(
-            itemExtent: 80.0,
             itemCount: chatViewModel.conversations.length,
             itemBuilder: (context, index) {
               final conversation = chatViewModel.conversations[index];
               return ListTile(
                 leading: CircleAvatar(
-                  radius: 25,
                   backgroundImage: conversation.landlord['avatarBase64']?.isNotEmpty == true
-                      ? MemoryImage(base64Decode(conversation.landlord['avatarBase64'] as String))
+                      ? MemoryImage(base64Decode(conversation.landlord['avatarBase64']))
                       : null,
                   child: conversation.landlord['avatarBase64']?.isEmpty == true
                       ? const Icon(Icons.person)
                       : null,
                 ),
-                title: Text(
-                  conversation.landlord['username'] ?? 'Unknown',
-                  style: const TextStyle(fontWeight: FontWeight.bold),
-                ),
-                subtitle: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      conversation.rental?['title'] ?? 'Unknown Rental',
-                      style: TextStyle(color: Colors.grey[600]),
-                    ),
-                    if (conversation.lastMessage != null)
-                      Text(
-                        conversation.lastMessage!.content,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(color: Colors.grey[600]),
-                      ),
-                  ],
+                title: Text(conversation.landlord['username'] ?? 'Unknown'),
+                subtitle: Text(
+                  conversation.lastMessage != null
+                      ? conversation.lastMessage!.content
+                      : 'Chưa có tin nhắn',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
                 trailing: Text(
                   conversation.lastMessage != null
                       ? DateFormat('HH:mm, dd/MM').format(conversation.lastMessage!.createdAt)
-                      : '',
-                  style: TextStyle(color: Colors.grey[600]),
+                      : DateFormat('HH:mm, dd/MM').format(conversation.createdAt),
+                  style: TextStyle(fontSize: 12, color: Colors.grey[600]),
                 ),
-                onTap: () async {
-                  try {
-                    await chatViewModel.fetchConversations(authViewModel.currentUser!.token!);
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => ChatScreen(
-                          rentalId: conversation.rentalId,
-                          landlordId: conversation.landlord['id'],
-                          conversationId: conversation.id,
-                        ),
-                      ),
-                    );
-                  } catch (e) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('Lỗi khi mở cuộc trò chuyện: $e')),
-                    );
-                  }
+                onTap: () {
+                  print('Navigating to ChatScreen with conversationId: ${conversation.id}');
+                  Navigator.push(
+                    context,
+                    _createRoute(ChatScreen(
+                      rentalId: conversation.rentalId,
+                      landlordId: conversation.landlord['id'],
+                      conversationId: conversation.id,
+                    )),
+                  );
                 },
               );
             },

@@ -10,15 +10,24 @@ class ChatService {
 
   // Initialize Socket.IO connection
   void connect(String token, Function(Message) onMessageReceived) {
+    if (_socket != null && _socket!.connected) {
+      print('Socket already connected');
+      return;
+    }
+
     _socket = io.io(ApiRoutes.socketUrl, <String, dynamic>{
       'transports': ['websocket'],
       'autoConnect': false,
       'extraHeaders': {'Authorization': 'Bearer $token'},
+      'reconnection': true,
+      'reconnectionAttempts': 5,
+      'reconnectionDelay': 1000,
     });
 
     _socket?.connect();
 
     _socket?.on('receiveMessage', (data) {
+      print('Received message via socket: $data');
       final message = Message.fromJson(data as Map<String, dynamic>);
       onMessageReceived(message);
     });
@@ -26,13 +35,35 @@ class ChatService {
     _socket?.on('error', (error) {
       print('Socket.IO Error: $error');
     });
+
+    _socket?.onConnect((_) {
+      print('Connected to socket server');
+    });
+
+    _socket?.onDisconnect((_) {
+      print('Disconnected from socket server');
+    });
+
+    _socket?.onConnectError((data) {
+      print('Socket connection error: $data');
+    });
   }
 
   void joinConversation(String conversationId) {
+    if (_socket == null || !_socket!.connected) {
+      print('Socket not connected, cannot join conversation: $conversationId');
+      return;
+    }
+    print('Joining conversation: $conversationId');
     _socket?.emit('joinConversation', conversationId);
   }
 
   void sendMessage(String conversationId, String senderId, String content) {
+    if (_socket == null || !_socket!.connected) {
+      print('Socket not connected, cannot send message');
+      return;
+    }
+    print('Sending message via socket: conversationId=$conversationId, senderId=$senderId, content=$content');
     _socket?.emit('sendMessage', {
       'conversationId': conversationId,
       'senderId': senderId,
@@ -41,6 +72,7 @@ class ChatService {
   }
 
   void disconnect() {
+    print('Disconnecting socket');
     _socket?.disconnect();
     _socket = null;
   }
@@ -51,6 +83,7 @@ class ChatService {
     required String landlordId,
     required String token,
   }) async {
+    print('Creating conversation with rentalId: $rentalId, landlordId: $landlordId');
     final response = await http.post(
       Uri.parse(ApiRoutes.conversations),
       headers: {
@@ -63,7 +96,9 @@ class ChatService {
       }),
     );
 
-    if (response.statusCode == 200) {
+    print('Response status: ${response.statusCode}, body: ${response.body}');
+
+    if (response.statusCode == 201) {
       return Conversation.fromJson(jsonDecode(response.body));
     } else {
       throw Exception('Failed to create conversation: ${response.body}');
@@ -78,11 +113,15 @@ class ChatService {
     int limit = 10,
   }) async {
     final query = cursor != null ? {'cursor': cursor, 'limit': limit.toString()} : {'limit': limit.toString()};
-    final uri = Uri.parse(ApiRoutes.messages(conversationId)).replace(queryParameters: query);
+    final uri = Uri.parse(ApiRoutes.messagesByConversation(conversationId)).replace(queryParameters: query);
+
+    print('Fetching messages for conversationId: $conversationId, uri: $uri');
     final response = await http.get(
       uri,
       headers: {'Authorization': 'Bearer $token'},
     );
+
+    print('Fetch messages status: ${response.statusCode}, body: ${response.body}');
 
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
@@ -96,10 +135,13 @@ class ChatService {
 
   // Fetch all conversations
   Future<List<Conversation>> fetchConversations(String token) async {
+    print('Fetching conversations');
     final response = await http.get(
       Uri.parse(ApiRoutes.conversations),
       headers: {'Authorization': 'Bearer $token'},
     );
+
+    print('Fetch conversations status: ${response.statusCode}, body: ${response.body}');
 
     if (response.statusCode == 200) {
       final List<dynamic> data = jsonDecode(response.body);
@@ -111,10 +153,13 @@ class ChatService {
 
   // Fetch pending conversations
   Future<List<Conversation>> fetchPendingConversations(String token) async {
+    print('Fetching pending conversations');
     final response = await http.get(
       Uri.parse(ApiRoutes.pendingConversations),
       headers: {'Authorization': 'Bearer $token'},
     );
+
+    print('Fetch pending conversations status: ${response.statusCode}, body: ${response.body}');
 
     if (response.statusCode == 200) {
       final List<dynamic> data = jsonDecode(response.body);

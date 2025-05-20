@@ -50,63 +50,70 @@ mongoose.connect(MONGODB_URI)
   });
 
 app.use('/api/auth', authRoutes);
-app.use('/api', rentalRoutes);
+app.use('/api', rentalRoutes(io));
 
 io.on('connection', (socket) => {
-  console.log('A user connected:', socket.id);
+  console.log('New client connected:', socket.id);
 
   socket.on('joinConversation', (conversationId) => {
+    console.log(`User joined conversation: ${conversationId}`);
     socket.join(conversationId);
-    console.log(`User ${socket.id} joined conversation ${conversationId}`);
   });
 
-  socket.on('sendMessage', async ({ conversationId, senderId, content }) => {
+  socket.on('sendMessage', async (data) => {
+    console.log(`Received sendMessage: ${JSON.stringify(data)}`);
+    const { conversationId, senderId, content } = data;
+
+    if (!mongoose.Types.ObjectId.isValid(conversationId)) {
+      socket.emit('error', 'Invalid conversationId format');
+      return;
+    }
+
     try {
-      const Message = mongoose.model('Message');
       const Conversation = mongoose.model('Conversation');
+      const Message = mongoose.model('Message');
+      const conversation = await Conversation.findById(conversationId);
+      if (!conversation || !conversation.participants.includes(senderId)) {
+        socket.emit('error', 'Unauthorized or conversation not found');
+        return;
+      }
 
       const message = new Message({
         conversationId,
         senderId,
         content,
-        createdAt: new Date(),
+        images: [],
       });
+
       await message.save();
 
-      await Conversation.findByIdAndUpdate(conversationId, {
-        lastMessage: message._id,
-        updatedAt: new Date(),
-        isPending: false,
-      });
+      conversation.lastMessage = message._id;
+      conversation.isPending = false;
+      await conversation.save();
 
-      const populatedMessage = await Message.findById(message._id)
-        .populate('senderId', 'username avatarBase64')
-        .lean();
+      await redisClient.del(`conversations:${conversation.participants[0]}`);
+      await redisClient.del(`conversations:${conversation.participants[1]}`);
 
-      // Adjust timestamp for +7 timezone
-      const adjustedMessage = {
-        ...populatedMessage,
-        createdAt: new Date(new Date(populatedMessage.createdAt).getTime() + 7 * 60 * 60 * 1000),
+      const messageData = {
+        _id: message._id.toString(),
+        conversationId: message.conversationId.toString(),
+        senderId: message.senderId,
+        content: message.content,
+        images: message.images,
+        createdAt: message.createdAt,
       };
 
-      io.to(conversationId).emit('receiveMessage', adjustedMessage);
-
-      // Invalidate Redis cache for participants
-      const conversation = await Conversation.findById(conversationId);
-      for (const participant of conversation.participants) {
-        await redisClient.del(`conversations:${participant}`);
-      }
+      io.to(conversationId).emit('receiveMessage', messageData);
     } catch (err) {
-      console.error('Error sending message:', err);
-      socket.emit('error', { message: 'Failed to send message' });
+      console.error('Error in sendMessage:', err);
+      socket.emit('error', 'Failed to send message');
     }
   });
 
   socket.on('disconnect', () => {
-    console.log('User disconnected:', socket.id);
+    console.log('Client disconnected:', socket.id);
   });
 });
-
 app.use((err, req, res, next) => {
   console.error(err.stack);
   res.status(500).json({ message: 'Something went wrong!' });

@@ -119,7 +119,6 @@ class RentalItemWidget extends StatelessWidget {
                         child: const Icon(Icons.image, size: 50, color: Colors.grey),
                       ),
                     ),
-                    // Position status and "Bài viết của bạn" at the top right
                     Positioned(
                       top: 8,
                       right: 8,
@@ -193,7 +192,7 @@ class RentalItemWidget extends StatelessWidget {
                           Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              if (!isMyPost) // Hide favorite icon if it's my post
+                              if (!isMyPost)
                                 GestureDetector(
                                   onTap: isLoading
                                       ? null
@@ -260,7 +259,7 @@ class RentalItemWidget extends StatelessWidget {
                                     ),
                                   ),
                                 ),
-                              if (!isMyPost) // Hide chat icon if it's my post
+                              if (!isMyPost)
                                 GestureDetector(
                                   onTap: () async {
                                     if (authViewModel.currentUser == null) {
@@ -294,6 +293,9 @@ class RentalItemWidget extends StatelessWidget {
                                       if (conversation == null) {
                                         throw Exception('Không thể tạo hoặc lấy cuộc trò chuyện');
                                       }
+
+                                      // Cập nhật danh sách cuộc trò chuyện
+                                      await chatViewModel.fetchConversations(authViewModel.currentUser!.token!);
 
                                       print('Conversation created/fetched with ID: ${conversation.id}');
                                       Navigator.push(

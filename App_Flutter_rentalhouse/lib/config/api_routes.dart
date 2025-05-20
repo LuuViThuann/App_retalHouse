@@ -37,6 +37,7 @@ class ApiRoutes {
   static const String conversations = '$baseUrl/conversations';
   static String conversationById(String conversationId) => '$conversations/$conversationId';
   static const String pendingConversations = '$conversations/pending';
-  static String messages(String conversationId) => '$baseUrl/messages/$conversationId';
+  static const String messages = '$baseUrl/messages';
+  static String messagesByConversation(String conversationId) => '$baseUrl/messages/$conversationId';
 }
 

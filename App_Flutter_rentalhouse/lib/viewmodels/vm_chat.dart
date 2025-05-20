@@ -54,11 +54,11 @@ class ChatViewModel extends ChangeNotifier {
 
     _socket?.onConnectError((data) {
       _errorMessage = 'Socket connection error: $data';
+      print('Socket connection error: $data');
       notifyListeners();
     });
   }
 
-  // Lấy hoặc tạo cuộc trò chuyện
   Future<Conversation?> getOrCreateConversation({
     required String rentalId,
     required String landlordId,
@@ -157,12 +157,11 @@ class ChatViewModel extends ChangeNotifier {
     }
   }
 
-  // Tải cuộc trò chuyện cụ thể
   Future<Conversation?> fetchConversationById(String conversationId, String token) async {
     try {
       print('Fetching conversation with ID: $conversationId');
       final response = await http.get(
-        Uri.parse('${ApiRoutes.conversations}/$conversationId'),
+        Uri.parse(ApiRoutes.conversationById(conversationId)),
         headers: {
           'Authorization': 'Bearer $token',
         },
@@ -189,16 +188,17 @@ class ChatViewModel extends ChangeNotifier {
     }
   }
 
-  Future<void> fetchMessages(String conversationId, String token, {String? lastMessageId}) async {
+  Future<void> fetchMessages(String conversationId, String token, {String? cursor}) async {
     if (!_hasMoreMessages) return;
 
     _isLoading = true;
     notifyListeners();
 
     try {
-      final query = lastMessageId != null ? '?limit=$_messageLimit&lastMessageId=$lastMessageId' : '?limit=$_messageLimit';
+      final query = cursor != null ? {'cursor': cursor, 'limit': _messageLimit.toString()} : {'limit': _messageLimit.toString()};
+      final uri = Uri.parse(ApiRoutes.messagesByConversation(conversationId)).replace(queryParameters: query);
       final response = await http.get(
-        Uri.parse('${ApiRoutes.messages(conversationId)}$query'),
+        uri,
         headers: {
           'Authorization': 'Bearer $token',
         },
@@ -208,9 +208,10 @@ class ChatViewModel extends ChangeNotifier {
       print('Fetch messages body: ${response.body}');
 
       if (response.statusCode == 200) {
-        final List<dynamic> data = jsonDecode(response.body);
-        final newMessages = data.map((json) => Message.fromJson(json)).toList();
-        _messages = [..._messages, ...newMessages];
+        final data = jsonDecode(response.body);
+        final List<dynamic> messageData = data['messages'] ?? [];
+        final newMessages = messageData.map((json) => Message.fromJson(json)).toList();
+        _messages = [...newMessages, ..._messages]; // Thêm tin nhắn mới vào đầu danh sách
         _hasMoreMessages = newMessages.length == _messageLimit;
       } else {
         _errorMessage = 'Không thể tải tin nhắn: ${response.body}';
@@ -234,7 +235,7 @@ class ChatViewModel extends ChangeNotifier {
     notifyListeners();
 
     try {
-      var request = http.MultipartRequest('POST', Uri.parse(ApiRoutes.messages(conversationId)));
+      var request = http.MultipartRequest('POST', Uri.parse(ApiRoutes.messages));
       request.headers['Authorization'] = 'Bearer $token';
       request.fields['conversationId'] = conversationId;
       request.fields['content'] = content;
@@ -266,6 +267,12 @@ class ChatViewModel extends ChangeNotifier {
       _isLoading = false;
       notifyListeners();
     }
+  }
+
+  void clearMessages() {
+    _messages = [];
+    _hasMoreMessages = true;
+    notifyListeners();
   }
 
   @override
