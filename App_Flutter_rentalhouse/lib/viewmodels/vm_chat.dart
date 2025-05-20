@@ -212,7 +212,7 @@ class ChatViewModel extends ChangeNotifier {
         final data = jsonDecode(response.body);
         final List<dynamic> messageData = data['messages'] ?? [];
         final newMessages = messageData.map((json) => Message.fromJson(json)).toList();
-        _messages = [...newMessages, ..._messages]; // Thêm tin nhắn mới vào đầu danh sách
+        _messages = [...newMessages, ..._messages];
         _hasMoreMessages = newMessages.length == _messageLimit;
       } else {
         _errorMessage = 'Không thể tải tin nhắn: ${response.body}';
@@ -239,7 +239,7 @@ class ChatViewModel extends ChangeNotifier {
       var request = http.MultipartRequest('POST', Uri.parse(ApiRoutes.messages));
       request.headers['Authorization'] = 'Bearer $token';
       request.fields['conversationId'] = conversationId;
-      request.fields['content'] = content;
+      request.fields['content'] = content; // Can be empty string
 
       for (var imagePath in imagePaths) {
         request.files.add(await http.MultipartFile.fromPath(

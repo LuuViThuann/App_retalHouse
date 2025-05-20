@@ -7,7 +7,7 @@ class Message {
   final String content;
   final List<String> images;
   final DateTime createdAt;
-  final Map<String, dynamic> sender; // Added sender info
+  final Map<String, dynamic> sender;
 
   Message({
     required this.id,
@@ -20,7 +20,7 @@ class Message {
   });
 
   factory Message.fromJson(Map<String, dynamic> json) {
-    print('Parsing message JSON: $json'); // Log để debug
+    print('Parsing message JSON: $json');
     return Message(
       id: json['_id']?.toString() ?? '',
       conversationId: json['conversationId']?.toString() ?? '',

@@ -13,7 +13,8 @@ const messageSchema = new mongoose.Schema({
   },
   content: {
     type: String,
-    required: true,
+    required: false, // Changed to optional
+    default: '', // Default to empty string
   },
   images: [{
     type: String,

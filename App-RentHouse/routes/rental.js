@@ -950,16 +950,22 @@ module.exports = (io) => {
         if (landlordDoc.exists) landlordData = landlordDoc.data();
       } catch (err) {}
       try {
-        const landlordMongo = await mongoose.model('User').findOne({ _id: landlordId }).select('avatarBase64');
-        if (landlordMongo) landlordData.avatarBase64 = landlordMongo.avatarBase64 || '';
+        const landlordMongo = await mongoose.model('User').findOne({ _id: landlordId }).select('avatarBase64 username');
+        if (landlordMongo) {
+          landlordData.avatarBase64 = landlordMongo.avatarBase64 || '';
+          landlordData.username = landlordMongo.username || landlordData.username;
+        }
       } catch (err) {}
       try {
         const userDoc = await admin.firestore().collection('Users').doc(userId).get();
         if (userDoc.exists) userData = userDoc.data();
       } catch (err) {}
       try {
-        const userMongo = await mongoose.model('User').findOne({ _id: userId }).select('avatarBase64');
-        if (userMongo) userData.avatarBase64 = userMongo.avatarBase64 || '';
+        const userMongo = await mongoose.model('User').findOne({ _id: userId }).select('avatarBase64 username');
+        if (userMongo) {
+          userData.avatarBase64 = userMongo.avatarBase64 || '';
+          userData.username = userMongo.username || userData.username;
+        }
       } catch (err) {}
 
       // Only one conversation per user/landlord/rental
@@ -1003,6 +1009,11 @@ module.exports = (io) => {
               _id: conversation.lastMessage._id.toString(),
               conversationId: conversation.lastMessage.conversationId.toString(),
               createdAt: new Date(conversation.lastMessage.createdAt.getTime() + 7 * 60 * 60 * 1000),
+              sender: {
+                id: conversation.lastMessage.senderId,
+                username: conversation.lastMessage.senderId === userId ? userData.username : landlordData.username,
+                avatarBase64: conversation.lastMessage.senderId === userId ? userData.avatarBase64 : landlordData.avatarBase64,
+              }
             }
           : null,
         landlord: {
@@ -1035,16 +1046,22 @@ module.exports = (io) => {
             if (participantDoc.exists) participantData = participantDoc.data();
           } catch (err) {}
           try {
-            const participantMongo = await mongoose.model('User').findOne({ _id: otherParticipantId }).select('avatarBase64');
-            if (participantMongo) participantData.avatarBase64 = participantMongo.avatarBase64 || '';
+            const participantMongo = await mongoose.model('User').findOne({ _id: otherParticipantId }).select('avatarBase64 username');
+            if (participantMongo) {
+              participantData.avatarBase64 = participantMongo.avatarBase64 || '';
+              participantData.username = participantMongo.username || participantData.username;
+            }
           } catch (err) {}
           try {
             const userDoc2 = await admin.firestore().collection('Users').doc(userId).get();
             if (userDoc2.exists) userData2 = userDoc2.data();
           } catch (err) {}
           try {
-            const userMongo2 = await mongoose.model('User').findOne({ _id: userId }).select('avatarBase64');
-            if (userMongo2) userData2.avatarBase64 = userMongo2.avatarBase64 || '';
+            const userMongo2 = await mongoose.model('User').findOne({ _id: userId }).select('avatarBase64 username');
+            if (userMongo2) {
+              userData2.avatarBase64 = userMongo2.avatarBase64 || '';
+              userData2.username = userMongo2.username || userData2.username;
+            }
           } catch (err) {}
           try {
             const rental = await Rental.findById(conv.rentalId).select('title images');
@@ -1068,6 +1085,11 @@ module.exports = (io) => {
                   _id: conv.lastMessage._id.toString(),
                   conversationId: conv.lastMessage.conversationId.toString(),
                   createdAt: new Date(conv.lastMessage.createdAt.getTime() + 7 * 60 * 60 * 1000),
+                  sender: {
+                    id: conv.lastMessage.senderId,
+                    username: conv.lastMessage.senderId === userId ? userData2.username : participantData.username,
+                    avatarBase64: conv.lastMessage.senderId === userId ? userData2.avatarBase64 : participantData.avatarBase64,
+                  }
                 }
               : null,
             landlord: {
@@ -1162,9 +1184,12 @@ module.exports = (io) => {
   // Send a message in a conversation (support image upload)
   router.post('/messages', authMiddleware, upload.array('images'), async (req, res) => {
     try {
-      const { conversationId, content } = req.body;
-      if (!mongoose.Types.ObjectId.isValid(conversationId) || (!content && (!req.files || req.files.length === 0))) {
-        return res.status(400).json({ message: 'Invalid conversationId or missing content/images' });
+      const { conversationId, content = '' } = req.body; // Default content to empty string
+      if (!mongoose.Types.ObjectId.isValid(conversationId)) {
+        return res.status(400).json({ message: 'Invalid conversationId' });
+      }
+      if (!content && (!req.files || req.files.length === 0)) {
+        return res.status(400).json({ message: 'Message must have either content or images' });
       }
       const conversation = await Conversation.findById(conversationId);
       if (!conversation || !conversation.participants.includes(req.userId)) {
