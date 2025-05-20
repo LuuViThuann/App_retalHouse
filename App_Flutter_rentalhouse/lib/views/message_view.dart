@@ -113,7 +113,7 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
                       ? const Icon(Icons.person)
                       : null,
                 ),
-                title: Text(conversation.landlord['username'] ?? 'Unknown'),
+                title: Text(conversation.landlord['username'] ?? 'Chủ nhà'),
                 subtitle: Text(
                   subtitleText,
                   maxLines: 1,

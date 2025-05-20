@@ -350,6 +350,11 @@ class RentalItemWidget extends StatelessWidget {
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Chủ nhà: ${rental.contactInfo['name'] ?? 'Chủ nhà'}',
+                        style: TextStyle(fontSize: 14, color: Colors.grey[600]),
+                      ),
                       const SizedBox(height: 15),
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,

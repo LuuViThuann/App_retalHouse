@@ -51,7 +51,6 @@ class _ChatScreenState extends State<ChatScreen> {
 
     try {
       print('Loading data for conversationId: ${widget.conversationId}');
-      // Clear messages before loading new ones
       chatViewModel.clearMessages();
       if (chatViewModel.conversations.isEmpty ||
           !chatViewModel.conversations.any((c) => c.id == widget.conversationId)) {
@@ -95,7 +94,7 @@ class _ChatScreenState extends State<ChatScreen> {
             participants: [widget.landlordId],
             isPending: true,
             createdAt: DateTime.now(),
-            landlord: {'id': widget.landlordId, 'username': 'Unknown', 'avatarBase64': ''},
+            landlord: {'id': widget.landlordId, 'username': 'Chủ nhà', 'avatarBase64': ''},
             rental: null,
           );
         },
@@ -107,7 +106,7 @@ class _ChatScreenState extends State<ChatScreen> {
       return conversation.landlord;
     } catch (e) {
       print('Error in _fetchLandlordInfo: $e');
-      return {'id': widget.landlordId, 'username': 'Unknown', 'avatarBase64': ''};
+      return {'id': widget.landlordId, 'username': 'Chủ nhà', 'avatarBase64': ''};
     }
   }
 
@@ -159,7 +158,7 @@ class _ChatScreenState extends State<ChatScreen> {
               return const Text('Loading...');
             }
             if (snapshot.hasError || !snapshot.hasData) {
-              return const Text('Unknown');
+              return const Text('Chủ nhà');
             }
             final landlord = snapshot.data!;
             return Row(
@@ -172,7 +171,7 @@ class _ChatScreenState extends State<ChatScreen> {
                   child: landlord['avatarBase64']?.isEmpty == true ? const Icon(Icons.person) : null,
                 ),
                 const SizedBox(width: 10),
-                Text(landlord['username'] ?? 'Unknown'),
+                Text(landlord['username'] ?? 'Chủ nhà'),
               ],
             );
           },
