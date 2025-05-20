@@ -52,20 +52,44 @@ mongoose.connect(MONGODB_URI)
 app.use('/api/auth', authRoutes);
 app.use('/api', rentalRoutes(io));
 
+io.use(async (socket, next) => {
+  const token = socket.handshake.headers.authorization?.replace('Bearer ', '');
+  if (!token) {
+    return next(new Error('Authentication error: No token provided'));
+  }
+  try {
+    const decodedToken = await admin.auth().verifyIdToken(token);
+    socket.userId = decodedToken.uid;
+    next();
+  } catch (err) {
+    console.error('Socket authentication error:', err);
+    next(new Error('Authentication error: Invalid token'));
+  }
+});
+
 io.on('connection', (socket) => {
-  console.log('New client connected:', socket.id);
+  console.log('New client connected:', socket.id, 'User:', socket.userId);
 
   socket.on('joinConversation', (conversationId) => {
-    console.log(`User joined conversation: ${conversationId}`);
+    console.log(`User ${socket.userId} joined conversation: ${conversationId}`);
+    if (!mongoose.Types.ObjectId.isValid(conversationId)) {
+      socket.emit('error', 'Invalid conversationId format');
+      return;
+    }
     socket.join(conversationId);
   });
 
   socket.on('sendMessage', async (data) => {
-    console.log(`Received sendMessage: ${JSON.stringify(data)}`);
+    console.log(`Received sendMessage from user ${socket.userId}: ${JSON.stringify(data)}`);
     const { conversationId, senderId, content } = data;
 
     if (!mongoose.Types.ObjectId.isValid(conversationId)) {
       socket.emit('error', 'Invalid conversationId format');
+      return;
+    }
+
+    if (socket.userId !== senderId) {
+      socket.emit('error', 'Unauthorized: Sender ID does not match authenticated user');
       return;
     }
 
@@ -100,7 +124,7 @@ io.on('connection', (socket) => {
         senderId: message.senderId,
         content: message.content,
         images: message.images,
-        createdAt: message.createdAt,
+        createdAt: new Date(message.createdAt.getTime() + 7 * 60 * 60 * 1000), // Adjust for +7 timezone
       };
 
       io.to(conversationId).emit('receiveMessage', messageData);
@@ -111,9 +135,11 @@ io.on('connection', (socket) => {
   });
 
   socket.on('disconnect', () => {
-    console.log('Client disconnected:', socket.id);
+    console.log('Client disconnected:', socket.id, 'User:', socket.userId);
   });
 });
+
+
 app.use((err, req, res, next) => {
   console.error(err.stack);
   res.status(500).json({ message: 'Something went wrong!' });

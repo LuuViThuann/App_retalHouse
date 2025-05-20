@@ -179,7 +179,6 @@ class _ChatScreenState extends State<ChatScreen> {
                 }
                 return ListView.builder(
                   reverse: true,
-                  itemExtent: 100.0,
                   itemCount: chatViewModel.messages.length,
                   itemBuilder: (context, index) {
                     final message = chatViewModel.messages[chatViewModel.messages.length - 1 - index];

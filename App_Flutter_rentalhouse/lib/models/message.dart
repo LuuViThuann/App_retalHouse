@@ -1,4 +1,3 @@
-
 class Message {
   final String id;
   final String conversationId;
@@ -21,7 +20,7 @@ class Message {
     return Message(
       id: json['_id']?.toString() ?? '',
       conversationId: json['conversationId']?.toString() ?? '',
-      senderId: json['senderId']?['_id']?.toString() ?? json['senderId']?.toString() ?? '',
+      senderId: json['senderId']?.toString() ?? '', // Directly use senderId as string
       content: json['content']?.toString() ?? '',
       images: List<String>.from(json['images'] ?? []),
       createdAt: DateTime.tryParse(json['createdAt']?.toString() ?? '') ?? DateTime.now(),

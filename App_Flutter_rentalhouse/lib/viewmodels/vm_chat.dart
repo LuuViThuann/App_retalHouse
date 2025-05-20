@@ -89,6 +89,7 @@ class ChatViewModel extends ChangeNotifier {
         final data = jsonDecode(response.body);
         final conversation = Conversation.fromJson(data);
         _conversations = [conversation, ..._conversations.where((c) => c.id != conversation.id)];
+        print('Joining conversation room: ${conversation.id}');
         _socket?.emit('joinConversation', conversation.id);
         notifyListeners();
         return conversation;
