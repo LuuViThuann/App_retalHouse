@@ -926,8 +926,9 @@ router.delete('/comments/:commentId/replies/:replyId/unlike', authMiddleware, as
 
 // Lấy hoặc tạo cuộc trò chuyện
 
+// Export as a function for Socket.IO integration; otherwise, export the router directly for Express.
 module.exports = (io) => {
-  // Create or get a conversation
+  // Create or get a conversation (only one conversation per user/landlord/rental)
   router.post('/conversations', authMiddleware, async (req, res) => {
     try {
       const { rentalId, landlordId } = req.body;
@@ -947,26 +948,33 @@ module.exports = (io) => {
         return res.status(404).json({ message: 'Rental not found' });
       }
 
+      // Get user and landlord avatar
       let landlordData = { username: 'Unknown', avatarBase64: '' };
+      let userData = { username: 'Unknown', avatarBase64: '' };
       try {
         const landlordDoc = await admin.firestore().collection('Users').doc(landlordId).get();
-        if (!landlordDoc.exists) {
-          return res.status(404).json({ message: 'Landlord not found' });
-        }
-        landlordData = landlordDoc.data();
-      } catch (err) {
-        return res.status(500).json({ message: 'Error fetching landlord information' });
-      }
+        if (landlordDoc.exists) landlordData = landlordDoc.data();
+      } catch (err) {}
       try {
         const landlordMongo = await mongoose.model('User').findOne({ _id: landlordId }).select('avatarBase64');
-        if (landlordMongo) {
-          landlordData.avatarBase64 = landlordMongo.avatarBase64 || '';
-        }
+        if (landlordMongo) landlordData.avatarBase64 = landlordMongo.avatarBase64 || '';
+      } catch (err) {}
+      try {
+        const userDoc = await admin.firestore().collection('Users').doc(userId).get();
+        if (userDoc.exists) userData = userDoc.data();
+      } catch (err) {}
+      try {
+        const userMongo = await mongoose.model('User').findOne({ _id: userId }).select('avatarBase64');
+        if (userMongo) userData.avatarBase64 = userMongo.avatarBase64 || '';
       } catch (err) {}
 
+      // Only one conversation per user/landlord/rental
       let conversation = await Conversation.findOne({
         rentalId,
-        participants: { $all: [userId, landlordId] },
+        $or: [
+          { participants: [userId, landlordId] },
+          { participants: [landlordId, userId] }
+        ]
       }).populate('lastMessage');
       if (!conversation) {
         conversation = new Conversation({
@@ -1008,30 +1016,41 @@ module.exports = (io) => {
           username: landlordData.username || 'Unknown',
           avatarBase64: landlordData.avatarBase64 || '',
         },
+        user: {
+          id: userId,
+          username: userData.username || 'Unknown',
+          avatarBase64: userData.avatarBase64 || '',
+        },
         rental: rentalData,
       };
 
       await redisClient.del(`conversations:${userId}`);
       await redisClient.del(`conversations:${landlordId}`);
 
+      // Update cache for user
       const userConversations = await Conversation.find({ participants: userId }).populate('lastMessage').lean();
       const enrichedUserConversations = await Promise.all(
         userConversations.map(async (conv) => {
           const otherParticipantId = conv.participants.find((p) => p !== userId) || '';
           let participantData = { username: 'Unknown', avatarBase64: '' };
+          let userData2 = { username: 'Unknown', avatarBase64: '' };
           let rentalData = null;
 
           try {
             const participantDoc = await admin.firestore().collection('Users').doc(otherParticipantId).get();
-            if (participantDoc.exists) {
-              participantData = participantDoc.data();
-            }
+            if (participantDoc.exists) participantData = participantDoc.data();
           } catch (err) {}
           try {
             const participantMongo = await mongoose.model('User').findOne({ _id: otherParticipantId }).select('avatarBase64');
-            if (participantMongo) {
-              participantData.avatarBase64 = participantMongo.avatarBase64 || '';
-            }
+            if (participantMongo) participantData.avatarBase64 = participantMongo.avatarBase64 || '';
+          } catch (err) {}
+          try {
+            const userDoc2 = await admin.firestore().collection('Users').doc(userId).get();
+            if (userDoc2.exists) userData2 = userDoc2.data();
+          } catch (err) {}
+          try {
+            const userMongo2 = await mongoose.model('User').findOne({ _id: userId }).select('avatarBase64');
+            if (userMongo2) userData2.avatarBase64 = userMongo2.avatarBase64 || '';
           } catch (err) {}
           try {
             const rental = await Rental.findById(conv.rentalId).select('title images');
@@ -1061,6 +1080,11 @@ module.exports = (io) => {
               id: otherParticipantId,
               username: participantData.username || 'Unknown',
               avatarBase64: participantData.avatarBase64 || '',
+            },
+            user: {
+              id: userId,
+              username: userData2.username || 'Unknown',
+              avatarBase64: userData2.avatarBase64 || '',
             },
             rental: rentalData,
           };
@@ -1139,7 +1163,9 @@ module.exports = (io) => {
         images: message.images,
         createdAt: message.createdAt,
       };
-      io.to(conversationId).emit('receiveMessage', messageData);
+      if (io) {
+        io.to(conversationId).emit('receiveMessage', messageData);
+      }
       res.status(201).json(messageData);
     } catch (err) {
       res.status(500).json({ message: err.message });
@@ -1160,18 +1186,23 @@ module.exports = (io) => {
         conversations.map(async (conv) => {
           const otherParticipantId = conv.participants.find((p) => p !== userId) || '';
           let participantData = { username: 'Unknown', avatarBase64: '' };
+          let userData = { username: 'Unknown', avatarBase64: '' };
           let rentalData = null;
           try {
             const participantDoc = await admin.firestore().collection('Users').doc(otherParticipantId).get();
-            if (participantDoc.exists) {
-              participantData = participantDoc.data();
-            }
+            if (participantDoc.exists) participantData = participantDoc.data();
           } catch (err) {}
           try {
             const participantMongo = await mongoose.model('User').findOne({ _id: otherParticipantId }).select('avatarBase64');
-            if (participantMongo) {
-              participantData.avatarBase64 = participantMongo.avatarBase64 || '';
-            }
+            if (participantMongo) participantData.avatarBase64 = participantMongo.avatarBase64 || '';
+          } catch (err) {}
+          try {
+            const userDoc = await admin.firestore().collection('Users').doc(userId).get();
+            if (userDoc.exists) userData = userDoc.data();
+          } catch (err) {}
+          try {
+            const userMongo = await mongoose.model('User').findOne({ _id: userId }).select('avatarBase64');
+            if (userMongo) userData.avatarBase64 = userMongo.avatarBase64 || '';
           } catch (err) {}
           try {
             const rental = await Rental.findById(conv.rentalId).select('title images');
@@ -1201,6 +1232,11 @@ module.exports = (io) => {
               username: participantData.username || 'Unknown',
               avatarBase64: participantData.avatarBase64 || '',
             },
+            user: {
+              id: userId,
+              username: userData.username || 'Unknown',
+              avatarBase64: userData.avatarBase64 || '',
+            },
             rental: rentalData,
           };
         })
@@ -1213,3 +1249,9 @@ module.exports = (io) => {
   });
   return router;
 };
+
+// If this file is required without Socket.IO, export the router directly.
+if (!module.parent) {
+  module.exports = router;
+}
+
