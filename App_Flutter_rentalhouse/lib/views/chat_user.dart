@@ -1,9 +1,12 @@
+import 'dart:convert';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_rentalhouse/config/api_routes.dart';
+import 'package:flutter_rentalhouse/models/conversation.dart';
+import 'package:flutter_rentalhouse/viewmodels/vm_auth.dart';
+import 'package:flutter_rentalhouse/viewmodels/vm_chat.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
-import '../viewmodels/vm_auth.dart';
-import '../viewmodels/vm_chat.dart';
-import '../models/message.dart';
 
 class ChatScreen extends StatefulWidget {
   final String rentalId;
@@ -11,140 +14,250 @@ class ChatScreen extends StatefulWidget {
   final String conversationId;
 
   const ChatScreen({
-    Key? key,
+    super.key,
     required this.rentalId,
     required this.landlordId,
     required this.conversationId,
-  }) : super(key: key);
+  });
 
   @override
   _ChatScreenState createState() => _ChatScreenState();
 }
 
 class _ChatScreenState extends State<ChatScreen> {
-  final TextEditingController _messageController = TextEditingController();
-  final ScrollController _scrollController = ScrollController();
+  bool _isLoading = true;
+  String? _errorMessage;
 
   @override
   void initState() {
     super.initState();
+    _loadData();
+  }
+
+  Future<void> _loadData() async {
     final authViewModel = Provider.of<AuthViewModel>(context, listen: false);
     final chatViewModel = Provider.of<ChatViewModel>(context, listen: false);
 
-    // Initialize Socket.IO
-    chatViewModel.initializeSocket(authViewModel.currentUser!.token!);
-    chatViewModel.joinConversation(widget.conversationId);
+    if (authViewModel.currentUser == null) {
+      setState(() {
+        _errorMessage = 'Vui lòng đăng nhập để xem tin nhắn';
+        _isLoading = false;
+      });
+      return;
+    }
 
-    // Fetch initial messages
-    chatViewModel.fetchMessages(
-      conversationId: widget.conversationId,
-      token: authViewModel.currentUser!.token!,
-    );
-
-    // Load more messages when scrolling to the top
-    _scrollController.addListener(() {
-      if (_scrollController.position.pixels == _scrollController.position.maxScrollExtent) {
-        chatViewModel.loadMoreMessages(widget.conversationId, authViewModel.currentUser!.token!);
+    try {
+      print('Loading data for conversationId: ${widget.conversationId}');
+      // Kiểm tra và tải conversations nếu cần
+      if (chatViewModel.conversations.isEmpty ||
+          !chatViewModel.conversations.any((c) => c.id == widget.conversationId)) {
+        print('Conversations empty or missing conversation, fetching...');
+        await chatViewModel.fetchConversations(authViewModel.currentUser!.token!);
+        // Thử tải cuộc trò chuyện cụ thể nếu vẫn không tìm thấy
+        if (!chatViewModel.conversations.any((c) => c.id == widget.conversationId)) {
+          print('Conversation ${widget.conversationId} not found in conversations, fetching by ID');
+          final conversation = await chatViewModel.fetchConversationById(
+            widget.conversationId,
+            authViewModel.currentUser!.token!,
+          );
+          if (conversation == null) {
+            throw Exception('Cuộc trò chuyện không tồn tại hoặc không thể tải');
+          }
+        }
       }
-    });
+      await chatViewModel.fetchMessages(widget.conversationId, authViewModel.currentUser!.token!);
+      setState(() {
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _errorMessage = 'Lỗi khi tải tin nhắn: $e';
+        _isLoading = false;
+      });
+      print('Error in _loadData: $e');
+    }
   }
 
-  @override
-  void dispose() {
-    _messageController.dispose();
-    _scrollController.dispose();
-    Provider.of<ChatViewModel>(context, listen: false).disconnectSocket();
-    super.dispose();
+  Future<Map<String, dynamic>> _fetchLandlordInfo(BuildContext context) async {
+    final chatViewModel = Provider.of<ChatViewModel>(context, listen: false);
+    try {
+      print('Fetching landlord info for conversationId: ${widget.conversationId}');
+      final conversation = chatViewModel.conversations.firstWhere(
+            (c) => c.id == widget.conversationId,
+        orElse: () {
+          print('Conversation ${widget.conversationId} not found in conversations');
+          return Conversation(
+            id: '',
+            rentalId: widget.rentalId,
+            participants: [widget.landlordId],
+            isPending: true,
+            createdAt: DateTime.now(),
+            landlord: {'id': widget.landlordId, 'username': 'Unknown', 'avatarBase64': ''},
+            rental: null,
+          );
+        },
+      );
+      if (conversation.id.isEmpty) {
+        throw Exception('Không tìm thấy cuộc trò chuyện');
+      }
+      print('Landlord info: ${conversation.landlord}');
+      return conversation.landlord;
+    } catch (e) {
+      print('Error in _fetchLandlordInfo: $e');
+      return {'id': widget.landlordId, 'username': 'Unknown', 'avatarBase64': ''};
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final authViewModel = Provider.of<AuthViewModel>(context);
     final chatViewModel = Provider.of<ChatViewModel>(context);
+    final TextEditingController messageController = TextEditingController();
+
+    if (_isLoading) {
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    if (_errorMessage != null) {
+      return Scaffold(
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(_errorMessage!),
+              ElevatedButton(
+                onPressed: _loadData,
+                child: const Text('Thử lại'),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
 
     return Scaffold(
       appBar: AppBar(
-        title: Text('Chat với chủ nhà'),
+        title: FutureBuilder<Map<String, dynamic>>(
+          future: _fetchLandlordInfo(context),
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const Text('Loading...');
+            }
+            if (snapshot.hasError || !snapshot.hasData) {
+              return const Text('Unknown');
+            }
+            final landlord = snapshot.data!;
+            return Row(
+              children: [
+                CircleAvatar(
+                  radius: 20,
+                  backgroundImage: landlord['avatarBase64']?.isNotEmpty == true
+                      ? MemoryImage(base64Decode(landlord['avatarBase64'] as String))
+                      : null,
+                  child: landlord['avatarBase64']?.isEmpty == true ? const Icon(Icons.person) : null,
+                ),
+                const SizedBox(width: 10),
+                Text(landlord['username'] ?? 'Unknown'),
+              ],
+            );
+          },
+        ),
         backgroundColor: Colors.blue,
       ),
       body: Column(
         children: [
-          // Display pending conversations indicator for landlord
-          if (authViewModel.currentUser!.id == widget.landlordId)
-            Consumer<ChatViewModel>(
-              builder: (context, vm, child) {
-                return vm.pendingConversations.isNotEmpty
-                    ? Container(
-                  color: Colors.yellow[100],
-                  padding: const EdgeInsets.all(8.0),
-                  child: Text(
-                    'Bạn có ${vm.pendingConversations.length} cuộc trò chuyện đang chờ trả lời.',
-                    style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold),
-                  ),
-                )
-                    : const SizedBox.shrink();
-              },
-            ),
-          // Message List
           Expanded(
             child: Consumer<ChatViewModel>(
-              builder: (context, vm, child) {
-                if (vm.isLoading && vm.messages.isEmpty) {
+              builder: (context, chatViewModel, child) {
+                if (chatViewModel.isLoading) {
                   return const Center(child: CircularProgressIndicator());
                 }
-                if (vm.errorMessage != null) {
-                  return Center(child: Text(vm.errorMessage!));
+                if (chatViewModel.errorMessage != null) {
+                  return Center(child: Text(chatViewModel.errorMessage!));
                 }
                 return ListView.builder(
-                  controller: _scrollController,
                   reverse: true,
-                  itemCount: vm.messages.length + (vm.isLoading ? 1 : 0),
+                  itemExtent: 100.0,
+                  itemCount: chatViewModel.messages.length,
                   itemBuilder: (context, index) {
-                    if (index == vm.messages.length) {
-                      return const Center(child: CircularProgressIndicator());
-                    }
-                    final message = vm.messages[index];
-                    final isMe = message.senderId == authViewModel.currentUser!.id;
-                    return _buildMessageBubble(message, isMe);
+                    final message = chatViewModel.messages[chatViewModel.messages.length - 1 - index];
+                    final isMe = message.senderId == authViewModel.currentUser?.id;
+                    return Align(
+                      alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
+                      child: Container(
+                        margin: const EdgeInsets.symmetric(vertical: 5, horizontal: 10),
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: isMe ? Colors.blue[100] : Colors.grey[200],
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+                          children: [
+                            if (message.images.isNotEmpty)
+                              Wrap(
+                                spacing: 5,
+                                children: message.images
+                                    .map((img) => ClipRRect(
+                                  borderRadius: BorderRadius.circular(8),
+                                  child: CachedNetworkImage(
+                                    imageUrl: '${ApiRoutes.serverBaseUrl}$img',
+                                    width: 100,
+                                    height: 100,
+                                    fit: BoxFit.cover,
+                                    memCacheHeight: 200,
+                                    memCacheWidth: 200,
+                                    placeholder: (context, url) => const CircularProgressIndicator(),
+                                    errorWidget: (context, url, error) => const Icon(Icons.error),
+                                  ),
+                                ))
+                                    .toList(),
+                              ),
+                            Text(
+                              message.content,
+                              style: const TextStyle(fontSize: 16),
+                            ),
+                            const SizedBox(height: 5),
+                            Text(
+                              DateFormat('HH:mm, dd/MM').format(message.createdAt),
+                              style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
                   },
                 );
               },
             ),
           ),
-          // Message Input
           Padding(
             padding: const EdgeInsets.all(8.0),
             child: Row(
               children: [
                 Expanded(
                   child: TextField(
-                    controller: _messageController,
+                    controller: messageController,
                     decoration: InputDecoration(
                       hintText: 'Nhập tin nhắn...',
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(20),
                       ),
-                      filled: true,
-                      fillColor: Colors.grey[200],
                     ),
                   ),
                 ),
-                const SizedBox(width: 8),
                 IconButton(
-                  icon: const Icon(Icons.send, color: Colors.blue),
-                  onPressed: () {
-                    if (_messageController.text.trim().isNotEmpty) {
-                      chatViewModel.sendMessage(
-                        widget.conversationId,
-                        authViewModel.currentUser!.id,
-                        _messageController.text.trim(),
+                  icon: const Icon(Icons.send),
+                  onPressed: () async {
+                    if (messageController.text.isNotEmpty && authViewModel.currentUser != null) {
+                      await chatViewModel.sendMessage(
+                        conversationId: widget.conversationId,
+                        content: messageController.text,
+                        token: authViewModel.currentUser!.token!,
                       );
-                      _messageController.clear();
-                      _scrollController.animateTo(
-                        0,
-                        duration: const Duration(milliseconds: 300),
-                        curve: Curves.easeOut,
-                      );
+                      messageController.clear();
                     }
                   },
                 ),
@@ -152,40 +265,6 @@ class _ChatScreenState extends State<ChatScreen> {
             ),
           ),
         ],
-      ),
-    );
-  }
-
-  Widget _buildMessageBubble(Message message, bool isMe) {
-    return Align(
-      alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
-      child: Container(
-        margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
-        padding: const EdgeInsets.all(10),
-        decoration: BoxDecoration(
-          color: isMe ? Colors.blue : Colors.grey[300],
-          borderRadius: BorderRadius.circular(15),
-        ),
-        child: Column(
-          crossAxisAlignment: isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
-          children: [
-            Text(
-              message.content,
-              style: TextStyle(
-                color: isMe ? Colors.white : Colors.black,
-                fontSize: 16,
-              ),
-            ),
-            const SizedBox(height: 5),
-            Text(
-              DateFormat('HH:mm').format(message.createdAt),
-              style: TextStyle(
-                color: isMe ? Colors.white70 : Colors.black54,
-                fontSize: 12,
-              ),
-            ),
-          ],
-        ),
       ),
     );
   }

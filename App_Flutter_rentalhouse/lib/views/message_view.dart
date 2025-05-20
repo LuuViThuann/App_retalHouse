@@ -1,28 +1,53 @@
+import 'dart:convert';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_rentalhouse/config/api_routes.dart';
+import 'package:flutter_rentalhouse/viewmodels/vm_auth.dart';
+import 'package:flutter_rentalhouse/viewmodels/vm_chat.dart';
 import 'package:flutter_rentalhouse/views/chat_user.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
-import '../viewmodels/vm_auth.dart';
-import '../viewmodels/vm_chat.dart';
-
 
 class ConversationsScreen extends StatefulWidget {
-  const ConversationsScreen({Key? key}) : super(key: key);
+  const ConversationsScreen({super.key});
 
   @override
   _ConversationsScreenState createState() => _ConversationsScreenState();
 }
 
 class _ConversationsScreenState extends State<ConversationsScreen> {
+  bool _isLoading = true;
+  String? _errorMessage;
+
   @override
   void initState() {
     super.initState();
+    _loadConversations();
+  }
+
+  Future<void> _loadConversations() async {
     final authViewModel = Provider.of<AuthViewModel>(context, listen: false);
     final chatViewModel = Provider.of<ChatViewModel>(context, listen: false);
 
-    // Fetch conversations when screen initializes
-    chatViewModel.fetchConversations(authViewModel.currentUser!.token!);
-    chatViewModel.fetchPendingConversations(authViewModel.currentUser!.token!);
+    if (authViewModel.currentUser == null) {
+      setState(() {
+        _errorMessage = 'Vui lòng đăng nhập để xem tin nhắn';
+        _isLoading = false;
+      });
+      return;
+    }
+
+    try {
+      await chatViewModel.fetchConversations(authViewModel.currentUser!.token!);
+      setState(() {
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _errorMessage = 'Lỗi khi tải danh sách cuộc trò chuyện: $e';
+        _isLoading = false;
+      });
+    }
   }
 
   @override
@@ -30,121 +55,108 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
     final authViewModel = Provider.of<AuthViewModel>(context);
     final chatViewModel = Provider.of<ChatViewModel>(context);
 
+    if (_isLoading) {
+      return Scaffold(
+        appBar: AppBar(title: Text('Tin nhắn'), backgroundColor: Colors.blue),
+        body: const Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    if (_errorMessage != null) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Tin nhắn'), backgroundColor: Colors.blue),
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(_errorMessage!),
+              ElevatedButton(
+                onPressed: _loadConversations,
+                child: const Text('Thử lại'),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Cuộc Trò Chuyện'),
+        title: const Text('Tin nhắn'),
         backgroundColor: Colors.blue,
-        actions: [
-          if (authViewModel.currentUser!.id == authViewModel.currentUser!.id) // For landlords
-            IconButton(
-              icon: const Icon(Icons.warning, color: Colors.yellow),
-              onPressed: () {
-                // Navigate to pending conversations (can be a filter or new screen)
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Xem các cuộc trò chuyện đang chờ trả lời')),
-                );
-              },
-            ),
-        ],
       ),
-      body: Column(
-        children: [
-          // Pending Conversations Indicator for Landlord
-          if (authViewModel.currentUser!.id == authViewModel.currentUser!.id && chatViewModel.pendingConversations.isNotEmpty)
-            Container(
-              color: Colors.yellow[100],
-              padding: const EdgeInsets.all(8.0),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    'Bạn có ${chatViewModel.pendingConversations.length} cuộc trò chuyện đang chờ trả lời',
-                    style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold),
-                  ),
-                  TextButton(
-                    onPressed: () {
-                      // Filter or navigate to pending conversations
-                      setState(() {
-                        chatViewModel.pendingConversations;
-                      });
-                    },
-                    child: const Text('Xem tất cả', style: TextStyle(color: Colors.blue)),
-                  ),
-                ],
-              ),
-            ),
-          // Conversations List
-          Expanded(
-            child: chatViewModel.isLoading && chatViewModel.conversations.isEmpty
-                ? const Center(child: CircularProgressIndicator())
-                : chatViewModel.errorMessage != null
-                ? Center(child: Text(chatViewModel.errorMessage!))
-                : ListView.builder(
-              itemCount: chatViewModel.conversations.length,
-              itemBuilder: (context, index) {
-                final conversation = chatViewModel.conversations[index];
-                final otherParticipant = conversation.participants.firstWhere(
-                      (id) => id != authViewModel.currentUser!.id,
-                  orElse: () => '',
-                );
-                final lastMessage = conversation.lastMessage;
-                final isPending = conversation.isPending;
+      body: authViewModel.currentUser == null
+          ? const Center(child: Text('Vui lòng đăng nhập để xem tin nhắn'))
+          : Consumer<ChatViewModel>(
+        builder: (context, chatViewModel, child) {
+          if (chatViewModel.conversations.isEmpty) {
+            return const Center(child: Text('Chưa có cuộc trò chuyện nào'));
+          }
 
-                return ListTile(
-                  leading: CircleAvatar(
-                    backgroundColor: Colors.grey[300],
-                    child: const Icon(Icons.person, color: Colors.grey),
-                  ),
-                  title: Text(otherParticipant.isNotEmpty ? 'Người dùng $otherParticipant' : 'Người dùng ẩn'),
-                  subtitle: lastMessage != null
-                      ? Text(
-                    lastMessage.content.length > 30
-                        ? '${lastMessage.content.substring(0, 30)}...'
-                        : lastMessage.content,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  )
-                      : const Text('Chưa có tin nhắn'),
-                  trailing: Column(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
+          return ListView.builder(
+            itemExtent: 80.0,
+            itemCount: chatViewModel.conversations.length,
+            itemBuilder: (context, index) {
+              final conversation = chatViewModel.conversations[index];
+              return ListTile(
+                leading: CircleAvatar(
+                  radius: 25,
+                  backgroundImage: conversation.landlord['avatarBase64']?.isNotEmpty == true
+                      ? MemoryImage(base64Decode(conversation.landlord['avatarBase64'] as String))
+                      : null,
+                  child: conversation.landlord['avatarBase64']?.isEmpty == true
+                      ? const Icon(Icons.person)
+                      : null,
+                ),
+                title: Text(
+                  conversation.landlord['username'] ?? 'Unknown',
+                  style: const TextStyle(fontWeight: FontWeight.bold),
+                ),
+                subtitle: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      conversation.rental?['title'] ?? 'Unknown Rental',
+                      style: TextStyle(color: Colors.grey[600]),
+                    ),
+                    if (conversation.lastMessage != null)
                       Text(
-                        lastMessage != null
-                            ? DateFormat('HH:mm').format(lastMessage.createdAt)
-                            : DateFormat('HH:mm').format(conversation.updatedAt),
-                        style: TextStyle(color: Colors.grey[600], fontSize: 12),
+                        conversation.lastMessage!.content,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(color: Colors.grey[600]),
                       ),
-                      if (isPending && authViewModel.currentUser!.id != otherParticipant)
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: Colors.red[100],
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: const Text(
-                            'Chờ trả lời',
-                            style: TextStyle(color: Colors.red, fontSize: 12),
-                          ),
-                        ),
-                    ],
-                  ),
-                  onTap: () {
+                  ],
+                ),
+                trailing: Text(
+                  conversation.lastMessage != null
+                      ? DateFormat('HH:mm, dd/MM').format(conversation.lastMessage!.createdAt)
+                      : '',
+                  style: TextStyle(color: Colors.grey[600]),
+                ),
+                onTap: () async {
+                  try {
+                    await chatViewModel.fetchConversations(authViewModel.currentUser!.token!);
                     Navigator.push(
                       context,
                       MaterialPageRoute(
                         builder: (context) => ChatScreen(
                           rentalId: conversation.rentalId,
-                          landlordId: otherParticipant,
+                          landlordId: conversation.landlord['id'],
                           conversationId: conversation.id,
                         ),
                       ),
                     );
-                  },
-                );
-              },
-            ),
-          ),
-        ],
+                  } catch (e) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Lỗi khi mở cuộc trò chuyện: $e')),
+                    );
+                  }
+                },
+              );
+            },
+          );
+        },
       ),
     );
   }

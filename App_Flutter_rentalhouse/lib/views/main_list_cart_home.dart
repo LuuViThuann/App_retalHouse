@@ -216,14 +216,18 @@ class RentalItemWidget extends StatelessWidget {
                                         rentalId,
                                         authViewModel.currentUser!.token!,
                                       );
-                                      message = success ? 'Đã xóa khỏi yêu thích!' : (favoriteViewModel.errorMessage ?? 'Lỗi khi xóa');
+                                      message = success
+                                          ? 'Đã xóa khỏi yêu thích!'
+                                          : (favoriteViewModel.errorMessage ?? 'Lỗi khi xóa');
                                     } else {
                                       success = await favoriteViewModel.addFavorite(
                                         authViewModel.currentUser!.id,
                                         rentalId,
                                         authViewModel.currentUser!.token!,
                                       );
-                                      message = success ? 'Đã thêm vào yêu thích!' : (favoriteViewModel.errorMessage ?? 'Lỗi khi thêm');
+                                      message = success
+                                          ? 'Đã thêm vào yêu thích!'
+                                          : (favoriteViewModel.errorMessage ?? 'Lỗi khi thêm');
                                     }
 
                                     ScaffoldMessenger.of(context).showSnackBar(
@@ -269,13 +273,29 @@ class RentalItemWidget extends StatelessWidget {
                                       return;
                                     }
 
+                                    if (rental.id == null || rental.userId.isEmpty) {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        const SnackBar(
+                                          content: Text('Thông tin bài đăng không hợp lệ!'),
+                                          backgroundColor: Colors.redAccent,
+                                        ),
+                                      );
+                                      return;
+                                    }
+
                                     try {
-                                      await chatViewModel.getOrCreateConversation(
+                                      print('Initiating conversation for rentalId: ${rental.id}, landlordId: ${rental.userId}');
+                                      final conversation = await chatViewModel.getOrCreateConversation(
                                         rentalId: rental.id!,
                                         landlordId: rental.userId,
                                         token: authViewModel.currentUser!.token!,
                                       );
-                                      final conversation = chatViewModel.conversations.last;
+
+                                      if (conversation == null) {
+                                        throw Exception('Không thể tạo hoặc lấy cuộc trò chuyện');
+                                      }
+
+                                      print('Conversation created/fetched with ID: ${conversation.id}');
                                       Navigator.push(
                                         context,
                                         _createRoute(ChatScreen(
@@ -285,6 +305,7 @@ class RentalItemWidget extends StatelessWidget {
                                         )),
                                       );
                                     } catch (e) {
+                                      print('Error opening chat: $e');
                                       ScaffoldMessenger.of(context).showSnackBar(
                                         SnackBar(
                                           content: Text('Lỗi khi mở cuộc trò chuyện: $e'),

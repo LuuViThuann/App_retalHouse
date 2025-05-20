@@ -17,7 +17,7 @@ const conversationSchema = new mongoose.Schema({
   },
   isPending: {
     type: Boolean,
-    default: true, // Marks if the conversation is pending (unanswered by landlord)
+    default: true,
   },
   createdAt: {
     type: Date,
@@ -29,14 +29,12 @@ const conversationSchema = new mongoose.Schema({
   },
 });
 
-// Create an index on createdAt for efficient sorting
-conversationSchema.index({ createdAt: -1 });
-// Index on participants for quick lookup
-conversationSchema.index({ participants: 1, rentalId: 1 });
-
 conversationSchema.pre('save', function(next) {
   this.updatedAt = Date.now();
   next();
 });
+
+conversationSchema.index({ participants: 1, rentalId: 1 });
+conversationSchema.index({ updatedAt: -1 });
 
 module.exports = mongoose.model('Conversation', conversationSchema);

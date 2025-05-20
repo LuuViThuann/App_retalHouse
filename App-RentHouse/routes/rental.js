@@ -14,6 +14,7 @@ const admin = require('firebase-admin');
 const multer = require('multer');
 const path = require('path');
 const redis = require('redis');
+const sharp = require('sharp');
 
 // sử dụng redis để lưu trữ các thông tin tạm thời
 const redisClient = redis.createClient({
@@ -920,56 +921,65 @@ router.delete('/comments/:commentId/replies/:replyId/unlike', authMiddleware, as
 // -------------------------------------------------------------------------------------------
 // Phần code xử lý đoạn chat 
 // Chat routes
-router.get('/conversations', authMiddleware, async (req, res) => {
-  try {
-    const userId = req.userId;
-    const cacheKey = `conversations:${userId}`;
-    
-    // Check Redis cache
-    const cachedConversations = await redisClient.get(cacheKey);
-    if (cachedConversations) {
-      return res.status(200).json(JSON.parse(cachedConversations));
-    }
-
-    const conversations = await Conversation.find({ participants: userId })
-      .populate('participants', 'username avatarBase64')
-      .populate('lastMessage')
-      .sort({ updatedAt: -1 })
-      .lean();
-
-    // Cache the result in Redis (expire after 1 hour)
-    await redisClient.setEx(cacheKey, 3600, JSON.stringify(conversations));
-    res.status(200).json(conversations);
-  } catch (err) {
-    res.status(500).json({ message: 'Error fetching conversations', error: err.message });
-  }
-});
-
-// Get pending conversations (unanswered by landlord)
-router.get('/conversations/pending', authMiddleware, async (req, res) => {
-  try {
-    const userId = req.userId;
-    const conversations = await Conversation.find({ participants: userId, isPending: true })
-      .populate('participants', 'username avatarBase64')
-      .populate('lastMessage')
-      .sort({ updatedAt: -1 })
-      .lean();
-    res.status(200).json(conversations);
-  } catch (err) {
-    res.status(500).json({ message: 'Error fetching pending conversations', error: err.message });
-  }
-});
-
-// Get or create a conversation for a rental
 router.post('/conversations', authMiddleware, async (req, res) => {
   try {
     const { rentalId, landlordId } = req.body;
     const userId = req.userId;
 
-    if (userId === landlordId) {
-      return res.status(400).json({ message: 'Cannot chat with yourself' });
+    console.log(`Received POST /conversations with rentalId: ${rentalId}, landlordId: ${landlordId}, userId: ${userId}`);
+
+    // Kiểm tra rentalId là MongoDB ObjectId hợp lệ
+    if (!mongoose.Types.ObjectId.isValid(rentalId)) {
+      console.log(`Invalid rentalId format: ${rentalId}`);
+      return res.status(400).json({ message: 'Invalid rentalId format' });
     }
 
+    // Kiểm tra landlordId không rỗng (không yêu cầu ObjectId vì là Firestore UID)
+    if (!landlordId || typeof landlordId !== 'string' || landlordId.trim() === '') {
+      console.log(`Invalid landlordId: ${landlordId}`);
+      return res.status(400).json({ message: 'Invalid landlordId' });
+    }
+
+    // Kiểm tra userId không trò chuyện với chính mình
+    if (userId === landlordId) {
+      console.log(`User ${userId} attempted to start conversation with self`);
+      return res.status(403).json({ message: 'You cannot start a conversation with yourself' });
+    }
+
+    // Kiểm tra rental tồn tại
+    const rental = await Rental.findById(rentalId);
+    if (!rental) {
+      console.log(`Rental ${rentalId} not found in MongoDB`);
+      return res.status(404).json({ message: 'Rental not found' });
+    }
+
+    // Kiểm tra landlord tồn tại trong Firestore
+    let landlordData = { username: 'Unknown', avatarBase64: '' };
+    try {
+      const landlordDoc = await admin.firestore().collection('Users').doc(landlordId).get();
+      if (!landlordDoc.exists) {
+        console.log(`Landlord ${landlordId} not found in Firestore`);
+        return res.status(404).json({ message: 'Landlord not found' });
+      }
+      landlordData = landlordDoc.data();
+    } catch (err) {
+      console.error(`Error fetching landlord ${landlordId} from Firestore:`, err);
+      return res.status(500).json({ message: 'Error fetching landlord information' });
+    }
+
+    // Lấy avatar từ MongoDB (nếu có document user tương ứng trong MongoDB)
+    try {
+      const landlordMongo = await mongoose.model('User').findOne({ _id: landlordId }).select('avatarBase64');
+      if (landlordMongo) {
+        landlordData.avatarBase64 = landlordMongo.avatarBase64 || '';
+      } else {
+        console.log(`No MongoDB user found for landlordId: ${landlordId}`);
+      }
+    } catch (err) {
+      console.error(`Error fetching landlord ${landlordId} from MongoDB:`, err);
+    }
+
+    // Tìm hoặc tạo cuộc trò chuyện
     let conversation = await Conversation.findOne({
       rentalId,
       participants: { $all: [userId, landlordId] },
@@ -977,27 +987,281 @@ router.post('/conversations', authMiddleware, async (req, res) => {
 
     if (!conversation) {
       conversation = new Conversation({
-        participants: [userId, landlordId],
         rentalId,
+        participants: [userId, landlordId],
+        lastMessage: null,
+        isPending: true,
       });
       await conversation.save();
+      console.log(`Created new conversation ${conversation._id} for user ${userId} and landlord ${landlordId}`);
+    } else {
+      console.log(`Found existing conversation ${conversation._id} for user ${userId} and landlord ${landlordId}`);
     }
 
-    // Invalidate Redis cache
+    // Lấy thông tin rental
+    let rentalData = null;
+    try {
+      const rentalDoc = await Rental.findById(rentalId).select('title images');
+      if (rentalDoc) {
+        rentalData = {
+          id: rentalDoc._id.toString(),
+          title: rentalDoc.title,
+          image: rentalDoc.images[0] || '',
+        };
+      } else {
+        console.warn(`Rental ${rentalId} not found during data enrichment`);
+      }
+    } catch (err) {
+      console.error(`Error fetching rental ${rentalId} from MongoDB:`, err);
+    }
+
+    const adjustedConversation = {
+      ...conversation.toObject(),
+      _id: conversation._id.toString(),
+      createdAt: new Date(conversation.createdAt.getTime() + 7 * 60 * 60 * 1000),
+      updatedAt: conversation.updatedAt ? new Date(conversation.updatedAt.getTime() + 7 * 60 * 60 * 1000) : null,
+      landlord: {
+        id: landlordId,
+        username: landlordData.username || 'Unknown',
+        avatarBase64: landlordData.avatarBase64 || '',
+      },
+      rental: rentalData,
+    };
+
+    // Xóa cache của cả user và landlord
     await redisClient.del(`conversations:${userId}`);
     await redisClient.del(`conversations:${landlordId}`);
+    console.log(`Cleared cache for user ${userId} and landlord ${landlordId}`);
 
-    res.status(200).json(conversation);
+    // Cập nhật cache cho user
+    const userConversations = await Conversation.find({ participants: userId }).lean();
+    const enrichedUserConversations = await Promise.all(
+      userConversations.map(async (conv) => {
+        const otherParticipantId = conv.participants.find((p) => p !== userId) || '';
+        let participantData = { username: 'Unknown', avatarBase64: '' };
+        let rentalData = null;
+
+        try {
+          const participantDoc = await admin.firestore().collection('Users').doc(otherParticipantId).get();
+          if (participantDoc.exists) {
+            participantData = participantDoc.data();
+          }
+        } catch (err) {
+          console.error(`Error fetching participant ${otherParticipantId} from Firestore:`, err);
+        }
+
+        try {
+          const participantMongo = await mongoose.model('User').findOne({ _id: otherParticipantId }).select('avatarBase64');
+          if (participantMongo) {
+            participantData.avatarBase64 = participantMongo.avatarBase64 || '';
+          }
+        } catch (err) {
+          console.error(`Error fetching participant ${otherParticipantId} from MongoDB:`, err);
+        }
+
+        try {
+          const rental = await Rental.findById(conv.rentalId).select('title images');
+          if (rental) {
+            rentalData = {
+              id: rental._id.toString(),
+              title: rental.title,
+              image: rental.images[0] || '',
+            };
+          }
+        } catch (err) {
+          console.error(`Error fetching rental ${conv.rentalId} from MongoDB:`, err);
+        }
+
+        return {
+          ...conv,
+          _id: conv._id.toString(),
+          createdAt: new Date(conv.createdAt.getTime() + 7 * 60 * 60 * 1000),
+          updatedAt: conv.updatedAt ? new Date(conv.updatedAt.getTime() + 7 * 60 * 60 * 1000) : null,
+          landlord: {
+            id: otherParticipantId,
+            username: participantData.username || 'Unknown',
+            avatarBase64: participantData.avatarBase64 || '',
+          },
+          rental: rentalData,
+        };
+      })
+    );
+
+    await redisClient.setEx(`conversations:${userId}`, 3600, JSON.stringify(enrichedUserConversations));
+    console.log(`Updated cache for user ${userId}`);
+
+    res.status(201).json(adjustedConversation);
   } catch (err) {
-    res.status(500).json({ message: 'Error creating conversation', error: err.message });
+    console.error('Error in POST /conversations:', err);
+    res.status(500).json({ message: 'Server error', error: err.message });
   }
 });
 
-// Get messages for a conversation with cursor-based pagination
+// Lấy hoặc tạo cuộc trò chuyện
+router.post('/conversations', authMiddleware, async (req, res) => {
+  try {
+    const { rentalId, landlordId } = req.body;
+    const userId = req.userId;
+
+    if (!mongoose.Types.ObjectId.isValid(rentalId) || !mongoose.Types.ObjectId.isValid(landlordId)) {
+      return res.status(400).json({ message: 'Invalid rentalId or landlordId format' });
+    }
+
+    const rental = await Rental.findById(rentalId);
+    if (!rental) return res.status(404).json({ message: 'Rental not found' });
+
+    if (userId === landlordId) {
+      return res.status(403).json({ message: 'You cannot start a conversation with yourself' });
+    }
+
+    // Tìm cuộc trò chuyện hiện có
+    let conversation = await Conversation.findOne({
+      rentalId,
+      participants: { $all: [userId, landlordId] },
+    });
+
+    if (!conversation) {
+      conversation = new Conversation({
+        rentalId,
+        participants: [userId, landlordId],
+        lastMessage: null,
+        isPending: true,
+      });
+      await conversation.save();
+      console.log(`Created new conversation ${conversation._id} for user ${userId} and landlord ${landlordId}`);
+    }
+
+    // Lấy thông tin landlord
+    let landlordData = { username: 'Unknown', avatarBase64: '' };
+    try {
+      const landlordDoc = await admin.firestore().collection('Users').doc(landlordId).get();
+      if (landlordDoc.exists) {
+        landlordData = landlordDoc.data();
+      } else {
+        console.warn(`Landlord ${landlordId} not found in Firestore`);
+      }
+    } catch (err) {
+      console.error(`Error fetching landlord ${landlordId} from Firestore:`, err);
+    }
+
+    // Lấy avatar từ MongoDB
+    try {
+      const landlordMongo = await mongoose.model('User').findById(landlordId).select('avatarBase64');
+      if (landlordMongo) {
+        landlordData.avatarBase64 = landlordMongo.avatarBase64 || '';
+      }
+    } catch (err) {
+      console.error(`Error fetching landlord ${landlordId} from MongoDB:`, err);
+    }
+
+    // Lấy thông tin rental
+    let rentalData = null;
+    try {
+      const rental = await Rental.findById(rentalId).select('title images');
+      if (rental) {
+        rentalData = {
+          id: rental._id.toString(),
+          title: rental.title,
+          image: rental.images[0] || '',
+        };
+      } else {
+        console.warn(`Rental ${rentalId} not found in MongoDB`);
+      }
+    } catch (err) {
+      console.error(`Error fetching rental ${rentalId} from MongoDB:`, err);
+    }
+
+    const adjustedConversation = {
+      ...conversation.toObject(),
+      _id: conversation._id.toString(),
+      createdAt: new Date(conversation.createdAt.getTime() + 7 * 60 * 60 * 1000),
+      updatedAt: conversation.updatedAt ? new Date(conversation.updatedAt.getTime() + 7 * 60 * 60 * 1000) : null,
+      landlord: {
+        id: landlordId,
+        username: landlordData.username || 'Unknown',
+        avatarBase64: landlordData.avatarBase64 || '',
+      },
+      rental: rentalData,
+    };
+
+    // Xóa cache của cả user và landlord
+    await redisClient.del(`conversations:${userId}`);
+    await redisClient.del(`conversations:${landlordId}`);
+    console.log(`Cleared cache for user ${userId} and landlord ${landlordId}`);
+
+    // Cập nhật cache cho user
+    const userConversations = await Conversation.find({ participants: userId }).lean();
+    const enrichedUserConversations = await Promise.all(
+      userConversations.map(async (conv) => {
+        const landlordId = conv.participants.find((p) => p !== userId) || '';
+        let landlordData = { username: 'Unknown', avatarBase64: '' };
+        let rentalData = null;
+
+        try {
+          const landlordDoc = await admin.firestore().collection('Users').doc(landlordId).get();
+          if (landlordDoc.exists) {
+            landlordData = landlordDoc.data();
+          }
+        } catch (err) {
+          console.error(`Error fetching landlord ${landlordId} from Firestore:`, err);
+        }
+
+        try {
+          const landlordMongo = await mongoose.model('User').findById(landlordId).select('avatarBase64');
+          if (landlordMongo) {
+            landlordData.avatarBase64 = landlordMongo.avatarBase64 || '';
+          }
+        } catch (err) {
+          console.error(`Error fetching landlord ${landlordId} from MongoDB:`, err);
+        }
+
+        try {
+          const rental = await Rental.findById(conv.rentalId).select('title images');
+          if (rental) {
+            rentalData = {
+              id: rental._id.toString(),
+              title: rental.title,
+              image: rental.images[0] || '',
+            };
+          }
+        } catch (err) {
+          console.error(`Error fetching rental ${conv.rentalId} from MongoDB:`, err);
+        }
+
+        return {
+          ...conv,
+          _id: conv._id.toString(),
+          createdAt: new Date(conv.createdAt.getTime() + 7 * 60 * 60 * 1000),
+          updatedAt: conv.updatedAt ? new Date(conv.updatedAt.getTime() + 7 * 60 * 60 * 1000) : null,
+          landlord: {
+            id: landlordId,
+            username: landlordData.username || 'Unknown',
+            avatarBase64: landlordData.avatarBase64 || '',
+          },
+          rental: rentalData,
+        };
+      })
+    );
+
+    await redisClient.setEx(`conversations:${userId}`, 3600, JSON.stringify(enrichedUserConversations));
+    console.log(`Updated cache for user ${userId}`);
+
+    res.status(201).json(adjustedConversation);
+  } catch (err) {
+    console.error('Error in POST /conversations:', err);
+    res.status(400).json({ message: err.message });
+  }
+});
+
+// Lấy tin nhắn của một cuộc trò chuyện
 router.get('/messages/:conversationId', authMiddleware, async (req, res) => {
   try {
     const { conversationId } = req.params;
-    const { cursor, limit = 10 } = req.query;
+    const { limit = 20, lastMessageId } = req.query;
+
+    if (!mongoose.Types.ObjectId.isValid(conversationId)) {
+      return res.status(400).json({ message: 'Invalid conversationId format' });
+    }
 
     const conversation = await Conversation.findById(conversationId);
     if (!conversation || !conversation.participants.includes(req.userId)) {
@@ -1005,8 +1269,8 @@ router.get('/messages/:conversationId', authMiddleware, async (req, res) => {
     }
 
     let query = { conversationId };
-    if (cursor) {
-      query.createdAt = { $lt: new Date(cursor) };
+    if (lastMessageId) {
+      query._id = { $lt: lastMessageId };
     }
 
     const messages = await Message.find(query)
@@ -1015,16 +1279,77 @@ router.get('/messages/:conversationId', authMiddleware, async (req, res) => {
       .populate('senderId', 'username avatarBase64')
       .lean();
 
-    const nextCursor = messages.length === Number(limit) ? messages[messages.length - 1].createdAt.toISOString() : null;
+    const adjustedMessages = messages.map((msg) => ({
+      ...msg,
+      createdAt: new Date(msg.createdAt.getTime() + 7 * 60 * 60 * 1000),
+    }));
 
-    res.status(200).json({ messages, nextCursor });
+    res.json(adjustedMessages);
   } catch (err) {
-    res.status(500).json({ message: 'Error fetching messages', error: err.message });
+    console.error('Error in GET /messages:', err);
+    res.status(500).json({ message: err.message });
   }
 });
 
+// Gửi tin nhắn mới
+router.post('/messages', authMiddleware, upload.array('images'), async (req, res) => {
+  try {
+    const { conversationId, content } = req.body;
+    if (!mongoose.Types.ObjectId.isValid(conversationId) || !content) {
+      return res.status(400).json({ message: 'Invalid conversationId or missing content' });
+    }
 
+    const conversation = await Conversation.findById(conversationId);
+    if (!conversation || !conversation.participants.includes(req.userId)) {
+      return res.status(403).json({ message: 'Unauthorized or conversation not found' });
+    }
 
+    const imageUrls = [];
+    for (const file of req.files) {
+      const compressedImage = await sharp(file.path)
+        .resize({ width: 800 })
+        .jpeg({ quality: 80 })
+        .toFile(`uploads/compressed-${file.filename}`);
+      imageUrls.push(`/uploads/compressed-${file.filename}`);
+    }
+
+    const message = new Message({
+      conversationId,
+      senderId: req.userId,
+      content,
+      images: imageUrls,
+      createdAt: new Date(),
+    });
+
+    await message.save();
+
+    await Conversation.findByIdAndUpdate(conversationId, {
+      lastMessage: message._id,
+      updatedAt: new Date(),
+      isPending: false,
+    });
+
+    const populatedMessage = await Message.findById(message._id)
+      .populate('senderId', 'username avatarBase64')
+      .lean();
+
+    const adjustedMessage = {
+      ...populatedMessage,
+      createdAt: new Date(populatedMessage.createdAt.getTime() + 7 * 60 * 60 * 1000),
+    };
+
+    io.to(conversationId).emit('receiveMessage', adjustedMessage);
+
+    for (const participant of conversation.participants) {
+      await redisClient.del(`conversations:${participant}`);
+    }
+
+    res.status(201).json(adjustedMessage);
+  } catch (err) {
+    console.error('Error in POST /messages:', err);
+    res.status(400).json({ message: err.message });
+  }
+});
 
 
 module.exports = router;

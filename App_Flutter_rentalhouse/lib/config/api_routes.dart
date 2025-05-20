@@ -1,5 +1,5 @@
 class ApiRoutes {
-  static const String rootUrl = 'http://192.168.1.128:3000';
+  static const String rootUrl = 'http://192.168.1.198:3000';
   static const String baseUrl = '$rootUrl/api';
   static const String serverBaseUrl = rootUrl;
   static const String socketUrl = serverBaseUrl;
@@ -35,6 +35,8 @@ class ApiRoutes {
 
   // Chat Endpoints
   static const String conversations = '$baseUrl/conversations';
+  static String conversationById(String conversationId) => '$conversations/$conversationId';
   static const String pendingConversations = '$conversations/pending';
   static String messages(String conversationId) => '$baseUrl/messages/$conversationId';
 }
+

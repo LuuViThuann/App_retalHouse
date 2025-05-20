@@ -1,48 +1,65 @@
-import 'package:flutter/foundation.dart';
-import '../services/chat_service.dart';
+import 'dart:async';
+import 'dart:convert';
+import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+import 'package:socket_io_client/socket_io_client.dart' as IO;
+import '../config/api_routes.dart';
 import '../models/conversation.dart';
 import '../models/message.dart';
 
 class ChatViewModel extends ChangeNotifier {
-  final ChatService _chatService = ChatService();
   List<Conversation> _conversations = [];
-  List<Conversation> _pendingConversations = [];
   List<Message> _messages = [];
-  String? _nextCursor;
   bool _isLoading = false;
   String? _errorMessage;
+  int _messageLimit = 20;
+  bool _hasMoreMessages = true;
 
   List<Conversation> get conversations => _conversations;
-  List<Conversation> get pendingConversations => _pendingConversations;
   List<Message> get messages => _messages;
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
 
-  // Initialize Socket.IO connection
-  void initializeSocket(String token) {
-    _chatService.connect(token, (message) {
-      _messages.insert(0, message);
+  IO.Socket? _socket;
+
+  ChatViewModel() {
+    _initSocket();
+  }
+
+  void _initSocket() {
+    _socket = IO.io(ApiRoutes.socketUrl, <String, dynamic>{
+      'transports': ['websocket'],
+      'autoConnect': false,
+      'reconnection': true,
+      'reconnectionAttempts': 5,
+      'reconnectionDelay': 1000,
+    });
+
+    _socket?.connect();
+
+    _socket?.onConnect((_) {
+      print('Connected to socket server');
+    });
+
+    _socket?.on('receiveMessage', (data) {
+      print('Received message: $data');
+      final message = Message.fromJson(data);
+      _messages.add(message);
+      notifyListeners();
+    });
+
+    _socket?.onDisconnect((_) {
+      print('Disconnected from socket server');
+    });
+
+    _socket?.onConnectError((data) {
+      _errorMessage = 'Socket connection error: $data';
       notifyListeners();
     });
   }
 
-  // Join a conversation room
-  void joinConversation(String conversationId) {
-    _chatService.joinConversation(conversationId);
-  }
-
-  // Send a message
-  void sendMessage(String conversationId, String senderId, String content) {
-    _chatService.sendMessage(conversationId, senderId, content);
-  }
-
-  // Disconnect Socket.IO
-  void disconnectSocket() {
-    _chatService.disconnect();
-  }
-
-  // Get or create a conversation
-  Future<void> getOrCreateConversation({
+  // Lấy hoặc tạo cuộc trò chuyện
+  Future<Conversation?> getOrCreateConversation({
     required String rentalId,
     required String landlordId,
     required String token,
@@ -52,89 +69,208 @@ class ChatViewModel extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final conversation = await _chatService.getOrCreateConversation(
-        rentalId: rentalId,
-        landlordId: landlordId,
-        token: token,
+      print('Creating conversation with rentalId: $rentalId, landlordId: $landlordId');
+      final response = await http.post(
+        Uri.parse(ApiRoutes.conversations),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode({
+          'rentalId': rentalId,
+          'landlordId': landlordId,
+        }),
       );
-      _conversations.add(conversation);
+
+      print('Response status: ${response.statusCode}');
+      print('Response body: ${response.body}');
+
+      if (response.statusCode == 201) {
+        final data = jsonDecode(response.body);
+        final conversation = Conversation.fromJson(data);
+        _conversations = [conversation, ..._conversations.where((c) => c.id != conversation.id)];
+        _socket?.emit('joinConversation', conversation.id);
+        notifyListeners();
+        return conversation;
+      } else {
+        _errorMessage = 'Không thể tạo cuộc trò chuyện: ${response.body}';
+        return null;
+      }
     } catch (e) {
-      _errorMessage = e.toString();
+      _errorMessage = 'Lỗi khi tạo cuộc trò chuyện: $e';
+      print('Error in getOrCreateConversation: $e');
+      return null;
     } finally {
       _isLoading = false;
       notifyListeners();
     }
   }
 
-  // Fetch messages for a conversation
-  Future<void> fetchMessages({
+  Future<void> fetchConversations(String token, {int limit = 20}) async {
+    if (_isLoading) return;
+
+    _isLoading = true;
+    _errorMessage = null;
+    notifyListeners();
+
+    try {
+      print('Fetching conversations with token: $token');
+      final response = await http.get(
+        Uri.parse('${ApiRoutes.conversations}?limit=$limit'),
+        headers: {
+          'Authorization': 'Bearer $token',
+        },
+      ).timeout(const Duration(seconds: 10), onTimeout: () {
+        throw TimeoutException('Không thể kết nối đến server');
+      });
+
+      print('Response status: ${response.statusCode}');
+      print('Response body: ${response.body}');
+
+      if (response.statusCode == 200) {
+        final dynamic decodedData = jsonDecode(response.body);
+        List<dynamic> data;
+
+        if (decodedData is List) {
+          data = decodedData;
+        } else if (decodedData is Map && decodedData['data'] is List) {
+          data = decodedData['data'];
+        } else {
+          throw FormatException('Unexpected response format: $decodedData');
+        }
+
+        print('Parsed conversations: $data');
+
+        _conversations = data.map((json) => Conversation.fromJson(json as Map<String, dynamic>)).toList();
+        for (var conv in _conversations) {
+          _socket?.emit('joinConversation', conv.id);
+        }
+      } else {
+        _errorMessage = 'Không thể tải danh sách cuộc trò chuyện: ${response.body}';
+      }
+    } catch (e) {
+      _errorMessage = 'Lỗi khi tải danh sách cuộc trò chuyện: ${e.toString()}';
+      print('Error in fetchConversations: ${e.toString()}');
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  // Tải cuộc trò chuyện cụ thể
+  Future<Conversation?> fetchConversationById(String conversationId, String token) async {
+    try {
+      print('Fetching conversation with ID: $conversationId');
+      final response = await http.get(
+        Uri.parse('${ApiRoutes.conversations}/$conversationId'),
+        headers: {
+          'Authorization': 'Bearer $token',
+        },
+      );
+
+      print('Fetch conversation status: ${response.statusCode}');
+      print('Fetch conversation body: ${response.body}');
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        final conversation = Conversation.fromJson(data);
+        _conversations = [
+          conversation,
+          ..._conversations.where((c) => c.id != conversation.id),
+        ];
+        _socket?.emit('joinConversation', conversation.id);
+        notifyListeners();
+        return conversation;
+      }
+      return null;
+    } catch (e) {
+      print('Error fetching conversation $conversationId: $e');
+      return null;
+    }
+  }
+
+  Future<void> fetchMessages(String conversationId, String token, {String? lastMessageId}) async {
+    if (!_hasMoreMessages) return;
+
+    _isLoading = true;
+    notifyListeners();
+
+    try {
+      final query = lastMessageId != null ? '?limit=$_messageLimit&lastMessageId=$lastMessageId' : '?limit=$_messageLimit';
+      final response = await http.get(
+        Uri.parse('${ApiRoutes.messages(conversationId)}$query'),
+        headers: {
+          'Authorization': 'Bearer $token',
+        },
+      );
+
+      print('Fetch messages status: ${response.statusCode}');
+      print('Fetch messages body: ${response.body}');
+
+      if (response.statusCode == 200) {
+        final List<dynamic> data = jsonDecode(response.body);
+        final newMessages = data.map((json) => Message.fromJson(json)).toList();
+        _messages = [..._messages, ...newMessages];
+        _hasMoreMessages = newMessages.length == _messageLimit;
+      } else {
+        _errorMessage = 'Không thể tải tin nhắn: ${response.body}';
+      }
+    } catch (e) {
+      _errorMessage = 'Lỗi khi tải tin nhắn: $e';
+      print('Error in fetchMessages: $e');
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> sendMessage({
     required String conversationId,
+    required String content,
     required String token,
-    String? cursor,
+    List<String> imagePaths = const [],
   }) async {
     _isLoading = true;
-    _errorMessage = null;
     notifyListeners();
 
     try {
-      final result = await _chatService.fetchMessages(
-        conversationId: conversationId,
-        token: token,
-        cursor: cursor,
-      );
-      if (cursor == null) {
-        _messages = result['messages'] as List<Message>;
-      } else {
-        _messages.addAll(result['messages'] as List<Message>);
+      var request = http.MultipartRequest('POST', Uri.parse(ApiRoutes.messages(conversationId)));
+      request.headers['Authorization'] = 'Bearer $token';
+      request.fields['conversationId'] = conversationId;
+      request.fields['content'] = content;
+
+      for (var imagePath in imagePaths) {
+        request.files.add(await http.MultipartFile.fromPath(
+          'images',
+          imagePath,
+        ));
       }
-      _nextCursor = result['nextCursor'] as String?;
+
+      final response = await request.send();
+      final responseBody = await response.stream.bytesToString();
+
+      print('Send message status: ${response.statusCode}');
+      print('Send message body: $responseBody');
+
+      if (response.statusCode == 201) {
+        final data = jsonDecode(responseBody);
+        final message = Message.fromJson(data);
+        _messages.add(message);
+      } else {
+        _errorMessage = 'Không thể gửi tin nhắn: $responseBody';
+      }
     } catch (e) {
-      _errorMessage = e.toString();
+      _errorMessage = 'Lỗi khi gửi tin nhắn: $e';
+      print('Error in sendMessage: $e');
     } finally {
       _isLoading = false;
       notifyListeners();
     }
   }
 
-  // Fetch all conversations
-  Future<void> fetchConversations(String token) async {
-    _isLoading = true;
-    _errorMessage = null;
-    notifyListeners();
-
-    try {
-      _conversations = await _chatService.fetchConversations(token);
-    } catch (e) {
-      _errorMessage = e.toString();
-    } finally {
-      _isLoading = false;
-      notifyListeners();
-    }
-  }
-
-  // Fetch pending conversations
-  Future<void> fetchPendingConversations(String token) async {
-    _isLoading = true;
-    _errorMessage = null;
-    notifyListeners();
-
-    try {
-      _pendingConversations = await _chatService.fetchPendingConversations(token);
-    } catch (e) {
-      _errorMessage = e.toString();
-    } finally {
-      _isLoading = false;
-      notifyListeners();
-    }
-  }
-
-  // Load more messages
-  Future<void> loadMoreMessages(String conversationId, String token) async {
-    if (_nextCursor == null || _isLoading) return;
-    await fetchMessages(
-      conversationId: conversationId,
-      token: token,
-      cursor: _nextCursor,
-    );
+  @override
+  void dispose() {
+    _socket?.disconnect();
+    super.dispose();
   }
 }

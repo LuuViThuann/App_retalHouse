@@ -2,32 +2,49 @@ import 'package:flutter_rentalhouse/models/message.dart';
 
 class Conversation {
   final String id;
-  final List<String> participants;
   final String rentalId;
+  final List<String> participants;
   final Message? lastMessage;
   final bool isPending;
   final DateTime createdAt;
-  final DateTime updatedAt;
+  final DateTime? updatedAt;
+  final Map<String, dynamic> landlord;
+  final Map<String, dynamic>? rental;
 
   Conversation({
     required this.id,
-    required this.participants,
     required this.rentalId,
+    required this.participants,
     this.lastMessage,
     required this.isPending,
     required this.createdAt,
-    required this.updatedAt,
+    this.updatedAt,
+    required this.landlord,
+    this.rental,
   });
 
   factory Conversation.fromJson(Map<String, dynamic> json) {
+    print('Parsing conversation JSON: $json'); // Log để debug
     return Conversation(
-      id: json['_id'] as String,
-      participants: List<String>.from(json['participants'] as List),
-      rentalId: json['rentalId'] as String,
-      lastMessage: json['lastMessage'] != null ? Message.fromJson(json['lastMessage']) : null,
-      isPending: json['isPending'] as bool,
-      createdAt: DateTime.parse(json['createdAt'] as String),
-      updatedAt: DateTime.parse(json['updatedAt'] as String),
+      id: json['_id']?.toString() ?? '',
+      rentalId: json['rentalId']?.toString() ?? '',
+      participants: List<String>.from(json['participants']?.map((id) => id.toString()) ?? []),
+      lastMessage: json['lastMessage'] != null ? Message.fromJson(json['lastMessage'] as Map<String, dynamic>) : null,
+      isPending: json['isPending'] as bool? ?? true,
+      createdAt: DateTime.tryParse(json['createdAt']?.toString() ?? '') ?? DateTime.now(),
+      updatedAt: json['updatedAt'] != null ? DateTime.tryParse(json['updatedAt']?.toString() ?? '') : null,
+      landlord: {
+        'id': json['landlord']?['id']?.toString() ?? '',
+        'username': json['landlord']?['username']?.toString() ?? 'Unknown',
+        'avatarBase64': json['landlord']?['avatarBase64']?.toString() ?? '',
+      },
+      rental: json['rental'] != null
+          ? {
+        'id': json['rental']?['id']?.toString() ?? '',
+        'title': json['rental']?['title']?.toString() ?? '',
+        'image': json['rental']?['image']?.toString() ?? '',
+      }
+          : null,
     );
   }
 }
