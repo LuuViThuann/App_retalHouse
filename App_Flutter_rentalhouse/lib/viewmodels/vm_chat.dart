@@ -13,6 +13,8 @@ class ChatViewModel extends ChangeNotifier {
   bool _isLoading = false;
   String? _errorMessage;
   io.Socket? _socket;
+  String? _currentConversationId;
+  String? _token;
 
   List<Conversation> get conversations => _conversations;
   List<Message> get messages => _messages;
@@ -23,14 +25,31 @@ class ChatViewModel extends ChangeNotifier {
     _initializeSocket();
   }
 
+  void setToken(String token) {
+    _token = token;
+    _initializeSocket();
+  }
+
   void _initializeSocket() {
+    if (_socket != null) {
+      _socket?.disconnect();
+      _socket = null;
+    }
+
     _socket = io.io(ApiRoutes.serverBaseUrl, <String, dynamic>{
       'transports': ['websocket'],
       'autoConnect': false,
+      'reconnection': true,
+      'reconnectionAttempts': 10,
+      'reconnectionDelay': 1000,
+      'auth': {'token': _token != null ? 'Bearer $_token' : null},
     });
 
     _socket?.onConnect((_) {
       print('Socket connected');
+      if (_currentConversationId != null) {
+        joinConversation(_currentConversationId!);
+      }
     });
 
     _socket?.onDisconnect((_) {
@@ -39,21 +58,31 @@ class ChatViewModel extends ChangeNotifier {
 
     _socket?.onConnectError((data) {
       print('Socket connect error: $data');
+      _errorMessage = 'Failed to connect to server';
+      notifyListeners();
     });
 
     _socket?.onError((data) {
       print('Socket error: $data');
+      _errorMessage = 'Socket error: $data';
+      notifyListeners();
     });
 
     _socket?.on('receiveMessage', (data) {
       print('Received message: ${jsonEncode(data)}');
       try {
         final message = Message.fromJson(data);
-        if (message.conversationId == _messages.firstOrNull?.conversationId) {
-          _messages.insert(0, message);
-          notifyListeners();
+        if (_currentConversationId != null && message.conversationId == _currentConversationId) {
+          // Avoid duplicate messages
+          if (!_messages.any((msg) => msg.id == message.id)) {
+            _messages.insert(0, message);
+            print('Added message ${message.id} to conversation $_currentConversationId');
+            notifyListeners();
+          } else {
+            print('Duplicate message ${message.id} ignored');
+          }
         } else {
-          print('Ignoring message for conversation ${message.conversationId}');
+          print('Ignoring message for conversation ${message.conversationId}, current: $_currentConversationId');
         }
       } catch (e) {
         print('Error parsing receiveMessage: $e');
@@ -65,8 +94,9 @@ class ChatViewModel extends ChangeNotifier {
       try {
         final messageId = data['messageId']?.toString();
         if (messageId != null) {
-          final removed = _messages.removeWhere((msg) => msg.id == messageId);
-
+          _messages.removeWhere((msg) => msg.id == messageId);
+          print('Deleted message $messageId');
+          notifyListeners();
         } else {
           print('Invalid messageId in deleteMessage');
         }
@@ -80,19 +110,57 @@ class ChatViewModel extends ChangeNotifier {
       try {
         final updatedMessage = Message.fromJson(data);
         final index = _messages.indexWhere((msg) => msg.id == updatedMessage.id);
-        if (index != -1 && updatedMessage.conversationId == _messages.firstOrNull?.conversationId) {
+        if (index != -1 && _currentConversationId != null && updatedMessage.conversationId == _currentConversationId) {
           _messages[index] = updatedMessage;
           print('Updated message ${updatedMessage.id} at index $index');
           notifyListeners();
         } else {
-          print('Message ${updatedMessage.id} not found or wrong conversation ${updatedMessage.conversationId}');
+          print('Message ${updatedMessage.id} not found or wrong conversation ${updatedMessage.conversationId}, current: $_currentConversationId');
         }
       } catch (e) {
         print('Error handling updateMessage: $e');
       }
     });
 
-    _socket?.connect();
+    _socket?.on('updateConversation', (data) {
+      print('Received updateConversation: ${jsonEncode(data)}');
+      try {
+        final updatedConversation = Conversation.fromJson(data);
+        final index = _conversations.indexWhere((conv) => conv.id == updatedConversation.id);
+        if (index != -1) {
+          _conversations[index] = updatedConversation;
+        } else {
+          _conversations.add(updatedConversation);
+        }
+        // Sort conversations by last message date or updatedAt
+        _conversations.sort((a, b) {
+          final aDate = a.lastMessage?.createdAt ?? a.updatedAt ?? a.createdAt;
+          final bDate = b.lastMessage?.createdAt ?? b.updatedAt ?? b.createdAt;
+          return bDate.compareTo(aDate);
+        });
+        print('Updated conversation list with conversation ${updatedConversation.id}');
+        notifyListeners();
+      } catch (e) {
+        print('Error handling updateConversation: $e');
+      }
+    });
+
+    _socket?.on('reconnect', (attempt) {
+      print('Socket reconnected after $attempt attempts');
+      if (_currentConversationId != null) {
+        joinConversation(_currentConversationId!);
+      }
+    });
+
+    _socket?.on('reconnect_error', (data) {
+      print('Socket reconnect error: $data');
+      _errorMessage = 'Failed to reconnect to server';
+      notifyListeners();
+    });
+
+    if (_token != null) {
+      _socket?.connect();
+    }
   }
 
   Future<void> fetchConversations(String token) async {
@@ -142,6 +210,7 @@ class ChatViewModel extends ChangeNotifier {
 
   Future<void> fetchMessages(String conversationId, String token, {String? cursor, int limit = 10}) async {
     _isLoading = true;
+    _currentConversationId = conversationId;
     notifyListeners();
 
     try {
@@ -160,7 +229,11 @@ class ChatViewModel extends ChangeNotifier {
         final data = jsonDecode(response.body);
         final List<dynamic> messageData = data['messages'];
         final newMessages = messageData.map((json) => Message.fromJson(json)).toList();
-        _messages.addAll(newMessages);
+        // Avoid duplicates by filtering out existing messages
+        _messages = [
+          ...newMessages.where((newMsg) => !_messages.any((msg) => msg.id == newMsg.id)),
+          ..._messages,
+        ];
         _errorMessage = null;
       } else {
         _errorMessage = 'Failed to load messages: ${response.body}';
@@ -193,7 +266,21 @@ class ChatViewModel extends ChangeNotifier {
 
       if (response.statusCode == 201) {
         final data = jsonDecode(response.body);
-        return Conversation.fromJson(data);
+        final newConversation = Conversation.fromJson(data);
+        // Update local conversations list
+        final index = _conversations.indexWhere((conv) => conv.id == newConversation.id);
+        if (index != -1) {
+          _conversations[index] = newConversation;
+        } else {
+          _conversations.add(newConversation);
+        }
+        _conversations.sort((a, b) {
+          final aDate = a.lastMessage?.createdAt ?? a.updatedAt ?? a.createdAt;
+          final bDate = b.lastMessage?.createdAt ?? b.updatedAt ?? b.createdAt;
+          return bDate.compareTo(aDate);
+        });
+        notifyListeners();
+        return newConversation;
       } else {
         print('Failed to create/get conversation: ${response.body}');
         return null;
@@ -225,8 +312,18 @@ class ChatViewModel extends ChangeNotifier {
 
       final response = await request.send();
       final responseBody = await response.stream.bytesToString();
+      final responseData = jsonDecode(responseBody);
 
       if (response.statusCode == 201) {
+        // Add the message to the local list immediately for instant UI feedback
+        final message = Message.fromJson(responseData);
+        if (_currentConversationId == conversationId && !_messages.any((msg) => msg.id == message.id)) {
+          _messages.insert(0, message);
+          print('Added sent message ${message.id} to conversation $conversationId');
+          notifyListeners();
+        }
+        // Fetch updated conversations to reflect the new lastMessage
+        await fetchConversations(token);
         return true;
       } else {
         _errorMessage = 'Failed to send message: $responseBody';
@@ -251,6 +348,12 @@ class ChatViewModel extends ChangeNotifier {
       );
 
       if (response.statusCode == 200) {
+        // Remove locally to ensure immediate UI update
+        _messages.removeWhere((msg) => msg.id == messageId);
+        print('Locally deleted message $messageId');
+        notifyListeners();
+        // Fetch updated conversations to reflect the new lastMessage
+        await fetchConversations(token);
         return true;
       } else {
         _errorMessage = 'Failed to delete message: ${response.body}';
@@ -286,8 +389,19 @@ class ChatViewModel extends ChangeNotifier {
 
       final response = await request.send();
       final responseBody = await response.stream.bytesToString();
+      final responseData = jsonDecode(responseBody);
 
       if (response.statusCode == 200) {
+        // Update the message locally for immediate UI feedback
+        final updatedMessage = Message.fromJson(responseData);
+        final index = _messages.indexWhere((msg) => msg.id == updatedMessage.id);
+        if (index != -1 && _currentConversationId == updatedMessage.conversationId) {
+          _messages[index] = updatedMessage;
+          print('Locally updated message ${updatedMessage.id}');
+          notifyListeners();
+        }
+        // Fetch updated conversations to reflect the new lastMessage
+        await fetchConversations(token);
         return true;
       } else {
         _errorMessage = 'Failed to edit message: $responseBody';
@@ -303,13 +417,21 @@ class ChatViewModel extends ChangeNotifier {
 
   void clearMessages() {
     _messages = [];
+    _currentConversationId = null;
     _errorMessage = null;
     notifyListeners();
   }
 
   void joinConversation(String conversationId) {
-    print('Joining conversation: $conversationId');
-    _socket?.emit('joinConversation', conversationId);
+    if (_socket?.connected == true) {
+      _currentConversationId = conversationId;
+      print('Joining conversation: $conversationId');
+      _socket?.emit('joinConversation', conversationId);
+    } else {
+      print('Socket not connected, queuing join for conversation: $conversationId');
+      _currentConversationId = conversationId;
+      _socket?.connect();
+    }
   }
 
   @override

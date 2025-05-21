@@ -262,6 +262,8 @@ module.exports = (io) => {
         .limit(parseInt(limit))
         .lean();
 
+      console.log(`Fetched ${messages.length} messages for conversation ${conversationId}`);
+
       const senderIds = [...new Set(messages.map(msg => msg.senderId))];
       const senderAvatars = {};
       for (const senderId of senderIds) {
@@ -380,14 +382,15 @@ module.exports = (io) => {
         }
       };
 
-      console.log(`Emitting receiveMessage to room ${conversationId}:`, JSON.stringify(messageData, null, 2));
+      console.log(`Emitting receiveMessage to room ${conversationId} for user ${req.userId}:`, JSON.stringify(messageData, null, 2));
       if (io) {
         io.to(conversationId).emit('receiveMessage', messageData);
       } else {
-        console.error('Socket.IO instance is not initialized');
+        console.error('Socket.IO instance is not initialized for receiveMessage');
       }
       res.status(201).json(messageData);
     } catch (err) {
+      console.error('Error in POST /messages:', err.message);
       res.status(500).json({ message: err.message });
     }
   });
@@ -433,6 +436,7 @@ module.exports = (io) => {
 
       res.status(200).json({ message: 'Message deleted successfully' });
     } catch (err) {
+      console.error('Error in DELETE /messages:', err.message);
       res.status(500).json({ message: err.message });
     }
   });
@@ -526,7 +530,7 @@ module.exports = (io) => {
         }
       };
 
-      console.log(`Emitting updateMessage to room ${conversation._id}:`, JSON.stringify(messageData, null, 2));
+      console.log(`Emitting updateMessage to room ${conversation._id} for user ${req.userId}:`, JSON.stringify(messageData, null, 2));
       if (io) {
         io.to(conversation._id.toString()).emit('updateMessage', messageData);
       } else {
@@ -535,6 +539,7 @@ module.exports = (io) => {
 
       res.status(200).json(messageData);
     } catch (err) {
+      console.error('Error in PATCH /messages:', err.message);
       res.status(500).json({ message: err.message });
     }
   });
@@ -628,6 +633,7 @@ module.exports = (io) => {
       await redisClient.setEx(`conversations:${userId}`, 3600, JSON.stringify(enrichedConversations));
       res.json(enrichedConversations);
     } catch (err) {
+      console.error('Error in GET /conversations:', err.message);
       res.status(500).json({ message: err.message });
     }
   });
