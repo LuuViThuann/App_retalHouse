@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
@@ -29,12 +30,16 @@ class ChatScreen extends StatefulWidget {
 
 class _ChatScreenState extends State<ChatScreen> {
   bool _isLoading = true;
+  bool _isFetchingOlderMessages = false; // Separate loading state for older messages
   String? _errorMessage;
   final List<XFile> _selectedImages = [];
   final List<String> _existingImagesToRemove = [];
   String? _editingMessageId;
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
+  Timer? _debounceTimer;
+  double? _lastScrollPosition; // Track last scroll position to detect direction
+  bool _hasMoreMessages = true; // Track if there are more messages to load
 
   @override
   void initState() {
@@ -56,17 +61,14 @@ class _ChatScreenState extends State<ChatScreen> {
     }
 
     try {
-      print('Loading data for conversationId: ${widget.conversationId}');
       chatViewModel.clearMessages();
       if (chatViewModel.conversations.isEmpty ||
           !chatViewModel.conversations
               .any((c) => c.id == widget.conversationId)) {
-        print('Conversations empty or missing conversation, fetching...');
         await chatViewModel
             .fetchConversations(authViewModel.currentUser!.token!);
         if (!chatViewModel.conversations
             .any((c) => c.id == widget.conversationId)) {
-          print('Conversation ${widget.conversationId} not found, creating...');
           final conversation = await chatViewModel.getOrCreateConversation(
             rentalId: widget.rentalId,
             landlordId: widget.landlordId,
@@ -78,7 +80,10 @@ class _ChatScreenState extends State<ChatScreen> {
         }
       }
       await chatViewModel.fetchMessages(
-          widget.conversationId, authViewModel.currentUser!.token!);
+        widget.conversationId,
+        authViewModel.currentUser!.token!,
+        limit: 50,
+      );
       chatViewModel.joinConversation(widget.conversationId);
       setState(() {
         _isLoading = false;
@@ -91,41 +96,55 @@ class _ChatScreenState extends State<ChatScreen> {
         _errorMessage = 'Lỗi khi tải tin nhắn: $e';
         _isLoading = false;
       });
-      print('Error in _loadData: $e');
     }
   }
 
   void _onScroll() {
-    if (_scrollController.position.pixels <=
-        _scrollController.position.minScrollExtent + 50) {
-      final chatViewModel = Provider.of<ChatViewModel>(context, listen: false);
-      final authViewModel = Provider.of<AuthViewModel>(context, listen: false);
-      if (!_isLoading && chatViewModel.messages.isNotEmpty) {
-        setState(() {
-          _isLoading = true;
-        });
-        chatViewModel
-            .fetchMessages(
-          widget.conversationId,
-          authViewModel.currentUser!.token!,
-          cursor: chatViewModel.messages.first.id,
-          limit: 10,
-        )
-            .then((_) {
+    if (!_scrollController.hasClients) return;
+
+    final currentPosition = _scrollController.position.pixels;
+    final isAtTop = currentPosition <= _scrollController.position.minScrollExtent + 10; // Tighter threshold
+    final isScrollingUp = _lastScrollPosition != null && currentPosition < _lastScrollPosition!;
+    _lastScrollPosition = currentPosition;
+
+    if (isAtTop && isScrollingUp && !_isFetchingOlderMessages && _hasMoreMessages) {
+      if (_debounceTimer?.isActive ?? false) return;
+      _debounceTimer = Timer(const Duration(milliseconds: 500), () {
+        final chatViewModel = Provider.of<ChatViewModel>(context, listen: false);
+        final authViewModel = Provider.of<AuthViewModel>(context, listen: false);
+        if (chatViewModel.messages.isNotEmpty) {
           setState(() {
-            _isLoading = false;
+            _isFetchingOlderMessages = true;
           });
-          if (_scrollController.hasClients) {
-            _scrollController.jumpTo(_scrollController.position.pixels);
-          }
-        });
-      }
+          final previousExtent = _scrollController.position.pixels;
+          chatViewModel
+              .fetchMessages(
+            widget.conversationId,
+            authViewModel.currentUser!.token!,
+            cursor: chatViewModel.messages.first.id,
+            limit: 20,
+          )
+              .then((_) {
+            setState(() {
+              _isFetchingOlderMessages = false;
+              // Optionally update _hasMoreMessages here if you have a way to determine it
+            });
+            if (_scrollController.hasClients) {
+              _scrollController.jumpTo(previousExtent);
+            }
+          });
+        }
+      });
     }
   }
 
   void _scrollToBottom() {
     if (_scrollController.hasClients) {
-      _scrollController.jumpTo(0);
+      _scrollController.animateTo(
+        0,
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeOut,
+      );
     }
   }
 
@@ -152,8 +171,7 @@ class _ChatScreenState extends State<ChatScreen> {
         throw Exception('Không tìm thấy cuộc trò chuyện');
       }
       return conversation.landlord;
-    } catch (e) {
-      print('Error in _fetchLandlordInfo: $e');
+    } catch (_) {
       return {
         'id': widget.landlordId,
         'username': 'Chủ nhà',
@@ -300,198 +318,218 @@ class _ChatScreenState extends State<ChatScreen> {
                   items.add(message);
                 }
 
-                return ListView.builder(
-                  controller: _scrollController,
-                  reverse: true,
-                  itemCount: items.length + (_isLoading ? 1 : 0),
-                  itemBuilder: (context, index) {
-                    if (_isLoading && index == items.length) {
-                      return const Padding(
-                        padding: EdgeInsets.all(8.0),
-                        child: Center(child: CircularProgressIndicator()),
-                      );
-                    }
-                    final item = items[index];
-                    if (item is String) {
-                      return Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 8),
-                        child: Center(
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 12, vertical: 6),
-                            decoration: BoxDecoration(
-                              color: Colors.grey[300],
-                              borderRadius: BorderRadius.circular(12),
+                return Stack(
+                  children: [
+                    ListView.builder(
+                      controller: _scrollController,
+                      reverse: true,
+                      itemCount: items.length,
+                      itemBuilder: (context, index) {
+                        final item = items[index];
+                        if (item is String) {
+                          return Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 8),
+                            child: Center(
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 12, vertical: 6),
+                                decoration: BoxDecoration(
+                                  color: Colors.grey[300],
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Text(
+                                  item,
+                                  style: TextStyle(
+                                      fontSize: 12, color: Colors.grey[800]),
+                                ),
+                              ),
                             ),
-                            child: Text(
-                              item,
-                              style: TextStyle(
-                                  fontSize: 12, color: Colors.grey[800]),
-                            ),
-                          ),
-                        ),
-                      );
-                    }
-                    final message = item as Message;
-                    final isMe =
-                        message.senderId == authViewModel.currentUser?.id;
-                    return GestureDetector(
-                      key: ValueKey(message.id),
-                      onLongPress: isMe
-                          ? () {
-                              showModalBottomSheet(
-                                context: context,
-                                builder: (context) => SafeArea(
-                                  child: Column(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      ListTile(
-                                        leading: const Icon(Icons.edit),
-                                        title: const Text('Chỉnh sửa'),
-                                        onTap: () {
-                                          Navigator.pop(context);
-                                          _startEditing(message);
-                                        },
+                          );
+                        }
+                        final message = item as Message;
+                        final isMe =
+                            message.senderId == authViewModel.currentUser?.id;
+                        return GestureDetector(
+                          key: ValueKey(message.id),
+                          onLongPress: isMe
+                              ? () {
+                                  showModalBottomSheet(
+                                    context: context,
+                                    builder: (context) => SafeArea(
+                                      child: Column(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          ListTile(
+                                            leading: const Icon(Icons.edit),
+                                            title: const Text('Chỉnh sửa'),
+                                            onTap: () {
+                                              Navigator.pop(context);
+                                              _startEditing(message);
+                                            },
+                                          ),
+                                          ListTile(
+                                            leading: const Icon(Icons.delete),
+                                            title: const Text('Xóa'),
+                                            onTap: () async {
+                                              Navigator.pop(context);
+                                              final success = await chatViewModel
+                                                  .deleteMessage(
+                                                messageId: message.id,
+                                                token: authViewModel
+                                                    .currentUser!.token!,
+                                              );
+                                              if (success) {
+                                                ScaffoldMessenger.of(context)
+                                                    .showSnackBar(
+                                                  const SnackBar(
+                                                    content: Text(
+                                                        'Tin nhắn đã được xóa'),
+                                                    backgroundColor:
+                                                        Colors.green,
+                                                  ),
+                                                );
+                                                _scrollToBottom();
+                                              } else {
+                                                ScaffoldMessenger.of(context)
+                                                    .showSnackBar(
+                                                  SnackBar(
+                                                    content: Text(
+                                                        chatViewModel
+                                                                .errorMessage ??
+                                                            'Lỗi khi xóa tin nhắn'),
+                                                    backgroundColor:
+                                                        Colors.redAccent,
+                                                  ),
+                                                );
+                                              }
+                                            },
+                                          ),
+                                        ],
                                       ),
-                                      ListTile(
-                                        leading: const Icon(Icons.delete),
-                                        title: const Text('Xóa'),
-                                        onTap: () async {
-                                          Navigator.pop(context);
-                                          final success =
-                                              await chatViewModel.deleteMessage(
-                                            messageId: message.id,
-                                            token: authViewModel
-                                                .currentUser!.token!,
-                                          );
-                                          if (success) {
-                                            ScaffoldMessenger.of(context)
-                                                .showSnackBar(
-                                              const SnackBar(
-                                                content: Text(
-                                                    'Tin nhắn đã được xóa'),
-                                                backgroundColor: Colors.green,
-                                              ),
-                                            );
-                                            _scrollToBottom();
-                                          } else {
-                                            ScaffoldMessenger.of(context)
-                                                .showSnackBar(
-                                              SnackBar(
-                                                content: Text(chatViewModel
-                                                        .errorMessage ??
-                                                    'Lỗi khi xóa tin nhắn'),
-                                                backgroundColor:
-                                                    Colors.redAccent,
-                                              ),
-                                            );
-                                          }
-                                        },
+                                    ),
+                                  );
+                                }
+                              : null,
+                          child: Row(
+                            mainAxisAlignment: isMe
+                                ? MainAxisAlignment.end
+                                : MainAxisAlignment.start,
+                            children: [
+                              if (!isMe) ...[
+                                CircleAvatar(
+                                  radius: 16,
+                                  backgroundImage: message
+                                              .sender['avatarBase64']
+                                              ?.isNotEmpty ==
+                                          true
+                                      ? MemoryImage(base64Decode(
+                                          message.sender['avatarBase64']))
+                                      : null,
+                                  child: message.sender['avatarBase64']
+                                              ?.isEmpty ==
+                                          true
+                                      ? const Icon(Icons.person, size: 16)
+                                      : null,
+                                ),
+                                const SizedBox(width: 8),
+                              ],
+                              Flexible(
+                                child: Container(
+                                  margin: const EdgeInsets.symmetric(
+                                      vertical: 5, horizontal: 10),
+                                  padding: const EdgeInsets.all(10),
+                                  decoration: BoxDecoration(
+                                    color: isMe
+                                        ? Colors.blue[100]
+                                        : Colors.grey[200],
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: Column(
+                                    crossAxisAlignment: isMe
+                                        ? CrossAxisAlignment.end
+                                        : CrossAxisAlignment.start,
+                                    children: [
+                                      if (message.images.isNotEmpty)
+                                        Wrap(
+                                          spacing: 5,
+                                          children: message.images
+                                              .map((img) => ClipRRect(
+                                                    borderRadius:
+                                                        BorderRadius.circular(8),
+                                                    child: CachedNetworkImage(
+                                                      imageUrl:
+                                                          '${ApiRoutes.serverBaseUrl}$img',
+                                                      width: 100,
+                                                      height: 100,
+                                                      fit: BoxFit.cover,
+                                                      memCacheHeight: 200,
+                                                      memCacheWidth: 200,
+                                                      placeholder:
+                                                          (context, url) =>
+                                                              const CircularProgressIndicator(),
+                                                      errorWidget: (context, url,
+                                                              error) =>
+                                                          const Icon(Icons.error),
+                                                    ),
+                                                  ))
+                                              .toList(),
+                                        ),
+                                      if (message.content.isNotEmpty)
+                                        Text(
+                                          message.content,
+                                          style: const TextStyle(fontSize: 16),
+                                        ),
+                                      const SizedBox(height: 5),
+                                      Text(
+                                        message.updatedAt != null
+                                            ? 'Đã chỉnh sửa - ${DateFormat('HH:mm, dd/MM').format(message.updatedAt!)}'
+                                            : DateFormat('HH:mm, dd/MM')
+                                                .format(message.createdAt),
+                                        style: TextStyle(
+                                            fontSize: 12,
+                                            color: Colors.grey[600]),
                                       ),
                                     ],
                                   ),
                                 ),
-                              );
-                            }
-                          : null,
-                      child: Row(
-                        mainAxisAlignment: isMe
-                            ? MainAxisAlignment.end
-                            : MainAxisAlignment.start,
-                        children: [
-                          if (!isMe) ...[
-                            CircleAvatar(
-                              radius: 16,
-                              backgroundImage:
-                                  message.sender['avatarBase64']?.isNotEmpty ==
+                              ),
+                              if (isMe) ...[
+                                const SizedBox(width: 8),
+                                CircleAvatar(
+                                  radius: 16,
+                                  backgroundImage: message
+                                              .sender['avatarBase64']
+                                              ?.isNotEmpty ==
                                           true
                                       ? MemoryImage(base64Decode(
                                           message.sender['avatarBase64']))
                                       : null,
-                              child: message.sender['avatarBase64']?.isEmpty ==
-                                      true
-                                  ? const Icon(Icons.person, size: 16)
-                                  : null,
-                            ),
-                            const SizedBox(width: 8),
-                          ],
-                          Flexible(
-                            child: Container(
-                              margin: const EdgeInsets.symmetric(
-                                  vertical: 5, horizontal: 10),
-                              padding: const EdgeInsets.all(10),
-                              decoration: BoxDecoration(
-                                color:
-                                    isMe ? Colors.blue[100] : Colors.grey[200],
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: Column(
-                                crossAxisAlignment: isMe
-                                    ? CrossAxisAlignment.end
-                                    : CrossAxisAlignment.start,
-                                children: [
-                                  if (message.images.isNotEmpty)
-                                    Wrap(
-                                      spacing: 5,
-                                      children: message.images
-                                          .map((img) => ClipRRect(
-                                                borderRadius:
-                                                    BorderRadius.circular(8),
-                                                child: CachedNetworkImage(
-                                                  imageUrl:
-                                                      '${ApiRoutes.serverBaseUrl}$img',
-                                                  width: 100,
-                                                  height: 100,
-                                                  fit: BoxFit.cover,
-                                                  memCacheHeight: 200,
-                                                  memCacheWidth: 200,
-                                                  placeholder: (context, url) =>
-                                                      const CircularProgressIndicator(),
-                                                  errorWidget: (context, url,
-                                                          error) =>
-                                                      const Icon(Icons.error),
-                                                ),
-                                              ))
-                                          .toList(),
-                                    ),
-                                  if (message.content.isNotEmpty)
-                                    Text(
-                                      message.content,
-                                      style: const TextStyle(fontSize: 16),
-                                    ),
-                                  const SizedBox(height: 5),
-                                  Text(
-                                    message.updatedAt != null
-                                        ? 'Đã chỉnh sửa - ${DateFormat('HH:mm, dd/MM').format(message.updatedAt!)}'
-                                        : DateFormat('HH:mm, dd/MM')
-                                            .format(message.createdAt),
-                                    style: TextStyle(
-                                        fontSize: 12, color: Colors.grey[600]),
-                                  ),
-                                ],
-                              ),
-                            ),
+                                  child: message.sender['avatarBase64']
+                                              ?.isEmpty ==
+                                          true
+                                      ? const Icon(Icons.person, size: 16)
+                                      : null,
+                                ),
+                              ],
+                            ],
                           ),
-                          if (isMe) ...[
-                            const SizedBox(width: 8),
-                            CircleAvatar(
-                              radius: 16,
-                              backgroundImage:
-                                  message.sender['avatarBase64']?.isNotEmpty ==
-                                          true
-                                      ? MemoryImage(base64Decode(
-                                          message.sender['avatarBase64']))
-                                      : null,
-                              child: message.sender['avatarBase64']?.isEmpty ==
-                                      true
-                                  ? const Icon(Icons.person, size: 16)
-                                  : null,
-                            ),
-                          ],
-                        ],
+                        );
+                      },
+                    ),
+                    if (_isFetchingOlderMessages)
+                      const Positioned(
+                        top: 10,
+                        left: 0,
+                        right: 0,
+                        child: Center(
+                          child: SizedBox(
+                            width: 24,
+                            height: 24,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          ),
+                        ),
                       ),
-                    );
-                  },
+                  ],
                 );
               },
             ),
@@ -690,12 +728,6 @@ class _ChatScreenState extends State<ChatScreen> {
                             senderId: authViewModel.currentUser!.id,
                           );
                           if (success) {
-                            // ScaffoldMessenger.of(context).showSnackBar(
-                            //   const SnackBar(
-                            //     content: Text('Tin nhắn đã được gửi'),
-                            //     backgroundColor: Colors.green,
-                            //   ),
-                            // );
                             _messageController.clear();
                             setState(() {
                               _selectedImages.clear();
@@ -725,6 +757,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
   @override
   void dispose() {
+    _debounceTimer?.cancel();
     _scrollController.removeListener(_onScroll);
     _messageController.dispose();
     _scrollController.dispose();
