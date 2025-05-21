@@ -96,23 +96,27 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   void _onScroll() {
-    if (_scrollController.position.pixels >=
-        _scrollController.position.maxScrollExtent - 50) {
+    if (_scrollController.position.pixels <=
+        _scrollController.position.minScrollExtent + 50) {
       final chatViewModel = Provider.of<ChatViewModel>(context, listen: false);
       final authViewModel = Provider.of<AuthViewModel>(context, listen: false);
       if (!_isLoading && chatViewModel.messages.isNotEmpty) {
-        _isLoading = true;
+        setState(() {
+          _isLoading = true;
+        });
         chatViewModel
             .fetchMessages(
           widget.conversationId,
           authViewModel.currentUser!.token!,
           cursor: chatViewModel.messages.first.id,
+          limit: 10,
         )
             .then((_) {
-          _isLoading = false;
+          setState(() {
+            _isLoading = false;
+          });
           if (_scrollController.hasClients) {
-            _scrollController
-                .jumpTo(_scrollController.position.maxScrollExtent);
+            _scrollController.jumpTo(_scrollController.position.pixels);
           }
         });
       }
@@ -261,6 +265,29 @@ class _ChatScreenState extends State<ChatScreen> {
           Expanded(
             child: Consumer<ChatViewModel>(
               builder: (context, chatViewModel, child) {
+                if (chatViewModel.messages.isEmpty) {
+                  return Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.chat_bubble_outline,
+                          size: 50,
+                          color: Colors.grey[600],
+                        ),
+                        const SizedBox(height: 10),
+                        Text(
+                          'Hãy bắt đầu nhắn tin bây giờ!',
+                          style: TextStyle(
+                            fontSize: 18,
+                            color: Colors.grey[600],
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }
+
                 final items = <dynamic>[];
                 String? lastHeader;
 
@@ -276,8 +303,14 @@ class _ChatScreenState extends State<ChatScreen> {
                 return ListView.builder(
                   controller: _scrollController,
                   reverse: true,
-                  itemCount: items.length,
+                  itemCount: items.length + (_isLoading ? 1 : 0),
                   itemBuilder: (context, index) {
+                    if (_isLoading && index == items.length) {
+                      return const Padding(
+                        padding: EdgeInsets.all(8.0),
+                        child: Center(child: CircularProgressIndicator()),
+                      );
+                    }
                     final item = items[index];
                     if (item is String) {
                       return Padding(

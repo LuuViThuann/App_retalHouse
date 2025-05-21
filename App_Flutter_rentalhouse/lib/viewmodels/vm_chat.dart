@@ -229,7 +229,7 @@ class ChatViewModel extends ChangeNotifier {
   }
 
   Future<void> fetchMessages(String conversationId, String token,
-      {String? cursor, int limit = 20}) async {
+      {String? cursor, int limit = 10}) async {
     _isLoading = true;
     _currentConversationId = conversationId;
     notifyListeners();
