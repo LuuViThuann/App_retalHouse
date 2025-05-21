@@ -37,35 +37,58 @@ class ChatViewModel extends ChangeNotifier {
       print('Socket disconnected');
     });
 
+    _socket?.onConnectError((data) {
+      print('Socket connect error: $data');
+    });
+
+    _socket?.onError((data) {
+      print('Socket error: $data');
+    });
+
     _socket?.on('receiveMessage', (data) {
-      print('Received message: $data');
-      final message = Message.fromJson(data);
-      if (message.conversationId == _messages.firstOrNull?.conversationId) {
-        _messages.insert(0, message);
-        notifyListeners();
-      } else {
-        print('Ignoring message for conversation ${message.conversationId}');
+      print('Received message: ${jsonEncode(data)}');
+      try {
+        final message = Message.fromJson(data);
+        if (message.conversationId == _messages.firstOrNull?.conversationId) {
+          _messages.insert(0, message);
+          notifyListeners();
+        } else {
+          print('Ignoring message for conversation ${message.conversationId}');
+        }
+      } catch (e) {
+        print('Error parsing receiveMessage: $e');
       }
     });
 
     _socket?.on('deleteMessage', (data) {
-      print('Received deleteMessage: $data');
-      final messageId = data['messageId']?.toString();
-      if (messageId != null) {
-        _messages.removeWhere((msg) => msg.id == messageId);
-        notifyListeners();
+      print('Received deleteMessage: ${jsonEncode(data)}');
+      try {
+        final messageId = data['messageId']?.toString();
+        if (messageId != null) {
+          final removed = _messages.removeWhere((msg) => msg.id == messageId);
+
+        } else {
+          print('Invalid messageId in deleteMessage');
+        }
+      } catch (e) {
+        print('Error handling deleteMessage: $e');
       }
     });
 
     _socket?.on('updateMessage', (data) {
-      print('Received updateMessage: $data');
-      final updatedMessage = Message.fromJson(data);
-      final index = _messages.indexWhere((msg) => msg.id == updatedMessage.id);
-      if (index != -1 && updatedMessage.conversationId == _messages.firstOrNull?.conversationId) {
-        _messages[index] = updatedMessage;
-        notifyListeners();
-      } else {
-        print('Message ${updatedMessage.id} not found or wrong conversation');
+      print('Received updateMessage: ${jsonEncode(data)}');
+      try {
+        final updatedMessage = Message.fromJson(data);
+        final index = _messages.indexWhere((msg) => msg.id == updatedMessage.id);
+        if (index != -1 && updatedMessage.conversationId == _messages.firstOrNull?.conversationId) {
+          _messages[index] = updatedMessage;
+          print('Updated message ${updatedMessage.id} at index $index');
+          notifyListeners();
+        } else {
+          print('Message ${updatedMessage.id} not found or wrong conversation ${updatedMessage.conversationId}');
+        }
+      } catch (e) {
+        print('Error handling updateMessage: $e');
       }
     });
 
@@ -285,6 +308,7 @@ class ChatViewModel extends ChangeNotifier {
   }
 
   void joinConversation(String conversationId) {
+    print('Joining conversation: $conversationId');
     _socket?.emit('joinConversation', conversationId);
   }
 

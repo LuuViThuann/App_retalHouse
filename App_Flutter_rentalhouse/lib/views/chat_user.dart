@@ -294,7 +294,17 @@ class _ChatScreenState extends State<ChatScreen> {
                                       messageId: message.id,
                                       token: authViewModel.currentUser!.token!,
                                     );
-                                    if (!success) {
+                                    if (success) {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        const SnackBar(
+                                          content: Text('Tin nhắn đã được xóa'),
+                                          backgroundColor: Colors.green,
+                                        ),
+                                      );
+                                      WidgetsBinding.instance.addPostFrameCallback((_) {
+                                        _scrollController.jumpTo(_scrollController.position.maxScrollExtent);
+                                      });
+                                    } else {
                                       ScaffoldMessenger.of(context).showSnackBar(
                                         SnackBar(
                                           content: Text(chatViewModel.errorMessage ?? 'Lỗi khi xóa tin nhắn'),
@@ -425,22 +435,23 @@ class _ChatScreenState extends State<ChatScreen> {
                                 ),
                               ),
                             ),
-                            Positioned(
-                              top: 0,
-                              right: 0,
-                              child: GestureDetector(
-                                onTap: () {
-                                  setState(() {
-                                    _existingImagesToRemove.add(imageUrl);
-                                  });
-                                },
-                                child: const Icon(
-                                  Icons.cancel,
-                                  color: Colors.red,
-                                  size: 20,
+                            if (!_existingImagesToRemove.contains(imageUrl))
+                              Positioned(
+                                top: 0,
+                                right: 0,
+                                child: GestureDetector(
+                                  onTap: () {
+                                    setState(() {
+                                      _existingImagesToRemove.add(imageUrl);
+                                    });
+                                  },
+                                  child: const Icon(
+                                    Icons.cancel,
+                                    color: Colors.red,
+                                    size: 20,
+                                  ),
                                 ),
                               ),
-                            ),
                           ],
                         );
                       },
@@ -542,6 +553,12 @@ class _ChatScreenState extends State<ChatScreen> {
                             removeImages: _existingImagesToRemove,
                           );
                           if (success) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Tin nhắn đã được chỉnh sửa'),
+                                backgroundColor: Colors.green,
+                              ),
+                            );
                             _cancelEditing();
                             WidgetsBinding.instance.addPostFrameCallback((_) {
                               _scrollController.jumpTo(_scrollController.position.maxScrollExtent);
@@ -565,6 +582,12 @@ class _ChatScreenState extends State<ChatScreen> {
                             imagePaths: _selectedImages.map((x) => x.path).toList(),
                           );
                           if (success) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Tin nhắn đã được gửi'),
+                                backgroundColor: Colors.green,
+                              ),
+                            );
                             _messageController.clear();
                             setState(() {
                               _selectedImages.clear();
