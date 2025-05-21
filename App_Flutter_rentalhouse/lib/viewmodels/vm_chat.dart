@@ -78,14 +78,20 @@ class ChatViewModel extends ChangeNotifier {
         final message = Message.fromJson(data);
         if (_currentConversationId != null &&
             message.conversationId == _currentConversationId) {
-          if (!_messages.any((msg) => msg.id == message.id)) {
-            _messages.insert(0, message);
+          final tempIndex = _messages.indexWhere((msg) =>
+              msg.id.startsWith('temp_') && msg.content == message.content);
+          if (tempIndex != -1) {
+            _messages[tempIndex] = message;
+            print('Replaced temp message with ${message.id}');
+          } else if (!_messages.any((msg) => msg.id == message.id)) {
+            _messages.add(message);
             print(
                 'Added message ${message.id} to conversation $_currentConversationId');
-            notifyListeners();
           } else {
             print('Duplicate message ${message.id} ignored');
+            return;
           }
+          notifyListeners();
         } else {
           print(
               'Ignoring message for conversation ${message.conversationId}, current: $_currentConversationId');
@@ -223,7 +229,7 @@ class ChatViewModel extends ChangeNotifier {
   }
 
   Future<void> fetchMessages(String conversationId, String token,
-      {String? cursor, int limit = 10}) async {
+      {String? cursor, int limit = 20}) async {
     _isLoading = true;
     _currentConversationId = conversationId;
     notifyListeners();
@@ -247,10 +253,10 @@ class ChatViewModel extends ChangeNotifier {
         final newMessages =
             messageData.map((json) => Message.fromJson(json)).toList();
         _messages = [
+          ..._messages,
           ...newMessages
               .where((newMsg) => !_messages.any((msg) => msg.id == newMsg.id)),
-          ..._messages,
-        ];
+        ]..sort((a, b) => a.createdAt.compareTo(b.createdAt));
         _errorMessage = null;
       } else {
         _errorMessage = 'Failed to load messages: ${response.body}';
@@ -313,23 +319,24 @@ class ChatViewModel extends ChangeNotifier {
     required String content,
     required String token,
     List<String> imagePaths = const [],
+    required String senderId,
   }) async {
+    final tempId = 'temp_${DateTime.now().millisecondsSinceEpoch}';
     try {
       // Optimistic update: Add temporary message
-      final tempId = 'temp_${DateTime.now().millisecondsSinceEpoch}';
       if (content.isNotEmpty || imagePaths.isNotEmpty) {
         final tempMessage = Message(
           id: tempId,
           conversationId: conversationId,
-          senderId: '', // Will be updated by server
+          senderId: senderId,
           content: content,
           images: imagePaths,
           createdAt: DateTime.now(),
           updatedAt: null,
-          sender: {'id': '', 'username': 'You', 'avatarBase64': ''},
+          sender: {'id': senderId, 'username': 'You', 'avatarBase64': ''},
         );
         if (_currentConversationId == conversationId) {
-          _messages.insert(0, tempMessage);
+          _messages.add(tempMessage);
           notifyListeners();
         }
       }
@@ -351,7 +358,6 @@ class ChatViewModel extends ChangeNotifier {
       final responseData = jsonDecode(responseBody);
 
       if (response.statusCode == 201) {
-        // Replace temporary message with server response
         final message = Message.fromJson(responseData);
         final tempIndex = _messages.indexWhere((msg) => msg.id == tempId);
         if (tempIndex != -1 && _currentConversationId == conversationId) {
@@ -359,22 +365,21 @@ class ChatViewModel extends ChangeNotifier {
           print('Replaced temp message $tempId with ${message.id}');
         } else if (!_messages.any((msg) => msg.id == message.id) &&
             _currentConversationId == conversationId) {
-          _messages.insert(0, message);
+          _messages.add(message);
           print(
               'Added sent message ${message.id} to conversation $conversationId');
         }
+        _messages.sort((a, b) => a.createdAt.compareTo(b.createdAt));
         notifyListeners();
         return true;
       } else {
-        // Remove temporary message on failure
         _messages.removeWhere((msg) => msg.id == tempId);
         _errorMessage = 'Failed to send message: $responseBody';
         notifyListeners();
         return false;
       }
     } catch (e) {
-      _messages.removeWhere(
-          (msg) => msg.id == 'temp_${DateTime.now().millisecondsSinceEpoch}');
+      _messages.removeWhere((msg) => msg.id == tempId);
       _errorMessage = 'Error sending message: $e';
       notifyListeners();
       return false;
@@ -386,6 +391,15 @@ class ChatViewModel extends ChangeNotifier {
     required String token,
   }) async {
     try {
+      // Optimistic update
+      final index = _messages.indexWhere((msg) => msg.id == messageId);
+      Message? backupMessage;
+      if (index != -1) {
+        backupMessage = _messages[index];
+        _messages.removeAt(index);
+        notifyListeners();
+      }
+
       final response = await http.delete(
         Uri.parse('${ApiRoutes.serverBaseUrl}/api/messages/$messageId'),
         headers: {'Authorization': 'Bearer $token'},
@@ -394,11 +408,22 @@ class ChatViewModel extends ChangeNotifier {
       if (response.statusCode == 200) {
         return true;
       } else {
+        if (backupMessage != null && _currentConversationId != null) {
+          _messages.add(backupMessage);
+          _messages.sort((a, b) => a.createdAt.compareTo(b.createdAt));
+          notifyListeners();
+        }
         _errorMessage = 'Failed to delete message: ${response.body}';
         notifyListeners();
         return false;
       }
     } catch (e) {
+      final index = _messages.indexWhere((msg) => msg.id == messageId);
+      if (index == -1) {
+        _messages.add(_messages[index]);
+        _messages.sort((a, b) => a.createdAt.compareTo(b.createdAt));
+        notifyListeners();
+      }
       _errorMessage = 'Error deleting message: $e';
       notifyListeners();
       return false;
@@ -415,7 +440,9 @@ class ChatViewModel extends ChangeNotifier {
     try {
       // Optimistic update
       final index = _messages.indexWhere((msg) => msg.id == messageId);
+      Message? backupMessage;
       if (index != -1 && _currentConversationId != null) {
+        backupMessage = _messages[index];
         final oldMessage = _messages[index];
         _messages[index] = Message(
           id: messageId,
@@ -450,23 +477,31 @@ class ChatViewModel extends ChangeNotifier {
       final responseData = jsonDecode(responseBody);
 
       if (response.statusCode == 200) {
+        final updatedMessage = Message.fromJson(responseData);
+        if (index != -1 && _currentConversationId != null) {
+          _messages[index] = updatedMessage;
+          _messages.sort((a, b) => a.createdAt.compareTo(b.createdAt));
+          notifyListeners();
+        }
         return true;
       } else {
-        // Revert optimistic update on failure
-        if (index != -1 && _currentConversationId != null) {
-          _messages[index] =
-              _messages[index]; // Restore original (handled by server response)
+        if (index != -1 &&
+            backupMessage != null &&
+            _currentConversationId != null) {
+          _messages[index] = backupMessage;
+          _messages.sort((a, b) => a.createdAt.compareTo(b.createdAt));
+          notifyListeners();
         }
         _errorMessage = 'Failed to edit message: $responseBody';
         notifyListeners();
         return false;
       }
     } catch (e) {
-      // Revert optimistic update on error
       final index = _messages.indexWhere((msg) => msg.id == messageId);
       if (index != -1 && _currentConversationId != null) {
-        _messages[index] =
-            _messages[index]; // Restore original (handled by server response)
+        _messages[index] = _messages[index];
+        _messages.sort((a, b) => a.createdAt.compareTo(b.createdAt));
+        notifyListeners();
       }
       _errorMessage = 'Error editing message: $e';
       notifyListeners();

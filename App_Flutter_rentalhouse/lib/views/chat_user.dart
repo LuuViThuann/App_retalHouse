@@ -96,30 +96,32 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   void _onScroll() {
-    if (_scrollController.position.pixels <=
-        _scrollController.position.minScrollExtent + 50) {
+    if (_scrollController.position.pixels >=
+        _scrollController.position.maxScrollExtent - 50) {
       final chatViewModel = Provider.of<ChatViewModel>(context, listen: false);
       final authViewModel = Provider.of<AuthViewModel>(context, listen: false);
       if (!_isLoading && chatViewModel.messages.isNotEmpty) {
         _isLoading = true;
         chatViewModel
             .fetchMessages(
-              widget.conversationId,
-              authViewModel.currentUser!.token!,
-              cursor: chatViewModel.messages.last.id,
-            )
-            .then((_) => _isLoading = false);
+          widget.conversationId,
+          authViewModel.currentUser!.token!,
+          cursor: chatViewModel.messages.first.id,
+        )
+            .then((_) {
+          _isLoading = false;
+          if (_scrollController.hasClients) {
+            _scrollController
+                .jumpTo(_scrollController.position.maxScrollExtent);
+          }
+        });
       }
     }
   }
 
   void _scrollToBottom() {
     if (_scrollController.hasClients) {
-      _scrollController.animateTo(
-        _scrollController.position.maxScrollExtent,
-        duration: const Duration(milliseconds: 300),
-        curve: Curves.easeOut,
-      );
+      _scrollController.jumpTo(0);
     }
   }
 
@@ -259,13 +261,10 @@ class _ChatScreenState extends State<ChatScreen> {
           Expanded(
             child: Consumer<ChatViewModel>(
               builder: (context, chatViewModel, child) {
-                final sortedMessages =
-                    List<Message>.from(chatViewModel.messages)
-                      ..sort((a, b) => a.createdAt.compareTo(b.createdAt));
                 final items = <dynamic>[];
                 String? lastHeader;
 
-                for (var message in sortedMessages) {
+                for (var message in chatViewModel.messages.reversed) {
                   final header = _getDateHeader(message.createdAt);
                   if (header != lastHeader) {
                     items.add(header);
@@ -276,6 +275,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
                 return ListView.builder(
                   controller: _scrollController,
+                  reverse: true,
                   itemCount: items.length,
                   itemBuilder: (context, index) {
                     final item = items[index];
@@ -303,7 +303,7 @@ class _ChatScreenState extends State<ChatScreen> {
                     final isMe =
                         message.senderId == authViewModel.currentUser?.id;
                     return GestureDetector(
-                      key: ValueKey(message.id), // Prevent widget rebuilds
+                      key: ValueKey(message.id),
                       onLongPress: isMe
                           ? () {
                               showModalBottomSheet(
@@ -429,7 +429,7 @@ class _ChatScreenState extends State<ChatScreen> {
                                   const SizedBox(height: 5),
                                   Text(
                                     message.updatedAt != null
-                                        ? 'Đã chỉnh sửa ${DateFormat('HH:mm, dd/MM').format(message.updatedAt!)}'
+                                        ? 'Đã chỉnh sửa - ${DateFormat('HH:mm, dd/MM').format(message.updatedAt!)}'
                                         : DateFormat('HH:mm, dd/MM')
                                             .format(message.createdAt),
                                     style: TextStyle(
@@ -654,14 +654,15 @@ class _ChatScreenState extends State<ChatScreen> {
                             token: authViewModel.currentUser!.token!,
                             imagePaths:
                                 _selectedImages.map((x) => x.path).toList(),
+                            senderId: authViewModel.currentUser!.id,
                           );
                           if (success) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('Tin nhắn đã được gửi'),
-                                backgroundColor: Colors.green,
-                              ),
-                            );
+                            // ScaffoldMessenger.of(context).showSnackBar(
+                            //   const SnackBar(
+                            //     content: Text('Tin nhắn đã được gửi'),
+                            //     backgroundColor: Colors.green,
+                            //   ),
+                            // );
                             _messageController.clear();
                             setState(() {
                               _selectedImages.clear();
