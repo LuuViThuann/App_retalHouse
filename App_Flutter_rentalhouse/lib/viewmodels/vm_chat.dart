@@ -68,21 +68,27 @@ class ChatViewModel extends ChangeNotifier {
       notifyListeners();
     });
 
+    _socket?.on('joinedConversation', (data) {
+      print('Joined conversation: ${jsonEncode(data)}');
+    });
+
     _socket?.on('receiveMessage', (data) {
       print('Received message: ${jsonEncode(data)}');
       try {
         final message = Message.fromJson(data);
-        if (_currentConversationId != null && message.conversationId == _currentConversationId) {
-          // Avoid duplicate messages
+        if (_currentConversationId != null &&
+            message.conversationId == _currentConversationId) {
           if (!_messages.any((msg) => msg.id == message.id)) {
             _messages.insert(0, message);
-            print('Added message ${message.id} to conversation $_currentConversationId');
+            print(
+                'Added message ${message.id} to conversation $_currentConversationId');
             notifyListeners();
           } else {
             print('Duplicate message ${message.id} ignored');
           }
         } else {
-          print('Ignoring message for conversation ${message.conversationId}, current: $_currentConversationId');
+          print(
+              'Ignoring message for conversation ${message.conversationId}, current: $_currentConversationId');
         }
       } catch (e) {
         print('Error parsing receiveMessage: $e');
@@ -109,13 +115,17 @@ class ChatViewModel extends ChangeNotifier {
       print('Received updateMessage: ${jsonEncode(data)}');
       try {
         final updatedMessage = Message.fromJson(data);
-        final index = _messages.indexWhere((msg) => msg.id == updatedMessage.id);
-        if (index != -1 && _currentConversationId != null && updatedMessage.conversationId == _currentConversationId) {
+        final index =
+            _messages.indexWhere((msg) => msg.id == updatedMessage.id);
+        if (index != -1 &&
+            _currentConversationId != null &&
+            updatedMessage.conversationId == _currentConversationId) {
           _messages[index] = updatedMessage;
           print('Updated message ${updatedMessage.id} at index $index');
           notifyListeners();
         } else {
-          print('Message ${updatedMessage.id} not found or wrong conversation ${updatedMessage.conversationId}, current: $_currentConversationId');
+          print(
+              'Message ${updatedMessage.id} not found or wrong conversation ${updatedMessage.conversationId}, current: $_currentConversationId');
         }
       } catch (e) {
         print('Error handling updateMessage: $e');
@@ -126,19 +136,20 @@ class ChatViewModel extends ChangeNotifier {
       print('Received updateConversation: ${jsonEncode(data)}');
       try {
         final updatedConversation = Conversation.fromJson(data);
-        final index = _conversations.indexWhere((conv) => conv.id == updatedConversation.id);
+        final index = _conversations
+            .indexWhere((conv) => conv.id == updatedConversation.id);
         if (index != -1) {
           _conversations[index] = updatedConversation;
         } else {
           _conversations.add(updatedConversation);
         }
-        // Sort conversations by last message date or updatedAt
         _conversations.sort((a, b) {
           final aDate = a.lastMessage?.createdAt ?? a.updatedAt ?? a.createdAt;
           final bDate = b.lastMessage?.createdAt ?? b.updatedAt ?? b.createdAt;
           return bDate.compareTo(aDate);
         });
-        print('Updated conversation list with conversation ${updatedConversation.id}');
+        print(
+            'Updated conversation list with conversation ${updatedConversation.id}');
         notifyListeners();
       } catch (e) {
         print('Error handling updateConversation: $e');
@@ -175,7 +186,8 @@ class ChatViewModel extends ChangeNotifier {
 
       if (response.statusCode == 200) {
         final List<dynamic> data = jsonDecode(response.body);
-        _conversations = data.map((json) => Conversation.fromJson(json)).toList();
+        _conversations =
+            data.map((json) => Conversation.fromJson(json)).toList();
         _errorMessage = null;
       } else {
         _errorMessage = 'Failed to load conversations: ${response.body}';
@@ -188,10 +200,12 @@ class ChatViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<Conversation?> fetchConversationById(String conversationId, String token) async {
+  Future<Conversation?> fetchConversationById(
+      String conversationId, String token) async {
     try {
       final response = await http.get(
-        Uri.parse('${ApiRoutes.serverBaseUrl}/api/conversations/$conversationId'),
+        Uri.parse(
+            '${ApiRoutes.serverBaseUrl}/api/conversations/$conversationId'),
         headers: {'Authorization': 'Bearer $token'},
       );
 
@@ -208,7 +222,8 @@ class ChatViewModel extends ChangeNotifier {
     }
   }
 
-  Future<void> fetchMessages(String conversationId, String token, {String? cursor, int limit = 10}) async {
+  Future<void> fetchMessages(String conversationId, String token,
+      {String? cursor, int limit = 10}) async {
     _isLoading = true;
     _currentConversationId = conversationId;
     notifyListeners();
@@ -218,8 +233,9 @@ class ChatViewModel extends ChangeNotifier {
         'limit': limit.toString(),
         if (cursor != null) 'cursor': cursor,
       };
-      final uri = Uri.parse('${ApiRoutes.serverBaseUrl}/api/messages/$conversationId')
-          .replace(queryParameters: queryParameters);
+      final uri =
+          Uri.parse('${ApiRoutes.serverBaseUrl}/api/messages/$conversationId')
+              .replace(queryParameters: queryParameters);
       final response = await http.get(
         uri,
         headers: {'Authorization': 'Bearer $token'},
@@ -228,10 +244,11 @@ class ChatViewModel extends ChangeNotifier {
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         final List<dynamic> messageData = data['messages'];
-        final newMessages = messageData.map((json) => Message.fromJson(json)).toList();
-        // Avoid duplicates by filtering out existing messages
+        final newMessages =
+            messageData.map((json) => Message.fromJson(json)).toList();
         _messages = [
-          ...newMessages.where((newMsg) => !_messages.any((msg) => msg.id == newMsg.id)),
+          ...newMessages
+              .where((newMsg) => !_messages.any((msg) => msg.id == newMsg.id)),
           ..._messages,
         ];
         _errorMessage = null;
@@ -267,8 +284,8 @@ class ChatViewModel extends ChangeNotifier {
       if (response.statusCode == 201) {
         final data = jsonDecode(response.body);
         final newConversation = Conversation.fromJson(data);
-        // Update local conversations list
-        final index = _conversations.indexWhere((conv) => conv.id == newConversation.id);
+        final index =
+            _conversations.indexWhere((conv) => conv.id == newConversation.id);
         if (index != -1) {
           _conversations[index] = newConversation;
         } else {
@@ -298,6 +315,25 @@ class ChatViewModel extends ChangeNotifier {
     List<String> imagePaths = const [],
   }) async {
     try {
+      // Optimistic update: Add temporary message
+      final tempId = 'temp_${DateTime.now().millisecondsSinceEpoch}';
+      if (content.isNotEmpty || imagePaths.isNotEmpty) {
+        final tempMessage = Message(
+          id: tempId,
+          conversationId: conversationId,
+          senderId: '', // Will be updated by server
+          content: content,
+          images: imagePaths,
+          createdAt: DateTime.now(),
+          updatedAt: null,
+          sender: {'id': '', 'username': 'You', 'avatarBase64': ''},
+        );
+        if (_currentConversationId == conversationId) {
+          _messages.insert(0, tempMessage);
+          notifyListeners();
+        }
+      }
+
       final request = http.MultipartRequest(
         'POST',
         Uri.parse('${ApiRoutes.serverBaseUrl}/api/messages'),
@@ -315,22 +351,30 @@ class ChatViewModel extends ChangeNotifier {
       final responseData = jsonDecode(responseBody);
 
       if (response.statusCode == 201) {
-        // Add the message to the local list immediately for instant UI feedback
+        // Replace temporary message with server response
         final message = Message.fromJson(responseData);
-        if (_currentConversationId == conversationId && !_messages.any((msg) => msg.id == message.id)) {
+        final tempIndex = _messages.indexWhere((msg) => msg.id == tempId);
+        if (tempIndex != -1 && _currentConversationId == conversationId) {
+          _messages[tempIndex] = message;
+          print('Replaced temp message $tempId with ${message.id}');
+        } else if (!_messages.any((msg) => msg.id == message.id) &&
+            _currentConversationId == conversationId) {
           _messages.insert(0, message);
-          print('Added sent message ${message.id} to conversation $conversationId');
-          notifyListeners();
+          print(
+              'Added sent message ${message.id} to conversation $conversationId');
         }
-        // Fetch updated conversations to reflect the new lastMessage
-        await fetchConversations(token);
+        notifyListeners();
         return true;
       } else {
+        // Remove temporary message on failure
+        _messages.removeWhere((msg) => msg.id == tempId);
         _errorMessage = 'Failed to send message: $responseBody';
         notifyListeners();
         return false;
       }
     } catch (e) {
+      _messages.removeWhere(
+          (msg) => msg.id == 'temp_${DateTime.now().millisecondsSinceEpoch}');
       _errorMessage = 'Error sending message: $e';
       notifyListeners();
       return false;
@@ -348,12 +392,6 @@ class ChatViewModel extends ChangeNotifier {
       );
 
       if (response.statusCode == 200) {
-        // Remove locally to ensure immediate UI update
-        _messages.removeWhere((msg) => msg.id == messageId);
-        print('Locally deleted message $messageId');
-        notifyListeners();
-        // Fetch updated conversations to reflect the new lastMessage
-        await fetchConversations(token);
         return true;
       } else {
         _errorMessage = 'Failed to delete message: ${response.body}';
@@ -375,6 +413,26 @@ class ChatViewModel extends ChangeNotifier {
     List<String> removeImages = const [],
   }) async {
     try {
+      // Optimistic update
+      final index = _messages.indexWhere((msg) => msg.id == messageId);
+      if (index != -1 && _currentConversationId != null) {
+        final oldMessage = _messages[index];
+        _messages[index] = Message(
+          id: messageId,
+          conversationId: oldMessage.conversationId,
+          senderId: oldMessage.senderId,
+          content: content,
+          images: [
+            ...oldMessage.images.where((img) => !removeImages.contains(img)),
+            ...imagePaths
+          ],
+          createdAt: oldMessage.createdAt,
+          updatedAt: DateTime.now(),
+          sender: oldMessage.sender,
+        );
+        notifyListeners();
+      }
+
       final request = http.MultipartRequest(
         'PATCH',
         Uri.parse('${ApiRoutes.serverBaseUrl}/api/messages/$messageId'),
@@ -392,23 +450,24 @@ class ChatViewModel extends ChangeNotifier {
       final responseData = jsonDecode(responseBody);
 
       if (response.statusCode == 200) {
-        // Update the message locally for immediate UI feedback
-        final updatedMessage = Message.fromJson(responseData);
-        final index = _messages.indexWhere((msg) => msg.id == updatedMessage.id);
-        if (index != -1 && _currentConversationId == updatedMessage.conversationId) {
-          _messages[index] = updatedMessage;
-          print('Locally updated message ${updatedMessage.id}');
-          notifyListeners();
-        }
-        // Fetch updated conversations to reflect the new lastMessage
-        await fetchConversations(token);
         return true;
       } else {
+        // Revert optimistic update on failure
+        if (index != -1 && _currentConversationId != null) {
+          _messages[index] =
+              _messages[index]; // Restore original (handled by server response)
+        }
         _errorMessage = 'Failed to edit message: $responseBody';
         notifyListeners();
         return false;
       }
     } catch (e) {
+      // Revert optimistic update on error
+      final index = _messages.indexWhere((msg) => msg.id == messageId);
+      if (index != -1 && _currentConversationId != null) {
+        _messages[index] =
+            _messages[index]; // Restore original (handled by server response)
+      }
       _errorMessage = 'Error editing message: $e';
       notifyListeners();
       return false;
@@ -428,7 +487,8 @@ class ChatViewModel extends ChangeNotifier {
       print('Joining conversation: $conversationId');
       _socket?.emit('joinConversation', conversationId);
     } else {
-      print('Socket not connected, queuing join for conversation: $conversationId');
+      print(
+          'Socket not connected, queuing join for conversation: $conversationId');
       _currentConversationId = conversationId;
       _socket?.connect();
     }

@@ -39,7 +39,8 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
           backgroundColor: Colors.redAccent,
           behavior: SnackBarBehavior.floating,
           margin: EdgeInsets.all(16),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         ),
       );
     }
@@ -53,7 +54,8 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
         const end = Offset.zero;
         const curve = Curves.easeInOut;
 
-        var tween = Tween(begin: begin, end: end).chain(CurveTween(curve: curve));
+        var tween =
+            Tween(begin: begin, end: end).chain(CurveTween(curve: curve));
         var offsetAnimation = animation.drive(tween);
 
         return SlideTransition(
@@ -135,7 +137,8 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     CircularProgressIndicator(
-                      valueColor: AlwaysStoppedAnimation<Color>(Colors.blueAccent),
+                      valueColor:
+                          AlwaysStoppedAnimation<Color>(Colors.blueAccent),
                     ),
                     SizedBox(height: 16),
                     Text(
@@ -156,7 +159,8 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(Icons.error_outline, size: 64, color: Colors.redAccent),
+                    Icon(Icons.error_outline,
+                        size: 64, color: Colors.redAccent),
                     SizedBox(height: 16),
                     Text(
                       chatViewModel.errorMessage!,
@@ -175,7 +179,8 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
                         ),
-                        padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                        padding:
+                            EdgeInsets.symmetric(horizontal: 24, vertical: 12),
                       ),
                       child: Text(
                         'Thử lại',
@@ -196,7 +201,8 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(Icons.chat_bubble_outline, size: 64, color: Colors.grey[400]),
+                    Icon(Icons.chat_bubble_outline,
+                        size: 64, color: Colors.grey[400]),
                     SizedBox(height: 16),
                     Text(
                       'Chưa có cuộc trò chuyện nào',
@@ -228,7 +234,8 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
                 }
                 return InkWell(
                   onTap: () {
-                    print('Navigating to ChatScreen with conversationId: ${conversation.id}');
+                    print(
+                        'Navigating to ChatScreen with conversationId: ${conversation.id}');
                     Navigator.push(
                       context,
                       _createRoute(ChatScreen(
@@ -252,15 +259,21 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
                       ],
                     ),
                     child: ListTile(
-                      contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      contentPadding:
+                          EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                       leading: CircleAvatar(
                         radius: 28,
-                        backgroundImage: conversation.landlord['avatarBase64']?.isNotEmpty == true
-                            ? MemoryImage(base64Decode(conversation.landlord['avatarBase64']))
-                            : null,
+                        backgroundImage:
+                            conversation.landlord['avatarBase64']?.isNotEmpty ==
+                                    true
+                                ? MemoryImage(base64Decode(
+                                    conversation.landlord['avatarBase64']))
+                                : null,
                         backgroundColor: Colors.blue[100],
-                        child: conversation.landlord['avatarBase64']?.isEmpty == true
-                            ? Icon(Icons.person, size: 28, color: Colors.blue[800])
+                        child: conversation.landlord['avatarBase64']?.isEmpty ==
+                                true
+                            ? Icon(Icons.person,
+                                size: 28, color: Colors.blue[800])
                             : null,
                       ),
                       title: Text(
@@ -282,8 +295,10 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
                       ),
                       trailing: Text(
                         conversation.lastMessage != null
-                            ? DateFormat('HH:mm, dd/MM').format(conversation.lastMessage!.createdAt)
-                            : DateFormat('HH:mm, dd/MM').format(conversation.createdAt),
+                            ? DateFormat('HH:mm, dd/MM')
+                                .format(conversation.lastMessage!.createdAt)
+                            : DateFormat('HH:mm, dd/MM')
+                                .format(conversation.createdAt),
                         style: TextStyle(
                           fontSize: 12,
                           color: Colors.grey[500],

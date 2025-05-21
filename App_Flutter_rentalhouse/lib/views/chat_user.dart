@@ -40,6 +40,7 @@ class _ChatScreenState extends State<ChatScreen> {
   void initState() {
     super.initState();
     _loadData();
+    _scrollController.addListener(_onScroll);
   }
 
   Future<void> _loadData() async {
@@ -58,27 +59,32 @@ class _ChatScreenState extends State<ChatScreen> {
       print('Loading data for conversationId: ${widget.conversationId}');
       chatViewModel.clearMessages();
       if (chatViewModel.conversations.isEmpty ||
-          !chatViewModel.conversations.any((c) => c.id == widget.conversationId)) {
+          !chatViewModel.conversations
+              .any((c) => c.id == widget.conversationId)) {
         print('Conversations empty or missing conversation, fetching...');
-        await chatViewModel.fetchConversations(authViewModel.currentUser!.token!);
-        if (!chatViewModel.conversations.any((c) => c.id == widget.conversationId)) {
-          print('Conversation ${widget.conversationId} not found in conversations, fetching by ID');
-          final conversation = await chatViewModel.fetchConversationById(
-            widget.conversationId,
-            authViewModel.currentUser!.token!,
+        await chatViewModel
+            .fetchConversations(authViewModel.currentUser!.token!);
+        if (!chatViewModel.conversations
+            .any((c) => c.id == widget.conversationId)) {
+          print('Conversation ${widget.conversationId} not found, creating...');
+          final conversation = await chatViewModel.getOrCreateConversation(
+            rentalId: widget.rentalId,
+            landlordId: widget.landlordId,
+            token: authViewModel.currentUser!.token!,
           );
           if (conversation == null) {
-            throw Exception('Cuộc trò chuyện không tồn tại hoặc không thể tải');
+            throw Exception('Không thể tạo hoặc tải cuộc trò chuyện');
           }
         }
       }
-      await chatViewModel.fetchMessages(widget.conversationId, authViewModel.currentUser!.token!);
+      await chatViewModel.fetchMessages(
+          widget.conversationId, authViewModel.currentUser!.token!);
       chatViewModel.joinConversation(widget.conversationId);
       setState(() {
         _isLoading = false;
       });
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        _scrollController.jumpTo(_scrollController.position.maxScrollExtent);
+        _scrollToBottom();
       });
     } catch (e) {
       setState(() {
@@ -89,33 +95,64 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
+  void _onScroll() {
+    if (_scrollController.position.pixels <=
+        _scrollController.position.minScrollExtent + 50) {
+      final chatViewModel = Provider.of<ChatViewModel>(context, listen: false);
+      final authViewModel = Provider.of<AuthViewModel>(context, listen: false);
+      if (!_isLoading && chatViewModel.messages.isNotEmpty) {
+        _isLoading = true;
+        chatViewModel
+            .fetchMessages(
+              widget.conversationId,
+              authViewModel.currentUser!.token!,
+              cursor: chatViewModel.messages.last.id,
+            )
+            .then((_) => _isLoading = false);
+      }
+    }
+  }
+
+  void _scrollToBottom() {
+    if (_scrollController.hasClients) {
+      _scrollController.animateTo(
+        _scrollController.position.maxScrollExtent,
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeOut,
+      );
+    }
+  }
+
   Future<Map<String, dynamic>> _fetchLandlordInfo(BuildContext context) async {
     final chatViewModel = Provider.of<ChatViewModel>(context, listen: false);
     try {
-      print('Fetching landlord info for conversationId: ${widget.conversationId}');
       final conversation = chatViewModel.conversations.firstWhere(
-            (c) => c.id == widget.conversationId,
-        orElse: () {
-          print('Conversation ${widget.conversationId} not found in conversations');
-          return Conversation(
-            id: '',
-            rentalId: widget.rentalId,
-            participants: [widget.landlordId],
-            isPending: true,
-            createdAt: DateTime.now(),
-            landlord: {'id': widget.landlordId, 'username': 'Chủ nhà', 'avatarBase64': ''},
-            rental: null,
-          );
-        },
+        (c) => c.id == widget.conversationId,
+        orElse: () => Conversation(
+          id: '',
+          rentalId: widget.rentalId,
+          participants: [widget.landlordId],
+          isPending: true,
+          createdAt: DateTime.now(),
+          landlord: {
+            'id': widget.landlordId,
+            'username': 'Chủ nhà',
+            'avatarBase64': ''
+          },
+          rental: null,
+        ),
       );
       if (conversation.id.isEmpty) {
         throw Exception('Không tìm thấy cuộc trò chuyện');
       }
-      print('Landlord info: ${conversation.landlord}');
       return conversation.landlord;
     } catch (e) {
       print('Error in _fetchLandlordInfo: $e');
-      return {'id': widget.landlordId, 'username': 'Chủ nhà', 'avatarBase64': ''};
+      return {
+        'id': widget.landlordId,
+        'username': 'Chủ nhà',
+        'avatarBase64': ''
+      };
     }
   }
 
@@ -164,7 +201,7 @@ class _ChatScreenState extends State<ChatScreen> {
     final authViewModel = Provider.of<AuthViewModel>(context);
     final chatViewModel = Provider.of<ChatViewModel>(context);
 
-    if (_isLoading) {
+    if (_isLoading && chatViewModel.messages.isEmpty) {
       return const Scaffold(
         body: Center(child: CircularProgressIndicator()),
       );
@@ -195,18 +232,19 @@ class _ChatScreenState extends State<ChatScreen> {
             if (snapshot.connectionState == ConnectionState.waiting) {
               return const Text('Loading...');
             }
-            if (snapshot.hasError || !snapshot.hasData) {
-              return const Text('Chủ nhà');
-            }
-            final landlord = snapshot.data!;
+            final landlord =
+                snapshot.data ?? {'username': 'Chủ nhà', 'avatarBase64': ''};
             return Row(
               children: [
                 CircleAvatar(
                   radius: 20,
                   backgroundImage: landlord['avatarBase64']?.isNotEmpty == true
-                      ? MemoryImage(base64Decode(landlord['avatarBase64'] as String))
+                      ? MemoryImage(
+                          base64Decode(landlord['avatarBase64'] as String))
                       : null,
-                  child: landlord['avatarBase64']?.isEmpty == true ? const Icon(Icons.person) : null,
+                  child: landlord['avatarBase64']?.isEmpty == true
+                      ? const Icon(Icons.person)
+                      : null,
                 ),
                 const SizedBox(width: 10),
                 Text(landlord['username'] ?? 'Chủ nhà'),
@@ -221,20 +259,13 @@ class _ChatScreenState extends State<ChatScreen> {
           Expanded(
             child: Consumer<ChatViewModel>(
               builder: (context, chatViewModel, child) {
-                if (chatViewModel.isLoading) {
-                  return const Center(child: CircularProgressIndicator());
-                }
-                if (chatViewModel.errorMessage != null) {
-                  return Center(child: Text(chatViewModel.errorMessage!));
-                }
-                // Sort messages by createdAt ascending (oldest first)
-                final sortedMessages = chatViewModel.messages..sort((a, b) => a.createdAt.compareTo(b.createdAt));
+                final sortedMessages =
+                    List<Message>.from(chatViewModel.messages)
+                      ..sort((a, b) => a.createdAt.compareTo(b.createdAt));
                 final items = <dynamic>[];
                 String? lastHeader;
 
-                // Add date headers and messages
-                for (var i = 0; i < sortedMessages.length; i++) {
-                  final message = sortedMessages[i];
+                for (var message in sortedMessages) {
                   final header = _getDateHeader(message.createdAt);
                   if (header != lastHeader) {
                     items.add(header);
@@ -253,83 +284,99 @@ class _ChatScreenState extends State<ChatScreen> {
                         padding: const EdgeInsets.symmetric(vertical: 8),
                         child: Center(
                           child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 12, vertical: 6),
                             decoration: BoxDecoration(
                               color: Colors.grey[300],
                               borderRadius: BorderRadius.circular(12),
                             ),
                             child: Text(
                               item,
-                              style: TextStyle(fontSize: 12, color: Colors.grey[800]),
+                              style: TextStyle(
+                                  fontSize: 12, color: Colors.grey[800]),
                             ),
                           ),
                         ),
                       );
                     }
                     final message = item as Message;
-                    final isMe = message.senderId == authViewModel.currentUser?.id;
+                    final isMe =
+                        message.senderId == authViewModel.currentUser?.id;
                     return GestureDetector(
+                      key: ValueKey(message.id), // Prevent widget rebuilds
                       onLongPress: isMe
                           ? () {
-                        showModalBottomSheet(
-                          context: context,
-                          builder: (context) => SafeArea(
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                ListTile(
-                                  leading: const Icon(Icons.edit),
-                                  title: const Text('Chỉnh sửa'),
-                                  onTap: () {
-                                    Navigator.pop(context);
-                                    _startEditing(message);
-                                  },
+                              showModalBottomSheet(
+                                context: context,
+                                builder: (context) => SafeArea(
+                                  child: Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      ListTile(
+                                        leading: const Icon(Icons.edit),
+                                        title: const Text('Chỉnh sửa'),
+                                        onTap: () {
+                                          Navigator.pop(context);
+                                          _startEditing(message);
+                                        },
+                                      ),
+                                      ListTile(
+                                        leading: const Icon(Icons.delete),
+                                        title: const Text('Xóa'),
+                                        onTap: () async {
+                                          Navigator.pop(context);
+                                          final success =
+                                              await chatViewModel.deleteMessage(
+                                            messageId: message.id,
+                                            token: authViewModel
+                                                .currentUser!.token!,
+                                          );
+                                          if (success) {
+                                            ScaffoldMessenger.of(context)
+                                                .showSnackBar(
+                                              const SnackBar(
+                                                content: Text(
+                                                    'Tin nhắn đã được xóa'),
+                                                backgroundColor: Colors.green,
+                                              ),
+                                            );
+                                            _scrollToBottom();
+                                          } else {
+                                            ScaffoldMessenger.of(context)
+                                                .showSnackBar(
+                                              SnackBar(
+                                                content: Text(chatViewModel
+                                                        .errorMessage ??
+                                                    'Lỗi khi xóa tin nhắn'),
+                                                backgroundColor:
+                                                    Colors.redAccent,
+                                              ),
+                                            );
+                                          }
+                                        },
+                                      ),
+                                    ],
+                                  ),
                                 ),
-                                ListTile(
-                                  leading: const Icon(Icons.delete),
-                                  title: const Text('Xóa'),
-                                  onTap: () async {
-                                    Navigator.pop(context);
-                                    final success = await chatViewModel.deleteMessage(
-                                      messageId: message.id,
-                                      token: authViewModel.currentUser!.token!,
-                                    );
-                                    if (success) {
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        const SnackBar(
-                                          content: Text('Tin nhắn đã được xóa'),
-                                          backgroundColor: Colors.green,
-                                        ),
-                                      );
-                                      WidgetsBinding.instance.addPostFrameCallback((_) {
-                                        _scrollController.jumpTo(_scrollController.position.maxScrollExtent);
-                                      });
-                                    } else {
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        SnackBar(
-                                          content: Text(chatViewModel.errorMessage ?? 'Lỗi khi xóa tin nhắn'),
-                                          backgroundColor: Colors.redAccent,
-                                        ),
-                                      );
-                                    }
-                                  },
-                                ),
-                              ],
-                            ),
-                          ),
-                        );
-                      }
+                              );
+                            }
                           : null,
                       child: Row(
-                        mainAxisAlignment: isMe ? MainAxisAlignment.end : MainAxisAlignment.start,
+                        mainAxisAlignment: isMe
+                            ? MainAxisAlignment.end
+                            : MainAxisAlignment.start,
                         children: [
                           if (!isMe) ...[
                             CircleAvatar(
                               radius: 16,
-                              backgroundImage: message.sender['avatarBase64']?.isNotEmpty == true
-                                  ? MemoryImage(base64Decode(message.sender['avatarBase64']))
-                                  : null,
-                              child: message.sender['avatarBase64']?.isEmpty == true
+                              backgroundImage:
+                                  message.sender['avatarBase64']?.isNotEmpty ==
+                                          true
+                                      ? MemoryImage(base64Decode(
+                                          message.sender['avatarBase64']))
+                                      : null,
+                              child: message.sender['avatarBase64']?.isEmpty ==
+                                      true
                                   ? const Icon(Icons.person, size: 16)
                                   : null,
                             ),
@@ -337,32 +384,41 @@ class _ChatScreenState extends State<ChatScreen> {
                           ],
                           Flexible(
                             child: Container(
-                              margin: const EdgeInsets.symmetric(vertical: 5, horizontal: 10),
+                              margin: const EdgeInsets.symmetric(
+                                  vertical: 5, horizontal: 10),
                               padding: const EdgeInsets.all(10),
                               decoration: BoxDecoration(
-                                color: isMe ? Colors.blue[100] : Colors.grey[200],
+                                color:
+                                    isMe ? Colors.blue[100] : Colors.grey[200],
                                 borderRadius: BorderRadius.circular(12),
                               ),
                               child: Column(
-                                crossAxisAlignment: isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+                                crossAxisAlignment: isMe
+                                    ? CrossAxisAlignment.end
+                                    : CrossAxisAlignment.start,
                                 children: [
                                   if (message.images.isNotEmpty)
                                     Wrap(
                                       spacing: 5,
                                       children: message.images
                                           .map((img) => ClipRRect(
-                                        borderRadius: BorderRadius.circular(8),
-                                        child: CachedNetworkImage(
-                                          imageUrl: '${ApiRoutes.serverBaseUrl}$img',
-                                          width: 100,
-                                          height: 100,
-                                          fit: BoxFit.cover,
-                                          memCacheHeight: 200,
-                                          memCacheWidth: 200,
-                                          placeholder: (context, url) => const CircularProgressIndicator(),
-                                          errorWidget: (context, url, error) => const Icon(Icons.error),
-                                        ),
-                                      ))
+                                                borderRadius:
+                                                    BorderRadius.circular(8),
+                                                child: CachedNetworkImage(
+                                                  imageUrl:
+                                                      '${ApiRoutes.serverBaseUrl}$img',
+                                                  width: 100,
+                                                  height: 100,
+                                                  fit: BoxFit.cover,
+                                                  memCacheHeight: 200,
+                                                  memCacheWidth: 200,
+                                                  placeholder: (context, url) =>
+                                                      const CircularProgressIndicator(),
+                                                  errorWidget: (context, url,
+                                                          error) =>
+                                                      const Icon(Icons.error),
+                                                ),
+                                              ))
                                           .toList(),
                                     ),
                                   if (message.content.isNotEmpty)
@@ -374,8 +430,10 @@ class _ChatScreenState extends State<ChatScreen> {
                                   Text(
                                     message.updatedAt != null
                                         ? 'Đã chỉnh sửa ${DateFormat('HH:mm, dd/MM').format(message.updatedAt!)}'
-                                        : DateFormat('HH:mm, dd/MM').format(message.createdAt),
-                                    style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                                        : DateFormat('HH:mm, dd/MM')
+                                            .format(message.createdAt),
+                                    style: TextStyle(
+                                        fontSize: 12, color: Colors.grey[600]),
                                   ),
                                 ],
                               ),
@@ -385,10 +443,14 @@ class _ChatScreenState extends State<ChatScreen> {
                             const SizedBox(width: 8),
                             CircleAvatar(
                               radius: 16,
-                              backgroundImage: message.sender['avatarBase64']?.isNotEmpty == true
-                                  ? MemoryImage(base64Decode(message.sender['avatarBase64']))
-                                  : null,
-                              child: message.sender['avatarBase64']?.isEmpty == true
+                              backgroundImage:
+                                  message.sender['avatarBase64']?.isNotEmpty ==
+                                          true
+                                      ? MemoryImage(base64Decode(
+                                          message.sender['avatarBase64']))
+                                      : null,
+                              child: message.sender['avatarBase64']?.isEmpty ==
+                                      true
                                   ? const Icon(Icons.person, size: 16)
                                   : null,
                             ),
@@ -405,7 +467,9 @@ class _ChatScreenState extends State<ChatScreen> {
             padding: const EdgeInsets.all(8.0),
             child: Column(
               children: [
-                if (_editingMessageId != null && chatViewModel.messages.any((msg) => msg.id == _editingMessageId))
+                if (_editingMessageId != null &&
+                    chatViewModel.messages
+                        .any((msg) => msg.id == _editingMessageId))
                   Container(
                     height: 60,
                     margin: const EdgeInsets.only(bottom: 8),
@@ -426,12 +490,15 @@ class _ChatScreenState extends State<ChatScreen> {
                               child: ClipRRect(
                                 borderRadius: BorderRadius.circular(8),
                                 child: CachedNetworkImage(
-                                  imageUrl: '${ApiRoutes.serverBaseUrl}$imageUrl',
+                                  imageUrl:
+                                      '${ApiRoutes.serverBaseUrl}$imageUrl',
                                   width: 60,
                                   height: 60,
                                   fit: BoxFit.cover,
-                                  placeholder: (context, url) => const CircularProgressIndicator(),
-                                  errorWidget: (context, url, error) => const Icon(Icons.error),
+                                  placeholder: (context, url) =>
+                                      const CircularProgressIndicator(),
+                                  errorWidget: (context, url, error) =>
+                                      const Icon(Icons.error),
                                 ),
                               ),
                             ),
@@ -508,7 +575,9 @@ class _ChatScreenState extends State<ChatScreen> {
                       child: TextField(
                         controller: _messageController,
                         decoration: InputDecoration(
-                          hintText: _editingMessageId == null ? 'Nhập tin nhắn...' : 'Chỉnh sửa tin nhắn...',
+                          hintText: _editingMessageId == null
+                              ? 'Nhập tin nhắn...'
+                              : 'Chỉnh sửa tin nhắn...',
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(20),
                           ),
@@ -527,7 +596,8 @@ class _ChatScreenState extends State<ChatScreen> {
                         if (authViewModel.currentUser == null) {
                           ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(
-                              content: Text('Vui lòng đăng nhập để gửi tin nhắn'),
+                              content:
+                                  Text('Vui lòng đăng nhập để gửi tin nhắn'),
                               backgroundColor: Colors.redAccent,
                             ),
                           );
@@ -536,10 +606,13 @@ class _ChatScreenState extends State<ChatScreen> {
 
                         final content = _messageController.text.trim();
                         if (_editingMessageId != null) {
-                          if (content.isEmpty && _selectedImages.isEmpty && _existingImagesToRemove.isEmpty) {
+                          if (content.isEmpty &&
+                              _selectedImages.isEmpty &&
+                              _existingImagesToRemove.isEmpty) {
                             ScaffoldMessenger.of(context).showSnackBar(
                               const SnackBar(
-                                content: Text('Vui lòng cung cấp nội dung hoặc hình ảnh để chỉnh sửa'),
+                                content: Text(
+                                    'Vui lòng cung cấp nội dung hoặc hình ảnh để chỉnh sửa'),
                                 backgroundColor: Colors.redAccent,
                               ),
                             );
@@ -549,7 +622,8 @@ class _ChatScreenState extends State<ChatScreen> {
                             messageId: _editingMessageId!,
                             content: content,
                             token: authViewModel.currentUser!.token!,
-                            imagePaths: _selectedImages.map((x) => x.path).toList(),
+                            imagePaths:
+                                _selectedImages.map((x) => x.path).toList(),
                             removeImages: _existingImagesToRemove,
                           );
                           if (success) {
@@ -560,13 +634,12 @@ class _ChatScreenState extends State<ChatScreen> {
                               ),
                             );
                             _cancelEditing();
-                            WidgetsBinding.instance.addPostFrameCallback((_) {
-                              _scrollController.jumpTo(_scrollController.position.maxScrollExtent);
-                            });
+                            _scrollToBottom();
                           } else {
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(
-                                content: Text(chatViewModel.errorMessage ?? 'Lỗi khi chỉnh sửa tin nhắn'),
+                                content: Text(chatViewModel.errorMessage ??
+                                    'Lỗi khi chỉnh sửa tin nhắn'),
                                 backgroundColor: Colors.redAccent,
                               ),
                             );
@@ -579,7 +652,8 @@ class _ChatScreenState extends State<ChatScreen> {
                             conversationId: widget.conversationId,
                             content: content,
                             token: authViewModel.currentUser!.token!,
-                            imagePaths: _selectedImages.map((x) => x.path).toList(),
+                            imagePaths:
+                                _selectedImages.map((x) => x.path).toList(),
                           );
                           if (success) {
                             ScaffoldMessenger.of(context).showSnackBar(
@@ -592,13 +666,12 @@ class _ChatScreenState extends State<ChatScreen> {
                             setState(() {
                               _selectedImages.clear();
                             });
-                            WidgetsBinding.instance.addPostFrameCallback((_) {
-                              _scrollController.jumpTo(_scrollController.position.maxScrollExtent);
-                            });
+                            _scrollToBottom();
                           } else {
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(
-                                content: Text(chatViewModel.errorMessage ?? 'Lỗi khi gửi tin nhắn'),
+                                content: Text(chatViewModel.errorMessage ??
+                                    'Lỗi khi gửi tin nhắn'),
                                 backgroundColor: Colors.redAccent,
                               ),
                             );
@@ -618,6 +691,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
   @override
   void dispose() {
+    _scrollController.removeListener(_onScroll);
     _messageController.dispose();
     _scrollController.dispose();
     super.dispose();
