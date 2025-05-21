@@ -3,6 +3,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_rentalhouse/config/api_routes.dart';
 import 'package:flutter_rentalhouse/models/conversation.dart';
+import 'package:flutter_rentalhouse/models/message.dart';
 import 'package:flutter_rentalhouse/viewmodels/vm_auth.dart';
 import 'package:flutter_rentalhouse/viewmodels/vm_chat.dart';
 import 'package:intl/intl.dart';
@@ -30,6 +31,10 @@ class _ChatScreenState extends State<ChatScreen> {
   bool _isLoading = true;
   String? _errorMessage;
   final List<XFile> _selectedImages = [];
+  final List<String> _existingImagesToRemove = [];
+  String? _editingMessageId;
+  final TextEditingController _messageController = TextEditingController();
+  final ScrollController _scrollController = ScrollController();
 
   @override
   void initState() {
@@ -68,8 +73,12 @@ class _ChatScreenState extends State<ChatScreen> {
         }
       }
       await chatViewModel.fetchMessages(widget.conversationId, authViewModel.currentUser!.token!);
+      chatViewModel.joinConversation(widget.conversationId);
       setState(() {
         _isLoading = false;
+      });
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _scrollController.jumpTo(_scrollController.position.maxScrollExtent);
       });
     } catch (e) {
       setState(() {
@@ -120,11 +129,40 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
+  void _startEditing(Message message) {
+    setState(() {
+      _editingMessageId = message.id;
+      _messageController.text = message.content;
+      _selectedImages.clear();
+      _existingImagesToRemove.clear();
+    });
+  }
+
+  void _cancelEditing() {
+    setState(() {
+      _editingMessageId = null;
+      _messageController.clear();
+      _selectedImages.clear();
+      _existingImagesToRemove.clear();
+    });
+  }
+
+  String _getDateHeader(DateTime date) {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final messageDate = DateTime(date.year, date.month, date.day);
+    final difference = today.difference(messageDate).inDays;
+
+    if (difference == 0) return 'Hôm nay';
+    if (difference == 1) return 'Hôm qua';
+    if (difference <= 7) return '$difference ngày trước';
+    return DateFormat('dd/MM/yyyy').format(messageDate);
+  }
+
   @override
   Widget build(BuildContext context) {
     final authViewModel = Provider.of<AuthViewModel>(context);
     final chatViewModel = Provider.of<ChatViewModel>(context);
-    final TextEditingController messageController = TextEditingController();
 
     if (_isLoading) {
       return const Scaffold(
@@ -189,84 +227,164 @@ class _ChatScreenState extends State<ChatScreen> {
                 if (chatViewModel.errorMessage != null) {
                   return Center(child: Text(chatViewModel.errorMessage!));
                 }
+                // Sort messages by createdAt ascending (oldest first)
+                final sortedMessages = chatViewModel.messages..sort((a, b) => a.createdAt.compareTo(b.createdAt));
+                final items = <dynamic>[];
+                String? lastHeader;
+
+                // Add date headers and messages
+                for (var i = 0; i < sortedMessages.length; i++) {
+                  final message = sortedMessages[i];
+                  final header = _getDateHeader(message.createdAt);
+                  if (header != lastHeader) {
+                    items.add(header);
+                    lastHeader = header;
+                  }
+                  items.add(message);
+                }
+
                 return ListView.builder(
-                  reverse: true,
-                  itemCount: chatViewModel.messages.length,
+                  controller: _scrollController,
+                  itemCount: items.length,
                   itemBuilder: (context, index) {
-                    final message = chatViewModel.messages[chatViewModel.messages.length - 1 - index];
-                    final isMe = message.senderId == authViewModel.currentUser?.id;
-                    return Row(
-                      mainAxisAlignment: isMe ? MainAxisAlignment.end : MainAxisAlignment.start,
-                      children: [
-                        if (!isMe) ...[
-                          CircleAvatar(
-                            radius: 16,
-                            backgroundImage: message.sender['avatarBase64']?.isNotEmpty == true
-                                ? MemoryImage(base64Decode(message.sender['avatarBase64']))
-                                : null,
-                            child: message.sender['avatarBase64']?.isEmpty == true
-                                ? const Icon(Icons.person, size: 16)
-                                : null,
-                          ),
-                          const SizedBox(width: 8),
-                        ],
-                        Flexible(
+                    final item = items[index];
+                    if (item is String) {
+                      return Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        child: Center(
                           child: Container(
-                            margin: const EdgeInsets.symmetric(vertical: 5, horizontal: 10),
-                            padding: const EdgeInsets.all(10),
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                             decoration: BoxDecoration(
-                              color: isMe ? Colors.blue[100] : Colors.grey[200],
+                              color: Colors.grey[300],
                               borderRadius: BorderRadius.circular(12),
                             ),
+                            child: Text(
+                              item,
+                              style: TextStyle(fontSize: 12, color: Colors.grey[800]),
+                            ),
+                          ),
+                        ),
+                      );
+                    }
+                    final message = item as Message;
+                    final isMe = message.senderId == authViewModel.currentUser?.id;
+                    return GestureDetector(
+                      onLongPress: isMe
+                          ? () {
+                        showModalBottomSheet(
+                          context: context,
+                          builder: (context) => SafeArea(
                             child: Column(
-                              crossAxisAlignment: isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+                              mainAxisSize: MainAxisSize.min,
                               children: [
-                                if (message.images.isNotEmpty)
-                                  Wrap(
-                                    spacing: 5,
-                                    children: message.images
-                                        .map((img) => ClipRRect(
-                                      borderRadius: BorderRadius.circular(8),
-                                      child: CachedNetworkImage(
-                                        imageUrl: '${ApiRoutes.serverBaseUrl}$img',
-                                        width: 100,
-                                        height: 100,
-                                        fit: BoxFit.cover,
-                                        memCacheHeight: 200,
-                                        memCacheWidth: 200,
-                                        placeholder: (context, url) => const CircularProgressIndicator(),
-                                        errorWidget: (context, url, error) => const Icon(Icons.error),
-                                      ),
-                                    ))
-                                        .toList(),
-                                  ),
-                                if (message.content.isNotEmpty)
-                                  Text(
-                                    message.content,
-                                    style: const TextStyle(fontSize: 16),
-                                  ),
-                                const SizedBox(height: 5),
-                                Text(
-                                  DateFormat('HH:mm, dd/MM').format(message.createdAt),
-                                  style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                                ListTile(
+                                  leading: const Icon(Icons.edit),
+                                  title: const Text('Chỉnh sửa'),
+                                  onTap: () {
+                                    Navigator.pop(context);
+                                    _startEditing(message);
+                                  },
+                                ),
+                                ListTile(
+                                  leading: const Icon(Icons.delete),
+                                  title: const Text('Xóa'),
+                                  onTap: () async {
+                                    Navigator.pop(context);
+                                    final success = await chatViewModel.deleteMessage(
+                                      messageId: message.id,
+                                      token: authViewModel.currentUser!.token!,
+                                    );
+                                    if (!success) {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(
+                                          content: Text(chatViewModel.errorMessage ?? 'Lỗi khi xóa tin nhắn'),
+                                          backgroundColor: Colors.redAccent,
+                                        ),
+                                      );
+                                    }
+                                  },
                                 ),
                               ],
                             ),
                           ),
-                        ),
-                        if (isMe) ...[
-                          const SizedBox(width: 8),
-                          CircleAvatar(
-                            radius: 16,
-                            backgroundImage: message.sender['avatarBase64']?.isNotEmpty == true
-                                ? MemoryImage(base64Decode(message.sender['avatarBase64']))
-                                : null,
-                            child: message.sender['avatarBase64']?.isEmpty == true
-                                ? const Icon(Icons.person, size: 16)
-                                : null,
+                        );
+                      }
+                          : null,
+                      child: Row(
+                        mainAxisAlignment: isMe ? MainAxisAlignment.end : MainAxisAlignment.start,
+                        children: [
+                          if (!isMe) ...[
+                            CircleAvatar(
+                              radius: 16,
+                              backgroundImage: message.sender['avatarBase64']?.isNotEmpty == true
+                                  ? MemoryImage(base64Decode(message.sender['avatarBase64']))
+                                  : null,
+                              child: message.sender['avatarBase64']?.isEmpty == true
+                                  ? const Icon(Icons.person, size: 16)
+                                  : null,
+                            ),
+                            const SizedBox(width: 8),
+                          ],
+                          Flexible(
+                            child: Container(
+                              margin: const EdgeInsets.symmetric(vertical: 5, horizontal: 10),
+                              padding: const EdgeInsets.all(10),
+                              decoration: BoxDecoration(
+                                color: isMe ? Colors.blue[100] : Colors.grey[200],
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Column(
+                                crossAxisAlignment: isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+                                children: [
+                                  if (message.images.isNotEmpty)
+                                    Wrap(
+                                      spacing: 5,
+                                      children: message.images
+                                          .map((img) => ClipRRect(
+                                        borderRadius: BorderRadius.circular(8),
+                                        child: CachedNetworkImage(
+                                          imageUrl: '${ApiRoutes.serverBaseUrl}$img',
+                                          width: 100,
+                                          height: 100,
+                                          fit: BoxFit.cover,
+                                          memCacheHeight: 200,
+                                          memCacheWidth: 200,
+                                          placeholder: (context, url) => const CircularProgressIndicator(),
+                                          errorWidget: (context, url, error) => const Icon(Icons.error),
+                                        ),
+                                      ))
+                                          .toList(),
+                                    ),
+                                  if (message.content.isNotEmpty)
+                                    Text(
+                                      message.content,
+                                      style: const TextStyle(fontSize: 16),
+                                    ),
+                                  const SizedBox(height: 5),
+                                  Text(
+                                    message.updatedAt != null
+                                        ? 'Đã chỉnh sửa ${DateFormat('HH:mm, dd/MM').format(message.updatedAt!)}'
+                                        : DateFormat('HH:mm, dd/MM').format(message.createdAt),
+                                    style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                                  ),
+                                ],
+                              ),
+                            ),
                           ),
+                          if (isMe) ...[
+                            const SizedBox(width: 8),
+                            CircleAvatar(
+                              radius: 16,
+                              backgroundImage: message.sender['avatarBase64']?.isNotEmpty == true
+                                  ? MemoryImage(base64Decode(message.sender['avatarBase64']))
+                                  : null,
+                              child: message.sender['avatarBase64']?.isEmpty == true
+                                  ? const Icon(Icons.person, size: 16)
+                                  : null,
+                            ),
+                          ],
                         ],
-                      ],
+                      ),
                     );
                   },
                 );
@@ -275,84 +393,197 @@ class _ChatScreenState extends State<ChatScreen> {
           ),
           Padding(
             padding: const EdgeInsets.all(8.0),
-            child: Row(
+            child: Column(
               children: [
-                IconButton(
-                  icon: const Icon(Icons.image),
-                  onPressed: _pickImages,
-                ),
-                Expanded(
-                  child: Column(
-                    children: [
-                      if (_selectedImages.isNotEmpty)
-                        Container(
-                          height: 60,
-                          margin: const EdgeInsets.only(bottom: 8),
-                          child: ListView.builder(
-                            scrollDirection: Axis.horizontal,
-                            itemCount: _selectedImages.length,
-                            itemBuilder: (context, index) {
-                              return Stack(
-                                children: [
-                                  Padding(
-                                    padding: const EdgeInsets.only(right: 8),
-                                    child: Image.file(
-                                      File(_selectedImages[index].path),
-                                      width: 60,
-                                      height: 60,
-                                      fit: BoxFit.cover,
-                                    ),
-                                  ),
-                                  Positioned(
-                                    top: 0,
-                                    right: 0,
-                                    child: GestureDetector(
-                                      onTap: () {
-                                        setState(() {
-                                          _selectedImages.removeAt(index);
-                                        });
-                                      },
-                                      child: const Icon(
-                                        Icons.cancel,
-                                        color: Colors.red,
-                                        size: 20,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              );
-                            },
-                          ),
-                        ),
-                      TextField(
-                        controller: messageController,
+                if (_editingMessageId != null && chatViewModel.messages.any((msg) => msg.id == _editingMessageId))
+                  Container(
+                    height: 60,
+                    margin: const EdgeInsets.only(bottom: 8),
+                    child: ListView.builder(
+                      scrollDirection: Axis.horizontal,
+                      itemCount: chatViewModel.messages
+                          .firstWhere((msg) => msg.id == _editingMessageId)
+                          .images
+                          .length,
+                      itemBuilder: (context, index) {
+                        final imageUrl = chatViewModel.messages
+                            .firstWhere((msg) => msg.id == _editingMessageId)
+                            .images[index];
+                        return Stack(
+                          children: [
+                            Padding(
+                              padding: const EdgeInsets.only(right: 8),
+                              child: ClipRRect(
+                                borderRadius: BorderRadius.circular(8),
+                                child: CachedNetworkImage(
+                                  imageUrl: '${ApiRoutes.serverBaseUrl}$imageUrl',
+                                  width: 60,
+                                  height: 60,
+                                  fit: BoxFit.cover,
+                                  placeholder: (context, url) => const CircularProgressIndicator(),
+                                  errorWidget: (context, url, error) => const Icon(Icons.error),
+                                ),
+                              ),
+                            ),
+                            Positioned(
+                              top: 0,
+                              right: 0,
+                              child: GestureDetector(
+                                onTap: () {
+                                  setState(() {
+                                    _existingImagesToRemove.add(imageUrl);
+                                  });
+                                },
+                                child: const Icon(
+                                  Icons.cancel,
+                                  color: Colors.red,
+                                  size: 20,
+                                ),
+                              ),
+                            ),
+                          ],
+                        );
+                      },
+                    ),
+                  ),
+                if (_selectedImages.isNotEmpty)
+                  Container(
+                    height: 60,
+                    margin: const EdgeInsets.only(bottom: 8),
+                    child: ListView.builder(
+                      scrollDirection: Axis.horizontal,
+                      itemCount: _selectedImages.length,
+                      itemBuilder: (context, index) {
+                        return Stack(
+                          children: [
+                            Padding(
+                              padding: const EdgeInsets.only(right: 8),
+                              child: Image.file(
+                                File(_selectedImages[index].path),
+                                width: 60,
+                                height: 60,
+                                fit: BoxFit.cover,
+                              ),
+                            ),
+                            Positioned(
+                              top: 0,
+                              right: 0,
+                              child: GestureDetector(
+                                onTap: () {
+                                  setState(() {
+                                    _selectedImages.removeAt(index);
+                                  });
+                                },
+                                child: const Icon(
+                                  Icons.cancel,
+                                  color: Colors.red,
+                                  size: 20,
+                                ),
+                              ),
+                            ),
+                          ],
+                        );
+                      },
+                    ),
+                  ),
+                Row(
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.image),
+                      onPressed: _pickImages,
+                      color: Colors.blue,
+                    ),
+                    Expanded(
+                      child: TextField(
+                        controller: _messageController,
                         decoration: InputDecoration(
-                          hintText: 'Nhập tin nhắn...',
+                          hintText: _editingMessageId == null ? 'Nhập tin nhắn...' : 'Chỉnh sửa tin nhắn...',
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(20),
                           ),
                         ),
                       ),
-                    ],
-                  ),
-                ),
-                IconButton(
-                  icon: const Icon(Icons.send),
-                  onPressed: () async {
-                    if ((messageController.text.isNotEmpty || _selectedImages.isNotEmpty) &&
-                        authViewModel.currentUser != null) {
-                      await chatViewModel.sendMessage(
-                        conversationId: widget.conversationId,
-                        content: messageController.text,
-                        token: authViewModel.currentUser!.token!,
-                        imagePaths: _selectedImages.map((x) => x.path).toList(),
-                      );
-                      messageController.clear();
-                      setState(() {
-                        _selectedImages.clear();
-                      });
-                    }
-                  },
+                    ),
+                    if (_editingMessageId != null)
+                      IconButton(
+                        icon: const Icon(Icons.cancel),
+                        onPressed: _cancelEditing,
+                        color: Colors.red,
+                      ),
+                    IconButton(
+                      icon: const Icon(Icons.send),
+                      onPressed: () async {
+                        if (authViewModel.currentUser == null) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Vui lòng đăng nhập để gửi tin nhắn'),
+                              backgroundColor: Colors.redAccent,
+                            ),
+                          );
+                          return;
+                        }
+
+                        final content = _messageController.text.trim();
+                        if (_editingMessageId != null) {
+                          if (content.isEmpty && _selectedImages.isEmpty && _existingImagesToRemove.isEmpty) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Vui lòng cung cấp nội dung hoặc hình ảnh để chỉnh sửa'),
+                                backgroundColor: Colors.redAccent,
+                              ),
+                            );
+                            return;
+                          }
+                          final success = await chatViewModel.editMessage(
+                            messageId: _editingMessageId!,
+                            content: content,
+                            token: authViewModel.currentUser!.token!,
+                            imagePaths: _selectedImages.map((x) => x.path).toList(),
+                            removeImages: _existingImagesToRemove,
+                          );
+                          if (success) {
+                            _cancelEditing();
+                            WidgetsBinding.instance.addPostFrameCallback((_) {
+                              _scrollController.jumpTo(_scrollController.position.maxScrollExtent);
+                            });
+                          } else {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(chatViewModel.errorMessage ?? 'Lỗi khi chỉnh sửa tin nhắn'),
+                                backgroundColor: Colors.redAccent,
+                              ),
+                            );
+                          }
+                        } else {
+                          if (content.isEmpty && _selectedImages.isEmpty) {
+                            return;
+                          }
+                          final success = await chatViewModel.sendMessage(
+                            conversationId: widget.conversationId,
+                            content: content,
+                            token: authViewModel.currentUser!.token!,
+                            imagePaths: _selectedImages.map((x) => x.path).toList(),
+                          );
+                          if (success) {
+                            _messageController.clear();
+                            setState(() {
+                              _selectedImages.clear();
+                            });
+                            WidgetsBinding.instance.addPostFrameCallback((_) {
+                              _scrollController.jumpTo(_scrollController.position.maxScrollExtent);
+                            });
+                          } else {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(chatViewModel.errorMessage ?? 'Lỗi khi gửi tin nhắn'),
+                                backgroundColor: Colors.redAccent,
+                              ),
+                            );
+                          }
+                        }
+                      },
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -360,5 +591,12 @@ class _ChatScreenState extends State<ChatScreen> {
         ],
       ),
     );
+  }
+
+  @override
+  void dispose() {
+    _messageController.dispose();
+    _scrollController.dispose();
+    super.dispose();
   }
 }

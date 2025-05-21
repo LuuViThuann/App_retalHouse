@@ -943,7 +943,7 @@ module.exports = (io) => {
       }
 
       // Get user and landlord avatar and username
-      let landlordData = { username: rental.contactInfo?.name || 'Chủ nhà', avatarBase64: '' }; // Fallback to rental.contactInfo.name
+      let landlordData = { username: rental.contactInfo?.name || 'Chủ nhà', avatarBase64: '' };
       let userData = { username: 'Chủ nhà', avatarBase64: '' };
       try {
         const landlordDoc = await admin.firestore().collection('Users').doc(landlordId).get();
@@ -994,7 +994,7 @@ module.exports = (io) => {
             id: rentalDoc._id.toString(),
             title: rentalDoc.title,
             image: rentalDoc.images[0] || '',
-            contactName: rentalDoc.contactInfo?.name || 'Chủ nhà', // Include contactName
+            contactName: rentalDoc.contactInfo?.name || 'Chủ nhà',
           };
         }
       } catch (err) {}
@@ -1185,6 +1185,7 @@ module.exports = (io) => {
         _id: msg._id.toString(),
         conversationId: msg.conversationId.toString(),
         createdAt: new Date(msg.createdAt.getTime() + 7 * 60 * 60 * 1000),
+        updatedAt: msg.updatedAt ? new Date(msg.updatedAt.getTime() + 7 * 60 * 60 * 1000) : null,
         sender: {
           id: msg.senderId,
           username: senderAvatars[msg.senderId]?.username || 'Chủ nhà',
@@ -1259,6 +1260,7 @@ module.exports = (io) => {
         content: message.content,
         images: message.images,
         createdAt: new Date(message.createdAt.getTime() + 7 * 60 * 60 * 1000),
+        updatedAt: message.updatedAt ? new Date(message.updatedAt.getTime() + 7 * 60 * 60 * 1000) : null,
         sender: {
           id: req.userId,
           username: username,
@@ -1271,6 +1273,157 @@ module.exports = (io) => {
         io.to(conversationId).emit('receiveMessage', messageData);
       }
       res.status(201).json(messageData);
+    } catch (err) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  // Delete a message
+  router.delete('/messages/:messageId', authMiddleware, async (req, res) => {
+    try {
+      const { messageId } = req.params;
+      if (!mongoose.Types.ObjectId.isValid(messageId)) {
+        return res.status(400).json({ message: 'Invalid messageId format' });
+      }
+      const message = await Message.findById(messageId);
+      if (!message) {
+        return res.status(404).json({ message: 'Message not found' });
+      }
+      if (message.senderId !== req.userId) {
+        return res.status(403).json({ message: 'Unauthorized: You can only delete your own messages' });
+      }
+      const conversation = await Conversation.findById(message.conversationId);
+      if (!conversation || !conversation.participants.includes(req.userId)) {
+        return res.status(403).json({ message: 'Unauthorized or conversation not found' });
+      }
+
+      await Message.deleteOne({ _id: messageId });
+
+      // Update lastMessage if necessary
+      if (conversation.lastMessage?.toString() === messageId) {
+        const lastMessage = await Message.findOne({ conversationId: conversation._id })
+          .sort({ createdAt: -1 })
+          .lean();
+        conversation.lastMessage = lastMessage ? lastMessage._id : null;
+        await conversation.save();
+      }
+
+      await redisClient.del(`conversations:${conversation.participants[0]}`);
+      await redisClient.del(`conversations:${conversation.participants[1]}`);
+
+      console.log(`Emitting deleteMessage to room ${conversation._id}:`, { messageId });
+      if (io) {
+        io.to(conversation._id.toString()).emit('deleteMessage', { messageId });
+      }
+
+      res.status(200).json({ message: 'Message deleted successfully' });
+    } catch (err) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  // Edit a message (support updating content and images)
+  router.patch('/messages/:messageId', authMiddleware, upload.array('images'), async (req, res) => {
+    try {
+      const { messageId } = req.params;
+      let { content, removeImages } = req.body;
+      content = content ? content.trim() : '';
+
+      if (!mongoose.Types.ObjectId.isValid(messageId)) {
+        return res.status(400).json({ message: 'Invalid messageId format' });
+      }
+      if (!content && (!req.files || req.files.length === 0) && (!removeImages || removeImages.length === 0)) {
+        return res.status(400).json({ message: 'At least one of content or images must be provided' });
+      }
+      const message = await Message.findById(messageId);
+      if (!message) {
+        return res.status(404).json({ message: 'Message not found' });
+      }
+      if (message.senderId !== req.userId) {
+        return res.status(403).json({ message: 'Unauthorized: You can only edit your own messages' });
+      }
+      const conversation = await Conversation.findById(message.conversationId);
+      if (!conversation || !conversation.participants.includes(req.userId)) {
+        return res.status(403).json({ message: 'Unauthorized or conversation not found' });
+      }
+
+      // Update content if provided
+      if (content) {
+        message.content = content;
+      }
+
+      // Handle image updates
+      let updatedImages = message.images;
+      // Remove specified images
+      if (removeImages) {
+        try {
+          removeImages = JSON.parse(removeImages);
+          if (Array.isArray(removeImages)) {
+            updatedImages = updatedImages.filter(url => !removeImages.includes(url));
+          }
+        } catch (err) {
+          console.warn('Invalid removeImages format:', removeImages);
+        }
+      }
+      // Add new images
+      if (req.files && req.files.length > 0) {
+        const newImageUrls = req.files.map(file => `/uploads/${file.filename}`);
+        updatedImages = [...updatedImages, ...newImageUrls];
+      }
+      message.images = updatedImages;
+
+      // Update timestamp
+      message.updatedAt = new Date();
+      await message.save();
+
+      // Get sender avatar and username
+      let avatarBase64 = '';
+      let username = 'Chủ nhà';
+      try {
+        const rentalDoc = await Rental.findOne({ userId: req.userId }).select('contactInfo');
+        if (rentalDoc) {
+          username = rentalDoc.contactInfo?.name || 'Chủ nhà';
+        }
+      } catch (err) {}
+      try {
+        const userMongo = await mongoose.model('User').findOne({ _id: req.userId }).select('avatarBase64 username');
+        if (userMongo) {
+          avatarBase64 = userMongo.avatarBase64 || '';
+          username = userMongo.username || username;
+        }
+      } catch (err) {}
+      if (!avatarBase64 || !username) {
+        try {
+          const userDoc = await admin.firestore().collection('Users').doc(req.userId).get();
+          if (userDoc.exists) {
+            const data = userDoc.data();
+            avatarBase64 = avatarBase64 || data.avatarBase64 || '';
+            username = data.username || username;
+          }
+        } catch (err) {}
+      }
+
+      const messageData = {
+        _id: message._id.toString(),
+        conversationId: message.conversationId.toString(),
+        senderId: message.senderId,
+        content: message.content,
+        images: message.images,
+        createdAt: new Date(message.createdAt.getTime() + 7 * 60 * 60 * 1000),
+        updatedAt: new Date(message.updatedAt.getTime() + 7 * 60 * 60 * 1000),
+        sender: {
+          id: req.userId,
+          username: username,
+          avatarBase64: avatarBase64,
+        }
+      };
+
+      console.log(`Emitting updateMessage to room ${conversation._id}:`, messageData);
+      if (io) {
+        io.to(conversation._id.toString()).emit('updateMessage', messageData);
+      }
+
+      res.status(200).json(messageData);
     } catch (err) {
       res.status(500).json({ message: err.message });
     }
@@ -1342,6 +1495,7 @@ module.exports = (io) => {
                   _id: conv.lastMessage._id.toString(),
                   conversationId: conv.lastMessage.conversationId.toString(),
                   createdAt: new Date(conv.lastMessage.createdAt.getTime() + 7 * 60 * 60 * 1000),
+                  updatedAt: conv.lastMessage.updatedAt ? new Date(conv.lastMessage.updatedAt.getTime() + 7 * 60 * 60 * 1000) : null,
                   sender: {
                     id: conv.lastMessage.senderId,
                     username: conv.lastMessage.senderId === userId ? userData.username : participantData.username,

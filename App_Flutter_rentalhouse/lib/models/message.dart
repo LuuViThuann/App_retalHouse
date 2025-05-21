@@ -7,6 +7,7 @@ class Message {
   final String content;
   final List<String> images;
   final DateTime createdAt;
+  final DateTime? updatedAt;
   final Map<String, dynamic> sender;
 
   Message({
@@ -16,6 +17,7 @@ class Message {
     required this.content,
     required this.images,
     required this.createdAt,
+    this.updatedAt,
     required this.sender,
   });
 
@@ -28,9 +30,10 @@ class Message {
       content: json['content']?.toString() ?? '',
       images: List<String>.from(json['images'] ?? []),
       createdAt: DateTime.tryParse(json['createdAt']?.toString() ?? '') ?? DateTime.now(),
+      updatedAt: json['updatedAt'] != null ? DateTime.tryParse(json['updatedAt']?.toString() ?? '') : null,
       sender: {
         'id': json['sender']?['id']?.toString() ?? json['senderId']?.toString() ?? '',
-        'username': json['sender']?['username']?.toString() ?? 'Unknown',
+        'username': json['sender']?['username']?.toString() ?? 'Chủ nhà',
         'avatarBase64': json['sender']?['avatarBase64']?.toString() ?? '',
       },
     );
