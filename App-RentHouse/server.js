@@ -12,6 +12,8 @@ const redis = require('redis');
 const rentalRoutes = require('./routes/rental');
 const authRoutes = require('./routes/auth');
 const chatRoutes = require('./routes/chat');
+const favoriteRoutes = require('./routes/favorite');
+const commentRoutes = require('./routes/comment');
 
 require('./models/conversation');
 require('./models/message');
@@ -53,6 +55,9 @@ mongoose.connect(MONGODB_URI)
 app.use('/api/auth', authRoutes);
 app.use('/api', rentalRoutes);
 app.use('/api', chatRoutes(io));
+app.use('/api', favoriteRoutes);
+app.use('/api', commentRoutes(io));
+
 
 io.use(async (socket, next) => {
   const token = socket.handshake.headers.authorization?.replace('Bearer ', '');
