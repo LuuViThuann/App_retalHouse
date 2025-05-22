@@ -1,5 +1,6 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_rentalhouse/Widgets/Message/chat_image_full_screen.dart';
 import 'package:flutter_rentalhouse/config/api_routes.dart';
 import 'package:flutter_rentalhouse/models/message.dart';
 import 'package:flutter_rentalhouse/viewmodels/vm_auth.dart';
@@ -45,25 +46,28 @@ class ChatMessageList extends StatelessWidget {
     });
 
     if (chatViewModel.messages.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.chat_bubble_outline,
-              size: 60,
-              color: Colors.grey[400],
-            ),
-            const SizedBox(height: 16),
-            Text(
-              'Hãy bắt đầu nhắn tin ngay!',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.w500,
-                color: Colors.grey[600],
+      return Container(
+        color: Colors.white,
+        child: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                Icons.chat_bubble_outline,
+                size: 60,
+                color: Colors.grey[400],
               ),
-            ),
-          ],
+              const SizedBox(height: 16),
+              Text(
+                'Hãy bắt đầu nhắn tin ngay!',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w500,
+                  color: Colors.grey[600],
+                ),
+              ),
+            ],
+          ),
         ),
       );
     }
@@ -301,37 +305,49 @@ class ChatMessageList extends StatelessWidget {
                                     spacing: 8,
                                     runSpacing: 8,
                                     children: message.images
-                                        .map((img) => ClipRRect(
-                                              borderRadius:
-                                                  BorderRadius.circular(12),
-                                              child: CachedNetworkImage(
-                                                imageUrl:
-                                                    '${ApiRoutes.serverBaseUrl}$img',
-                                                width: 120,
-                                                height: 120,
-                                                fit: BoxFit.cover,
-                                                memCacheHeight: 240,
-                                                memCacheWidth: 240,
-                                                placeholder: (context, url) =>
-                                                    Container(
+                                        .map((img) => GestureDetector(
+                                              onTap: () {
+                                                showDialog(
+                                                  context: context,
+                                                  builder: (context) =>
+                                                      ChatFullImage(
+                                                    imageUrl:
+                                                        '${ApiRoutes.serverBaseUrl}$img',
+                                                  ),
+                                                );
+                                              },
+                                              child: ClipRRect(
+                                                borderRadius:
+                                                    BorderRadius.circular(12),
+                                                child: CachedNetworkImage(
+                                                  imageUrl:
+                                                      '${ApiRoutes.serverBaseUrl}$img',
                                                   width: 120,
                                                   height: 120,
-                                                  color: Colors.grey[100],
-                                                  child: const Center(
-                                                      child:
-                                                          CircularProgressIndicator(
-                                                    strokeWidth: 2,
-                                                  )),
-                                                ),
-                                                errorWidget:
-                                                    (context, url, error) =>
-                                                        Container(
-                                                  width: 120,
-                                                  height: 120,
-                                                  color: Colors.grey[100],
-                                                  child: const Icon(
-                                                    Icons.error_outline,
-                                                    color: Colors.red,
+                                                  fit: BoxFit.cover,
+                                                  memCacheHeight: 240,
+                                                  memCacheWidth: 240,
+                                                  placeholder: (context, url) =>
+                                                      Container(
+                                                    width: 120,
+                                                    height: 120,
+                                                    color: Colors.grey[100],
+                                                    child: const Center(
+                                                        child:
+                                                            CircularProgressIndicator(
+                                                      strokeWidth: 2,
+                                                    )),
+                                                  ),
+                                                  errorWidget:
+                                                      (context, url, error) =>
+                                                          Container(
+                                                    width: 120,
+                                                    height: 120,
+                                                    color: Colors.grey[100],
+                                                    child: const Icon(
+                                                      Icons.error_outline,
+                                                      color: Colors.red,
+                                                    ),
                                                   ),
                                                 ),
                                               ),

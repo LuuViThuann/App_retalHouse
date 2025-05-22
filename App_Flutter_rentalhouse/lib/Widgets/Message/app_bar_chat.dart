@@ -63,6 +63,9 @@ class ChatAppBar extends StatelessWidget implements PreferredSizeWidget {
           ],
         ),
       ),
+      iconTheme: const IconThemeData(
+        color: Colors.white,
+      ),
       title: FutureBuilder<Map<String, dynamic>>(
         future: _fetchLandlordInfo(context),
         builder: (context, snapshot) {
@@ -120,6 +123,14 @@ class ChatAppBar extends StatelessWidget implements PreferredSizeWidget {
         },
       ),
       elevation: 0,
+      actions: [
+        IconButton(
+          icon: const Icon(Icons.info_outline, color: Colors.white),
+          onPressed: () {
+            // Handle more options
+          },
+        ),
+      ],
     );
   }
 

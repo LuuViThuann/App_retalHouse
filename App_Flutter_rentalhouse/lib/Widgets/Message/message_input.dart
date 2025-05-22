@@ -324,7 +324,10 @@ class ChatInputArea extends StatelessWidget {
               AnimatedContainer(
                 duration: Duration(milliseconds: 200),
                 child: IconButton(
-                  icon: Icon(Icons.send, color: Colors.blue[600]),
+                  icon: Icon(
+                    editingMessageId != null ? Icons.check : Icons.send,
+                    color: Colors.blue[600],
+                  ),
                   onPressed: () async {
                     final content = messageController.text.trim();
                     if (!checkAuthentication(authViewModel, context)) return;
