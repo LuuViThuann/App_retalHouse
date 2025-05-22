@@ -10,7 +10,7 @@ const Conversation = require('../models/conversation');
 const Message = require('../models/message');
 
 const storage = multer.diskStorage({
-  destination: './uploads/',
+  destination: './Uploads/',
   filename: (req, file, cb) => {
     cb(null, `${Date.now()}-${file.originalname}`);
   },
@@ -255,10 +255,10 @@ module.exports = (io) => {
       }
       const query = { conversationId: new mongoose.Types.ObjectId(conversationId) };
       if (cursor) {
-        query._id = { $lt: cursor };
+        query._id = { $gt: cursor }; // Fetch newer messages for pagination
       }
       const messages = await Message.find(query)
-        .sort({ createdAt: -1 })
+        .sort({ createdAt: 1 }) // Sort oldest first
         .limit(parseInt(limit))
         .lean();
 

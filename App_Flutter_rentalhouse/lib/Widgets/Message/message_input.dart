@@ -29,17 +29,19 @@ class ChatInputArea extends StatelessWidget {
 
   Future<void> _pickImages(BuildContext context) async {
     final ImagePicker picker = ImagePicker();
-    final List<XFile>? images = await picker.pickMultiImage();
-    if (images != null) {
+    final List<XFile>? images = await picker.pickMultiImage(
+      maxWidth: 800, // Compress images to reduce size
+      maxHeight: 800,
+      imageQuality: 80,
+    );
+    if (images != null && images.isNotEmpty) {
       selectedImages.addAll(images);
-      (context as Element).markNeedsBuild();
+      Provider.of<ChatViewModel>(context, listen: false).notifyListeners();
     }
   }
 
   Future<void> _sendMessage(BuildContext context, ChatViewModel chatViewModel,
       AuthViewModel authViewModel, String content) async {
-    bool isLoading = true;
-    (context as Element).markNeedsBuild();
     final success = await chatViewModel.sendMessage(
       conversationId: conversationId,
       content: content,
@@ -47,27 +49,27 @@ class ChatInputArea extends StatelessWidget {
       imagePaths: selectedImages.map((x) => x.path).toList(),
       senderId: authViewModel.currentUser!.id,
     );
-    isLoading = false;
     if (success) {
       messageController.clear();
       selectedImages.clear();
-    }
-    (context as Element).markNeedsBuild();
-    scrollToBottom(ScrollController());
-    if (!success) {
+      Provider.of<ChatViewModel>(context, listen: false).notifyListeners();
+    } else {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(chatViewModel.errorMessage ?? 'Lỗi khi gửi tin nhắn'),
           backgroundColor: Colors.redAccent,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
         ),
       );
     }
+    scrollToBottom(ScrollController());
   }
 
   Future<void> _editMessage(BuildContext context, ChatViewModel chatViewModel,
       AuthViewModel authViewModel, String content) async {
-    bool isLoading = true;
-    (context as Element).markNeedsBuild();
     final success = await chatViewModel.editMessage(
       messageId: editingMessageId!,
       content: content,
@@ -75,17 +77,16 @@ class ChatInputArea extends StatelessWidget {
       imagePaths: selectedImages.map((x) => x.path).toList(),
       removeImages: existingImagesToRemove,
     );
-    isLoading = false;
     if (success) {
       onCancelEditing();
-    }
-    (context as Element).markNeedsBuild();
-    scrollToBottom(ScrollController());
-    if (success) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
+        SnackBar(
           content: Text('Tin nhắn đã được chỉnh sửa'),
-          backgroundColor: Colors.green,
+          backgroundColor: Colors.green[600],
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
         ),
       );
     } else {
@@ -94,9 +95,14 @@ class ChatInputArea extends StatelessWidget {
           content:
               Text(chatViewModel.errorMessage ?? 'Lỗi khi chỉnh sửa tin nhắn'),
           backgroundColor: Colors.redAccent,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
         ),
       );
     }
+    scrollToBottom(ScrollController());
   }
 
   @override
@@ -104,15 +110,25 @@ class ChatInputArea extends StatelessWidget {
     final chatViewModel = Provider.of<ChatViewModel>(context);
     final authViewModel = Provider.of<AuthViewModel>(context);
 
-    return Padding(
-      padding: const EdgeInsets.all(8.0),
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.1),
+            blurRadius: 8,
+            offset: Offset(0, -2),
+          ),
+        ],
+      ),
       child: Column(
         children: [
           if (editingMessageId != null &&
               chatViewModel.messages.any((msg) => msg.id == editingMessageId))
             Container(
-              height: 60,
-              margin: const EdgeInsets.only(bottom: 8),
+              height: 80,
+              margin: const EdgeInsets.only(bottom: 12),
               child: ListView.builder(
                 scrollDirection: Axis.horizontal,
                 itemCount: chatViewModel.messages
@@ -126,34 +142,55 @@ class ChatInputArea extends StatelessWidget {
                   return Stack(
                     children: [
                       Padding(
-                        padding: const EdgeInsets.only(right: 8),
+                        padding: const EdgeInsets.only(right: 12),
                         child: ClipRRect(
-                          borderRadius: BorderRadius.circular(8),
+                          borderRadius: BorderRadius.circular(12),
                           child: CachedNetworkImage(
                             imageUrl: '${ApiRoutes.serverBaseUrl}$imageUrl',
-                            width: 60,
-                            height: 60,
+                            width: 80,
+                            height: 80,
                             fit: BoxFit.cover,
-                            placeholder: (context, url) =>
-                                const CircularProgressIndicator(),
+                            placeholder: (context, url) => Container(
+                              width: 80,
+                              height: 80,
+                              color: Colors.grey[200],
+                              child: Center(
+                                  child: CircularProgressIndicator(
+                                color: Colors.blue[400],
+                              )),
+                            ),
                             errorWidget: (context, url, error) =>
-                                const Icon(Icons.error),
+                                Icon(Icons.error, color: Colors.red[400]),
                           ),
                         ),
                       ),
                       if (!existingImagesToRemove.contains(imageUrl))
                         Positioned(
-                          top: 0,
-                          right: 0,
+                          top: 4,
+                          right: 4,
                           child: GestureDetector(
                             onTap: () {
                               existingImagesToRemove.add(imageUrl);
-                              (context as Element).markNeedsBuild();
+                              Provider.of<ChatViewModel>(context, listen: false)
+                                  .notifyListeners();
                             },
-                            child: const Icon(
-                              Icons.cancel,
-                              color: Colors.red,
-                              size: 20,
+                            child: Container(
+                              decoration: BoxDecoration(
+                                color: Colors.red[600],
+                                shape: BoxShape.circle,
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withOpacity(0.2),
+                                    blurRadius: 4,
+                                    offset: Offset(0, 2),
+                                  ),
+                                ],
+                              ),
+                              child: Icon(
+                                Icons.cancel,
+                                color: Colors.white,
+                                size: 24,
+                              ),
                             ),
                           ),
                         ),
@@ -164,35 +201,57 @@ class ChatInputArea extends StatelessWidget {
             ),
           if (selectedImages.isNotEmpty)
             Container(
-              height: 60,
-              margin: const EdgeInsets.only(bottom: 8),
+              height: 80,
+              margin: const EdgeInsets.only(bottom: 12),
               child: ListView.builder(
                 scrollDirection: Axis.horizontal,
                 itemCount: selectedImages.length,
                 itemBuilder: (context, index) {
+                  if (index >= selectedImages.length) return SizedBox.shrink();
                   return Stack(
                     children: [
                       Padding(
-                        padding: const EdgeInsets.only(right: 8),
-                        child: Image.file(
-                          File(selectedImages[index].path),
-                          width: 60,
-                          height: 60,
-                          fit: BoxFit.cover,
+                        padding: const EdgeInsets.only(right: 12),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(12),
+                          child: Image.file(
+                            File(selectedImages[index].path),
+                            width: 80,
+                            height: 80,
+                            fit: BoxFit.cover,
+                            errorBuilder: (context, error, stackTrace) =>
+                                Icon(Icons.error, color: Colors.red[400]),
+                          ),
                         ),
                       ),
                       Positioned(
-                        top: 0,
-                        right: 0,
+                        top: 4,
+                        right: 4,
                         child: GestureDetector(
                           onTap: () {
-                            selectedImages.removeAt(index);
-                            (context as Element).markNeedsBuild();
+                            if (index < selectedImages.length) {
+                              selectedImages.removeAt(index);
+                              Provider.of<ChatViewModel>(context, listen: false)
+                                  .notifyListeners();
+                            }
                           },
-                          child: const Icon(
-                            Icons.cancel,
-                            color: Colors.red,
-                            size: 20,
+                          child: Container(
+                            decoration: BoxDecoration(
+                              color: Colors.red[600],
+                              shape: BoxShape.circle,
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(0.2),
+                                  blurRadius: 4,
+                                  offset: Offset(0, 2),
+                                ),
+                              ],
+                            ),
+                            child: Icon(
+                              Icons.cancel,
+                              color: Colors.white,
+                              size: 24,
+                            ),
                           ),
                         ),
                       ),
@@ -203,47 +262,92 @@ class ChatInputArea extends StatelessWidget {
             ),
           Row(
             children: [
-              IconButton(
-                icon: const Icon(Icons.image),
-                onPressed: () => _pickImages(context),
-                color: Colors.blue,
-              ),
-              Expanded(
-                child: TextField(
-                  controller: messageController,
-                  decoration: InputDecoration(
-                    hintText: editingMessageId == null
-                        ? 'Nhập tin nhắn...'
-                        : 'Chỉnh sửa tin nhắn...',
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(20),
-                    ),
+              AnimatedContainer(
+                duration: Duration(milliseconds: 200),
+                child: IconButton(
+                  icon: Icon(Icons.image, color: Colors.blue[600]),
+                  onPressed: () => _pickImages(context),
+                  padding: EdgeInsets.all(12),
+                  style: ButtonStyle(
+                    backgroundColor:
+                        MaterialStateProperty.all(Colors.grey[100]),
+                    shape: MaterialStateProperty.all(CircleBorder()),
+                    elevation: MaterialStateProperty.all(2),
                   ),
                 ),
               ),
-              if (editingMessageId != null)
-                IconButton(
-                  icon: const Icon(Icons.cancel),
-                  onPressed: onCancelEditing,
-                  color: Colors.red,
+              const SizedBox(width: 8),
+              Expanded(
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: Colors.grey[100],
+                    borderRadius: BorderRadius.circular(25),
+                  ),
+                  child: TextField(
+                    controller: messageController,
+                    decoration: InputDecoration(
+                      hintText: editingMessageId == null
+                          ? 'Nhập tin nhắn...'
+                          : 'Chỉnh sửa tin nhắn...',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(25),
+                        borderSide: BorderSide.none,
+                      ),
+                      contentPadding:
+                          EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                      hintStyle: TextStyle(
+                        color: Colors.grey[500],
+                        fontFamily: 'Roboto',
+                      ),
+                    ),
+                    style: TextStyle(fontFamily: 'Roboto'),
+                  ),
                 ),
-              IconButton(
-                icon: const Icon(Icons.send),
-                onPressed: () async {
-                  final content = messageController.text.trim();
-                  if (!checkAuthentication(authViewModel, context)) return;
-                  if (editingMessageId != null) {
-                    if (!validateEditInput(content, selectedImages,
-                        existingImagesToRemove, context)) return;
-                    await _editMessage(
-                        context, chatViewModel, authViewModel, content);
-                  } else {
-                    if (!validateSendInput(content, selectedImages, context))
-                      return;
-                    await _sendMessage(
-                        context, chatViewModel, authViewModel, content);
-                  }
-                },
+              ),
+              const SizedBox(width: 8),
+              if (editingMessageId != null)
+                AnimatedContainer(
+                  duration: Duration(milliseconds: 200),
+                  child: IconButton(
+                    icon: Icon(Icons.cancel, color: Colors.red[600]),
+                    onPressed: onCancelEditing,
+                    padding: EdgeInsets.all(12),
+                    style: ButtonStyle(
+                      backgroundColor:
+                          MaterialStateProperty.all(Colors.grey[100]),
+                      shape: MaterialStateProperty.all(CircleBorder()),
+                      elevation: MaterialStateProperty.all(2),
+                    ),
+                  ),
+                ),
+              const SizedBox(width: 8),
+              AnimatedContainer(
+                duration: Duration(milliseconds: 200),
+                child: IconButton(
+                  icon: Icon(Icons.send, color: Colors.blue[600]),
+                  onPressed: () async {
+                    final content = messageController.text.trim();
+                    if (!checkAuthentication(authViewModel, context)) return;
+                    if (editingMessageId != null) {
+                      if (!validateEditInput(content, selectedImages,
+                          existingImagesToRemove, context)) return;
+                      await _editMessage(
+                          context, chatViewModel, authViewModel, content);
+                    } else {
+                      if (!validateSendInput(content, selectedImages, context))
+                        return;
+                      await _sendMessage(
+                          context, chatViewModel, authViewModel, content);
+                    }
+                  },
+                  padding: EdgeInsets.all(12),
+                  style: ButtonStyle(
+                    backgroundColor:
+                        MaterialStateProperty.all(Colors.grey[100]),
+                    shape: MaterialStateProperty.all(CircleBorder()),
+                    elevation: MaterialStateProperty.all(2),
+                  ),
+                ),
               ),
             ],
           ),

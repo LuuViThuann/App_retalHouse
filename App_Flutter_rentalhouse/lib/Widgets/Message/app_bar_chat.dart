@@ -40,43 +40,86 @@ class ChatAppBar extends StatelessWidget implements PreferredSizeWidget {
       }
       return conversation.landlord;
     } catch (_) {
-      return {
-        'id': landlordId,
-        'username': 'Chủ nhà',
-        'avatarBase64': ''
-      };
+      return {'id': landlordId, 'username': 'Chủ nhà', 'avatarBase64': ''};
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return AppBar(
+      flexibleSpace: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [Colors.blue[600]!, Colors.blue[800]!],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.2),
+              blurRadius: 8,
+              offset: Offset(0, 4),
+            ),
+          ],
+        ),
+      ),
       title: FutureBuilder<Map<String, dynamic>>(
         future: _fetchLandlordInfo(context),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Text('Loading...');
+            return Text(
+              'Loading...',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
+                color: Colors.white,
+                fontFamily: 'Roboto',
+              ),
+            );
           }
           final landlord =
               snapshot.data ?? {'username': 'Chủ nhà', 'avatarBase64': ''};
           return Row(
             children: [
-              CircleAvatar(
-                radius: 20,
-                backgroundImage: landlord['avatarBase64']?.isNotEmpty == true
-                    ? MemoryImage(base64Decode(landlord['avatarBase64'] as String))
-                    : null,
-                child: landlord['avatarBase64']?.isEmpty == true
-                    ? const Icon(Icons.person)
-                    : null,
+              Container(
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(color: Colors.white, width: 2),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.1),
+                      blurRadius: 4,
+                      offset: Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: CircleAvatar(
+                  radius: 22,
+                  backgroundColor: Colors.grey[300],
+                  backgroundImage: landlord['avatarBase64']?.isNotEmpty == true
+                      ? MemoryImage(
+                          base64Decode(landlord['avatarBase64'] as String))
+                      : null,
+                  child: landlord['avatarBase64']?.isEmpty == true
+                      ? Icon(Icons.person, size: 22, color: Colors.grey[600])
+                      : null,
+                ),
               ),
-              const SizedBox(width: 10),
-              Text(landlord['username'] ?? 'Chủ nhà'),
+              const SizedBox(width: 12),
+              Text(
+                landlord['username'] ?? 'Chủ nhà',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.white,
+                  fontFamily: 'Roboto',
+                ),
+              ),
             ],
           );
         },
       ),
-      backgroundColor: Colors.blue,
+      elevation: 0,
     );
   }
 

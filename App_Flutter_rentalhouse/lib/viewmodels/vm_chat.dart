@@ -15,14 +15,13 @@ class ChatViewModel extends ChangeNotifier {
   io.Socket? _socket;
   String? _currentConversationId;
   String? _token;
-  static const int _messageLimit = 50; // Default limit for initial messages
-  static const int _maxMessagesInMemory = 200; // Cap to prevent memory issues
+  static const int _messageLimit = 50;
+  static const int _maxMessagesInMemory = 200;
 
   List<Conversation> get conversations => List.unmodifiable(_conversations);
   List<Message> get messages => List.unmodifiable(_messages);
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
-
   String? get currentConversationId => _currentConversationId;
 
   ChatViewModel() {
@@ -125,8 +124,6 @@ class ChatViewModel extends ChangeNotifier {
     _socket?.connect();
   }
 
-  
-
   void _addOrUpdateMessage(Message message, {bool isTemp = false}) {
     final index = _messages.indexWhere((msg) => msg.id == message.id);
     if (index != -1) {
@@ -140,12 +137,12 @@ class ChatViewModel extends ChangeNotifier {
         _messages[tempIndex] = message;
       } else {
         if (_messages.length >= _maxMessagesInMemory) {
-          _messages.removeAt(_messages.length - 1); // Remove oldest (end)
+          _messages.removeAt(0); // Remove oldest (start)
         }
-        _messages.insert(0, message); // Prepend new message
+        _messages.add(message); // Append new message
       }
     }
-    _hasMoreMessages = true; // New messages imply more may exist
+    _hasMoreMessages = true;
     _notify();
   }
 
@@ -174,7 +171,7 @@ class ChatViewModel extends ChangeNotifier {
       ..clear()
       ..addAll(messages);
     if (_messages.length > _maxMessagesInMemory) {
-      _messages.removeRange(_maxMessagesInMemory, _messages.length);
+      _messages.removeRange(0, _messages.length - _maxMessagesInMemory);
     }
     _hasMoreMessages = messages.length == _messageLimit;
     _notify();
@@ -223,14 +220,14 @@ class ChatViewModel extends ChangeNotifier {
 
   Future<bool> fetchMessages(String conversationId, String token,
       {String? cursor, int limit = _messageLimit}) async {
-    if (_isLoading) return _hasMoreMessages; // Prevent concurrent fetches
+    if (_isLoading) return _hasMoreMessages;
     _setLoading(true);
     _currentConversationId = conversationId;
     try {
       final queryParameters = {
         'limit': limit.toString(),
         if (cursor != null) 'cursor': cursor,
-        'sort': 'desc', // Request newest messages first
+        'sort': 'asc', // Fetch oldest messages first
       };
       final uri =
           Uri.parse('${ApiRoutes.serverBaseUrl}/api/messages/$conversationId')
@@ -255,11 +252,11 @@ class ChatViewModel extends ChangeNotifier {
         } else {
           _messages
             ..clear()
-            ..addAll(filteredMessages.reversed); // Newer messages first
+            ..addAll(filteredMessages); // Set messages in chronological order
         }
 
         if (_messages.length > _maxMessagesInMemory) {
-          _messages.removeRange(_maxMessagesInMemory, _messages.length);
+          _messages.removeRange(0, _messages.length - _maxMessagesInMemory);
         }
         _setError(null);
         _hasMoreMessages = newMessages.length == limit;
@@ -331,7 +328,7 @@ class ChatViewModel extends ChangeNotifier {
           images: imagePaths,
           createdAt: DateTime.now(),
           updatedAt: null,
-          sender: {'id': senderId, 'username': 'You', 'avatarBase64': ''},     
+          sender: {'id': senderId, 'username': 'You', 'avatarBase64': ''},
         );
         if (_currentConversationId == conversationId) {
           _addOrUpdateMessage(tempMessage, isTemp: true);
@@ -432,7 +429,7 @@ class ChatViewModel extends ChangeNotifier {
         ],
         createdAt: oldMessage.createdAt,
         updatedAt: DateTime.now(),
-        sender: oldMessage.sender,      
+        sender: oldMessage.sender,
       );
       _notify();
     }

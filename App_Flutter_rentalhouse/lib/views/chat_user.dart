@@ -10,7 +10,6 @@ import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import '../utils/date_chat.dart';
 
-
 class ChatScreen extends StatefulWidget {
   final String rentalId;
   final String landlordId;
@@ -169,12 +168,14 @@ class _ChatScreenState extends State<ChatScreen> {
 
     if (_isLoading && chatViewModel.messages.isEmpty) {
       return const Scaffold(
+        backgroundColor: Colors.white,
         body: Center(child: CircularProgressIndicator()),
       );
     }
 
     if (_errorMessage != null) {
       return Scaffold(
+        backgroundColor: Colors.white,
         body: Center(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
