@@ -35,6 +35,7 @@ class _ChatScreenState extends State<ChatScreen> {
   String? _editingMessageId;
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
+  final Map<String, GlobalKey> _messageKeys = {}; // Thêm Map để lưu GlobalKey
   Timer? _debounceTimer;
   double? _lastScrollPosition;
   bool _hasMoreMessages = true;
@@ -204,6 +205,7 @@ class _ChatScreenState extends State<ChatScreen> {
               scrollController: _scrollController,
               isFetchingOlderMessages: _isFetchingOlderMessages,
               onLongPress: _startEditing,
+              messageKeys: _messageKeys, // Truyền messageKeys
             ),
           ),
           ChatInputArea(
@@ -213,6 +215,8 @@ class _ChatScreenState extends State<ChatScreen> {
             editingMessageId: _editingMessageId,
             conversationId: widget.conversationId,
             onCancelEditing: _cancelEditing,
+            scrollController: _scrollController, // Truyền ScrollController
+            messageKeys: _messageKeys, // Truyền messageKeys
           ),
         ],
       ),

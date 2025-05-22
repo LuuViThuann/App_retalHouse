@@ -13,12 +13,14 @@ class ChatMessageList extends StatelessWidget {
   final ScrollController scrollController;
   final bool isFetchingOlderMessages;
   final Function(Message) onLongPress;
+  final Map<String, GlobalKey> messageKeys;
 
   const ChatMessageList({
     super.key,
     required this.scrollController,
     required this.isFetchingOlderMessages,
     required this.onLongPress,
+    required this.messageKeys,
   });
 
   String _getDateHeader(DateTime date) {
@@ -31,6 +33,31 @@ class ChatMessageList extends StatelessWidget {
     if (difference == 1) return 'Hôm qua';
     if (difference <= 7) return '$difference ngày trước';
     return DateFormat('dd/MM/yyyy').format(messageDate);
+  }
+
+  void _scrollToMessage(String? messageId, List<Message> messages) {
+    if (scrollController.hasClients) {
+      if (messageId != null && messageKeys.containsKey(messageId)) {
+        final key = messageKeys[messageId]!;
+        final context = key.currentContext;
+        if (context != null) {
+          Scrollable.ensureVisible(
+            context,
+            alignment: 0.5,
+            duration: const Duration(milliseconds: 300),
+            curve: Curves.easeOut,
+          );
+        }
+      } else {
+        Future.delayed(const Duration(milliseconds: 100), () {
+          scrollController.animateTo(
+            scrollController.position.maxScrollExtent,
+            duration: const Duration(milliseconds: 300),
+            curve: Curves.easeOut,
+          );
+        });
+      }
+    }
   }
 
   @override
@@ -73,19 +100,49 @@ class ChatMessageList extends StatelessWidget {
     }
 
     final items = <dynamic>[];
-    String? lastHeader;
-
-    // Messages are already in reverse chronological order (newest first)
     final messages = chatViewModel.messages;
 
-    // Iterate in reverse to build items from oldest to newest for display
-    for (var message in messages.reversed) {
+    // Nhóm tin nhắn theo ngày và thêm tiêu đề phía trên mỗi nhóm
+    Map<String, List<Message>> groupedMessages = {};
+    for (var message in messages) {
       final header = _getDateHeader(message.createdAt);
-      if (header != lastHeader) {
-        items.add(header);
-        lastHeader = header;
+      if (!groupedMessages.containsKey(header)) {
+        groupedMessages[header] = [];
       }
-      items.add(message);
+      groupedMessages[header]!.add(message);
+      messageKeys[message.id] = GlobalKey();
+    }
+
+    // Sắp xếp các nhóm theo ngày, từ mới đến cũ
+    final sortedHeaders = groupedMessages.keys.toList()
+      ..sort((a, b) {
+        DateTime dateA = a == 'Hôm nay'
+            ? DateTime.now()
+            : a == 'Hôm qua'
+                ? DateTime.now().subtract(Duration(days: 1))
+                : a.contains('ngày trước')
+                    ? DateTime.now().subtract(Duration(
+                        days: int.parse(a.split(' ')[0]),
+                      ))
+                    : DateFormat('dd/MM/yyyy').parse(a);
+        DateTime dateB = b == 'Hôm nay'
+            ? DateTime.now()
+            : b == 'Hôm qua'
+                ? DateTime.now().subtract(Duration(days: 1))
+                : b.contains('ngày trước')
+                    ? DateTime.now().subtract(Duration(
+                        days: int.parse(b.split(' ')[0]),
+                      ))
+                    : DateFormat('dd/MM/yyyy').parse(b);
+        return dateB.compareTo(dateA); // Đảo ngược để từ mới đến cũ
+      });
+
+    // Xây dựng items: tin nhắn trước, tiêu đề sau (do reverse: true)
+    for (var header in sortedHeaders) {
+      for (var message in groupedMessages[header]!.reversed) {
+        items.add(message);
+      }
+      items.add(header);
     }
 
     return Container(
@@ -96,7 +153,7 @@ class ChatMessageList extends StatelessWidget {
             controller: scrollController,
             padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
             itemCount: items.length,
-            reverse: true, // Newest messages at bottom
+            reverse: true,
             itemBuilder: (context, index) {
               final item = items[index];
               if (item is String) {
@@ -136,7 +193,7 @@ class ChatMessageList extends StatelessWidget {
                 opacity: 1.0,
                 duration: const Duration(milliseconds: 300),
                 child: GestureDetector(
-                  key: ValueKey(message.id),
+                  key: messageKeys[message.id],
                   onLongPress: isMe
                       ? () {
                           showModalBottomSheet(
@@ -189,15 +246,16 @@ class ChatMessageList extends StatelessWidget {
                                             ),
                                           ),
                                         );
-                                        if (scrollController.hasClients) {
-                                          scrollController.animateTo(
-                                            scrollController
-                                                .position.maxScrollExtent,
-                                            duration: const Duration(
-                                                milliseconds: 300),
-                                            curve: Curves.easeOut,
-                                          );
-                                        }
+                                        final remainingMessages = chatViewModel
+                                            .messages
+                                            .where((m) => m.id != message.id)
+                                            .toList();
+                                        final nextMessageId =
+                                            remainingMessages.isNotEmpty
+                                                ? remainingMessages.last.id
+                                                : null;
+                                        _scrollToMessage(
+                                            nextMessageId, remainingMessages);
                                       } else {
                                         ScaffoldMessenger.of(context)
                                             .showSnackBar(

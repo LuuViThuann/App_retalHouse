@@ -16,6 +16,9 @@ class ChatInputArea extends StatelessWidget {
   final String? editingMessageId;
   final String conversationId;
   final VoidCallback onCancelEditing;
+  final ScrollController scrollController; // Thêm ScrollController
+  final Map<String, GlobalKey>
+      messageKeys; // Thêm Map để lưu GlobalKey của tin nhắn
 
   const ChatInputArea({
     super.key,
@@ -25,18 +28,46 @@ class ChatInputArea extends StatelessWidget {
     required this.editingMessageId,
     required this.conversationId,
     required this.onCancelEditing,
+    required this.scrollController,
+    required this.messageKeys,
   });
 
   Future<void> _pickImages(BuildContext context) async {
     final ImagePicker picker = ImagePicker();
     final List<XFile>? images = await picker.pickMultiImage(
-      maxWidth: 800, // Compress images to reduce size
+      maxWidth: 800,
       maxHeight: 800,
       imageQuality: 80,
     );
     if (images != null && images.isNotEmpty) {
       selectedImages.addAll(images);
       Provider.of<ChatViewModel>(context, listen: false).notifyListeners();
+    }
+  }
+
+  void _scrollToMessage(String? messageId) {
+    if (scrollController.hasClients) {
+      if (messageId != null && messageKeys.containsKey(messageId)) {
+        final key = messageKeys[messageId]!;
+        final context = key.currentContext;
+        if (context != null) {
+          Scrollable.ensureVisible(
+            context,
+            alignment: 0.5, // Đặt tin nhắn ở giữa màn hình
+            duration: const Duration(milliseconds: 300),
+            curve: Curves.easeOut,
+          );
+        }
+      } else {
+        // Nếu không có messageId hoặc key, cuộn xuống dưới cùng
+        Future.delayed(const Duration(milliseconds: 100), () {
+          scrollController.animateTo(
+            scrollController.position.maxScrollExtent,
+            duration: const Duration(milliseconds: 300),
+            curve: Curves.easeOut,
+          );
+        });
+      }
     }
   }
 
@@ -53,6 +84,8 @@ class ChatInputArea extends StatelessWidget {
       messageController.clear();
       selectedImages.clear();
       Provider.of<ChatViewModel>(context, listen: false).notifyListeners();
+      // Cuộn xuống tin nhắn mới nhất (không cần messageId vì là tin nhắn mới)
+      _scrollToMessage(null);
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -65,7 +98,6 @@ class ChatInputArea extends StatelessWidget {
         ),
       );
     }
-    scrollToBottom(ScrollController());
   }
 
   Future<void> _editMessage(BuildContext context, ChatViewModel chatViewModel,
@@ -89,6 +121,8 @@ class ChatInputArea extends StatelessWidget {
           ),
         ),
       );
+      // Cuộn đến tin nhắn vừa chỉnh sửa
+      _scrollToMessage(editingMessageId);
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -102,7 +136,6 @@ class ChatInputArea extends StatelessWidget {
         ),
       );
     }
-    scrollToBottom(ScrollController());
   }
 
   @override
