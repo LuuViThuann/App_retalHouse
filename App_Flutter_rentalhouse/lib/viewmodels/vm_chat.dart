@@ -23,6 +23,8 @@ class ChatViewModel extends ChangeNotifier {
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
 
+  String? get currentConversationId => _currentConversationId;
+
   ChatViewModel() {
     _initializeSocket();
   }
@@ -122,6 +124,8 @@ class ChatViewModel extends ChangeNotifier {
 
     _socket?.connect();
   }
+
+  
 
   void _addOrUpdateMessage(Message message, {bool isTemp = false}) {
     final index = _messages.indexWhere((msg) => msg.id == message.id);
@@ -327,7 +331,7 @@ class ChatViewModel extends ChangeNotifier {
           images: imagePaths,
           createdAt: DateTime.now(),
           updatedAt: null,
-          sender: {'id': senderId, 'username': 'You', 'avatarBase64': ''},
+          sender: {'id': senderId, 'username': 'You', 'avatarBase64': ''},     
         );
         if (_currentConversationId == conversationId) {
           _addOrUpdateMessage(tempMessage, isTemp: true);
@@ -428,7 +432,7 @@ class ChatViewModel extends ChangeNotifier {
         ],
         createdAt: oldMessage.createdAt,
         updatedAt: DateTime.now(),
-        sender: oldMessage.sender,
+        sender: oldMessage.sender,      
       );
       _notify();
     }
