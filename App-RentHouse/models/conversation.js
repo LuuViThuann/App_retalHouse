@@ -27,6 +27,7 @@ const conversationSchema = new mongoose.Schema({
     type: Date,
     default: Date.now,
   },
+  unreadCounts: { type: Map, of: Number, default: {} },
 });
 
 conversationSchema.pre('save', function(next) {

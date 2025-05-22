@@ -10,9 +10,7 @@ class ChatViewModel extends ChangeNotifier {
   final List<Conversation> _conversations = [];
   final List<Message> _messages = [];
   bool _isLoading = false;
-
   bool _hasMoreMessages = true;
-
   String? _errorMessage;
   io.Socket? _socket;
   String? _currentConversationId;
@@ -125,24 +123,56 @@ class ChatViewModel extends ChangeNotifier {
     _socket?.connect();
   }
 
-  void _addOrUpdateMessage(Message message) {
+  void _addOrUpdateMessage(Message message, {bool isTemp = false}) {
     final index = _messages.indexWhere((msg) => msg.id == message.id);
     if (index != -1) {
       _messages[index] = message;
     } else {
-      final tempIndex = _messages.indexWhere((msg) =>
-          msg.id.startsWith('temp_') && msg.content == message.content);
+      final tempIndex = isTemp
+          ? -1
+          : _messages.indexWhere((msg) =>
+              msg.id.startsWith('temp_') && msg.content == message.content);
       if (tempIndex != -1) {
         _messages[tempIndex] = message;
-      } else if (_messages.length < _maxMessagesInMemory) {
-        _messages.add(message);
       } else {
-        _messages.removeAt(0);
-        _messages.add(message);
+        if (_messages.length >= _maxMessagesInMemory) {
+          _messages.removeAt(_messages.length - 1); // Remove oldest (end)
+        }
+        _messages.insert(0, message); // Prepend new message
       }
     }
-    _messages.sort((a, b) => a.createdAt.compareTo(b.createdAt));
     _hasMoreMessages = true; // New messages imply more may exist
+    _notify();
+  }
+
+  void setConversations(List<Conversation> conversations) {
+    _conversations
+      ..clear()
+      ..addAll(conversations);
+    _sortConversations();
+    _notify();
+  }
+
+  void addConversation(Conversation conversation) {
+    final index =
+        _conversations.indexWhere((conv) => conv.id == conversation.id);
+    if (index != -1) {
+      _conversations[index] = conversation;
+    } else {
+      _conversations.add(conversation);
+    }
+    _sortConversations();
+    _notify();
+  }
+
+  void setMessages(List<Message> messages) {
+    _messages
+      ..clear()
+      ..addAll(messages);
+    if (_messages.length > _maxMessagesInMemory) {
+      _messages.removeRange(_maxMessagesInMemory, _messages.length);
+    }
+    _hasMoreMessages = messages.length == _messageLimit;
     _notify();
   }
 
@@ -212,25 +242,24 @@ class ChatViewModel extends ChangeNotifier {
         final newMessages =
             messageData.map((json) => Message.fromJson(json)).toList();
         final existingIds = _messages.map((m) => m.id).toSet();
-        final filteredMessages =
-            newMessages.where((newMsg) => !existingIds.contains(newMsg.id));
+        final filteredMessages = newMessages
+            .where((newMsg) => !existingIds.contains(newMsg.id))
+            .toList();
 
         if (cursor != null) {
-          _messages.insertAll(0, filteredMessages);
+          _messages.addAll(filteredMessages); // Append older messages
         } else {
           _messages
             ..clear()
-            ..addAll(filteredMessages);
+            ..addAll(filteredMessages.reversed); // Newer messages first
         }
 
-        // Cap total messages in memory
         if (_messages.length > _maxMessagesInMemory) {
-          _messages.removeRange(0, _messages.length - _maxMessagesInMemory);
+          _messages.removeRange(_maxMessagesInMemory, _messages.length);
         }
-        _messages.sort((a, b) => a.createdAt.compareTo(b.createdAt));
         _setError(null);
-        // Return whether more messages are available (based on response or message count)
         _hasMoreMessages = newMessages.length == limit;
+        _notify();
         return _hasMoreMessages;
       } else {
         _setError('Failed to load messages: ${response.body}');
@@ -301,7 +330,7 @@ class ChatViewModel extends ChangeNotifier {
           sender: {'id': senderId, 'username': 'You', 'avatarBase64': ''},
         );
         if (_currentConversationId == conversationId) {
-          _addOrUpdateMessage(tempMessage);
+          _addOrUpdateMessage(tempMessage, isTemp: true);
         }
       }
 
