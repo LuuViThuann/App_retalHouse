@@ -8,8 +8,6 @@ import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'dart:convert';
 
-import '../../utils/date_chat.dart';
-
 class ChatMessageList extends StatelessWidget {
   final ScrollController scrollController;
   final bool isFetchingOlderMessages;
@@ -73,10 +71,11 @@ class ChatMessageList extends StatelessWidget {
     final items = <dynamic>[];
     String? lastHeader;
 
-    // Use messages directly, as they are already sorted chronologically
+    // Messages are already in reverse chronological order (newest first)
     final messages = chatViewModel.messages;
 
-    for (var message in messages) {
+    // Iterate in reverse to build items from oldest to newest for display
+    for (var message in messages.reversed) {
       final header = _getDateHeader(message.createdAt);
       if (header != lastHeader) {
         items.add(header);
@@ -93,6 +92,7 @@ class ChatMessageList extends StatelessWidget {
             controller: scrollController,
             padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
             itemCount: items.length,
+            reverse: true, // Newest messages at bottom
             itemBuilder: (context, index) {
               final item = items[index];
               if (item is String) {
