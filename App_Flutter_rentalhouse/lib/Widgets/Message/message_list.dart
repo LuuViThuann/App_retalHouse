@@ -39,7 +39,7 @@ class ChatMessageList extends StatelessWidget {
     final authViewModel = Provider.of<AuthViewModel>(context);
     final chatViewModel = Provider.of<ChatViewModel>(context);
 
-    // Scroll to bottom after the frame is built
+    // Scroll to bottom after the frame is built to show newest messages
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (scrollController.hasClients && !isFetchingOlderMessages) {
         scrollController.jumpTo(scrollController.position.maxScrollExtent);
@@ -73,11 +73,10 @@ class ChatMessageList extends StatelessWidget {
     final items = <dynamic>[];
     String? lastHeader;
 
-    // Sort messages by createdAt in ascending order (oldest first)
-    final sortedMessages = List<Message>.from(chatViewModel.messages)
-      ..sort((a, b) => a.createdAt.compareTo(b.createdAt));
+    // Use messages directly, as they are already sorted chronologically
+    final messages = chatViewModel.messages;
 
-    for (var message in sortedMessages) {
+    for (var message in messages) {
       final header = _getDateHeader(message.createdAt);
       if (header != lastHeader) {
         items.add(header);
