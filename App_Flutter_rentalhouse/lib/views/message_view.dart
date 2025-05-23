@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_rentalhouse/Widgets/conversation/conversation_list.dart';
 import 'package:flutter_rentalhouse/constants/app_style.dart';
@@ -6,7 +7,6 @@ import 'package:flutter_rentalhouse/viewmodels/vm_auth.dart';
 import 'package:flutter_rentalhouse/viewmodels/vm_chat.dart';
 import 'package:provider/provider.dart';
 
-
 class ConversationsScreen extends StatefulWidget {
   const ConversationsScreen({super.key});
 
@@ -14,11 +14,22 @@ class ConversationsScreen extends StatefulWidget {
   _ConversationsScreenState createState() => _ConversationsScreenState();
 }
 
-class _ConversationsScreenState extends State<ConversationsScreen> with TickerProviderStateMixin {
+class _ConversationsScreenState extends State<ConversationsScreen>
+    with TickerProviderStateMixin {
+  final TextEditingController _searchController = TextEditingController();
+  Timer? _debounce;
+
   @override
   void initState() {
     super.initState();
     _loadConversations();
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    _debounce?.cancel();
+    super.dispose();
   }
 
   Future<void> _loadConversations() async {
@@ -28,8 +39,16 @@ class _ConversationsScreenState extends State<ConversationsScreen> with TickerPr
     if (authViewModel.currentUser != null) {
       await chatViewModel.fetchConversations(authViewModel.currentUser!.token!);
     } else {
-      SnackbarUtils.showError(context, 'Vui lòng đăng nhập để xem cuộc trò chuyện');
+      SnackbarUtils.showError(
+          context, 'Vui lòng đăng nhập để xem cuộc trò chuyện');
     }
+  }
+
+  void _onSearchChanged(String value) {
+    if (_debounce?.isActive ?? false) _debounce?.cancel();
+    _debounce = Timer(const Duration(milliseconds: 300), () {
+      setState(() {});
+    });
   }
 
   @override
@@ -56,23 +75,41 @@ class _ConversationsScreenState extends State<ConversationsScreen> with TickerPr
         elevation: 4,
         shadowColor: AppStyles.shadowColor,
       ),
-      body: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: [AppStyles.backgroundLight, AppStyles.whiteColor],
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
+      body: Column(
+        children: [
+          Container(
+            color: Colors.grey[100],
+            child: Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: TextField(
+                controller: _searchController,
+                decoration: AppStyles.searchInputDecoration,
+                onChanged: _onSearchChanged,
+              ),
+            ),
           ),
-        ),
-        child: Consumer2<AuthViewModel, ChatViewModel>(
-          builder: (context, authViewModel, chatViewModel, child) {
-            return ConversationList(
-              authViewModel: authViewModel,
-              chatViewModel: chatViewModel,
-              onRetry: _loadConversations,
-            );
-          },
-        ),
+          Expanded(
+            child: Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [AppStyles.backgroundLight, AppStyles.whiteColor],
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                ),
+              ),
+              child: Consumer2<AuthViewModel, ChatViewModel>(
+                builder: (context, authViewModel, chatViewModel, child) {
+                  return ConversationList(
+                    authViewModel: authViewModel,
+                    chatViewModel: chatViewModel,
+                    onRetry: _loadConversations,
+                    searchQuery: _searchController.text,
+                  );
+                },
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

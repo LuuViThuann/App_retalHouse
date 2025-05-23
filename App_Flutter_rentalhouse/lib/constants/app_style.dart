@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_rentalhouse/constants/app_color.dart';
 
-
 class AppStyles {
   // Colors (moved to app_colors.dart)
   static final Color whiteColor = AppColors.white;
@@ -100,5 +99,26 @@ class AppStyles {
     backgroundColor: AppColors.primary,
     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
     padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+  );
+
+  // Input Decoration for Search
+  static final searchInputDecoration = InputDecoration(
+    hintText: 'Tìm kiếm cuộc trò chuyện...',
+    hintStyle: TextStyle(color: AppColors.grey600),
+    prefixIcon: Icon(Icons.search, color: AppColors.grey600),
+    // Note: To clear the search field, you need to provide a TextEditingController from outside this style class.
+    // This is a placeholder; you should implement the suffixIcon in your widget where you have access to the controller.
+    suffixIcon: null,
+    filled: true,
+    fillColor: Colors.white,
+    border: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(12),
+      borderSide: BorderSide(color: AppColors.grey400),
+    ),
+    focusedBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(12),
+      borderSide: BorderSide(color: AppColors.primary, width: 2),
+    ),
+    contentPadding: EdgeInsets.symmetric(vertical: 0, horizontal: 16),
   );
 }

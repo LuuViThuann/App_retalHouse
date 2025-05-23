@@ -3,10 +3,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_rentalhouse/Widgets/Message/app_bar_chat.dart';
 import 'package:flutter_rentalhouse/Widgets/Message/message_input.dart';
 import 'package:flutter_rentalhouse/Widgets/Message/message_list.dart';
+import 'package:flutter_rentalhouse/config/loading.dart';
 import 'package:flutter_rentalhouse/models/message.dart';
 import 'package:flutter_rentalhouse/viewmodels/vm_auth.dart';
 import 'package:flutter_rentalhouse/viewmodels/vm_chat.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:lottie/lottie.dart';
 import 'package:provider/provider.dart';
 import '../utils/date_chat.dart';
 
@@ -168,9 +170,16 @@ class _ChatScreenState extends State<ChatScreen> {
     final chatViewModel = Provider.of<ChatViewModel>(context);
 
     if (_isLoading && chatViewModel.messages.isEmpty) {
-      return const Scaffold(
+      return Scaffold(
         backgroundColor: Colors.white,
-        body: Center(child: CircularProgressIndicator()),
+        body: Center(
+          child: Lottie.asset(
+            AssetsConfig.loadingLottie, // Sử dụng đường dẫn từ AssetsConfig
+            width: 100,
+            height: 100,
+            fit: BoxFit.fill,
+          ),
+        ),
       );
     }
 

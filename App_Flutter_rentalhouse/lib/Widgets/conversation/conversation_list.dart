@@ -6,17 +6,18 @@ import 'package:flutter_rentalhouse/utils/sort_conversation.dart';
 import 'package:flutter_rentalhouse/viewmodels/vm_auth.dart';
 import 'package:flutter_rentalhouse/viewmodels/vm_chat.dart';
 
-
 class ConversationList extends StatelessWidget {
   final AuthViewModel authViewModel;
   final ChatViewModel chatViewModel;
   final VoidCallback onRetry;
+  final String searchQuery;
 
   const ConversationList({
     super.key,
     required this.authViewModel,
     required this.chatViewModel,
     required this.onRetry,
+    required this.searchQuery,
   });
 
   @override
@@ -43,15 +44,33 @@ class ConversationList extends StatelessWidget {
       );
     }
 
-    final sortedConversations = ConversationSorter.sortConversations(chatViewModel.conversations);
+    // Filter and sort conversations only once per build
+    final filteredConversations =
+        chatViewModel.conversations.where((conversation) {
+      final landlordUsername =
+          conversation.landlord['username']?.toLowerCase() ?? 'chủ nhà';
+      final query = searchQuery.toLowerCase();
+      return query.isEmpty || landlordUsername.contains(query);
+    }).toList();
+
+    final sortedConversations =
+        ConversationSorter.sortConversations(filteredConversations);
+
+    if (sortedConversations.isEmpty && searchQuery.isNotEmpty) {
+      return _buildEmptyState(
+        icon: Icons.search_off,
+        message: 'Không tìm thấy cuộc trò chuyện nào',
+      );
+    }
 
     return ListView.separated(
       padding: EdgeInsets.all(16),
       itemCount: sortedConversations.length,
-      separatorBuilder: (context, index) => SizedBox(height: 12),
+      separatorBuilder: (context, index) => const SizedBox(height: 12),
       itemBuilder: (context, index) {
         final conversation = sortedConversations[index];
         return ConversationTile(
+          key: ValueKey(conversation.id), // Ensure stable keys for optimization
           conversation: conversation,
           token: authViewModel.currentUser!.token!,
         );
@@ -100,17 +119,17 @@ class ConversationList extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Icon(Icons.error_outline, size: 64, color: AppStyles.errorColor),
-          SizedBox(height: 16),
+          const SizedBox(height: 16),
           Text(
             errorMessage,
             style: AppStyles.errorText,
             textAlign: TextAlign.center,
           ),
-          SizedBox(height: 16),
+          const SizedBox(height: 16),
           ElevatedButton(
             onPressed: onRetry,
             style: AppStyles.retryButtonStyle,
-            child: Text('Thử lại', style: AppStyles.retryButtonText),
+            child: const Text('Thử lại', style: AppStyles.retryButtonText),
           ),
         ],
       ),
