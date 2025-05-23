@@ -36,9 +36,20 @@ const authMiddleware = async (req, res, next) => {
 };
 
 const adjustTimestamps = (obj) => {
-  const adjusted = { ...obj.toObject() };
+  const adjusted = { ...obj };
   adjusted.createdAt = new Date(adjusted.createdAt.getTime() + 7 * 60 * 60 * 1000);
+  adjusted.updatedAt = adjusted.updatedAt ? new Date(adjusted.updatedAt.getTime() + 7 * 60 * 60 * 1000) : null;
   return adjusted;
+};
+
+// Helper function to safely convert unreadCounts Map to object
+const convertUnreadCounts = (unreadCounts) => {
+  if (unreadCounts instanceof Map) {
+    return Object.fromEntries(unreadCounts);
+  } else if (unreadCounts && typeof unreadCounts === 'object') {
+    return unreadCounts;
+  }
+  return {};
 };
 
 module.exports = (io) => {
@@ -100,6 +111,7 @@ module.exports = (io) => {
           participants: [userId, landlordId],
           lastMessage: null,
           isPending: true,
+          unreadCounts: new Map([[userId, 0], [landlordId, 0]]),
         });
         await conversation.save();
       }
@@ -118,17 +130,14 @@ module.exports = (io) => {
       } catch (err) {}
 
       const adjustedConversation = {
-        ...conversation.toObject(),
+        ...adjustTimestamps(conversation.toObject()),
         _id: conversation._id.toString(),
-        createdAt: new Date(conversation.createdAt.getTime() + 7 * 60 * 60 * 1000),
-        updatedAt: conversation.updatedAt ? new Date(conversation.updatedAt.getTime() + 7 * 60 * 60 * 1000) : null,
+        unreadCounts: convertUnreadCounts(conversation.unreadCounts),
         lastMessage: conversation.lastMessage
           ? {
-              ...conversation.lastMessage.toObject(),
+              ...adjustTimestamps(conversation.lastMessage.toObject()),
               _id: conversation.lastMessage._id.toString(),
               conversationId: conversation.lastMessage.conversationId.toString(),
-              createdAt: new Date(conversation.lastMessage.createdAt.getTime() + 7 * 60 * 60 * 1000),
-              updatedAt: conversation.lastMessage.updatedAt ? new Date(conversation.lastMessage.updatedAt.getTime() + 7 * 60 * 60 * 1000) : null,
               sender: {
                 id: conversation.lastMessage.senderId,
                 username: conversation.lastMessage.senderId === userId ? userData.username : landlordData.username,
@@ -201,17 +210,14 @@ module.exports = (io) => {
           } catch (err) {}
 
           return {
-            ...conv,
+            ...adjustTimestamps(conv),
             _id: conv._id.toString(),
-            createdAt: new Date(conv.createdAt.getTime() + 7 * 60 * 60 * 1000),
-            updatedAt: conv.updatedAt ? new Date(conv.updatedAt.getTime() + 7 * 60 * 60 * 1000) : null,
+            unreadCounts: convertUnreadCounts(conv.unreadCounts),
             lastMessage: conv.lastMessage
               ? {
-                  ...conv.lastMessage,
+                  ...adjustTimestamps(conv.lastMessage),
                   _id: conv.lastMessage._id.toString(),
                   conversationId: conv.lastMessage.conversationId.toString(),
-                  createdAt: new Date(conv.lastMessage.createdAt.getTime() + 7 * 60 * 60 * 1000),
-                  updatedAt: conv.lastMessage.updatedAt ? new Date(conv.lastMessage.updatedAt.getTime() + 7 * 60 * 60 * 1000) : null,
                   sender: {
                     id: conv.lastMessage.senderId,
                     username: conv.lastMessage.senderId === userId ? userData2.username : participantData.username,
@@ -238,6 +244,41 @@ module.exports = (io) => {
 
       res.status(201).json(adjustedConversation);
     } catch (err) {
+      console.error('Error in POST /conversations:', err.message);
+      res.status(500).json({ message: 'Server error', error: err.message });
+    }
+  });
+
+  // Delete a conversation
+  router.delete('/conversations/:conversationId', authMiddleware, async (req, res) => {
+    try {
+      const { conversationId } = req.params;
+      const userId = req.userId;
+
+      if (!mongoose.Types.ObjectId.isValid(conversationId)) {
+        return res.status(400).json({ message: 'Invalid conversationId format' });
+      }
+
+      const conversation = await Conversation.findById(conversationId);
+      if (!conversation || !conversation.participants.includes(userId)) {
+        return res.status(403).json({ message: 'Unauthorized or conversation not found' });
+      }
+
+      await Message.deleteMany({ conversationId });
+      await Conversation.deleteOne({ _id: conversationId });
+
+      const participants = conversation.participants;
+      for (const participantId of participants) {
+        await redisClient.del(`conversations:${participantId}`);
+      }
+
+      if (io) {
+        io.to(conversationId).emit('deleteConversation', { conversationId });
+      }
+
+      res.status(200).json({ message: 'Conversation deleted successfully' });
+    } catch (err) {
+      console.error('Error in DELETE /conversations:', err.message);
       res.status(500).json({ message: 'Server error', error: err.message });
     }
   });
@@ -246,23 +287,29 @@ module.exports = (io) => {
     try {
       const { conversationId } = req.params;
       const { cursor, limit = 10 } = req.query;
+      const userId = req.userId;
+
       if (!mongoose.Types.ObjectId.isValid(conversationId)) {
         return res.status(400).json({ message: 'Invalid conversationId format' });
       }
       const conversation = await Conversation.findById(conversationId);
-      if (!conversation || !conversation.participants.includes(req.userId)) {
+      if (!conversation || !conversation.participants.includes(userId)) {
         return res.status(403).json({ message: 'Unauthorized or conversation not found' });
       }
+
+      // Reset unread count for the user when they view the conversation
+      conversation.unreadCounts.set(userId, 0);
+      await conversation.save();
+      await redisClient.del(`conversations:${userId}`);
+
       const query = { conversationId: new mongoose.Types.ObjectId(conversationId) };
       if (cursor) {
-        query._id = { $gt: cursor }; // Fetch newer messages for pagination
+        query._id = { $gt: cursor };
       }
       const messages = await Message.find(query)
-        .sort({ createdAt: 1 }) // Sort oldest first
+        .sort({ createdAt: 1 })
         .limit(parseInt(limit))
         .lean();
-
-      console.log(`Fetched ${messages.length} messages for conversation ${conversationId}`);
 
       const senderIds = [...new Set(messages.map(msg => msg.senderId))];
       const senderAvatars = {};
@@ -297,19 +344,19 @@ module.exports = (io) => {
 
       const nextCursor = messages.length === parseInt(limit) ? messages[messages.length - 1]._id : null;
       const adjustedMessages = messages.map((msg) => ({
-        ...msg,
+        ...adjustTimestamps(msg),
         _id: msg._id.toString(),
         conversationId: msg.conversationId.toString(),
-        createdAt: new Date(msg.createdAt.getTime() + 7 * 60 * 60 * 1000),
-        updatedAt: msg.updatedAt ? new Date(msg.updatedAt.getTime() + 7 * 60 * 60 * 1000) : null,
         sender: {
           id: msg.senderId,
           username: senderAvatars[msg.senderId]?.username || 'Chủ nhà',
           avatarBase64: senderAvatars[msg.senderId]?.avatarBase64 || '',
         }
       }));
+
       res.json({ messages: adjustedMessages, nextCursor });
     } catch (err) {
+      console.error('Error in GET /messages:', err.message);
       res.status(500).json({ message: err.message });
     }
   });
@@ -317,6 +364,8 @@ module.exports = (io) => {
   router.post('/messages', authMiddleware, upload.array('images'), async (req, res) => {
     try {
       const { conversationId, content = '' } = req.body;
+      const userId = req.userId;
+
       if (!mongoose.Types.ObjectId.isValid(conversationId)) {
         return res.status(400).json({ message: 'Invalid conversationId' });
       }
@@ -324,13 +373,21 @@ module.exports = (io) => {
         return res.status(400).json({ message: 'Message must have either content or images' });
       }
       const conversation = await Conversation.findById(conversationId);
-      if (!conversation || !conversation.participants.includes(req.userId)) {
+      if (!conversation || !conversation.participants.includes(userId)) {
         return res.status(403).json({ message: 'Unauthorized or conversation not found' });
       }
+
+      const recipientId = conversation.participants.find(p => p !== userId);
+      if (recipientId) {
+        const currentCount = conversation.unreadCounts.get(recipientId) || 0;
+        conversation.unreadCounts.set(recipientId, currentCount + 1);
+        conversation.unreadCounts.set(userId, 0); // Reset sender's unread count
+      }
+
       const imageUrls = req.files ? req.files.map(file => `/uploads/${file.filename}`) : [];
       const message = new Message({
         conversationId,
-        senderId: req.userId,
+        senderId: userId,
         content,
         images: imageUrls,
       });
@@ -338,19 +395,20 @@ module.exports = (io) => {
       conversation.lastMessage = message._id;
       conversation.isPending = false;
       await conversation.save();
+
       await redisClient.del(`conversations:${conversation.participants[0]}`);
       await redisClient.del(`conversations:${conversation.participants[1]}`);
 
       let avatarBase64 = '';
       let username = 'Chủ nhà';
       try {
-        const rentalDoc = await Rental.findOne({ userId: req.userId }).select('contactInfo');
+        const rentalDoc = await Rental.findOne({ userId }).select('contactInfo');
         if (rentalDoc) {
           username = rentalDoc.contactInfo?.name || 'Chủ nhà';
         }
       } catch (err) {}
       try {
-        const userMongo = await mongoose.model('User').findOne({ _id: req.userId }).select('avatarBase64 username');
+        const userMongo = await mongoose.model('User').findOne({ _id: userId }).select('avatarBase64 username');
         if (userMongo) {
           avatarBase64 = userMongo.avatarBase64 || '';
           username = userMongo.username || username;
@@ -358,7 +416,7 @@ module.exports = (io) => {
       } catch (err) {}
       if (!avatarBase64 || !username) {
         try {
-          const userDoc = await admin.firestore().collection('Users').doc(req.userId).get();
+          const userDoc = await admin.firestore().collection('Users').doc(userId).get();
           if (userDoc.exists) {
             const data = userDoc.data();
             avatarBase64 = avatarBase64 || data.avatarBase64 || '';
@@ -376,18 +434,21 @@ module.exports = (io) => {
         createdAt: new Date(message.createdAt.getTime() + 7 * 60 * 60 * 1000),
         updatedAt: message.updatedAt ? new Date(message.updatedAt.getTime() + 7 * 60 * 60 * 1000) : null,
         sender: {
-          id: req.userId,
+          id: userId,
           username: username,
           avatarBase64: avatarBase64,
         }
       };
 
-      console.log(`Emitting receiveMessage to room ${conversationId} for user ${req.userId}:`, JSON.stringify(messageData, null, 2));
       if (io) {
         io.to(conversationId).emit('receiveMessage', messageData);
-      } else {
-        console.error('Socket.IO instance is not initialized for receiveMessage');
+        io.to(conversationId).emit('updateConversation', {
+          ...adjustTimestamps(conversation.toObject()),
+          _id: conversation._id.toString(),
+          unreadCounts: convertUnreadCounts(conversation.unreadCounts),
+        });
       }
+
       res.status(201).json(messageData);
     } catch (err) {
       console.error('Error in POST /messages:', err.message);
@@ -427,11 +488,8 @@ module.exports = (io) => {
       await redisClient.del(`conversations:${conversation.participants[1]}`);
 
       const deleteData = { messageId: messageId.toString() };
-      console.log(`Emitting deleteMessage to room ${conversation._id}:`, JSON.stringify(deleteData, null, 2));
       if (io) {
         io.to(conversation._id.toString()).emit('deleteMessage', deleteData);
-      } else {
-        console.error('Socket.IO instance is not initialized for deleteMessage');
       }
 
       res.status(200).json({ message: 'Message deleted successfully' });
@@ -530,11 +588,8 @@ module.exports = (io) => {
         }
       };
 
-      console.log(`Emitting updateMessage to room ${conversation._id} for user ${req.userId}:`, JSON.stringify(messageData, null, 2));
       if (io) {
         io.to(conversation._id.toString()).emit('updateMessage', messageData);
-      } else {
-        console.error('Socket.IO instance is not initialized for updateMessage');
       }
 
       res.status(200).json(messageData);
@@ -598,17 +653,14 @@ module.exports = (io) => {
             }
           } catch (err) {}
           return {
-            ...conv,
+            ...adjustTimestamps(conv),
             _id: conv._id.toString(),
-            createdAt: new Date(conv.createdAt.getTime() + 7 * 60 * 60 * 1000),
-            updatedAt: conv.updatedAt ? new Date(conv.updatedAt.getTime() + 7 * 60 * 60 * 1000) : null,
+            unreadCounts: convertUnreadCounts(conv.unreadCounts),
             lastMessage: conv.lastMessage
               ? {
-                  ...conv.lastMessage,
+                  ...adjustTimestamps(conv.lastMessage),
                   _id: conv.lastMessage._id.toString(),
                   conversationId: conv.lastMessage.conversationId.toString(),
-                  createdAt: new Date(conv.lastMessage.createdAt.getTime() + 7 * 60 * 60 * 1000),
-                  updatedAt: conv.lastMessage.updatedAt ? new Date(conv.lastMessage.updatedAt.getTime() + 7 * 60 * 60 * 1000) : null,
                   sender: {
                     id: conv.lastMessage.senderId,
                     username: conv.lastMessage.senderId === userId ? userData.username : participantData.username,

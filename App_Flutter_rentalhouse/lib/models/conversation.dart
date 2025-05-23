@@ -10,6 +10,7 @@ class Conversation {
   final DateTime? updatedAt;
   final Map<String, dynamic> landlord;
   final Map<String, dynamic>? rental;
+  final int unreadCount;
 
   Conversation({
     required this.id,
@@ -21,18 +22,25 @@ class Conversation {
     this.updatedAt,
     required this.landlord,
     this.rental,
+    required this.unreadCount,
   });
 
   factory Conversation.fromJson(Map<String, dynamic> json) {
-    print('Parsing conversation JSON: $json'); // Log để debug
+    print('Parsing conversation JSON: $json');
     return Conversation(
       id: json['_id']?.toString() ?? '',
       rentalId: json['rentalId']?.toString() ?? '',
-      participants: List<String>.from(json['participants']?.map((id) => id.toString()) ?? []),
-      lastMessage: json['lastMessage'] != null ? Message.fromJson(json['lastMessage'] as Map<String, dynamic>) : null,
+      participants: List<String>.from(
+          json['participants']?.map((id) => id.toString()) ?? []),
+      lastMessage: json['lastMessage'] != null
+          ? Message.fromJson(json['lastMessage'] as Map<String, dynamic>)
+          : null,
       isPending: json['isPending'] as bool? ?? true,
-      createdAt: DateTime.tryParse(json['createdAt']?.toString() ?? '') ?? DateTime.now(),
-      updatedAt: json['updatedAt'] != null ? DateTime.tryParse(json['updatedAt']?.toString() ?? '') : null,
+      createdAt: DateTime.tryParse(json['createdAt']?.toString() ?? '') ??
+          DateTime.now(),
+      updatedAt: json['updatedAt'] != null
+          ? DateTime.tryParse(json['updatedAt']?.toString() ?? '')
+          : null,
       landlord: {
         'id': json['landlord']?['id']?.toString() ?? '',
         'username': json['landlord']?['username']?.toString() ?? 'Unknown',
@@ -40,11 +48,12 @@ class Conversation {
       },
       rental: json['rental'] != null
           ? {
-        'id': json['rental']?['id']?.toString() ?? '',
-        'title': json['rental']?['title']?.toString() ?? '',
-        'image': json['rental']?['image']?.toString() ?? '',
-      }
+              'id': json['rental']?['id']?.toString() ?? '',
+              'title': json['rental']?['title']?.toString() ?? '',
+              'image': json['rental']?['image']?.toString() ?? '',
+            }
           : null,
+      unreadCount: (json['unreadCounts']?[json['user']?['id']] ?? 0) as int,
     );
   }
 }

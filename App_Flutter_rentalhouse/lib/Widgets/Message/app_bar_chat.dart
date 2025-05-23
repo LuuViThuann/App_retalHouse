@@ -33,6 +33,7 @@ class ChatAppBar extends StatelessWidget implements PreferredSizeWidget {
             'avatarBase64': ''
           },
           rental: null,
+          unreadCount: 0,
         ),
       );
       if (conversation.id.isEmpty) {

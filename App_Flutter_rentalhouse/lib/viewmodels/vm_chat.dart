@@ -23,6 +23,8 @@ class ChatViewModel extends ChangeNotifier {
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
   String? get currentConversationId => _currentConversationId;
+  int get totalUnreadCount =>
+      _conversations.fold(0, (sum, conv) => sum + conv.unreadCount);
 
   ChatViewModel() {
     _initializeSocket();
@@ -74,6 +76,8 @@ class ChatViewModel extends ChangeNotifier {
         if (_currentConversationId == message.conversationId) {
           _addOrUpdateMessage(message);
         }
+        _updateConversationUnreadCount(
+            message.conversationId, message.senderId);
       } catch (_) {}
     });
 
@@ -111,6 +115,20 @@ class ChatViewModel extends ChangeNotifier {
       } catch (_) {}
     });
 
+    _socket?.on('deleteConversation', (data) {
+      try {
+        final conversationId = data['conversationId']?.toString();
+        if (conversationId != null) {
+          _conversations.removeWhere((conv) => conv.id == conversationId);
+          if (_currentConversationId == conversationId) {
+            _currentConversationId = null;
+            _messages.clear();
+          }
+          _notify();
+        }
+      } catch (_) {}
+    });
+
     _socket?.on('reconnect', (_) {
       if (_currentConversationId != null) {
         joinConversation(_currentConversationId!);
@@ -137,13 +155,37 @@ class ChatViewModel extends ChangeNotifier {
         _messages[tempIndex] = message;
       } else {
         if (_messages.length >= _maxMessagesInMemory) {
-          _messages.removeAt(0); // Remove oldest (start)
+          _messages.removeAt(0);
         }
-        _messages.add(message); // Append new message
+        _messages.add(message);
       }
     }
     _hasMoreMessages = true;
     _notify();
+  }
+
+  void _updateConversationUnreadCount(String conversationId, String senderId) {
+    final index =
+        _conversations.indexWhere((conv) => conv.id == conversationId);
+    if (index != -1 && _conversations[index].participants.contains(senderId)) {
+      final conv = _conversations[index];
+      _conversations[index] = Conversation(
+        id: conv.id,
+        rentalId: conv.rentalId,
+        participants: conv.participants,
+        lastMessage: conv.lastMessage,
+        isPending: conv.isPending,
+        createdAt: conv.createdAt,
+        updatedAt: conv.updatedAt,
+        landlord: conv.landlord,
+        rental: conv.rental,
+        unreadCount: _currentConversationId == conversationId
+            ? 0
+            : (conv.unreadCount + 1),
+      );
+      _sortConversations();
+      _notify();
+    }
   }
 
   void setConversations(List<Conversation> conversations) {
@@ -164,6 +206,32 @@ class ChatViewModel extends ChangeNotifier {
     }
     _sortConversations();
     _notify();
+  }
+
+  Future<bool> deleteConversation(String conversationId, String token) async {
+    try {
+      final response = await http.delete(
+        Uri.parse(
+            '${ApiRoutes.serverBaseUrl}/api/conversations/$conversationId'),
+        headers: {'Authorization': 'Bearer $token'},
+      );
+
+      if (response.statusCode == 200) {
+        _conversations.removeWhere((conv) => conv.id == conversationId);
+        if (_currentConversationId == conversationId) {
+          _currentConversationId = null;
+          _messages.clear();
+        }
+        _notify();
+        return true;
+      } else {
+        _setError('Failed to delete conversation: ${response.body}');
+        return false;
+      }
+    } catch (e) {
+      _setError('Error deleting conversation: $e');
+      return false;
+    }
   }
 
   void setMessages(List<Message> messages) {
@@ -227,7 +295,7 @@ class ChatViewModel extends ChangeNotifier {
       final queryParameters = {
         'limit': limit.toString(),
         if (cursor != null) 'cursor': cursor,
-        'sort': 'asc', // Fetch oldest messages first
+        'sort': 'asc',
       };
       final uri =
           Uri.parse('${ApiRoutes.serverBaseUrl}/api/messages/$conversationId')
@@ -248,11 +316,11 @@ class ChatViewModel extends ChangeNotifier {
             .toList();
 
         if (cursor != null) {
-          _messages.addAll(filteredMessages); // Append older messages
+          _messages.addAll(filteredMessages);
         } else {
           _messages
             ..clear()
-            ..addAll(filteredMessages); // Set messages in chronological order
+            ..addAll(filteredMessages);
         }
 
         if (_messages.length > _maxMessagesInMemory) {
@@ -260,7 +328,25 @@ class ChatViewModel extends ChangeNotifier {
         }
         _setError(null);
         _hasMoreMessages = newMessages.length == limit;
-        _notify();
+
+        final index =
+            _conversations.indexWhere((conv) => conv.id == conversationId);
+        if (index != -1) {
+          _conversations[index] = Conversation(
+            id: _conversations[index].id,
+            rentalId: _conversations[index].rentalId,
+            participants: _conversations[index].participants,
+            lastMessage: _conversations[index].lastMessage,
+            isPending: _conversations[index].isPending,
+            createdAt: _conversations[index].createdAt,
+            updatedAt: _conversations[index].updatedAt,
+            landlord: _conversations[index].landlord,
+            rental: _conversations[index].rental,
+            unreadCount: 0,
+          );
+          _notify();
+        }
+
         return _hasMoreMessages;
       } else {
         _setError('Failed to load messages: ${response.body}');
@@ -355,6 +441,24 @@ class ChatViewModel extends ChangeNotifier {
         final message = Message.fromJson(responseData);
         if (_currentConversationId == conversationId) {
           _addOrUpdateMessage(message);
+        }
+        final index =
+            _conversations.indexWhere((conv) => conv.id == conversationId);
+        if (index != -1) {
+          _conversations[index] = Conversation(
+            id: _conversations[index].id,
+            rentalId: _conversations[index].rentalId,
+            participants: _conversations[index].participants,
+            lastMessage: message,
+            isPending: false,
+            createdAt: _conversations[index].createdAt,
+            updatedAt: DateTime.now(),
+            landlord: _conversations[index].landlord,
+            rental: _conversations[index].rental,
+            unreadCount: 0,
+          );
+          _sortConversations();
+          _notify();
         }
         return true;
       } else {

@@ -38,6 +38,9 @@ class _PropertyTypeScreenState extends State<PropertyTypeScreen> {
             fontSize: 22,
           ),
         ),
+        iconTheme: const IconThemeData(
+          color: Colors.white,
+        ),
         flexibleSpace: Container(
           decoration: BoxDecoration(
             gradient: LinearGradient(
@@ -50,60 +53,59 @@ class _PropertyTypeScreenState extends State<PropertyTypeScreen> {
         elevation: 4,
         shadowColor: Colors.black26,
       ),
-
       body: rentalViewModel.isLoading
           ? const Center(child: CircularProgressIndicator(color: Colors.blue))
           : rentalViewModel.errorMessage != null
-          ? Center(
-        child: Text(
-          'Lỗi: ${rentalViewModel.errorMessage}',
-          style: const TextStyle(color: Colors.red, fontSize: 16),
-        ),
-      )
-          : filteredRentals.isEmpty
-          ? const Center(
-        child: Text(
-          'Không có bài đăng nào!',
-          style: TextStyle(fontSize: 16, color: Colors.grey),
-        ),
-      )
-          : ListView.separated(
-        padding: const EdgeInsets.all(16.0),
-        itemCount: displayRentals.length + (hasMorePosts ? 1 : 0),
-        separatorBuilder: (context, index) => const SizedBox(height: 12),
-        itemBuilder: (context, index) {
-          if (hasMorePosts && index == displayRentals.length) {
-            // Display "Xem thêm bài đăng" button
-            return Center(
-              child: TextButton(
-                onPressed: () {
-                  setState(() {
-                    _displayLimit += 5; // Load 5 more posts
-                  });
-                },
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      'Xem thêm bài đăng',
-                      style: TextStyle(fontSize: 14, color: Colors.blue[700]),
+              ? Center(
+                  child: Text(
+                    'Lỗi: ${rentalViewModel.errorMessage}',
+                    style: const TextStyle(color: Colors.red, fontSize: 16),
+                  ),
+                )
+              : filteredRentals.isEmpty
+                  ? const Center(
+                      child: Text(
+                        'Không có bài đăng nào!',
+                        style: TextStyle(fontSize: 16, color: Colors.grey),
+                      ),
+                    )
+                  : ListView.separated(
+                      padding: const EdgeInsets.all(16.0),
+                      itemCount: displayRentals.length + (hasMorePosts ? 1 : 0),
+                      separatorBuilder: (context, index) =>
+                          const SizedBox(height: 12),
+                      itemBuilder: (context, index) {
+                        if (hasMorePosts && index == displayRentals.length) {
+                          // Display "Xem thêm bài đăng" button
+                          return Center(
+                            child: TextButton(
+                              onPressed: () {
+                                setState(() {
+                                  _displayLimit += 5; // Load 5 more posts
+                                });
+                              },
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    'Xem thêm bài đăng',
+                                    style: TextStyle(
+                                        fontSize: 14, color: Colors.blue[700]),
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Icon(
+                                    Icons.arrow_forward,
+                                    size: 14,
+                                    color: Colors.blue[700],
+                                  ),
+                                ],
+                              ),
+                            ),
+                          );
+                        }
+                        return RentalItemWidget(rental: displayRentals[index]);
+                      },
                     ),
-                    const SizedBox(width: 4),
-                    Icon(
-                      Icons.arrow_forward,
-                      size: 14,
-                      color: Colors.blue[700],
-                    ),
-                  ],
-                ),
-              ),
-            );
-          }
-          return RentalItemWidget(rental: displayRentals[index]);
-        },
-      ),
     );
   }
 }
-
-

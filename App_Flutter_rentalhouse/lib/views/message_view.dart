@@ -67,6 +67,35 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
     );
   }
 
+  void _deleteConversation(String conversationId, String token) async {
+    final chatViewModel = Provider.of<ChatViewModel>(context, listen: false);
+    final success =
+        await chatViewModel.deleteConversation(conversationId, token);
+    if (success) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Đã xóa cuộc trò chuyện'),
+          backgroundColor: Colors.green,
+          behavior: SnackBarBehavior.floating,
+          margin: EdgeInsets.all(16),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        ),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Xóa cuộc trò chuyện thất bại'),
+          backgroundColor: Colors.redAccent,
+          behavior: SnackBarBehavior.floating,
+          margin: EdgeInsets.all(16),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        ),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -232,77 +261,126 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
                     subtitleText = '[Hình ảnh]';
                   }
                 }
-                return InkWell(
-                  onTap: () {
-                    print(
-                        'Navigating to ChatScreen with conversationId: ${conversation.id}');
-                    Navigator.push(
-                      context,
-                      _createRoute(ChatScreen(
-                        rentalId: conversation.rentalId,
-                        landlordId: conversation.landlord['id'],
-                        conversationId: conversation.id,
-                      )),
-                    );
+                return Dismissible(
+                  key: Key(conversation.id),
+                  direction: DismissDirection.endToStart,
+                  onDismissed: (direction) {
+                    if (authViewModel.currentUser != null) {
+                      _deleteConversation(
+                          conversation.id, authViewModel.currentUser!.token!);
+                    }
                   },
-                  borderRadius: BorderRadius.circular(12),
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(12),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black12,
-                          blurRadius: 1,
-                          offset: Offset(0, 2),
-                        ),
-                      ],
-                    ),
-                    child: ListTile(
-                      contentPadding:
-                          EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                      leading: CircleAvatar(
-                        radius: 28,
-                        backgroundImage:
-                            conversation.landlord['avatarBase64']?.isNotEmpty ==
-                                    true
-                                ? MemoryImage(base64Decode(
-                                    conversation.landlord['avatarBase64']))
-                                : null,
-                        backgroundColor: Colors.blue[100],
-                        child: conversation.landlord['avatarBase64']?.isEmpty ==
-                                true
-                            ? Icon(Icons.person,
-                                size: 28, color: Colors.blue[800])
-                            : null,
+                  background: Container(
+                    alignment: Alignment.centerRight,
+                    padding: EdgeInsets.only(right: 20),
+                    color: Colors.red,
+                    child: Icon(Icons.delete, color: Colors.white),
+                  ),
+                  child: InkWell(
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        _createRoute(ChatScreen(
+                          rentalId: conversation.rentalId,
+                          landlordId: conversation.landlord['id'],
+                          conversationId: conversation.id,
+                        )),
+                      );
+                    },
+                    borderRadius: BorderRadius.circular(12),
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(12),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black12,
+                            blurRadius: 1,
+                            offset: Offset(0, 2),
+                          ),
+                        ],
                       ),
-                      title: Text(
-                        conversation.landlord['username'] ?? 'Chủ nhà',
-                        style: TextStyle(
-                          fontWeight: FontWeight.w600,
-                          fontSize: 16,
-                          color: Colors.black87,
+                      child: ListTile(
+                        contentPadding:
+                            EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        leading: Stack(
+                          clipBehavior: Clip.none, // sử dụng clipBehavior tránh cắt phần bị che
+                          children: [
+                            CircleAvatar(
+                              radius: 28,
+                              backgroundImage: conversation
+                                          .landlord['avatarBase64']
+                                          ?.isNotEmpty ==
+                                      true
+                                  ? MemoryImage(base64Decode(
+                                      conversation.landlord['avatarBase64']))
+                                  : null,
+                              backgroundColor: Colors.blue[100],
+                              child: conversation
+                                          .landlord['avatarBase64']?.isEmpty ==
+                                      true
+                                  ? Icon(Icons.person,
+                                      size: 28, color: Colors.blue[800])
+                                  : null,
+                            ),
+                            if (conversation.unreadCount > 0)
+                              Positioned(
+                                right: 0,
+                                top: -10,
+                                child: Container(
+                                  padding: EdgeInsets.all(4),
+                                  decoration: BoxDecoration(
+                                    color: Colors.red,
+                                    shape: BoxShape.circle,
+                                    border: Border.all(
+                                        color: Colors.white, width: 2),
+                                  ),
+                                  constraints: BoxConstraints(
+                                    minWidth: 20,
+                                    minHeight: 20,
+                                  ),
+                                  child: Center(
+                                    child: Text(
+                                      '${conversation.unreadCount}',
+                                      style: TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                          ],
                         ),
-                      ),
-                      subtitle: Text(
-                        subtitleText,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: Colors.grey[600],
+                        title: Text(
+                          conversation.landlord['username'] ?? 'Chủ nhà',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w600,
+                            fontSize: 16,
+                            color: Colors.black87,
+                          ),
                         ),
-                      ),
-                      trailing: Text(
-                        conversation.lastMessage != null
-                            ? DateFormat('HH:mm, dd/MM')
-                                .format(conversation.lastMessage!.createdAt)
-                            : DateFormat('HH:mm, dd/MM')
-                                .format(conversation.createdAt),
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey[500],
-                          fontWeight: FontWeight.w500,
+                        subtitle: Text(
+                          subtitleText,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Colors.grey[600],
+                          ),
+                        ),
+                        trailing: Text(
+                          conversation.lastMessage != null
+                              ? DateFormat('HH:mm, dd/MM')
+                                  .format(conversation.lastMessage!.createdAt)
+                              : DateFormat('HH:mm, dd/MM')
+                                  .format(conversation.createdAt),
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey[500],
+                            fontWeight: FontWeight.w500,
+                          ),
                         ),
                       ),
                     ),

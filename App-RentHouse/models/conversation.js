@@ -19,6 +19,11 @@ const conversationSchema = new mongoose.Schema({
     type: Boolean,
     default: true,
   },
+  unreadCounts: {
+    type: Map,
+    of: Number,
+    default: () => new Map(), // Ensure default is a new Map
+  },
   createdAt: {
     type: Date,
     default: Date.now,
@@ -27,11 +32,25 @@ const conversationSchema = new mongoose.Schema({
     type: Date,
     default: Date.now,
   },
-  unreadCounts: { type: Map, of: Number, default: {} },
 });
 
+// Initialize unreadCounts for all participants on save
 conversationSchema.pre('save', function(next) {
+  if (!this.unreadCounts || !(this.unreadCounts instanceof Map)) {
+    this.unreadCounts = new Map();
+  }
+  // Ensure all participants have an unread count
+  this.participants.forEach(participant => {
+    if (!this.unreadCounts.has(participant)) {
+      this.unreadCounts.set(participant, 0);
+    }
+  });
   this.updatedAt = Date.now();
+  next();
+});
+
+conversationSchema.pre('find', function(next) {
+  this.populate('lastMessage');
   next();
 });
 
