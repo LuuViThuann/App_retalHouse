@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_rentalhouse/Widgets/Message/info_conversation.dart';
@@ -5,7 +6,7 @@ import 'package:flutter_rentalhouse/models/conversation.dart';
 import 'package:flutter_rentalhouse/viewmodels/vm_chat.dart';
 import 'package:provider/provider.dart';
 
-class ChatAppBar extends StatelessWidget implements PreferredSizeWidget {
+class ChatAppBar extends StatefulWidget implements PreferredSizeWidget {
   final String conversationId;
   final String landlordId;
   final String rentalId;
@@ -17,19 +18,53 @@ class ChatAppBar extends StatelessWidget implements PreferredSizeWidget {
     required this.rentalId,
   });
 
+  @override
+  _ChatAppBarState createState() => _ChatAppBarState();
+
+  @override
+  Size get preferredSize => const Size.fromHeight(kToolbarHeight);
+}
+
+class _ChatAppBarState extends State<ChatAppBar> with TickerProviderStateMixin {
+  AnimationController? _animationController;
+  Timer? _debounce;
+
+  @override
+  void initState() {
+    super.initState();
+    _animationController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 300),
+    );
+  }
+
+  @override
+  void dispose() {
+    _animationController?.dispose();
+    _debounce?.cancel();
+    super.dispose();
+  }
+
   Future<Map<String, dynamic>> _fetchLandlordInfo(BuildContext context) async {
+    if (!mounted) {
+      return {
+        'id': widget.landlordId,
+        'username': 'Chủ nhà',
+        'avatarBase64': ''
+      };
+    }
     final chatViewModel = Provider.of<ChatViewModel>(context, listen: false);
     try {
       final conversation = chatViewModel.conversations.firstWhere(
-        (c) => c.id == conversationId,
+        (c) => c.id == widget.conversationId,
         orElse: () => Conversation(
           id: '',
-          rentalId: rentalId,
-          participants: [landlordId],
+          rentalId: widget.rentalId,
+          participants: [widget.landlordId],
           isPending: true,
           createdAt: DateTime.now(),
           landlord: {
-            'id': landlordId,
+            'id': widget.landlordId,
             'username': 'Chủ nhà',
             'avatarBase64': ''
           },
@@ -42,8 +77,114 @@ class ChatAppBar extends StatelessWidget implements PreferredSizeWidget {
       }
       return conversation.landlord;
     } catch (_) {
-      return {'id': landlordId, 'username': 'Chủ nhà', 'avatarBase64': ''};
+      return {
+        'id': widget.landlordId,
+        'username': 'Chủ nhà',
+        'avatarBase64': ''
+      };
     }
+  }
+
+  void _showSearchSheet(BuildContext context) {
+    if (!mounted || _animationController == null) return;
+    final chatViewModel = Provider.of<ChatViewModel>(context, listen: false);
+    final searchController = TextEditingController();
+    final focusNode = FocusNode();
+    int resultCount = 0;
+
+    _animationController!.forward();
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      backgroundColor: Colors.white.withOpacity(0.95),
+      transitionAnimationController: _animationController,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (BuildContext context, StateSetter setState) {
+            return Padding(
+              padding: EdgeInsets.only(
+                bottom: MediaQuery.of(context).viewInsets.bottom,
+                left: 16,
+                right: 16,
+                top: 16,
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: searchController,
+                          focusNode: focusNode,
+                          decoration: InputDecoration(
+                            hintText: 'Tìm kiếm tin nhắn...',
+                            prefixIcon:
+                                Icon(Icons.search, color: Colors.blue[700]),
+                            suffixIcon: IconButton(
+                              icon: Icon(Icons.close, color: Colors.blue[700]),
+                              onPressed: () {
+                                searchController.clear();
+                                chatViewModel.setSearchQuery('');
+                                Navigator.pop(context);
+                              },
+                            ),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: BorderSide(
+                                  color: Colors.blue[700]!, width: 2),
+                            ),
+                            filled: true,
+                            fillColor: Colors.blue[50],
+                          ),
+                          onChanged: (value) {
+                            if (_debounce?.isActive ?? false)
+                              _debounce?.cancel();
+                            _debounce =
+                                Timer(const Duration(milliseconds: 300), () {
+                              chatViewModel.setSearchQuery(value);
+                              final results = chatViewModel.searchMessages(
+                                  widget.conversationId, value);
+                              setState(() {
+                                resultCount = results.length;
+                              });
+                            });
+                          },
+                          onTap: () => focusNode.requestFocus(),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      if (resultCount > 0)
+                        Text(
+                          '$resultCount kết quả',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w500,
+                            color: Colors.blue[700],
+                          ),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    ).whenComplete(() {
+      searchController.dispose();
+      focusNode.dispose();
+      if (mounted && _animationController != null) {
+        _animationController!.reset();
+      }
+    });
   }
 
   @override
@@ -60,7 +201,7 @@ class ChatAppBar extends StatelessWidget implements PreferredSizeWidget {
             BoxShadow(
               color: Colors.black.withOpacity(0.2),
               blurRadius: 8,
-              offset: Offset(0, 4),
+              offset: const Offset(0, 4),
             ),
           ],
         ),
@@ -72,7 +213,7 @@ class ChatAppBar extends StatelessWidget implements PreferredSizeWidget {
         future: _fetchLandlordInfo(context),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
-            return Text(
+            return const Text(
               'Loading...',
               style: TextStyle(
                 fontSize: 18,
@@ -94,7 +235,7 @@ class ChatAppBar extends StatelessWidget implements PreferredSizeWidget {
                     BoxShadow(
                       color: Colors.black.withOpacity(0.1),
                       blurRadius: 4,
-                      offset: Offset(0, 2),
+                      offset: const Offset(0, 2),
                     ),
                   ],
                 ),
@@ -113,7 +254,7 @@ class ChatAppBar extends StatelessWidget implements PreferredSizeWidget {
               const SizedBox(width: 12),
               Text(
                 landlord['username'] ?? 'Chủ nhà',
-                style: TextStyle(
+                style: const TextStyle(
                   fontSize: 20,
                   fontWeight: FontWeight.w600,
                   color: Colors.white,
@@ -133,7 +274,7 @@ class ChatAppBar extends StatelessWidget implements PreferredSizeWidget {
               context,
               PageRouteBuilder(
                 pageBuilder: (context, animation, secondaryAnimation) =>
-                    ConversationInfoPage(conversationId: conversationId),
+                    ConversationInfoPage(conversationId: widget.conversationId),
                 transitionsBuilder:
                     (context, animation, secondaryAnimation, child) {
                   const begin = Offset(0.0, 1.0);
@@ -157,10 +298,11 @@ class ChatAppBar extends StatelessWidget implements PreferredSizeWidget {
             );
           },
         ),
+        IconButton(
+          icon: const Icon(Icons.search, color: Colors.white),
+          onPressed: () => _showSearchSheet(context),
+        ),
       ],
     );
   }
-
-  @override
-  Size get preferredSize => const Size.fromHeight(kToolbarHeight);
 }

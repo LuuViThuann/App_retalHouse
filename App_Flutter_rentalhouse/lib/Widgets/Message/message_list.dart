@@ -14,6 +14,7 @@ class ChatMessageList extends StatelessWidget {
   final bool isFetchingOlderMessages;
   final Function(Message) onLongPress;
   final Map<String, GlobalKey> messageKeys;
+  final VoidCallback onComposeNewMessage;
 
   const ChatMessageList({
     super.key,
@@ -21,6 +22,7 @@ class ChatMessageList extends StatelessWidget {
     required this.isFetchingOlderMessages,
     required this.onLongPress,
     required this.messageKeys,
+    required this.onComposeNewMessage,
   });
 
   String _getDateHeader(DateTime date) {
@@ -60,15 +62,53 @@ class ChatMessageList extends StatelessWidget {
     }
   }
 
+  List<TextSpan> _highlightMatch(String text, String query) {
+    if (query.isEmpty) return [TextSpan(text: text)];
+    final matches = <TextSpan>[];
+    int lastIndex = 0;
+    final lowerText = text.toLowerCase();
+    final lowerQuery = query.toLowerCase();
+    int index = lowerText.indexOf(lowerQuery);
+
+    while (index != -1) {
+      if (index > lastIndex) {
+        matches.add(TextSpan(text: text.substring(lastIndex, index)));
+      }
+      matches.add(TextSpan(
+        text: text.substring(index, index + query.length),
+        style: TextStyle(
+          fontWeight: FontWeight.bold,
+          backgroundColor: Colors.red[300],
+        ),
+      ));
+      lastIndex = index + query.length;
+      index = lowerText.indexOf(lowerQuery, lastIndex);
+    }
+
+    if (lastIndex < text.length) {
+      matches.add(TextSpan(text: text.substring(lastIndex)));
+    }
+
+    return matches.isEmpty ? [TextSpan(text: text)] : matches;
+  }
+
   @override
   Widget build(BuildContext context) {
     final authViewModel = Provider.of<AuthViewModel>(context);
     final chatViewModel = Provider.of<ChatViewModel>(context);
+    final String conversationId = chatViewModel.currentConversationId ?? '';
+    final Set<String> highlightedMessageIds =
+        chatViewModel.highlightedMessageIds;
+    final String? searchQuery = chatViewModel.searchQuery;
 
-    // Scroll to bottom after the frame is built to show newest messages
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (scrollController.hasClients && !isFetchingOlderMessages) {
-        scrollController.jumpTo(scrollController.position.maxScrollExtent);
+        if (highlightedMessageIds.isEmpty) {
+          scrollController.jumpTo(scrollController.position.maxScrollExtent);
+        } else if (highlightedMessageIds.isNotEmpty &&
+            messageKeys.containsKey(highlightedMessageIds.first)) {
+          _scrollToMessage(highlightedMessageIds.first, chatViewModel.messages);
+        }
       }
     });
 
@@ -102,7 +142,6 @@ class ChatMessageList extends StatelessWidget {
     final items = <dynamic>[];
     final messages = chatViewModel.messages;
 
-    // Nhóm tin nhắn theo ngày và thêm tiêu đề phía trên mỗi nhóm
     Map<String, List<Message>> groupedMessages = {};
     for (var message in messages) {
       final header = _getDateHeader(message.createdAt);
@@ -113,31 +152,27 @@ class ChatMessageList extends StatelessWidget {
       messageKeys[message.id] = GlobalKey();
     }
 
-    // Sắp xếp các nhóm theo ngày, từ mới đến cũ
     final sortedHeaders = groupedMessages.keys.toList()
       ..sort((a, b) {
         DateTime dateA = a == 'Hôm nay'
             ? DateTime.now()
             : a == 'Hôm qua'
-                ? DateTime.now().subtract(Duration(days: 1))
+                ? DateTime.now().subtract(const Duration(days: 1))
                 : a.contains('ngày trước')
-                    ? DateTime.now().subtract(Duration(
-                        days: int.parse(a.split(' ')[0]),
-                      ))
+                    ? DateTime.now()
+                        .subtract(Duration(days: int.parse(a.split(' ')[0])))
                     : DateFormat('dd/MM/yyyy').parse(a);
         DateTime dateB = b == 'Hôm nay'
             ? DateTime.now()
             : b == 'Hôm qua'
-                ? DateTime.now().subtract(Duration(days: 1))
+                ? DateTime.now().subtract(const Duration(days: 1))
                 : b.contains('ngày trước')
-                    ? DateTime.now().subtract(Duration(
-                        days: int.parse(b.split(' ')[0]),
-                      ))
+                    ? DateTime.now()
+                        .subtract(Duration(days: int.parse(b.split(' ')[0])))
                     : DateFormat('dd/MM/yyyy').parse(b);
-        return dateB.compareTo(dateA); // Đảo ngược để từ mới đến cũ
+        return dateB.compareTo(dateA);
       });
 
-    // Xây dựng items: tin nhắn trước, tiêu đề sau (do reverse: true)
     for (var header in sortedHeaders) {
       for (var message in groupedMessages[header]!.reversed) {
         items.add(message);
@@ -208,10 +243,8 @@ class ChatMessageList extends StatelessWidget {
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
                                   ListTile(
-                                    leading: Icon(
-                                      Icons.edit,
-                                      color: Colors.blue[600],
-                                    ),
+                                    leading: Icon(Icons.edit,
+                                        color: Colors.blue[600]),
                                     title: const Text('Chỉnh sửa'),
                                     onTap: () {
                                       Navigator.pop(context);
@@ -219,10 +252,8 @@ class ChatMessageList extends StatelessWidget {
                                     },
                                   ),
                                   ListTile(
-                                    leading: Icon(
-                                      Icons.delete,
-                                      color: Colors.red[600],
-                                    ),
+                                    leading: Icon(Icons.delete,
+                                        color: Colors.red[600]),
                                     title: const Text('Xóa'),
                                     onTap: () async {
                                       Navigator.pop(context);
@@ -311,137 +342,145 @@ class ChatMessageList extends StatelessWidget {
                                       : null,
                               child: message.sender['avatarBase64']?.isEmpty ==
                                       true
-                                  ? Icon(
-                                      Icons.person,
-                                      size: 20,
-                                      color: Colors.grey[600],
-                                    )
+                                  ? Icon(Icons.person,
+                                      size: 20, color: Colors.grey[600])
                                   : null,
                             ),
                           ),
                           const SizedBox(width: 10),
                         ],
                         Flexible(
-                          child: Container(
-                            constraints: BoxConstraints(
-                              maxWidth:
-                                  MediaQuery.of(context).size.width * 0.75,
-                            ),
-                            margin: const EdgeInsets.symmetric(horizontal: 4),
-                            padding: const EdgeInsets.all(12),
-                            decoration: BoxDecoration(
-                              gradient: LinearGradient(
-                                colors: isMe
-                                    ? [
-                                        Colors.blue[400]!,
-                                        Colors.blue[600]!,
-                                      ]
-                                    : [
-                                        Colors.grey[200]!,
-                                        Colors.grey[300]!,
-                                      ],
-                                begin: Alignment.topLeft,
-                                end: Alignment.bottomRight,
-                              ),
-                              borderRadius: BorderRadius.circular(16),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.grey.withOpacity(0.2),
-                                  spreadRadius: 1,
-                                  blurRadius: 4,
-                                  offset: const Offset(0, 2),
+                          child: GestureDetector(
+                            onTap: () {
+                              if (highlightedMessageIds.contains(message.id)) {
+                                _scrollToMessage(
+                                    message.id, chatViewModel.messages);
+                              }
+                            },
+                            child: Container(
+                              constraints: BoxConstraints(
+                                  maxWidth:
+                                      MediaQuery.of(context).size.width * 0.75),
+                              margin: const EdgeInsets.symmetric(horizontal: 4),
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                gradient: LinearGradient(
+                                  colors: isMe
+                                      ? [Colors.blue[400]!, Colors.blue[600]!]
+                                      : [Colors.grey[200]!, Colors.grey[300]!],
+                                  begin: Alignment.topLeft,
+                                  end: Alignment.bottomRight,
                                 ),
-                              ],
-                            ),
-                            child: Column(
-                              crossAxisAlignment: isMe
-                                  ? CrossAxisAlignment.end
-                                  : CrossAxisAlignment.start,
-                              children: [
-                                if (message.images.isNotEmpty)
-                                  Wrap(
-                                    spacing: 8,
-                                    runSpacing: 8,
-                                    children: message.images
-                                        .map((img) => GestureDetector(
-                                              onTap: () {
-                                                showDialog(
-                                                  context: context,
-                                                  builder: (context) =>
-                                                      ChatFullImage(
+                                borderRadius: BorderRadius.circular(16),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.grey.withOpacity(0.2),
+                                    spreadRadius: 1,
+                                    blurRadius: 4,
+                                    offset: const Offset(0, 2),
+                                  ),
+                                ],
+                                border:
+                                    highlightedMessageIds.contains(message.id)
+                                        ? Border.all(
+                                            color: Colors.red[700]!,
+                                            width: 2)
+                                        : null,
+                              ),
+                              child: Column(
+                                crossAxisAlignment: isMe
+                                    ? CrossAxisAlignment.end
+                                    : CrossAxisAlignment.start,
+                                children: [
+                                  if (message.images.isNotEmpty)
+                                    Wrap(
+                                      spacing: 8,
+                                      runSpacing: 8,
+                                      children: message.images
+                                          .map((img) => GestureDetector(
+                                                onTap: () {
+                                                  showDialog(
+                                                    context: context,
+                                                    builder: (context) =>
+                                                        ChatFullImage(
+                                                      imageUrl:
+                                                          '${ApiRoutes.serverBaseUrl}$img',
+                                                    ),
+                                                  );
+                                                },
+                                                child: ClipRRect(
+                                                  borderRadius:
+                                                      BorderRadius.circular(12),
+                                                  child: CachedNetworkImage(
                                                     imageUrl:
                                                         '${ApiRoutes.serverBaseUrl}$img',
-                                                  ),
-                                                );
-                                              },
-                                              child: ClipRRect(
-                                                borderRadius:
-                                                    BorderRadius.circular(12),
-                                                child: CachedNetworkImage(
-                                                  imageUrl:
-                                                      '${ApiRoutes.serverBaseUrl}$img',
-                                                  width: 120,
-                                                  height: 120,
-                                                  fit: BoxFit.cover,
-                                                  memCacheHeight: 240,
-                                                  memCacheWidth: 240,
-                                                  placeholder: (context, url) =>
-                                                      Container(
                                                     width: 120,
                                                     height: 120,
-                                                    color: Colors.grey[100],
-                                                    child: const Center(
-                                                        child:
-                                                            CircularProgressIndicator(
-                                                      strokeWidth: 2,
-                                                    )),
-                                                  ),
-                                                  errorWidget:
-                                                      (context, url, error) =>
-                                                          Container(
-                                                    width: 120,
-                                                    height: 120,
-                                                    color: Colors.grey[100],
-                                                    child: const Icon(
-                                                      Icons.error_outline,
-                                                      color: Colors.red,
+                                                    fit: BoxFit.cover,
+                                                    memCacheHeight: 240,
+                                                    memCacheWidth: 240,
+                                                    placeholder:
+                                                        (context, url) =>
+                                                            Container(
+                                                      width: 120,
+                                                      height: 120,
+                                                      color: Colors.grey[100],
+                                                      child: const Center(
+                                                          child:
+                                                              CircularProgressIndicator(
+                                                                  strokeWidth:
+                                                                      2)),
+                                                    ),
+                                                    errorWidget:
+                                                        (context, url, error) =>
+                                                            Container(
+                                                      width: 120,
+                                                      height: 120,
+                                                      color: Colors.grey[100],
+                                                      child: const Icon(
+                                                          Icons.error_outline,
+                                                          color: Colors.red),
                                                     ),
                                                   ),
                                                 ),
-                                              ),
-                                            ))
-                                        .toList(),
-                                  ),
-                                if (message.content.isNotEmpty)
-                                  Padding(
-                                    padding:
-                                        const EdgeInsets.symmetric(vertical: 4),
-                                    child: Text(
-                                      message.content,
-                                      style: TextStyle(
-                                        fontSize: 16,
-                                        color: isMe
-                                            ? Colors.white
-                                            : Colors.grey[800],
-                                        fontWeight: FontWeight.w400,
+                                              ))
+                                          .toList(),
+                                    ),
+                                  if (message.content.isNotEmpty)
+                                    Padding(
+                                      padding: const EdgeInsets.symmetric(
+                                          vertical: 4),
+                                      child: RichText(
+                                        text: TextSpan(
+                                          style: TextStyle(
+                                            fontSize: 16,
+                                            color: isMe
+                                                ? Colors.white
+                                                : Colors.grey[800],
+                                            fontWeight: FontWeight.w400,
+                                          ),
+                                          children: _highlightMatch(
+                                              message.content,
+                                              searchQuery ?? ''),
+                                        ),
                                       ),
                                     ),
+                                  const SizedBox(height: 6),
+                                  Text(
+                                    message.updatedAt != null
+                                        ? 'Đã chỉnh sửa - ${DateFormat('HH:mm, dd/MM').format(message.updatedAt!)}'
+                                        : DateFormat('HH:mm, dd/MM')
+                                            .format(message.createdAt),
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: isMe
+                                          ? Colors.white70
+                                          : Colors.grey[600],
+                                      fontStyle: FontStyle.italic,
+                                    ),
                                   ),
-                                const SizedBox(height: 6),
-                                Text(
-                                  message.updatedAt != null
-                                      ? 'Đã chỉnh sửa - ${DateFormat('HH:mm, dd/MM').format(message.updatedAt!)}'
-                                      : DateFormat('HH:mm, dd/MM')
-                                          .format(message.createdAt),
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    color: isMe
-                                        ? Colors.white70
-                                        : Colors.grey[600],
-                                    fontStyle: FontStyle.italic,
-                                  ),
-                                ),
-                              ],
+                                ],
+                              ),
                             ),
                           ),
                         ),
@@ -470,11 +509,8 @@ class ChatMessageList extends StatelessWidget {
                                       : null,
                               child: message.sender['avatarBase64']?.isEmpty ==
                                       true
-                                  ? Icon(
-                                      Icons.person,
-                                      size: 20,
-                                      color: Colors.grey[600],
-                                    )
+                                  ? Icon(Icons.person,
+                                      size: 20, color: Colors.grey[600])
                                   : null,
                             ),
                           ),

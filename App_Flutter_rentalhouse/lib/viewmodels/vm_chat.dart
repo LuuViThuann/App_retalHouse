@@ -15,6 +15,10 @@ class ChatViewModel extends ChangeNotifier {
   io.Socket? _socket;
   String? _currentConversationId;
   String? _token;
+  String? _searchQuery;
+  final Set<String> _highlightedMessageIds = {};
+  List<Message> _lastSearchResults = [];
+  String? _lastSearchQuery;
   static const int _messageLimit = 50;
   static const int _maxMessagesInMemory = 200;
 
@@ -23,6 +27,8 @@ class ChatViewModel extends ChangeNotifier {
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
   String? get currentConversationId => _currentConversationId;
+  String? get searchQuery => _searchQuery;
+  Set<String> get highlightedMessageIds => _highlightedMessageIds;
   int get totalUnreadCount =>
       _conversations.fold(0, (sum, conv) => sum + conv.unreadCount);
 
@@ -75,6 +81,7 @@ class ChatViewModel extends ChangeNotifier {
         final message = Message.fromJson(data);
         if (_currentConversationId == message.conversationId) {
           _addOrUpdateMessage(message);
+          _updateSearchIfNeeded();
         }
         _updateConversationUnreadCount(
             message.conversationId, message.senderId);
@@ -86,6 +93,8 @@ class ChatViewModel extends ChangeNotifier {
         final messageId = data['messageId']?.toString();
         if (messageId != null) {
           _messages.removeWhere((msg) => msg.id == messageId);
+          _highlightedMessageIds.remove(messageId);
+          _updateSearchIfNeeded();
           _notify();
         }
       } catch (_) {}
@@ -96,6 +105,7 @@ class ChatViewModel extends ChangeNotifier {
         final updatedMessage = Message.fromJson(data);
         if (_currentConversationId == updatedMessage.conversationId) {
           _addOrUpdateMessage(updatedMessage);
+          _updateSearchIfNeeded();
         }
       } catch (_) {}
     });
@@ -123,6 +133,9 @@ class ChatViewModel extends ChangeNotifier {
           if (_currentConversationId == conversationId) {
             _currentConversationId = null;
             _messages.clear();
+            _highlightedMessageIds.clear();
+            _lastSearchResults.clear();
+            _lastSearchQuery = null;
           }
           _notify();
         }
@@ -155,7 +168,9 @@ class ChatViewModel extends ChangeNotifier {
         _messages[tempIndex] = message;
       } else {
         if (_messages.length >= _maxMessagesInMemory) {
+          final removedMessageId = _messages.first.id;
           _messages.removeAt(0);
+          _highlightedMessageIds.remove(removedMessageId);
         }
         _messages.add(message);
       }
@@ -221,6 +236,9 @@ class ChatViewModel extends ChangeNotifier {
         if (_currentConversationId == conversationId) {
           _currentConversationId = null;
           _messages.clear();
+          _highlightedMessageIds.clear();
+          _lastSearchResults.clear();
+          _lastSearchQuery = null;
         }
         _notify();
         return true;
@@ -239,9 +257,14 @@ class ChatViewModel extends ChangeNotifier {
       ..clear()
       ..addAll(messages);
     if (_messages.length > _maxMessagesInMemory) {
-      _messages.removeRange(0, _messages.length - _maxMessagesInMemory);
+      final excessCount = _messages.length - _maxMessagesInMemory;
+      for (int i = 0; i < excessCount; i++) {
+        _highlightedMessageIds.remove(_messages[i].id);
+      }
+      _messages.removeRange(0, excessCount);
     }
     _hasMoreMessages = messages.length == _messageLimit;
+    _updateSearchIfNeeded();
     _notify();
   }
 
@@ -324,7 +347,11 @@ class ChatViewModel extends ChangeNotifier {
         }
 
         if (_messages.length > _maxMessagesInMemory) {
-          _messages.removeRange(0, _messages.length - _maxMessagesInMemory);
+          final excessCount = _messages.length - _maxMessagesInMemory;
+          for (int i = 0; i < excessCount; i++) {
+            _highlightedMessageIds.remove(_messages[i].id);
+          }
+          _messages.removeRange(0, excessCount);
         }
         _setError(null);
         _hasMoreMessages = newMessages.length == limit;
@@ -347,6 +374,7 @@ class ChatViewModel extends ChangeNotifier {
           _notify();
         }
 
+        _updateSearchIfNeeded();
         return _hasMoreMessages;
       } else {
         _setError('Failed to load messages: ${response.body}');
@@ -441,6 +469,7 @@ class ChatViewModel extends ChangeNotifier {
         final message = Message.fromJson(responseData);
         if (_currentConversationId == conversationId) {
           _addOrUpdateMessage(message);
+          _clearHighlightsOnNewMessage();
         }
         final index =
             _conversations.indexWhere((conv) => conv.id == conversationId);
@@ -460,30 +489,32 @@ class ChatViewModel extends ChangeNotifier {
           _sortConversations();
           _notify();
         }
+        _updateSearchIfNeeded();
         return true;
       } else {
         _messages.removeWhere((msg) => msg.id == tempId);
+        _highlightedMessageIds.remove(tempId);
         _setError('Failed to send message: $responseBody');
         _notify();
         return false;
       }
     } catch (e) {
       _messages.removeWhere((msg) => msg.id == tempId);
+      _highlightedMessageIds.remove(tempId);
       _setError('Error sending message: $e');
       _notify();
       return false;
     }
   }
 
-  Future<bool> deleteMessage({
-    required String messageId,
-    required String token,
-  }) async {
+  Future<bool> deleteMessage(
+      {required String messageId, required String token}) async {
     Message? backupMessage;
     int index = _messages.indexWhere((msg) => msg.id == messageId);
     if (index != -1) {
       backupMessage = _messages[index];
       _messages.removeAt(index);
+      _highlightedMessageIds.remove(messageId);
       _notify();
     }
     try {
@@ -535,6 +566,7 @@ class ChatViewModel extends ChangeNotifier {
         updatedAt: DateTime.now(),
         sender: oldMessage.sender,
       );
+      _updateSearchIfNeeded();
       _notify();
     }
     try {
@@ -558,6 +590,7 @@ class ChatViewModel extends ChangeNotifier {
         final updatedMessage = Message.fromJson(responseData);
         if (index != -1 && _currentConversationId != null) {
           _addOrUpdateMessage(updatedMessage);
+          _updateSearchIfNeeded();
         }
         return true;
       } else {
@@ -585,6 +618,19 @@ class ChatViewModel extends ChangeNotifier {
     _currentConversationId = null;
     _errorMessage = null;
     _hasMoreMessages = true;
+    _highlightedMessageIds.clear();
+    _lastSearchResults.clear();
+    _lastSearchQuery = null;
+    _notify();
+  }
+
+  void exitConversation() {
+    if (_socket?.connected == true) {
+      _socket?.emit('leaveConversation', _currentConversationId);
+    }
+    _highlightedMessageIds.clear();
+    _lastSearchResults.clear();
+    _lastSearchQuery = null;
     _notify();
   }
 
@@ -618,6 +664,73 @@ class ChatViewModel extends ChangeNotifier {
       _errorMessage = message;
       _notify();
     }
+  }
+
+  void setSearchQuery(String? query) {
+    _searchQuery = query;
+    _updateHighlightedMessages();
+    _notify();
+  }
+
+  List<Message> searchMessages(String conversationId, String query) {
+    if (query.isEmpty) {
+      _highlightedMessageIds.clear();
+      _lastSearchResults.clear();
+      _lastSearchQuery = null;
+      _notify();
+      return [];
+    }
+
+    if (_lastSearchQuery == query) {
+      _updateHighlightedMessages(_lastSearchResults.map((m) => m.id).toSet());
+      return _lastSearchResults;
+    }
+
+    final results = _messages.where((message) {
+      return message.conversationId == conversationId &&
+          message.content.toLowerCase().contains(query.toLowerCase());
+    }).toList();
+
+    _lastSearchQuery = query;
+    _lastSearchResults = results;
+    _updateHighlightedMessages(results.map((m) => m.id).toSet());
+    _notify();
+    return results;
+  }
+
+  void clearSearchResults() {
+    _searchQuery = null;
+    _lastSearchResults.clear();
+    _lastSearchQuery = null;
+    _notify();
+  }
+
+  void _updateHighlightedMessages([Set<String>? ids]) {
+    _highlightedMessageIds.clear();
+    if (ids != null) {
+      _highlightedMessageIds.addAll(ids);
+    } else if (_searchQuery != null && _searchQuery!.isNotEmpty) {
+      final results =
+          searchMessages(_currentConversationId ?? '', _searchQuery!);
+      _highlightedMessageIds.addAll(results.map((m) => m.id));
+    }
+  }
+
+  void _updateSearchIfNeeded() {
+    if (_searchQuery != null && _searchQuery!.isNotEmpty) {
+      final results =
+          searchMessages(_currentConversationId ?? '', _searchQuery!);
+      _updateHighlightedMessages(results.map((m) => m.id).toSet());
+      _notify();
+    }
+  }
+
+  void _clearHighlightsOnNewMessage() {
+    _highlightedMessageIds.clear();
+    _lastSearchResults.clear();
+    _lastSearchQuery = null;
+    _searchQuery = null;
+    _notify();
   }
 
   void _notify() {

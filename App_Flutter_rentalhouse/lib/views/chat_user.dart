@@ -215,6 +215,10 @@ class _ChatScreenState extends State<ChatScreen> {
               isFetchingOlderMessages: _isFetchingOlderMessages,
               onLongPress: _startEditing,
               messageKeys: _messageKeys, // Truyền messageKeys
+              onComposeNewMessage: () {
+                //cuộn đến cuối khi bắt đầu soạn tin nhắn mới
+                scrollToBottom(_scrollController);
+              },
             ),
           ),
           ChatInputArea(
