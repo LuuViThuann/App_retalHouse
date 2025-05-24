@@ -5,6 +5,7 @@ import 'package:flutter_rentalhouse/viewmodels/vm_chat.dart';
 import 'package:flutter_rentalhouse/viewmodels/vm_favorite.dart';
 import 'package:flutter_rentalhouse/viewmodels/vm_rental.dart';
 import 'package:flutter_rentalhouse/views/login_view.dart';
+import 'package:flutter_rentalhouse/views/welcome.dart';
 import 'package:provider/provider.dart';
 
 void main() async {
@@ -33,7 +34,7 @@ class RentalApp extends StatelessWidget {
           useMaterial3: true,
           fontFamily: 'Roboto',
         ),
-        home: LoginScreen(),
+        home: const WelcomeScreen(),
       ),
     );
   }

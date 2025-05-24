@@ -81,6 +81,7 @@ flutter:
      - assets/img/
      - assets/lottie/like.json
      - assets/lottie/loading.json
+     - assets/lottie/stay.json
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images
