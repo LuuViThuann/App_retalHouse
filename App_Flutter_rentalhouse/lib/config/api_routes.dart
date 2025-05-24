@@ -1,5 +1,5 @@
 class ApiRoutes {
-  static const String rootUrl = 'http://192.168.1.98:3000';
+  static const String rootUrl = 'http://192.168.43.168:3000';
   static const String baseUrl = '$rootUrl/api';
   static const String serverBaseUrl = rootUrl;
   static const String socketUrl = serverBaseUrl;
@@ -22,24 +22,27 @@ class ApiRoutes {
 
   // Các endpoint bình luận cho bài viết
   static const String comments = '$baseUrl/comments';
-  static String commentReplies(String commentId) => '$comments/$commentId/replies';
+  static String commentReplies(String commentId) =>
+      '$comments/$commentId/replies';
   static String likeComment(String commentId) => '$comments/$commentId/like';
-  static String unlikeComment(String commentId) => '$comments/$commentId/unlike';
+  static String unlikeComment(String commentId) =>
+      '$comments/$commentId/unlike';
   static String getAvatar(String userId) => '$avatar/$userId/avatar';
 
-
   // Các endpoint cho phản hồi (replies) và phản hồi lồng nhau (nested replies)
-  static String reply(String commentId, String replyId) => '$comments/$commentId/replies/$replyId';
-  static String likeReply(String commentId, String replyId) => '$comments/$commentId/replies/$replyId/like';
-  static String unlikeReply(String commentId, String replyId) => '$comments/$commentId/replies/$replyId/unlike';
+  static String reply(String commentId, String replyId) =>
+      '$comments/$commentId/replies/$replyId';
+  static String likeReply(String commentId, String replyId) =>
+      '$comments/$commentId/replies/$replyId/like';
+  static String unlikeReply(String commentId, String replyId) =>
+      '$comments/$commentId/replies/$replyId/unlike';
 
   // Chat Endpoints
   static const String conversations = '$baseUrl/conversations';
-  static String conversationById(String conversationId) => '$conversations/$conversationId';
+  static String conversationById(String conversationId) =>
+      '$conversations/$conversationId';
   static const String pendingConversations = '$conversations/pending';
   static const String messages = '$baseUrl/messages';
-  static String messagesByConversation(String conversationId) => '$baseUrl/messages/$conversationId';
-
-  
+  static String messagesByConversation(String conversationId) =>
+      '$baseUrl/messages/$conversationId';
 }
-

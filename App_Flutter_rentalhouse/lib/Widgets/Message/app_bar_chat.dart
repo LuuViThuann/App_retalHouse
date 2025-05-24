@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter_rentalhouse/Widgets/Message/info_conversation.dart';
 import 'package:flutter_rentalhouse/models/conversation.dart';
 import 'package:flutter_rentalhouse/viewmodels/vm_chat.dart';
 import 'package:provider/provider.dart';
@@ -128,7 +129,32 @@ class ChatAppBar extends StatelessWidget implements PreferredSizeWidget {
         IconButton(
           icon: const Icon(Icons.info_outline, color: Colors.white),
           onPressed: () {
-            // Handle more options
+            Navigator.push(
+              context,
+              PageRouteBuilder(
+                pageBuilder: (context, animation, secondaryAnimation) =>
+                    ConversationInfoPage(conversationId: conversationId),
+                transitionsBuilder:
+                    (context, animation, secondaryAnimation, child) {
+                  const begin = Offset(0.0, 1.0);
+                  const end = Offset.zero;
+                  const curve = Curves.easeInOut;
+
+                  var tween = Tween(begin: begin, end: end)
+                      .chain(CurveTween(curve: curve));
+                  var offsetAnimation = animation.drive(tween);
+
+                  return SlideTransition(
+                    position: offsetAnimation,
+                    child: FadeTransition(
+                      opacity: animation,
+                      child: child,
+                    ),
+                  );
+                },
+                transitionDuration: const Duration(milliseconds: 300),
+              ),
+            );
           },
         ),
       ],
