@@ -1,0 +1,25 @@
+Các kiến thức học : ------------------------
+Quản lý trạng thái trong Flutter:
+    Sử dụng ChangeNotifier và provider để quản lý trạng thái và cập nhật giao diện.
+    Đóng gói dữ liệu với getter bất biến và trường riêng tư.
+Giao tiếp thời gian thực:
+    Sử dụng WebSocket để xử lý các sự kiện thời gian thực như nhận tin nhắn hoặc cập nhật cuộc trò chuyện.
+    Cấu hình kết nối lại để xử lý mạng không ổn định.
+Xử lý API và xác thực:
+    Gửi yêu cầu HTTP với xác thực token Bearer.
+    Sử dụng MultipartRequest để tải tệp (hình ảnh) lên máy chủ.
+Lập trình bất đồng bộ:
+    Sử dụng Future, async/await để xử lý các thao tác bất đồng bộ như lấy dữ liệu hoặc gửi tin nhắn.
+    Xử lý lỗi với try-catch để đảm bảo ứng dụng ổn định.
+Tối ưu hiệu suất:
+    Phân trang dữ liệu để tải tin nhắn từng phần.
+    Giới hạn số lượng tin nhắn trong bộ nhớ để tránh tiêu tốn tài nguyên.
+    Lưu trữ kết quả tìm kiếm để giảm thao tác lặp lại.
+    Quản lý giao diện người dùng:
+    Cập nhật giao diện thời gian thực khi nhận tin nhắn mới hoặc xóa tin nhắn.
+    Đánh dấu tin nhắn tìm kiếm để cải thiện trải nghiệm người dùng.
+Mô hình MVVM:
+    Tách biệt logic kinh doanh (ViewModel) khỏi giao diện (View) và dữ liệu (Model).
+    Sử dụng getter để kiểm soát quyền truy cập vào trạng thái.
+Dọn dẹp tài nguyên:
+    Đảm bảo ngắt kết nối WebSocket và giải phóng tài nguyên khi không cần thiết.

@@ -208,7 +208,7 @@ class _ChatScreenState extends State<ChatScreen> {
         rentalId: widget.rentalId,
       ),
       body: Column(
-        children: [
+        children: [   
           Expanded(
             child: ChatMessageList(
               scrollController: _scrollController,
