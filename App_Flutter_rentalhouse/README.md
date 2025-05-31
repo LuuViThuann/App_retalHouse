@@ -1,16 +1,23 @@
-# flutter_rentalhouse
+# Các công nghệ sử dụng
 
-A new Flutter project.
-
-## Getting Started
-
-This project is a starting point for a Flutter application.
-
-A few resources to get you started if this is your first Flutter project:
-
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
-
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+- Dart / FLutter
+- Firebase
+- NodeJS - ExpressJS
+- MongoDB - mongoose : Dùng để tạo schema, mô hình dữ liệu và tương tác với MongoDB dễ dàng.
+- Docker
+- Redis : Dùng để cache, lưu session, lưu mã OTP, token tạm thời,...
+- ElasticSearch : Dùng để kết nối và thao tác với cụm Elasticsearch như: tìm kiếm, index, xóa dữ liệu,...
+- POSTMAN : Kiểm thử chạy các API
+- Socket.IO : Thư viện cho giao tiếp real-time qua WebSocket.
+------------------------------------------------------------------------------------------------------
+- NPM sử dụng trong NodeJS :
+* axios : Dùng để gọi API, thường được dùng cho giao tiếp giữa các microservice hoặc gọi RESTful API.
+* bcrypt : Dùng để hash password khi người dùng đăng ký và so sánh password khi đăng nhập.
+* cors : truy cập API từ domain khác.
+* dotenv : tạo file .env để bảo mật và cấu hình server (port, DB URI, API keys...).
+* express : Dùng để xây dựng RESTful API, route, middleware,...
+* firebase-admin : SDK cho Node.js để truy cập Firebase từ backend (admin).
+* multer : Middleware để xử lý file multipart/form-data (upload ảnh) , thường dùng để người dùng upload ảnh đại diện, ảnh bài đăng,...
+* redis : Dùng để cache, lưu session, lưu mã OTP, token tạm thời,...
+* sharp : xử lý ảnh , Resize, crop, convert định dạng ảnh,... khi người dùng upload ảnh.
+------------------------------------------------------------------------------------------------------

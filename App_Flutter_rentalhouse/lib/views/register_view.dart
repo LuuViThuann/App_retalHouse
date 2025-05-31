@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_rentalhouse/config/loading.dart';
+import 'package:lottie/lottie.dart';
 import 'package:provider/provider.dart';
 import '../viewmodels/vm_auth.dart';
 import 'login_view.dart';
@@ -81,7 +83,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   children: [
                     const SizedBox(height: 50),
                     const Text(
-                      'Đăng Ký',
+                      'TẠO TÀI KHOẢN',
                       style: TextStyle(
                         fontSize: 32,
                         fontWeight: FontWeight.bold,
@@ -287,9 +289,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
                             ),
                             const SizedBox(height: 20),
                             if (authViewModel.isLoading)
-                              const Center(
-                                child: CircularProgressIndicator(
-                                  color: Colors.blueAccent,
+                              Center(
+                                child: Lottie.asset(
+                                  AssetsConfig.loadingLottie,
+                                  width: 100,
+                                  height: 100,
+                                  fit: BoxFit.fill,
                                 ),
                               )
                             else
@@ -342,10 +347,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                       begin: Alignment.topLeft,
                                       end: Alignment.bottomRight,
                                     ),
+                                    borderRadius: BorderRadius.all(
+                                      Radius.circular(10),
+                                    ),
                                   ),
                                   child: const Center(
                                     child: Text(
-                                      'Đăng Ký',
+                                      'Xác nhận đăng ký',
                                       style: TextStyle(
                                         color: Colors.white,
                                         fontSize: 18,

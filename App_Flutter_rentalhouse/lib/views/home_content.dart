@@ -6,6 +6,8 @@ import 'package:flutter_rentalhouse/Widgets/HomeMain/all_rental.dart';
 import 'package:flutter_rentalhouse/viewmodels/vm_rental.dart';
 import 'package:flutter_rentalhouse/views/login_view.dart';
 import 'package:flutter_rentalhouse/views/my_profile_view.dart';
+import 'package:flutter_rentalhouse/views/search_rental.dart';
+
 import 'package:provider/provider.dart';
 import '../models/user.dart';
 import '../viewmodels/vm_auth.dart';
@@ -20,12 +22,14 @@ class HomeContent extends StatelessWidget {
   Widget build(BuildContext context) {
     final rentalViewModel = Provider.of<RentalViewModel>(context);
     final authViewModel = Provider.of<AuthViewModel>(context);
+    final TextEditingController _searchController = TextEditingController();
 
     final AppUser? user = authViewModel.currentUser;
 
-    // Use a default image or avatarBase64 if available
     ImageProvider avatarImage = const AssetImage('assets/img/imageuser.jpg');
-    if (user != null && user.avatarBase64 != null && user.avatarBase64!.isNotEmpty) {
+    if (user != null &&
+        user.avatarBase64 != null &&
+        user.avatarBase64!.isNotEmpty) {
       try {
         final bytes = base64Decode(user.avatarBase64!);
         avatarImage = MemoryImage(bytes);
@@ -34,11 +38,9 @@ class HomeContent extends StatelessWidget {
       }
     }
 
-    // Fallback location if address is not available
     final location = user?.address ?? 'Nguyễn văn cừ nối dài - TP - Cần thơ';
     final username = user?.username ?? 'Người dùng';
 
-    // List of property types
     final propertyTypes = [
       'Căn hộ chung cư',
       'Nhà riêng',
@@ -49,17 +51,17 @@ class HomeContent extends StatelessWidget {
     ];
 
     String formatCurrency(double amount) {
-      final formatter = NumberFormat.currency(locale: 'vi_VN', symbol: '₫', decimalDigits: 0);
+      final formatter =
+          NumberFormat.currency(locale: 'vi_VN', symbol: '₫', decimalDigits: 0);
       return formatter.format(amount);
     }
 
-    // Widget for latest posts section
     Widget _buildLatestPostsSection() {
       final today = DateTime.now();
       final latestRentals = rentalViewModel.rentals
           .where((rental) =>
-      rental.createdAt.year == today.year &&
-          rental.createdAt.month == today.month)
+              rental.createdAt.year == today.year &&
+              rental.createdAt.month == today.month)
           .take(5)
           .toList();
 
@@ -71,7 +73,10 @@ class HomeContent extends StatelessWidget {
             children: [
               const Text(
                 'Bài đăng mới nhất',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.black87),
+                style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.black87),
               ),
               TextButton(
                 onPressed: () {
@@ -103,23 +108,24 @@ class HomeContent extends StatelessWidget {
           const SizedBox(height: 10),
           latestRentals.isEmpty
               ? const Center(
-            child: Padding(
-              padding: EdgeInsets.all(20.0),
-              child: Text(
-                'Không có bài đăng mới trong tháng này!',
-                style: TextStyle(fontSize: 16, color: Colors.grey),
-              ),
-            ),
-          )
+                  child: Padding(
+                    padding: EdgeInsets.all(20.0),
+                    child: Text(
+                      'Không có bài đăng mới trong tháng này!',
+                      style: TextStyle(fontSize: 16, color: Colors.grey),
+                    ),
+                  ),
+                )
               : ListView.separated(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            itemCount: latestRentals.length,
-            separatorBuilder: (context, index) => const SizedBox(height: 12),
-            itemBuilder: (context, index) {
-              return RentalItemWidget(rental: latestRentals[index]);
-            },
-          ),
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  itemCount: latestRentals.length,
+                  separatorBuilder: (context, index) =>
+                      const SizedBox(height: 12),
+                  itemBuilder: (context, index) {
+                    return RentalItemWidget(rental: latestRentals[index]);
+                  },
+                ),
           const SizedBox(height: 20),
         ],
       );
@@ -130,11 +136,11 @@ class HomeContent extends StatelessWidget {
       body: SafeArea(
         child: SingleChildScrollView(
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+            padding:
+                const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Header: Username, Location, and Avatar
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -143,7 +149,8 @@ class HomeContent extends StatelessWidget {
                       child: Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Icon(Icons.location_on, color: Colors.blue[700], size: 28),
+                          Icon(Icons.location_on,
+                              color: Colors.blue[700], size: 28),
                           const SizedBox(width: 8),
                           Expanded(
                             child: Column(
@@ -151,7 +158,8 @@ class HomeContent extends StatelessWidget {
                               children: [
                                 Text(
                                   'Vị trí của bạn - $username',
-                                  style: TextStyle(color: Colors.grey[600], fontSize: 12),
+                                  style: TextStyle(
+                                      color: Colors.grey[600], fontSize: 12),
                                 ),
                                 Text(
                                   location,
@@ -170,7 +178,10 @@ class HomeContent extends StatelessWidget {
                     ),
                     GestureDetector(
                       onTap: () {
-                        Navigator.push(context, MaterialPageRoute(builder: (context) => MyProfileView()));
+                        Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                                builder: (context) => MyProfileView()));
                       },
                       child: CircleAvatar(
                         radius: 24,
@@ -182,18 +193,29 @@ class HomeContent extends StatelessWidget {
                 const SizedBox(height: 20),
                 // Search bar
                 TextField(
+                  controller: _searchController,
                   decoration: InputDecoration(
                     hintText: 'Nhập thông tin tìm kiếm...',
                     hintStyle: TextStyle(color: Colors.grey[500]),
                     prefixIcon: Icon(Icons.search, color: Colors.grey[600]),
-                    suffixIcon: Container(
-                      margin: const EdgeInsets.all(4.0),
-                      padding: const EdgeInsets.all(8.0),
-                      decoration: BoxDecoration(
-                        color: Colors.teal[50],
-                        borderRadius: BorderRadius.circular(10),
+                    suffixIcon: GestureDetector(
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const SearchScreen(),
+                          ),
+                        );
+                      },
+                      child: Container(
+                        margin: const EdgeInsets.all(4.0),
+                        padding: const EdgeInsets.all(8.0),
+                        decoration: BoxDecoration(
+                          color: Colors.teal[50],
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Icon(Icons.tune, color: Colors.blue[700]),
                       ),
-                      child: Icon(Icons.tune, color: Colors.blue[700]),
                     ),
                     filled: true,
                     fillColor: Colors.grey[100],
@@ -203,6 +225,17 @@ class HomeContent extends StatelessWidget {
                     ),
                     contentPadding: const EdgeInsets.symmetric(vertical: 14.0),
                   ),
+                  onSubmitted: (value) {
+                    if (value.isNotEmpty) {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) =>
+                              SearchScreen(initialSearchQuery: value),
+                        ),
+                      );
+                    }
+                  },
                 ),
                 const SizedBox(height: 25),
                 // Banner
@@ -266,7 +299,7 @@ class HomeContent extends StatelessWidget {
                           Icons.storefront,
                         ][index],
                         label,
-                        index == 0, // Highlight first item
+                        index == 0,
                         context,
                         label,
                       );
@@ -282,7 +315,8 @@ class HomeContent extends StatelessWidget {
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Icon(Icons.lock_outline, size: 50, color: Colors.grey[400]),
+                          Icon(Icons.lock_outline,
+                              size: 50, color: Colors.grey[400]),
                           const SizedBox(height: 10),
                           const Text(
                             'Vui lòng đăng nhập để xem bài đăng.',
@@ -293,16 +327,19 @@ class HomeContent extends StatelessWidget {
                           ElevatedButton(
                             style: ElevatedButton.styleFrom(
                               backgroundColor: Colors.blue[700],
-                              padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 12),
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 30, vertical: 12),
                               textStyle: const TextStyle(fontSize: 16),
                             ),
                             onPressed: () {
                               Navigator.pushReplacement(
                                 context,
-                                MaterialPageRoute(builder: (context) => const LoginScreen()),
+                                MaterialPageRoute(
+                                    builder: (context) => const LoginScreen()),
                               );
                             },
-                            child: const Text('Đăng Nhập Ngay', style: TextStyle(color: Colors.white)),
+                            child: const Text('Đăng Nhập Ngay',
+                                style: TextStyle(color: Colors.white)),
                           ),
                         ],
                       ),
@@ -316,14 +353,16 @@ class HomeContent extends StatelessWidget {
                     ),
                   )
                 else if (rentalViewModel.errorMessage != null)
-                    Center(
-                      child: Padding(
-                        padding: const EdgeInsets.all(16.0),
-                        child: Text('Lỗi: ${rentalViewModel.errorMessage}', style: const TextStyle(color: Colors.red, fontSize: 16)),
-                      ),
-                    )
-                  else
-                    _buildLatestPostsSection(),
+                  Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(16.0),
+                      child: Text('Lỗi: ${rentalViewModel.errorMessage}',
+                          style:
+                              const TextStyle(color: Colors.red, fontSize: 16)),
+                    ),
+                  )
+                else
+                  _buildLatestPostsSection(),
               ],
             ),
           ),
@@ -354,13 +393,15 @@ class HomeContent extends StatelessWidget {
     );
   }
 
-  Widget _buildCategoryItem(IconData icon, String label, bool isSelected, BuildContext context, String propertyType) {
+  Widget _buildCategoryItem(IconData icon, String label, bool isSelected,
+      BuildContext context, String propertyType) {
     return GestureDetector(
       onTap: () {
         Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (context) => PropertyTypeScreen(propertyType: propertyType),
+            builder: (context) =>
+                PropertyTypeScreen(propertyType: propertyType),
           ),
         );
       },
@@ -373,17 +414,18 @@ class HomeContent extends StatelessWidget {
           border: isSelected ? null : Border.all(color: Colors.grey.shade300),
           boxShadow: isSelected
               ? [
-            BoxShadow(
-              color: Colors.teal.withOpacity(0.3),
-              blurRadius: 5,
-              offset: const Offset(0, 2),
-            )
-          ]
+                  BoxShadow(
+                    color: Colors.teal.withOpacity(0.3),
+                    blurRadius: 5,
+                    offset: const Offset(0, 2),
+                  )
+                ]
               : [],
         ),
         child: Row(
           children: [
-            Icon(icon, color: isSelected ? Colors.white : Colors.grey[700], size: 20),
+            Icon(icon,
+                color: isSelected ? Colors.white : Colors.grey[700], size: 20),
             const SizedBox(width: 8),
             Text(
               label,
@@ -399,5 +441,3 @@ class HomeContent extends StatelessWidget {
     );
   }
 }
-
-

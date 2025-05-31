@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_rentalhouse/config/loading.dart';
 import 'package:flutter_rentalhouse/utils/snackbar.dart';
+import 'package:flutter_rentalhouse/views/forgot_password.dart';
 import 'package:flutter_rentalhouse/views/home.dart';
 import 'package:lottie/lottie.dart';
 import 'package:provider/provider.dart';
@@ -96,7 +97,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       child: Material(
                         color: Colors.transparent,
                         child: Text(
-                          'Đăng Nhập',
+                          'ĐĂNG NHẬP',
                           style: const TextStyle(
                             fontSize: 32,
                             fontWeight: FontWeight.bold,
@@ -208,7 +209,31 @@ class _LoginScreenState extends State<LoginScreen> {
                                 const Spacer(),
                                 TextButton(
                                   onPressed: () {
-                                    // Add logic for "Quên Mật Khẩu?" here
+                                    Navigator.push(
+                                      context,
+                                      PageRouteBuilder(
+                                        pageBuilder: (context, animation,
+                                                secondaryAnimation) =>
+                                            const ForgotPasswordScreen(),
+                                        transitionsBuilder: (context, animation,
+                                            secondaryAnimation, child) {
+                                          const begin = Offset(0.0, 1.0);
+                                          const end = Offset.zero;
+                                          const curve = Curves.easeInOut;
+                                          var tween = Tween(
+                                                  begin: begin, end: end)
+                                              .chain(CurveTween(curve: curve));
+                                          var offsetAnimation =
+                                              animation.drive(tween);
+                                          return SlideTransition(
+                                            position: offsetAnimation,
+                                            child: child,
+                                          );
+                                        },
+                                        transitionDuration:
+                                            const Duration(milliseconds: 500),
+                                      ),
+                                    );
                                   },
                                   child: const Text(
                                     'Quên Mật Khẩu?',
@@ -284,10 +309,13 @@ class _LoginScreenState extends State<LoginScreen> {
                                       begin: Alignment.topLeft,
                                       end: Alignment.bottomRight,
                                     ),
+                                    borderRadius: BorderRadius.all(
+                                      Radius.circular(10),
+                                    ),
                                   ),
                                   child: const Center(
                                     child: Text(
-                                      'Đăng Nhập',
+                                      'Đăng nhập',
                                       style: TextStyle(
                                         color: Colors.white,
                                         fontSize: 18,

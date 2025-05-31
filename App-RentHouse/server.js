@@ -18,17 +18,20 @@ const commentRoutes = require('./routes/comment');
 require('./models/conversation');
 require('./models/message');
 
-const serviceAccount = require('./app-rentalhouse-firebase-admin.json');
-admin.initializeApp({
-  credential: admin.credential.cert(serviceAccount),
-});
+// Initialize Firebase Admin SDK
+if (!admin.apps.length) {
+  admin.initializeApp({
+    credential: admin.credential.cert(require('./app-rentalhouse-firebase-admin.json')),
+  });
+  console.log('Firebase Admin SDK initialized');
+}
 
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
-    origin: '*',
-    methods: ['GET', 'POST'],
+    origin: ['http://localhost:3000', 'http://localhost:8081'],
+    methods: ['GET', 'POST', 'PUT', 'DELETE'],
   },
 });
 const PORT = process.env.PORT || 3000;
@@ -40,9 +43,12 @@ const redisClient = redis.createClient({
 redisClient.on('error', (err) => console.log('Redis Client Error', err));
 redisClient.connect().catch((err) => console.error('Redis Connection Error:', err));
 
-app.use(cors());
+app.use(cors({
+  origin: ['http://localhost:3000', 'http://localhost:8081'],
+  methods: ['GET', 'POST', 'PUT', 'DELETE'],
+}));
 app.use(express.json());
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+app.use('/Uploads', express.static(path.join(__dirname, 'Uploads')));
 
 mongoose.connect(MONGODB_URI)
   .then(() => {
@@ -57,7 +63,6 @@ app.use('/api', rentalRoutes);
 app.use('/api', chatRoutes(io));
 app.use('/api', favoriteRoutes);
 app.use('/api', commentRoutes(io));
-
 
 io.use(async (socket, next) => {
   const token = socket.handshake.headers.authorization?.replace('Bearer ', '');
@@ -76,7 +81,6 @@ io.use(async (socket, next) => {
   }
 });
 
-// Socket.IO connection handling
 io.on('connection', (socket) => {
   console.log(`New client connected: Socket ${socket.id}, User: ${socket.userId}`);
 
@@ -108,7 +112,6 @@ io.on('connection', (socket) => {
     console.log(`Client disconnected: Socket ${socket.id}, User: ${socket.userId}`);
   });
 });
-
 
 app.use((err, req, res, next) => {
   console.error(err.stack);

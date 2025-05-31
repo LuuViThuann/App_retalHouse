@@ -1,0 +1,182 @@
+ * Các phần sử dụng trong NodeJS tạo API : 
+ 1. const express = require('express');
+Mục đích: Nhúng thư viện express, một framework phổ biến trong Node.js để tạo API RESTful.
+
+Tác dụng: Giúp bạn dễ dàng xử lý routing, middleware, request và response.
+
+2. const router = express.Router();
+Mục đích: Tạo một router instance từ Express.
+
+Tác dụng: Giúp tổ chức các route (đường dẫn API) riêng biệt thành các file/module. Ví dụ, thay vì viết hết tất cả các route trong app.js, bạn có thể chia nhỏ theo chức năng (/users, /products, v.v.).
+
+3. const mongoose = require('mongoose');
+Mục đích: Nhúng thư viện mongoose, là một ODM (Object Data Modeling) cho MongoDB.
+
+Tác dụng: Giúp kết nối tới MongoDB và thao tác với dữ liệu dễ dàng bằng cách dùng schema và model.
+
+4. const admin = require('firebase-admin');
+Mục đích: Nhúng SDK firebase-admin để làm việc với các dịch vụ Firebase từ phía backend.
+
+Tác dụng: Dùng để xác thực người dùng, gửi thông báo (push notification), truy cập cơ sở dữ liệu Firebase như Firestore hoặc Realtime Database.
+
+5. const multer = require('multer');
+Mục đích: Nhúng thư viện multer, middleware để xử lý file upload (ví dụ ảnh, tài liệu).
+
+Tác dụng: Lưu trữ file được upload từ client và cấu hình nơi lưu trữ, định dạng tên file, v.v.
+
+6. const redis = require('redis');
+Mục đích: Nhúng thư viện redis để giao tiếp với Redis server.
+
+Tác dụng: Dùng Redis để cache dữ liệu, quản lý phiên đăng nhập, hoặc lưu các thông tin tạm thời giúp tăng tốc độ xử lý.
+
+7. const { v4: uuidv4 } = require('uuid');
+Mục đích: Import hàm v4 từ thư viện uuid và đặt tên lại thành uuidv4.
+
+Tác dụng: Tạo chuỗi UUID (Universally Unique Identifier) version 4 – dùng làm ID duy nhất cho các đối tượng như file, token, v.v.
+
+8. const Rental = require('../models/Rental');
+Mục đích: Nhúng model Rental đã định nghĩa bằng mongoose.
+
+Tác dụng: Dùng để thao tác với collection "Rental" trong MongoDB: tạo, đọc, cập nhật, xóa (CRUD).
+
+9. const Conversation = require('../models/conversation');
+Tác dụng: Model dùng cho việc quản lý các cuộc trò chuyện giữa người dùng – thường dùng trong hệ thống chat.
+
+10. const Message = require('../models/message');
+Tác dụng: Model để thao tác với các tin nhắn cụ thể trong một cuộc trò chuyện.
+ 
+ --> Trong xử lý phần CHAT : ------------------------------------------------
+/****
+ * Các route xử lý cuộc trò chuyện và tin nhắn
+ * 1. Tạo hoặc lấy cuộc trò chuyện -> POST /conversations
+ * 2. Xóa cuộc trò chuyện -> DELETE /conversations/:conversationId
+ * 3. Lấy tin nhắn trong cuộc trò chuyện -> GET /messages/:conversationId
+ * 4. Gửi tin nhắn -> POST /messages
+ * 5. Xóa tin nhắn -> DELETE /messages/:messageId
+ * 6. Cập nhật tin nhắn -> PATCH /messages/:messageId
+ * 7. Lấy danh sách cuộc trò chuyện -> GET /conversations
+ * 8. Lấy cuộc trò chuyện theo ID -> GET /conversations/:conversationId
+ * 9. Lấy tin nhắn theo ID -> GET /messages/:messageId
+ * 10. Lấy cuộc trò chuyện theo người dùng -> GET /conversations/user/:userId
+ * 11. Lấy cuộc trò chuyện theo người dùng và rentalId -> GET /conversations/user/:userId/rental/:rentalId
+ * 12. Lấy cuộc trò chuyện theo người dùng và landlordId -> GET /conversations/user/:userId/landlord/:landlordId
+ * 13. Lấy cuộc trò chuyện theo người dùng và rentalId và landlordId -> GET /conversations/user/:userId/rental/:rentalId/landlord/:landlordId
+ * 
+ *  ---- Mục định các ROUTE này ----
+ * 
+ * * Các route này sử dụng middleware authMiddleware để xác thực người dùng
+ * * Các route này sử dụng Redis để cache dữ liệu cuộc trò chuyện và tin nhắn
+ * * Các route này sử dụng multer để upload ảnh tin nhắn
+ * * Các route này sử dụng Firebase Admin SDK để xác thực người dùng
+ * * Các route này sử dụng Mongoose để tương tác với MongoDB
+ * * Các route này sử dụng Socket.IO để gửi thông báo thời gian thực
+ * * Các route này sử dụng adjustTimestamps để điều chỉnh múi giờ của thời gian tạo và cập nhật
+ * * Các route này sử dụng convertUnreadCounts để chuyển đổi unreadCounts từ Map sang Object
+ * * Các route này sử dụng các hàm trợ giúp để lấy thông tin người dùng, rental, landlord từ Firestore và MongoDB
+ * * Các route này sử dụng các hàm trợ giúp để điều chỉnh dữ liệu trả về
+ * * Các route này sử dụng các hàm trợ giúp để kiểm tra định dạng ID và dữ liệu đầu vào
+ * * Các route này sử dụng các hàm trợ giúp để xử lý lỗi và trả về thông báo lỗi
+ * * Các route này sử dụng các hàm trợ giúp để gửi thông báo đến người dùng qua Socket.IO
+ * * Các route này sử dụng các hàm trợ giúp để xóa cache Redis khi có thay đổi dữ liệu
+ */
+
+--> Trong xử lý phần LOGIN  : ------------------------------------------------
+/***
+ * Các route xử lý đăng ký, đăng nhập, thay đổi mật khẩu và cập nhật thông tin người dùng
+ * 1 . Đăng ký người dùng mới -> /register
+ * 2 . Đăng nhập người dùng -> /login
+ * 3 . Thay đổi mật khẩu người dùng -> /change-password
+ * 4 . Cập nhật thông tin người dùng -> /update-profile
+ * 5 . Upload ảnh đại diện người dùng -> /upload-image
+ * 6 . Lấy ảnh đại diện người dùng -> /user/:id/avatar
+ * 7 . Lấy thông tin người dùng -> /user/:id
+ * 8 . Cập nhật thông tin người dùng -> /user/:id/update
+ * 9 . Xóa người dùng -> /user/:id/delete
+ * 10 . Lấy danh sách người dùng -> /users
+ * 11 . Tìm kiếm người dùng theo tên hoặc email -> /users/search
+ * 12 . Lấy thông tin người dùng theo ID -> /users/:id
+ * 13 . Cập nhật thông tin người dùng theo ID -> /users/:id/update
+ * 14 . Xóa người dùng theo ID -> /users/:id/delete
+ * 15 . Lấy danh sách người dùng theo trang -> /users/page/:page
+ * 16 . Lấy danh sách người dùng theo số lượng trên mỗi trang -> /users/limit/:limit
+ * 17 . Lấy danh sách người dùng theo trang và số lượng trên mỗi trang -> /users/page/:page/limit/:limit
+ * 18 . Lấy danh sách người dùng theo tên hoặc email và trang -> /users/search/:query/page/:page
+ * 19 . Lấy danh sách người dùng theo tên hoặc email và số lượng trên mỗi trang -> /users/search/:query/limit/:limit
+ * 20 . Lấy danh sách người dùng theo tên hoặc email, trang và số lượng trên mỗi trang -> /users/search/:query/page/:page/limit/:limit
+ * 21 . Lấy danh sách người dùng theo tên hoặc email, trang, số lượng trên mỗi trang và sắp xếp -> /users/search/:query/page/:page/limit/:limit/sort/:sort
+ * 22 . Lấy danh sách người dùng theo tên hoặc email, trang, số lượng trên mỗi trang, sắp xếp và lọc -> /users/search/:query/page/:page/limit/:limit/sort/:sort/filter/:filter
+ * 
+ * ---- Mục định các ROUTE này ----
+ * Các route này sẽ được sử dụng để quản lý người dùng trong ứng dụng, bao gồm đăng ký, đăng nhập, thay đổi mật khẩu, cập nhật thông tin và quản lý ảnh đại diện.
+ * Các route này sẽ sử dụng Firebase Authentication để xác thực người dùng và Firestore để lưu trữ thông tin người dùng.
+ * Các route này sẽ sử dụng Mongoose để kết nối với MongoDB và lưu trữ thông tin người dùng.
+ * 
+ */
+--> Trong xử lý phần COMMENT : ------------------------------------------------
+/****
+ * Các route xử lý trong code 
+ * - Lấy danh sách bình luận của một thuê nhà -> GET /comments/:rentalId
+ * - Tạo bình luận mới -> POST /comments
+ * - Cập nhật bình luận -> PUT /comments/:commentId
+ * - Xoá bình luận -> DELETE /comments/:commentId
+ * - Tạo phản hồi cho bình luận -> POST /comments/:commentId/replies
+ * - Cập nhật phản hồi -> PUT /comments/:commentId/replies/:replyId
+ * - Xoá phản hồi -> DELETE /comments/:commentId/replies/:replyId
+ * - Thích bình luận -> POST /comments/:commentId/like
+ * - Thích phản hồi -> POST /comments/:commentId/replies/:replyId/like
+ * - Bỏ thích bình luận -> DELETE /comments/:commentId/like
+ * - Bỏ thích phản hồi -> DELETE /comments/:commentId/replies/:replyId/like
+ * * Các route này sẽ được sử dụng trong ứng dụng để quản lý bình luận và phản hồi của người dùng đối với các thuê nhà.
+ */
+--> Trong xử lý phần FAVORITE : ------------------------------------------------
+/****
+ * Các route liên quan đến yêu thích (favorites)
+ * - POST /favorites: Thêm một rental vào danh sách yêu thích
+ * - DELETE /favorites/:rentalId: Xóa một rental khỏi danh sách yêu thích
+ * - GET /favorites: Lấy danh sách các rental trong danh sách yêu thích
+ * Các route này dùng để quản lý danh sách yêu thích của người dùng.
+ * * Các mô hình sử dụng:
+ * - Rental: Mô hình cho các rental
+ * * - Favorite: Mô hình cho danh sách yêu thích của người dùng
+ * * Các middleware sử dụng:
+ * * - authMiddleware: Kiểm tra xác thực người dùng thông qua token Firebase
+ * * Middleware authMiddleware: Kiểm tra token xác thực người dùng
+ */
+--> Trong xử lý phần TẠO BÀI VIẾT / RENTAL  : ------------------------------------------------
+
+
+/****
+ * Các route sử dụng Redis, Firebase Admin SDK và Multer để quản lý các tài sản cho thuê
+ * Các route này bao gồm:
+ * * - Lấy danh sách các tài sản cho thuê -> GET /rentals
+ * * - Lấy chi tiết một tài sản cho thuê -> GET /rentals/:id
+ * * - Thêm mới một tài sản cho thuê -> POST /rentals
+ * * - Cập nhật thông tin một tài sản cho thuê -> PUT /rentals/:id
+ * * - Xoá một tài sản cho thuê -> DELETE /rentals/:id
+ * Các route này sử dụng Firebase Admin SDK để xác thực người dùng, Redis để lưu trữ các thông tin tạm thời và Multer để xử lý việc upload file.
+ * * Các route này cũng sử dụng Mongoose để tương tác với MongoDB, bao gồm các mô hình Rental, Favorite, Comment, Reply và LikeComment.
+ * Các mô hình này được định nghĩa trong các file riêng biệt trong thư mục models.
+ * Các mô hình này bao gồm:
+ * * - Rental: mô hình đại diện cho một tài sản cho thuê, bao gồm các trường như tiêu đề, giá thuê, diện tích, vị trí, mô tả, điều khoản thuê, thông tin liên hệ và hình ảnh.
+ * * - Favorite: mô hình đại diện cho một tài sản được yêu thích, bao gồm các trường như userId và rentalId.
+ * * - Comment: mô hình đại diện cho một bình luận về một tài sản cho thuê, bao gồm các trường như nội dung, người dùng, tài sản cho thuê, đánh giá và thời gian tạo.
+ * * - Reply: mô hình đại diện cho một phản hồi về một bình luận, bao gồm các trường như nội dung, người dùng, bình luận gốc và thời gian tạo.
+ * * - LikeComment: mô hình đại diện cho một lượt thích về một bình luận hoặc phản hồi, bao gồm các trường như người dùng, mục tiêu (bình luận hoặc phản hồi) và loại mục tiêu.
+ * Các route này cũng sử dụng các middleware để xác thực người dùng và xử lý việc upload file.
+ * * Các middleware này bao gồm:
+ * * - authMiddleware: middleware xác thực người dùng bằng token Firebase.
+ * * - upload: middleware xử lý việc upload file bằng Multer, lưu trữ các file trong thư mục uploads và đổi tên file thành dạng timestamp.
+ * * Các route này cũng sử dụng các hàm trợ giúp để điều chỉnh múi giờ và xây dựng cấu trúc dữ liệu cho bình luận và phản hồi.
+ * * Các hàm trợ giúp này bao gồm:
+ * * - adjustTimestamps: hàm điều chỉnh múi giờ cho các trường thời gian trong đối tượng.
+ * * - buildReplyTree: hàm xây dựng cấu trúc dữ liệu cho các phản hồi, cho phép lồng ghép các phản hồi vào bình luận gốc.
+ * * Các route này cung cấp các chức năng cơ bản để quản lý các tài sản cho thuê, bao gồm tìm kiếm, lọc, thêm mới, cập nhật và xoá các tài sản.
+ * * Các route này cũng hỗ trợ việc quản lý bình luận, phản hồi và lượt thích cho các tài sản cho thuê.
+ * * Các route này có thể được mở rộng thêm các chức năng khác trong tương lai, như quản lý yêu thích, thống kê, báo cáo, v.v.
+ * * Các route này được xây dựng với mục tiêu cung cấp một API RESTful đơn giản và hiệu quả cho việc quản lý các tài sản cho thuê.
+ * * Các route này có thể được sử dụng trong các ứng dụng web hoặc di động để hiển thị và quản lý các tài sản cho thuê.
+ * * Các route này có thể được sử dụng trong các ứng dụng thương mại điện tử, bất động sản, du lịch, v.v.
+ */
+
+- Chạy elasticsearch trên docker 
+ docker run -d --name elasticsearch -p 9200:9200 -e "discovery.type=single-node" -e "xpack.security.enabled=false" -e "xpack.security.transport.ssl.enabled=false" elasticsearch:8.8.0

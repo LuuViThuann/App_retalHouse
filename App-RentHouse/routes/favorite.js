@@ -6,6 +6,7 @@ const admin = require('firebase-admin');
 const Rental = require('../models/Rental');
 const Favorite = require('../models/favorite');
 
+
 const authMiddleware = async (req, res, next) => {
   const token = req.header('Authorization')?.replace('Bearer ', '');
   if (!token) return res.status(401).json({ message: 'No token provided' });

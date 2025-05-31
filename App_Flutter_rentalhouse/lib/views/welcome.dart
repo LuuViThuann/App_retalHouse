@@ -13,12 +13,11 @@ class WelcomeScreen extends StatefulWidget {
 
 class _WelcomeScreenState extends State<WelcomeScreen>
     with TickerProviderStateMixin {
-  // Thay SingleTickerProviderStateMixin bằng TickerProviderStateMixin
   double _dragPosition = 0.0;
   bool _isDragging = false;
   bool _isHovering = false;
-  late AnimationController _controller; // Controller cho fade và slide
-  late AnimationController _pulseController; // Controller riêng cho pulse
+  late AnimationController _controller;
+  late AnimationController _pulseController;
   late Animation<double> _fadeAnimation;
   late Animation<double> _scaleAnimation;
   late Animation<double> _pulseAnimation;
@@ -27,16 +26,13 @@ class _WelcomeScreenState extends State<WelcomeScreen>
   @override
   void initState() {
     super.initState();
-    // Controller cho fade, scale, slide
     _controller = AnimationController(
       duration: const Duration(milliseconds: 1000),
       vsync: this,
     );
 
-    // Controller riêng cho pulse animation
     _pulseController = AnimationController(
-      duration: const Duration(
-          milliseconds: 1500), // Tăng thời gian để pulse mượt hơn
+      duration: const Duration(milliseconds: 1500),
       vsync: this,
     );
 
@@ -68,7 +64,6 @@ class _WelcomeScreenState extends State<WelcomeScreen>
       CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
     );
 
-    // Bắt đầu animations
     _controller.forward();
     _pulseController.forward();
   }
@@ -76,7 +71,7 @@ class _WelcomeScreenState extends State<WelcomeScreen>
   @override
   void dispose() {
     _controller.dispose();
-    _pulseController.dispose(); // Dispose controller riêng
+    _pulseController.dispose();
     super.dispose();
   }
 
@@ -94,7 +89,7 @@ class _WelcomeScreenState extends State<WelcomeScreen>
         transitionsBuilder: (context, animation, secondaryAnimation, child) {
           const begin = Offset(0.0, 1.0);
           const end = Offset.zero;
-          const curve = Curves.easeInOutCubic;
+          const curve = Curves.easeInOut;
           var tween =
               Tween(begin: begin, end: end).chain(CurveTween(curve: curve));
           var offsetAnimation = animation.drive(tween);
@@ -106,7 +101,7 @@ class _WelcomeScreenState extends State<WelcomeScreen>
             ),
           );
         },
-        transitionDuration: const Duration(milliseconds: 600),
+        transitionDuration: const Duration(milliseconds: 500),
       ),
     );
   }
@@ -116,7 +111,6 @@ class _WelcomeScreenState extends State<WelcomeScreen>
     return Scaffold(
       body: Stack(
         children: [
-          // Background with gradient and circles
           Container(
             decoration: const BoxDecoration(
               gradient: LinearGradient(
@@ -158,7 +152,6 @@ class _WelcomeScreenState extends State<WelcomeScreen>
               ),
             ),
           ),
-          // Main content
           SafeArea(
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
@@ -279,42 +272,15 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                     ),
                   ),
                 ),
-                // Draggable button at the bottom
                 Padding(
                   padding: const EdgeInsets.only(bottom: 40.0),
                   child: GestureDetector(
-                    onVerticalDragStart: (details) {
-                      try {
-                        setState(() {
-                          _isDragging = true;
-                          HapticFeedback.lightImpact();
-                        });
-                      } catch (e) {
-                        setState(() {
-                          _isDragging = true;
-                        });
-                      }
+                    onTap: () {
+                      _navigateToLogin(context);
                     },
-                    onVerticalDragUpdate: (details) {
-                      setState(() {
-                        _dragPosition += details.delta.dy;
-                        if (_dragPosition < -80) {
-                          _navigateToLogin(context);
-                        }
-                      });
-                    },
-                    onVerticalDragEnd: (details) {
-                      setState(() {
-                        _isDragging = false;
-                        _dragPosition = 0.0;
-                      });
-                    },
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 300),
+                    child: Container(
                       width: 60,
                       height: 60,
-                      transform: Matrix4.translationValues(0, _dragPosition, 0),
-                      transformAlignment: Alignment.center,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
                         gradient: const LinearGradient(
@@ -324,21 +290,16 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                         ),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black
-                                .withOpacity(_isDragging ? 0.3 : 0.2),
-                            blurRadius: _isDragging ? 15 : 10,
+                            color: Colors.black.withOpacity(0.2),
+                            blurRadius: 10,
                             offset: const Offset(0, 5),
                           ),
                         ],
                       ),
-                      child: AnimatedScale(
-                        scale: _isDragging ? 1.2 : 1.0,
-                        duration: const Duration(milliseconds: 200),
-                        child: const Icon(
-                          Icons.arrow_upward,
-                          color: Colors.white,
-                          size: 30,
-                        ),
+                      child: const Icon(
+                        Icons.arrow_upward,
+                        color: Colors.white,
+                        size: 30,
                       ),
                     ),
                   ),

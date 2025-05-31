@@ -6,6 +6,7 @@ const multer = require('multer');
 const { Comment, Reply, LikeComment } = require('../models/comments');
 const Rental = require('../models/Rental');
 
+
 // Configure multer for file uploads
 const storage = multer.diskStorage({
   destination: './Uploads/',

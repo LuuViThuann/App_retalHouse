@@ -14,9 +14,7 @@ class Rental {
   final List<String> images;
   final String status;
   final DateTime createdAt;
-  final String landlord; // Changed from dynamic to String
-
-
+  final String landlord;
 
   Rental({
     required this.id,
@@ -37,75 +35,118 @@ class Rental {
     required this.landlord,
   });
 
-  Map<String, dynamic> toJson() => {
-    '_id': id,
-    'title': title,
-    'price': price,
-    'area': {
-      'total': area['total'],
-      'livingRoom': area['livingRoom'],
-      'bedrooms': area['bedrooms'],
-      'bathrooms': area['bathrooms'],
-    },
-    'location': {
-      'short': location['short'],
-      'fullAddress': location['fullAddress'],
-    },
-    'propertyType': propertyType,
-    'furniture': furniture,
-    'amenities': amenities,
-    'surroundings': surroundings,
-    'rentalTerms': {
-      'minimumLease': rentalTerms['minimumLease'],
-      'deposit': rentalTerms['deposit'],
-      'paymentMethod': rentalTerms['paymentMethod'],
-      'renewalTerms': rentalTerms['renewalTerms'],
-    },
-    'contactInfo': {
-      'name': contactInfo['name'],
-      'phone': contactInfo['phone'],
-      'availableHours': contactInfo['availableHours'],
-    },
-    'userId': userId,
-    'images': images,
-    'status': status,
-    'createdAt': createdAt.toIso8601String(),
-    'landlord': landlord,
-  };
+  Rental copyWith({
+    String? id,
+    String? title,
+    double? price,
+    Map<String, dynamic>? area,
+    Map<String, dynamic>? location,
+    String? propertyType,
+    List<String>? furniture,
+    List<String>? amenities,
+    List<String>? surroundings,
+    Map<String, dynamic>? rentalTerms,
+    Map<String, dynamic>? contactInfo,
+    String? userId,
+    List<String>? images,
+    String? status,
+    DateTime? createdAt,
+    String? landlord,
+  }) {
+    return Rental(
+      id: id ?? this.id,
+      title: title ?? this.title,
+      price: price ?? this.price,
+      area: area ?? this.area,
+      location: location ?? this.location,
+      propertyType: propertyType ?? this.propertyType,
+      furniture: furniture ?? this.furniture,
+      amenities: amenities ?? this.amenities,
+      surroundings: surroundings ?? this.surroundings,
+      rentalTerms: rentalTerms ?? this.rentalTerms,
+      contactInfo: contactInfo ?? this.contactInfo,
+      userId: userId ?? this.userId,
+      images: images ?? this.images,
+      status: status ?? this.status,
+      createdAt: createdAt ?? this.createdAt,
+      landlord: landlord ?? this.landlord,
+    );
+  }
 
-  factory Rental.fromJson(Map<String, dynamic> json) => Rental(
-    id: json['_id'] as String? ?? (throw Exception('Rental ID is missing in JSON response')),
-    title: json['title'] as String,
-    price: (json['price'] as num?)?.toDouble() ?? 0.0,
-    area: {
-      'total': (json['area']['total'] as num?)?.toDouble() ?? 0.0,
-      'livingRoom': (json['area']['livingRoom'] as num?)?.toDouble() ?? 0.0,
-      'bedrooms': (json['area']['bedrooms'] as num?)?.toDouble() ?? 0.0,
-      'bathrooms': (json['area']['bathrooms'] as num?)?.toDouble() ?? 0.0,
-    },
-    location: {
-      'short': json['location']['short'] as String,
-      'fullAddress': json['location']['fullAddress'] as String,
-    },
-    propertyType: json['propertyType'] as String,
-    furniture: List<String>.from(json['furniture'] as List),
-    amenities: List<String>.from(json['amenities'] as List),
-    surroundings: List<String>.from(json['surroundings'] as List),
-    rentalTerms: {
-      'minimumLease': json['rentalTerms']['minimumLease'] as String,
-      'deposit': json['rentalTerms']['deposit'] as String,
-      'paymentMethod': json['rentalTerms']['paymentMethod'] as String,
-      'renewalTerms': json['rentalTerms']['renewalTerms'] as String,
-    },
-    contactInfo: {
-      'name': json['contactInfo']['name'] as String,
-      'phone': json['contactInfo']['phone'] as String,
-      'availableHours': json['contactInfo']['availableHours'] as String,
-    },
-    userId: json['userId'] as String,
-    images: List<String>.from(json['images'] as List),
-    status: json['status'] as String? ?? 'available',
-    createdAt: DateTime.parse(json['createdAt'] as String),
-    landlord: json['userId'] as String, // Use userId as landlord
-  );
+  Map<String, dynamic> toJson() => {
+        '_id': id,
+        'title': title,
+        'price': price,
+        'area': {
+          'total': area['total'],
+          'livingRoom': area['livingRoom'],
+          'bedrooms': area['bedrooms'],
+          'bathrooms': area['bathrooms'],
+        },
+        'location': {
+          'short': location['short'],
+          'fullAddress': location['fullAddress'],
+        },
+        'propertyType': propertyType,
+        'furniture': furniture,
+        'amenities': amenities,
+        'surroundings': surroundings,
+        'rentalTerms': {
+          'minimumLease': rentalTerms['minimumLease'],
+          'deposit': rentalTerms['deposit'],
+          'paymentMethod': rentalTerms['paymentMethod'],
+          'renewalTerms': rentalTerms['renewalTerms'],
+        },
+        'contactInfo': {
+          'name': contactInfo['name'],
+          'phone': contactInfo['phone'],
+          'availableHours': contactInfo['availableHours'],
+        },
+        'userId': userId,
+        'images': images,
+        'status': status,
+        'createdAt': createdAt.toIso8601String(),
+        'landlord': landlord,
+      };
+
+  factory Rental.fromJson(Map<String, dynamic> json) {
+    return Rental(
+      id: json['_id'] as String? ??
+          (throw Exception('Rental ID is missing in JSON response')),
+      title: json['title'] as String? ?? '',
+      price: (json['price'] as num?)?.toDouble() ?? 0.0,
+      area: {
+        'total': (json['area']['total'] as num?)?.toDouble() ?? 0.0,
+        'livingRoom': (json['area']['livingRoom'] as num?)?.toDouble() ?? 0.0,
+        'bedrooms': (json['area']['bedrooms'] as num?)?.toDouble() ?? 0.0,
+        'bathrooms': (json['area']['bathrooms'] as num?)?.toDouble() ?? 0.0,
+      },
+      location: {
+        'short': json['location']['short'] as String? ?? '',
+        'fullAddress': json['location']['fullAddress'] as String? ?? '',
+      },
+      propertyType: json['propertyType'] as String? ?? 'Khác',
+      furniture: List<String>.from(json['furniture'] as List? ?? []),
+      amenities: List<String>.from(json['amenities'] as List? ?? []),
+      surroundings: List<String>.from(json['surroundings'] as List? ?? []),
+      rentalTerms: {
+        'minimumLease': json['rentalTerms']['minimumLease'] as String? ?? '',
+        'deposit': json['rentalTerms']['deposit'] as String? ?? '',
+        'paymentMethod': json['rentalTerms']['paymentMethod'] as String? ?? '',
+        'renewalTerms': json['rentalTerms']['renewalTerms'] as String? ?? '',
+      },
+      contactInfo: {
+        'name': json['contactInfo']['name'] as String? ?? '',
+        'phone': json['contactInfo']['phone'] as String? ?? '',
+        'availableHours':
+            json['contactInfo']['availableHours'] as String? ?? '',
+      },
+      userId: json['userId'] as String? ?? '',
+      images: List<String>.from(json['images'] as List? ?? []),
+      status: json['status'] as String? ?? 'available',
+      createdAt: DateTime.parse(
+          json['createdAt'] as String? ?? DateTime.now().toIso8601String()),
+      landlord: json['userId'] as String? ?? '',
+    );
+  }
 }

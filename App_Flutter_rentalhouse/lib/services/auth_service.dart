@@ -55,7 +55,8 @@ class AuthService {
     required String password,
   }) async {
     try {
-      final userCredential = await FirebaseAuth.instance.signInWithEmailAndPassword(
+      final userCredential =
+          await FirebaseAuth.instance.signInWithEmailAndPassword(
         email: email,
         password: password,
       );
@@ -147,7 +148,8 @@ class AuthService {
           email: data['email'] as String,
           phoneNumber: data['phoneNumber'] as String,
           address: data['address'] as String,
-          createdAt: DateTime.parse(data['createdAt'] as String? ?? DateTime.now().toIso8601String()),
+          createdAt: DateTime.parse(
+              data['createdAt'] as String? ?? DateTime.now().toIso8601String()),
           token: idToken,
           username: data['username'] as String? ?? '',
         );
@@ -202,7 +204,8 @@ class AuthService {
         },
       );
 
-      print('Avatar fetch response status: ${response.statusCode}, body: ${response.body}');
+      print(
+          'Avatar fetch response status: ${response.statusCode}, body: ${response.body}');
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         final avatarBase64 = data['avatarBase64'] as String?;
@@ -236,7 +239,10 @@ class AuthService {
       if (user == null) return null;
 
       final idToken = await user.getIdToken(true);
-      final doc = await _firestore.collection('Users').doc(user.uid).get(GetOptions(source: Source.server));
+      final doc = await _firestore
+          .collection('Users')
+          .doc(user.uid)
+          .get(GetOptions(source: Source.server));
       if (doc.exists) {
         final avatarBase64 = await fetchAvatarBase64(user.uid, idToken!);
         return AppUser.fromFirestore(doc.data(), doc.id).copyWith(
@@ -263,7 +269,8 @@ class AuthService {
     } catch (e) {
       print('Error getting current user: $e');
       if (e.toString().contains('permission-denied')) {
-        throw Exception('Lỗi quyền truy cập Firestore. Vui lòng kiểm tra quy tắc bảo mật.');
+        throw Exception(
+            'Lỗi quyền truy cập Firestore. Vui lòng kiểm tra quy tắc bảo mật.');
       }
       throw Exception('Lỗi khi lấy thông tin người dùng: $e');
     }

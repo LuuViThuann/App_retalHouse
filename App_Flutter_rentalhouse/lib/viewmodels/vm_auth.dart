@@ -62,7 +62,8 @@ class AuthViewModel extends ChangeNotifier {
       if (user != null) {
         _currentUser = user;
       } else {
-        _errorMessage = 'Đăng nhập thất bại. Vui lòng kiểm tra email hoặc mật khẩu.';
+        _errorMessage =
+            'Đăng nhập thất bại. Vui lòng kiểm tra email hoặc mật khẩu.';
       }
     } catch (e) {
       _errorMessage = e.toString();
@@ -141,7 +142,8 @@ class AuthViewModel extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final avatarBase64 = await _authService.uploadProfileImage(imageBase64: imageBase64);
+      final avatarBase64 =
+          await _authService.uploadProfileImage(imageBase64: imageBase64);
       if (avatarBase64 != null && _currentUser != null) {
         _currentUser = _currentUser!.copyWith(avatarBase64: avatarBase64);
       } else {

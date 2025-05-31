@@ -1,10 +1,12 @@
 class ApiRoutes {
-  static const String rootUrl = 'http://192.168.1.184:3000';
+  static const String rootUrl = 'http://192.168.1.236:3000';
   static const String baseUrl = '$rootUrl/api';
   static const String serverBaseUrl = rootUrl;
   static const String socketUrl = serverBaseUrl;
 
   // Định nghĩa các endpoint dữ liệu cụ thể ------------------------------------------
+  static const String searchHistory = '$baseUrl/search-history';
+
   static const String rentals = '$baseUrl/rentals';
   static const String register = '$baseUrl/auth/register';
   static const String login = '$baseUrl/auth/login';
@@ -45,4 +47,11 @@ class ApiRoutes {
   static const String messages = '$baseUrl/messages';
   static String messagesByConversation(String conversationId) =>
       '$baseUrl/messages/$conversationId';
+
+  // Cấu hình EmailJS
+  static const String emailJsApi =
+      'https://api.emailjs.com/api/v1.0/email/send';
+  static const String emailJsServiceId = 'service_gz8v706';
+  static const String emailJsTemplateId = 'template_1k09fcg';
+  static const String emailJsUserId = 'bGlLdgP91zmfcVxzm';
 }
