@@ -7,6 +7,7 @@ import 'package:flutter_rentalhouse/Widgets/Profile/recent_comment.dart';
 import 'package:flutter_rentalhouse/Widgets/item_menu_profile.dart';
 import 'package:flutter_rentalhouse/models/user.dart';
 import 'package:flutter_rentalhouse/viewmodels/vm_auth.dart';
+import 'package:flutter_rentalhouse/views/change_password_view.dart';
 import 'package:flutter_rentalhouse/views/login_view.dart';
 import 'package:flutter_rentalhouse/views/my_profile_view.dart';
 import 'package:provider/provider.dart';
@@ -164,7 +165,11 @@ class _ProfileViewState extends State<ProfileView> {
                     icon: Icons.password,
                     text: 'Thay đổi mật khẩu',
                     onTap: () {
-                      // Handle My Cards tap
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                            builder: (context) => ChangePasswordScreen()),
+                      );
                     },
                   ),
                   ProfileMenuItem(

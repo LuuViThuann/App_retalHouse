@@ -246,18 +246,21 @@ class AuthViewModel extends ChangeNotifier {
     try {
       final data =
           await _authService.fetchRecentComments(page: page, limit: limit);
+      final comments =
+          (data['comments'] as List).map((e) => Comment.fromJson(e)).toList();
       if (page == 1) {
-        _recentComments =
-            (data['comments'] as List).map((e) => Comment.fromJson(e)).toList();
+        _recentComments = comments;
       } else {
-        _recentComments.addAll((data['comments'] as List)
-            .map((e) => Comment.fromJson(e))
-            .toList());
+        _recentComments.addAll(comments);
       }
       _commentsPage = data['page'] as int;
       _commentsTotalPages = data['pages'] as int;
+      if (comments.isEmpty && page == 1) {
+        _errorMessage = 'Chưa có bình luận nào';
+      }
     } catch (e) {
-      _errorMessage = 'Failed to fetch comments: $e';
+      _errorMessage = 'Lấy bình luận thất bại: $e';
+      _recentComments = [];
     } finally {
       _isLoading = false;
       notifyListeners();

@@ -21,7 +21,8 @@ class ConversationTile extends StatelessWidget {
 
   void _deleteConversation(BuildContext context) async {
     final chatViewModel = Provider.of<ChatViewModel>(context, listen: false);
-    final success = await chatViewModel.deleteConversation(conversation.id, token);
+    final success =
+        await chatViewModel.deleteConversation(conversation.id, token);
     if (success) {
       SnackbarUtils.showSuccess(context, 'Đã xóa cuộc trò chuyện');
     } else {
@@ -69,7 +70,10 @@ class ConversationTile extends StatelessWidget {
           decoration: BoxDecoration(
             gradient: hasUnread
                 ? LinearGradient(
-                    colors: [AppStyles.unreadGradientStart, AppStyles.unreadGradientEnd],
+                    colors: [
+                      AppStyles.unreadGradientStart,
+                      AppStyles.unreadGradientEnd
+                    ],
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                   )
@@ -85,18 +89,23 @@ class ConversationTile extends StatelessWidget {
             ],
           ),
           child: ListTile(
-            contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: hasUnread ? 16 : 12),
+            contentPadding: EdgeInsets.symmetric(
+                horizontal: 16, vertical: hasUnread ? 16 : 12),
             leading: Stack(
               clipBehavior: Clip.none,
               children: [
                 CircleAvatar(
                   radius: 28,
-                  backgroundImage: conversation.landlord['avatarBase64']?.isNotEmpty == true
-                      ? MemoryImage(base64Decode(conversation.landlord['avatarBase64']))
+                  backgroundImage: conversation
+                              .landlord['avatarBase64']?.isNotEmpty ==
+                          true
+                      ? MemoryImage(
+                          base64Decode(conversation.landlord['avatarBase64']))
                       : null,
                   backgroundColor: AppStyles.avatarBackground,
                   child: conversation.landlord['avatarBase64']?.isEmpty == true
-                      ? Icon(Icons.person, size: 28, color: AppStyles.avatarIconColor)
+                      ? Icon(Icons.person,
+                          size: 28, color: AppStyles.avatarIconColor)
                       : null,
                 ),
                 if (hasUnread)
@@ -112,7 +121,8 @@ class ConversationTile extends StatelessWidget {
                         decoration: BoxDecoration(
                           color: AppStyles.errorColor,
                           shape: BoxShape.circle,
-                          border: Border.all(color: AppStyles.whiteColor, width: 2),
+                          border:
+                              Border.all(color: AppStyles.whiteColor, width: 2),
                           boxShadow: [
                             BoxShadow(
                               color: AppStyles.errorColor.withOpacity(0.3),
@@ -138,13 +148,16 @@ class ConversationTile extends StatelessWidget {
             ),
             title: Text(
               conversation.landlord['username'] ?? 'Chủ nhà',
-              style: hasUnread ? AppStyles.unreadTitleText : AppStyles.titleText,
+              style:
+                  hasUnread ? AppStyles.unreadTitleText : AppStyles.titleText,
             ),
             subtitle: Text(
               subtitleText,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: hasUnread ? AppStyles.unreadSubtitleText : AppStyles.subtitleText,
+              style: hasUnread
+                  ? AppStyles.unreadSubtitleText
+                  : AppStyles.subtitleText,
             ),
             trailing: Row(
               mainAxisSize: MainAxisSize.min,
@@ -161,9 +174,13 @@ class ConversationTile extends StatelessWidget {
                   ),
                 Text(
                   conversation.lastMessage != null
-                      ? DateFormat('HH:mm, dd/MM').format(conversation.lastMessage!.createdAt)
-                      : DateFormat('HH:mm, dd/MM').format(conversation.createdAt),
-                  style: hasUnread ? AppStyles.unreadTimestampText : AppStyles.timestampText,
+                      ? DateFormat('HH:mm, dd/MM')
+                          .format(conversation.lastMessage!.createdAt)
+                      : DateFormat('HH:mm, dd/MM')
+                          .format(conversation.createdAt),
+                  style: hasUnread
+                      ? AppStyles.unreadTimestampText
+                      : AppStyles.timestampText,
                 ),
               ],
             ),

@@ -56,7 +56,9 @@ class _RecentCommentsViewState extends State<RecentCommentsView> {
                     : Padding(
                         padding: const EdgeInsets.all(16.0),
                         child: authViewModel.recentComments.isEmpty
-                            ? Center(child: Text('Chưa có bình luận nào'))
+                            ? Center(
+                                child:
+                                    Text('Chưa có bình luận hoặc phản hồi nào'))
                             : ListView.builder(
                                 itemCount: authViewModel.recentComments.length,
                                 itemBuilder: (context, index) {
@@ -98,7 +100,7 @@ class _RecentCommentsViewState extends State<RecentCommentsView> {
                                                     ),
                                                     Text(
                                                       isReply
-                                                          ? 'Reply on ${comment.rentalTitle}'
+                                                          ? 'Phản hồi trên ${comment.rentalTitle}'
                                                           : comment
                                                                   .rentalTitle ??
                                                               'Unknown Rental',
@@ -132,7 +134,7 @@ class _RecentCommentsViewState extends State<RecentCommentsView> {
                                             ),
                                           SizedBox(height: 8),
                                           Text(
-                                            '${comment.createdAt.toLocal()}',
+                                            '${comment.createdAt.toLocal().toString().substring(0, 16)}',
                                             style: TextStyle(
                                                 color: Colors.grey,
                                                 fontSize: 12),

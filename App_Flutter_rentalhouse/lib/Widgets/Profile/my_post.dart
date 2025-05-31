@@ -1,8 +1,10 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_rentalhouse/config/api_routes.dart';
+import 'package:flutter_rentalhouse/config/loading.dart';
 import 'package:flutter_rentalhouse/viewmodels/vm_auth.dart';
 import 'package:flutter_rentalhouse/views/rental_detail_view.dart';
+import 'package:lottie/lottie.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 
@@ -75,8 +77,14 @@ class _MyPostsViewState extends State<MyPostsView> {
             elevation: 0,
           ),
           body: authViewModel.isLoading && authViewModel.myPosts.isEmpty
-              ? const Center(
-                  child: CircularProgressIndicator(color: Colors.blue))
+              ? Center(
+                  child: Lottie.asset(
+                    AssetsConfig.loadingLottie,
+                    width: 100,
+                    height: 100,
+                    fit: BoxFit.fill,
+                  ),
+                )
               : authViewModel.myPosts.isEmpty
                   ? Center(
                       child: Column(

@@ -16,10 +16,11 @@ class RentalService {
   }) async {
     try {
       final response =
-      await http.get(Uri.parse('${ApiRoutes.rentals}/${rental.id}'));
+          await http.get(Uri.parse('${ApiRoutes.rentals}/${rental.id}'));
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        final averageRating = (data['averageRating'] as num?)?.toDouble() ?? 0.0;
+        final averageRating =
+            (data['averageRating'] as num?)?.toDouble() ?? 0.0;
         final reviewCount = (data['comments'] as List<dynamic>?)?.length ?? 0;
         onSuccess(averageRating, reviewCount);
       } else {
@@ -59,8 +60,8 @@ class RentalService {
 
       if (response.statusCode == 200) {
         final List<dynamic> favorites = jsonDecode(response.body);
-        final isFavorited = favorites.any(
-                (favorite) => favorite['rentalId']['_id'] == rental.id);
+        final isFavorited = favorites
+            .any((favorite) => favorite['rentalId']['_id'] == rental.id);
         onSuccess(isFavorited);
       } else {
         onError('Không thể tải trạng thái yêu thích: ${response.statusCode}');
@@ -94,20 +95,20 @@ class RentalService {
           : '${ApiRoutes.baseUrl}/favorites';
       final response = isFavorite
           ? await http.delete(
-        Uri.parse(url),
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $token',
-        },
-      )
+              Uri.parse(url),
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': 'Bearer $token',
+              },
+            )
           : await http.post(
-        Uri.parse(url),
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $token',
-        },
-        body: jsonEncode({'rentalId': rental.id}),
-      );
+              Uri.parse(url),
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': 'Bearer $token',
+              },
+              body: jsonEncode({'rentalId': rental.id}),
+            );
 
       if (response.statusCode == 200 || response.statusCode == 201) {
         onSuccess(!isFavorite);

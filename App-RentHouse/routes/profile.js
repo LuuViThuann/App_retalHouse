@@ -66,8 +66,14 @@ router.get('/recent-comments', authMiddleware, async (req, res) => {
 
     // Fetch comments by user
     const comments = await Comment.find({ userId: req.userId })
-      .populate('rentalId', 'title')
-      .populate('userId', 'avatarBase64 username')
+      .populate({
+        path: 'rentalId',
+        select: 'title',
+      })
+      .populate({
+        path: 'userId',
+        select: 'avatarBase64 username',
+      })
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(Number(limit))
@@ -77,27 +83,33 @@ router.get('/recent-comments', authMiddleware, async (req, res) => {
     const replies = await Reply.find({ userId: req.userId })
       .populate({
         path: 'commentId',
-        populate: { path: 'rentalId', select: 'title' },
+        populate: {
+          path: 'rentalId',
+          select: 'title',
+        },
       })
-      .populate('userId', 'username')
+      .populate({
+        path: 'userId',
+        select: 'username',
+      })
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(Number(limit))
       .lean();
 
-    // Combine comments and replies, adding type and rental title
+    // Combine comments and replies
     const combined = [
       ...comments.map((comment) => ({
         type: 'Comment',
-        _id: comment._id,
+        _id: comment._id?.toString() || '',
         rentalId: comment.rentalId?._id?.toString() || '',
         rentalTitle: comment.rentalId?.title || 'Unknown Rental',
         userId: {
-          _id: comment.userId?._id || req.userId,
-          username: comment.userId?.username || '',
+          _id: comment.userId?._id?.toString() || req.userId,
+          username: comment.userId?.username || 'Unknown User',
           avatarBase64: comment.userId?.avatarBase64 || '',
         },
-        content: comment.content,
+        content: comment.content || '',
         rating: comment.rating || 0,
         images: comment.images || [],
         isHidden: comment.isHidden || false,
@@ -107,15 +119,16 @@ router.get('/recent-comments', authMiddleware, async (req, res) => {
       })),
       ...replies.map((reply) => ({
         type: 'Reply',
-        _id: reply._id,
+        _id: reply._id?.toString() || '',
         commentId: reply.commentId?._id?.toString() || '',
         rentalId: reply.commentId?.rentalId?._id?.toString() || '',
         rentalTitle: reply.commentId?.rentalId?.title || 'Unknown Rental',
         userId: {
-          _id: reply.userId?._id || req.userId,
-          username: reply.userId?.username || '',
+          _id: reply.userId?._id?.toString() || req.userId,
+          username: reply.userId?.username || 'Unknown User',
+          avatarBase64: '', // Replies don't need avatarBase64
         },
-        content: reply.content,
+        content: reply.content || '',
         images: reply.images || [],
         parentReplyId: reply.parentReplyId?.toString() || null,
         createdAt: new Date(reply.createdAt),
@@ -128,7 +141,7 @@ router.get('/recent-comments', authMiddleware, async (req, res) => {
 
     // Sort by createdAt and apply pagination
     adjustedCombined.sort((a, b) => b.createdAt - a.createdAt);
-    const paginated = adjustedCombined.slice(0, Number(limit)); // Client-side slice for simplicity
+    const paginated = adjustedCombined.slice(skip, skip + Number(limit));
     const total = adjustedCombined.length;
 
     res.json({
@@ -165,7 +178,7 @@ router.get('/notifications', authMiddleware, async (req, res) => {
 
     const notifications = comments.map((comment) => ({
       type: 'Comment',
-      message: `${comment.userId?.username || 'Unknown'} commented on your rental: "${comment.rentalId?.title || 'Unknown'}"`,
+      message: `${comment.userId?.username || 'Unknown'} đã bình luận về bài viết của bạn : "${comment.rentalId?.title || 'Unknown'}"`,
       content: comment.content,
       createdAt: new Date(comment.createdAt.getTime() + 7 * 60 * 60 * 1000),
       rentalId: comment.rentalId?._id,

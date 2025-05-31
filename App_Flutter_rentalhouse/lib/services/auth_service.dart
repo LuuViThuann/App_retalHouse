@@ -345,6 +345,8 @@ class AuthService {
         },
       );
 
+      print(
+          'Recent comments response: ${response.statusCode} ${response.body}');
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         final comments = (data['comments'] as List)
@@ -352,15 +354,15 @@ class AuthService {
             .toList();
         return {
           'comments': comments,
-          'total': data['total'],
-          'page': data['page'],
-          'pages': data['pages'],
+          'total': data['total'] ?? 0,
+          'page': data['page'] ?? page,
+          'pages': data['pages'] ?? 1,
         };
       } else {
         throw Exception('Lấy bình luận thất bại: ${response.body}');
       }
     } catch (e) {
-      print('Error fetching comments: $e');
+      print('Error fetching recent comments: $e');
       throw Exception('Lấy bình luận thất bại: $e');
     }
   }
