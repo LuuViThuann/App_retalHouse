@@ -14,6 +14,7 @@ const authRoutes = require('./routes/auth');
 const chatRoutes = require('./routes/chat');
 const favoriteRoutes = require('./routes/favorite');
 const commentRoutes = require('./routes/comment');
+const profileRoutes = require('./routes/profile');
 
 require('./models/conversation');
 require('./models/message');
@@ -63,6 +64,8 @@ app.use('/api', rentalRoutes);
 app.use('/api', chatRoutes(io));
 app.use('/api', favoriteRoutes);
 app.use('/api', commentRoutes(io));
+app.use('/api/profile', profileRoutes);
+
 
 io.use(async (socket, next) => {
   const token = socket.handshake.headers.authorization?.replace('Bearer ', '');

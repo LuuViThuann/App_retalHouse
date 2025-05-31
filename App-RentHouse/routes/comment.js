@@ -1110,7 +1110,7 @@ module.exports = (io) => {
             createdAt: new Date(like.createdAt.getTime() + 7 * 60 * 60 * 1000),
           }));
 
-        // Emit Socket.IO event for unliked reply
+        // Gửi Socket.IO sự kiện cho reply đã bỏ thích
         io.emit('unlikeReply', { commentId, replyId, userId: req.userId });
 
         res.status(200).json({

@@ -1,6 +1,9 @@
 import 'dart:convert';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter_rentalhouse/models/comments.dart';
+import 'package:flutter_rentalhouse/models/notification.dart';
+import 'package:flutter_rentalhouse/models/rental.dart';
 import 'package:http/http.dart' as http;
 import '../config/api_routes.dart';
 import '../models/user.dart';
@@ -250,6 +253,7 @@ class AuthService {
           avatarBase64: avatarBase64,
         );
       }
+
       await _firestore.collection('Users').doc(user.uid).set({
         'email': user.email ?? '',
         'phoneNumber': '',
@@ -257,6 +261,7 @@ class AuthService {
         'username': '',
         'createdAt': FieldValue.serverTimestamp(),
       });
+
       return AppUser(
         id: user.uid,
         email: user.email ?? '',
@@ -286,6 +291,113 @@ class AuthService {
     } catch (e) {
       print('Error getting ID token: $e');
       return null;
+    }
+  }
+
+  Future<Map<String, dynamic>> fetchMyPosts(
+      {int page = 1, int limit = 10}) async {
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) throw Exception('Không tìm thấy người dùng');
+
+      final idToken = await user.getIdToken(true);
+      final response = await http.get(
+        Uri.parse('${ApiRoutes.myPosts}?page=$page&limit=$limit'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $idToken',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        final rentals = (data['rentals'] as List)
+            .map((rental) => Rental.fromJson(rental))
+            .toList();
+        return {
+          'rentals': rentals,
+          'total': data['total'],
+          'page': data['page'],
+          'pages': data['pages'],
+        };
+      } else {
+        throw Exception('Lấy bài đăng thất bại: ${response.body}');
+      }
+    } catch (e) {
+      print('Error fetching posts: $e');
+      throw Exception('Lấy bài đăng thất bại: $e');
+    }
+  }
+
+  // Fetch user's recent comments
+  Future<Map<String, dynamic>> fetchRecentComments(
+      {int page = 1, int limit = 10}) async {
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) throw Exception('Không tìm thấy người dùng');
+
+      final idToken = await user.getIdToken(true);
+      final response = await http.get(
+        Uri.parse('${ApiRoutes.recentComments}?page=$page&limit=$limit'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $idToken',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        final comments = (data['comments'] as List)
+            .map((comment) => Comment.fromJson(comment))
+            .toList();
+        return {
+          'comments': comments,
+          'total': data['total'],
+          'page': data['page'],
+          'pages': data['pages'],
+        };
+      } else {
+        throw Exception('Lấy bình luận thất bại: ${response.body}');
+      }
+    } catch (e) {
+      print('Error fetching comments: $e');
+      throw Exception('Lấy bình luận thất bại: $e');
+    }
+  }
+
+  // Fetch user's notifications
+  Future<Map<String, dynamic>> fetchNotifications(
+      {int page = 1, int limit = 10}) async {
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) throw Exception('Không tìm thấy người dùng');
+
+      final idToken = await user.getIdToken(true);
+      final response = await http.get(
+        Uri.parse('${ApiRoutes.notifications}?page=$page&limit=$limit'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $idToken',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        final notifications = (data['notifications'] as List)
+            .map((notification) => NotificationModel.fromJson(notification))
+            .toList();
+        return {
+          'notifications': notifications,
+          'total': data['total'],
+          'page': data['page'],
+          'pages': data['pages'],
+        };
+      } else {
+        throw Exception('Lấy thông báo thất bại: ${response.body}');
+      }
+    } catch (e) {
+      print('Error fetching notifications: $e');
+      throw Exception('Lấy thông báo thất bại: $e');
     }
   }
 }

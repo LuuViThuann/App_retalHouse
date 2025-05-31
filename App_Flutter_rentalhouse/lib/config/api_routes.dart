@@ -54,4 +54,8 @@ class ApiRoutes {
   static const String emailJsServiceId = 'service_gz8v706';
   static const String emailJsTemplateId = 'template_1k09fcg';
   static const String emailJsUserId = 'bGlLdgP91zmfcVxzm';
+
+  static const String myPosts = '$baseUrl/profile/my-posts';
+  static const String recentComments = '$baseUrl/profile/recent-comments';
+  static const String notifications = '$baseUrl/profile/notifications';
 }

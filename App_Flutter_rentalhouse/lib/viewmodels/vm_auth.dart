@@ -1,17 +1,37 @@
 import 'package:flutter/foundation.dart';
+import 'package:flutter_rentalhouse/models/comments.dart';
+import 'package:flutter_rentalhouse/models/notification.dart';
+import 'package:flutter_rentalhouse/models/rental.dart';
 import '../services/auth_service.dart';
 import '../models/user.dart';
 
 class AuthViewModel extends ChangeNotifier {
   final AuthService _authService = AuthService();
   AppUser? _currentUser;
+  List<Rental> _myPosts = [];
+  List<Comment> _recentComments = [];
+  List<NotificationModel> _notifications = [];
   bool _isLoading = false;
   String? _errorMessage;
+  int _postsPage = 1;
+  int _commentsPage = 1;
+  int _notificationsPage = 1;
+  int _postsTotalPages = 1;
+  int _commentsTotalPages = 1;
+  int _notificationsTotalPages = 1;
 
   AppUser? get currentUser => _currentUser;
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
-
+  List<Rental> get myPosts => _myPosts;
+  List<Comment> get recentComments => _recentComments;
+  List<NotificationModel> get notifications => _notifications;
+  int get postsPage => _postsPage;
+  int get commentsPage => _commentsPage;
+  int get notificationsPage => _notificationsPage;
+  int get postsTotalPages => _postsTotalPages;
+  int get commentsTotalPages => _commentsTotalPages;
+  int get notificationsTotalPages => _notificationsTotalPages;
   // Đăng ký
   Future<void> register({
     required String email,
@@ -187,6 +207,75 @@ class AuthViewModel extends ChangeNotifier {
     try {
       AppUser? user = await _authService.getCurrentUser();
       _currentUser = user;
+    } catch (e) {
+      _errorMessage = e.toString();
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> fetchMyPosts({int page = 1, int limit = 10}) async {
+    _isLoading = true;
+    _errorMessage = null;
+    notifyListeners();
+
+    try {
+      final data = await _authService.fetchMyPosts(page: page, limit: limit);
+      if (page == 1) {
+        _myPosts = data['rentals'] as List<Rental>;
+      } else {
+        _myPosts.addAll(data['rentals'] as List<Rental>);
+      }
+      _postsPage = data['page'] as int;
+      _postsTotalPages = data['pages'] as int;
+    } catch (e) {
+      _errorMessage = 'Failed to fetch posts: $e';
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  // Fetch recent comments
+  Future<void> fetchRecentComments({int page = 1, int limit = 10}) async {
+    _isLoading = true;
+    _errorMessage = null;
+    notifyListeners();
+
+    try {
+      final data =
+          await _authService.fetchRecentComments(page: page, limit: limit);
+      if (page == 1) {
+        _recentComments =
+            (data['comments'] as List).map((e) => Comment.fromJson(e)).toList();
+      } else {
+        _recentComments.addAll((data['comments'] as List)
+            .map((e) => Comment.fromJson(e))
+            .toList());
+      }
+      _commentsPage = data['page'] as int;
+      _commentsTotalPages = data['pages'] as int;
+    } catch (e) {
+      _errorMessage = 'Failed to fetch comments: $e';
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  // Fetch notifications
+  Future<void> fetchNotifications({int page = 1, int limit = 10}) async {
+    _isLoading = true;
+    _errorMessage = null;
+    notifyListeners();
+
+    try {
+      final data =
+          await _authService.fetchNotifications(page: page, limit: limit);
+      _notifications = data['notifications'] as List<NotificationModel>;
+      _notificationsPage = data['page'] as int;
+      _notificationsTotalPages = data['pages'] as int;
     } catch (e) {
       _errorMessage = e.toString();
     } finally {

@@ -1,6 +1,9 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_rentalhouse/Widgets/Profile/my_post.dart';
+import 'package:flutter_rentalhouse/Widgets/Profile/notification_view.dart';
+import 'package:flutter_rentalhouse/Widgets/Profile/recent_comment.dart';
 import 'package:flutter_rentalhouse/Widgets/item_menu_profile.dart';
 import 'package:flutter_rentalhouse/models/user.dart';
 import 'package:flutter_rentalhouse/viewmodels/vm_auth.dart';
@@ -19,9 +22,12 @@ class _ProfileViewState extends State<ProfileView> {
   @override
   void initState() {
     super.initState();
-    // Fetch user data when the view is initialized
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      Provider.of<AuthViewModel>(context, listen: false).fetchCurrentUser();
+      final authViewModel = Provider.of<AuthViewModel>(context, listen: false);
+      if (authViewModel.currentUser == null) {
+        // Fetch only if no user data
+        authViewModel.fetchCurrentUser();
+      }
     });
   }
 
@@ -32,20 +38,29 @@ class _ProfileViewState extends State<ProfileView> {
         final AppUser? user = authViewModel.currentUser;
 
         // Use a default image or avatarBase64 if available
-        ImageProvider avatarImage = const AssetImage('assets/img/imageuser.jpg');
-        if (user != null && user.avatarBase64 != null && user.avatarBase64!.isNotEmpty) {
+        ImageProvider avatarImage =
+            const AssetImage('assets/img/imageuser.jpg');
+        if (user != null &&
+            user.avatarBase64 != null &&
+            user.avatarBase64!.isNotEmpty) {
           try {
             final bytes = base64Decode(user.avatarBase64!);
             avatarImage = MemoryImage(bytes);
           } catch (e) {
             print('Error decoding avatarBase64: $e');
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Lỗi tải ảnh đại diện: $e'),
+                backgroundColor: Colors.red,
+              ),
+            );
           }
         }
 
         return Scaffold(
           backgroundColor: Colors.white,
           appBar: AppBar(
-            title:  Row(
+            title: Row(
               children: [
                 Icon(
                   Icons.person,
@@ -101,15 +116,9 @@ class _ProfileViewState extends State<ProfileView> {
                     onTap: () {
                       Navigator.push(
                         context,
-                        MaterialPageRoute(builder: (context) => MyProfileView()),
+                        MaterialPageRoute(
+                            builder: (context) => MyProfileView()),
                       );
-                    },
-                  ),
-                  ProfileMenuItem(
-                    icon: Icons.my_library_books,
-                    text: 'Danh sách đặt chỗ',
-                    onTap: () {
-                      // Handle My Orders tap
                     },
                   ),
                   ProfileMenuItem(
@@ -123,21 +132,32 @@ class _ProfileViewState extends State<ProfileView> {
                     icon: Icons.book,
                     text: 'Danh sách bài đăng của bạn',
                     onTap: () {
-                      // Handle My Cards tap
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => MyPostsView()),
+                      );
                     },
                   ),
                   ProfileMenuItem(
                     icon: Icons.comment,
                     text: 'Bình luận gần đây',
                     onTap: () {
-                      // Handle My Cards tap
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                            builder: (context) => RecentCommentsView()),
+                      );
                     },
                   ),
                   ProfileMenuItem(
                     icon: Icons.notifications,
                     text: 'Thông báo',
                     onTap: () {
-                      // Handle My Cards tap
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                            builder: (context) => NotificationsView()),
+                      );
                     },
                   ),
                   ProfileMenuItem(
@@ -148,13 +168,6 @@ class _ProfileViewState extends State<ProfileView> {
                     },
                   ),
                   ProfileMenuItem(
-                    icon: Icons.settings_outlined,
-                    text: 'Cài đặt',
-                    onTap: () {
-                      // Handle Settings tap
-                    },
-                  ),
-                  ProfileMenuItem(
                     icon: Icons.logout,
                     text: 'Đăng xuất',
                     onTap: () {
@@ -162,7 +175,8 @@ class _ProfileViewState extends State<ProfileView> {
                       if (authViewModel.errorMessage == null) {
                         Navigator.pushReplacement(
                           context,
-                          MaterialPageRoute(builder: (context) => const LoginScreen()),
+                          MaterialPageRoute(
+                              builder: (context) => const LoginScreen()),
                         );
                       } else {
                         ScaffoldMessenger.of(context).showSnackBar(
