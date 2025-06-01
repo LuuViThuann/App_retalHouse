@@ -1,11 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_rentalhouse/config/loading.dart';
+import 'package:flutter_rentalhouse/views/change_address_profile.dart';
 import 'package:lottie/lottie.dart';
 import 'package:provider/provider.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:convert';
 import 'dart:io';
-import 'dart:typed_data'; // For Uint8List
+import 'dart:typed_data';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:geocoding/geocoding.dart';
+import 'package:location/location.dart' as loc;
 import '../viewmodels/vm_auth.dart';
 import '../models/user.dart';
 
@@ -21,7 +25,6 @@ class _MyProfileViewState extends State<MyProfileView> {
   late TextEditingController _phoneController;
   late TextEditingController _addressController;
   late TextEditingController _userNameController;
-
   final ImagePicker _picker = ImagePicker();
 
   @override
@@ -73,10 +76,23 @@ class _MyProfileViewState extends State<MyProfileView> {
     }
   }
 
+  // Function to pick address from Google Maps
+  Future<void> _pickAddressFromMap() async {
+    final selectedAddress = await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const ChangeAddressView()),
+    );
+
+    if (selectedAddress != null && selectedAddress is String) {
+      setState(() {
+        _addressController.text = selectedAddress;
+      });
+    }
+  }
+
   // Helper function to convert Base64 string to ImageProvider
   ImageProvider getImageProvider(String? avatarUrl) {
     if (avatarUrl != null && avatarUrl.startsWith('data:image')) {
-      // Extract the Base64 part after "data:image/jpeg;base64,"
       final base64String = avatarUrl.split(',')[1];
       final bytes = base64Decode(base64String);
       return MemoryImage(bytes);
@@ -93,8 +109,7 @@ class _MyProfileViewState extends State<MyProfileView> {
         if (user != null) {
           _phoneController.text = user.phoneNumber ?? '';
           _addressController.text = user.address ?? '';
-          _userNameController.text =
-              user.username ?? ''; // Initialize username controller
+          _userNameController.text = user.username ?? '';
         }
 
         return Scaffold(
@@ -275,12 +290,31 @@ class _MyProfileViewState extends State<MyProfileView> {
                                         style: TextStyle(
                                             color: Colors.grey, fontSize: 12)),
                                     _isEditing
-                                        ? TextField(
-                                            controller: _addressController,
-                                            decoration: const InputDecoration(
-                                              border: OutlineInputBorder(),
-                                              hintText: 'Nhập địa chỉ...',
-                                            ),
+                                        ? Row(
+                                            children: [
+                                              Expanded(
+                                                child: TextField(
+                                                  controller:
+                                                      _addressController,
+                                                  decoration:
+                                                      const InputDecoration(
+                                                    border:
+                                                        OutlineInputBorder(),
+                                                    hintText: 'Nhập địa chỉ...',
+                                                  ),
+                                                  readOnly: true,
+                                                  onTap: _pickAddressFromMap,
+                                                ),
+                                              ),
+                                              const SizedBox(width: 8),
+                                              IconButton(
+                                                icon: const Icon(
+                                                  Icons.map,
+                                                  color: Colors.blueAccent,
+                                                ),
+                                                onPressed: _pickAddressFromMap,
+                                              ),
+                                            ],
                                           )
                                         : Text(
                                             user.address ?? 'Chưa cập nhật',
@@ -323,8 +357,7 @@ class _MyProfileViewState extends State<MyProfileView> {
                                       await authViewModel.updateUserProfile(
                                         phoneNumber: _phoneController.text,
                                         address: _addressController.text,
-                                        username: _userNameController
-                                            .text, // Add username update
+                                        username: _userNameController.text,
                                       );
                                       await authViewModel.fetchCurrentUser();
                                       ScaffoldMessenger.of(context)
@@ -378,3 +411,5 @@ class _MyProfileViewState extends State<MyProfileView> {
     );
   }
 }
+
+// New ChangeAddressView class

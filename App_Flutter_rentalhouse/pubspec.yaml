@@ -53,6 +53,12 @@ dependencies:
   shimmer: ^3.0.0
   animate_do: ^3.0.2
   firebase_dynamic_links: ^6.1.5
+  google_sign_in: ^6.2.2
+  geocoding: ^2.1.0
+  google_maps_flutter: ^2.7.0
+  custom_map_markers: ^0.0.2+1
+  location: ^5.0.3
+  flutter_facebook_auth: ^6.0.4
 
 dev_dependencies:
   flutter_test:
