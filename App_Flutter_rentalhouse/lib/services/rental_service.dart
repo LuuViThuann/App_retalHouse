@@ -8,6 +8,28 @@ import '../services/auth_service.dart';
 import '../viewmodels/vm_auth.dart';
 
 class RentalService {
+  Future<List<Rental>> fetchRentals() async {
+    try {
+      final response = await http.get(
+        Uri.parse('${ApiRoutes.baseUrl}/rentals'),
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final List<dynamic> data = jsonDecode(response.body);
+        return data.map((json) => Rental.fromJson(json)).toList();
+      } else {
+        throw Exception(
+            'Failed to fetch rentals: ${response.statusCode}, Body: ${response.body}');
+      }
+    } catch (e) {
+      print('Exception fetching rentals: $e');
+      throw Exception('Error fetching rentals: $e');
+    }
+  }
+
   Future<void> fetchRentalDetails({
     required Rental rental,
     required Function(double, int) onSuccess,

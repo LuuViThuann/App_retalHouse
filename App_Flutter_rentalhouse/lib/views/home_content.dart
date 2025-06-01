@@ -3,6 +3,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_rentalhouse/Widgets/HomeMain/PropertyType_house.dart';
 import 'package:flutter_rentalhouse/Widgets/HomeMain/all_rental.dart';
+import 'package:flutter_rentalhouse/services/chat_ai_service.dart';
 import 'package:flutter_rentalhouse/viewmodels/vm_rental.dart';
 import 'package:flutter_rentalhouse/views/login_view.dart';
 import 'package:flutter_rentalhouse/views/my_profile_view.dart';
@@ -374,7 +375,17 @@ class HomeContent extends StatelessWidget {
         children: [
           RawMaterialButton(
             onPressed: () {
-              // logic chatBox
+              showModalBottomSheet(
+                context: context,
+                isScrollControlled: true,
+                shape: const RoundedRectangleBorder(
+                  borderRadius:
+                      BorderRadius.vertical(top: Radius.circular(25.0)),
+                ),
+                builder: (context) => ChatAIBottomSheet(
+                  apiKey: 'AIzaSyAQ2qxzF90d2Yj03y_vt1Sb9AdIlbiBauE', // KEY API
+                ),
+              );
             },
             constraints: const BoxConstraints.tightFor(
               width: 145,
