@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_rentalhouse/Widgets/snackbar/showsnackbar.dart';
 import 'package:flutter_rentalhouse/config/loading.dart';
 import 'package:flutter_rentalhouse/utils/snackbar.dart';
-import 'package:flutter_rentalhouse/views/reset_password.dart';
 import 'package:lottie/lottie.dart';
 import 'package:provider/provider.dart';
 import '../viewmodels/vm_auth.dart';
+import 'reset_password.dart';
 
 class ForgotPasswordScreen extends StatefulWidget {
   const ForgotPasswordScreen({super.key});
@@ -23,11 +24,39 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     super.dispose();
   }
 
+  Future<void> _sendResetEmail(AuthViewModel authViewModel) async {
+    if (_formKey.currentState!.validate()) {
+      try {
+        await authViewModel.sendPasswordResetEmail(_emailController.text);
+        if (authViewModel.errorMessage == null) {
+          showSnackBar(context, 'Email đặt lại mật khẩu đã được gửi!');
+          // Chuyển hướng đến màn hình đặt lại mật khẩu hoặc thông báo chờ email
+        } else {
+          showSnackBar(context, authViewModel.errorMessage!);
+        }
+      } catch (e) {
+        showSnackBar(context, 'Lỗi: $e');
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final authViewModel = Provider.of<AuthViewModel>(context);
 
     return Scaffold(
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          onPressed: () {
+            Navigator.pop(context);
+          },
+        ),
+        centerTitle: true,
+      ),
+      extendBodyBehindAppBar: true, // để nội dung không bị che bởi AppBar
       body: Stack(
         children: [
           Container(
@@ -76,7 +105,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                       child: Material(
                         color: Colors.transparent,
                         child: Text(
-                          'KHÔI PHỤC MẬT KHẨU',
+                          'THAY ĐỔI MẬT KHẨU',
                           style: const TextStyle(
                             fontSize: 32,
                             fontWeight: FontWeight.bold,
@@ -150,7 +179,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                               )
                             else
                               GestureDetector(
-                                onTap: () async {},
+                                onTap: () => _sendResetEmail(authViewModel),
                                 child: Container(
                                   width: double.infinity,
                                   padding:
@@ -169,7 +198,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                                   ),
                                   child: const Center(
                                     child: Text(
-                                      'Gửi Mã Xác Nhận',
+                                      'Gửi Email Đặt Lại',
                                       style: TextStyle(
                                         color: Colors.white,
                                         fontSize: 18,

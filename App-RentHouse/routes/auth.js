@@ -90,7 +90,59 @@ router.post('/login', async (req, res) => {
     res.status(401).json({ message: 'Invalid token' });
   }
 });
+// Gửi email đặt lại mật khẩu
+router.post('/send-reset-email', async (req, res) => {
+  const { email } = req.body;
+  if (!email) {
+    return res.status(400).json({ message: 'Missing email' });
+  }
 
+  try {
+    const user = await admin.auth().getUserByEmail(email).catch(() => null);
+    if (!user) {
+      return res.status(404).json({ message: 'Email chưa được đăng ký' });
+    }
+
+    const continueUrl = 'https://flutterrentalhouse.page.link/reset-password'; // Kiểm tra giá trị
+    if (!continueUrl || !continueUrl.startsWith('http')) {
+      throw new Error('Invalid continue URL: ' + continueUrl);
+    }
+    console.log('Continue URL:', continueUrl);
+
+    const link = await admin.auth().generatePasswordResetLink(email, {
+      url: continueUrl,
+      handleCodeInApp: true,
+    });
+
+    console.log('Password reset link:', link);
+    res.json({ message: 'Email đặt lại mật khẩu đã được gửi thành công' });
+  } catch (err) {
+    console.error('Full error:', JSON.stringify(err, null, 2));
+    res.status(400).json({ message: 'Gửi email thất bại: ' + err.message });
+  }
+});
+// Xác minh mã OOB (out-of-band) và đặt lại mật khẩu
+router.post('/reset-password', async (req, res) => {
+  const { oobCode, newPassword } = req.body;
+  if (!oobCode || !newPassword) {
+    return res.status(400).json({ message: 'Missing oobCode or newPassword' });
+  }
+
+  try {
+    // Xác minh mã OOB
+    const response = await admin.auth().verifyPasswordResetCode(oobCode);
+    const email = response;
+
+    // Cập nhật mật khẩu
+    const user = await admin.auth().getUserByEmail(email);
+    await admin.auth().updateUser(user.uid, { password: newPassword });
+
+    res.json({ message: 'Mật khẩu đã được đặt lại thành công' });
+  } catch (err) {
+    console.error('Error resetting password:', err);
+    res.status(400).json({ message: 'Đặt lại mật khẩu thất bại: ' + err.message });
+  }
+});
 // Gửi mã OTP
 router.post('/send-otp', async (req, res) => {
   const { email } = req.body;

@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter_rentalhouse/config/loading.dart';
 import 'package:flutter_rentalhouse/models/comments.dart';
 import 'package:flutter_rentalhouse/models/notification.dart';
 import 'package:flutter_rentalhouse/models/rental.dart';
@@ -10,7 +11,7 @@ import '../models/user.dart';
 
 class AuthService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-
+  final FirebaseAuth _auth = FirebaseAuth.instance;
   // Đăng ký
   Future<AppUser?> register({
     required String email,
@@ -89,6 +90,51 @@ class AuthService {
     } catch (e) {
       print('Error during login: $e');
       throw Exception('Đăng nhập thất bại: $e');
+    }
+  }
+
+  Future<String> sendPasswordResetEmail(String email) async {
+    try {
+      await FirebaseAuth.instance.sendPasswordResetEmail(
+        email: email,
+        actionCodeSettings: ActionCodeSettings(
+          url: AssetsConfig.resetPasswordUrl,
+          handleCodeInApp: true,
+          iOSBundleId: AssetsConfig.iosBundleId,
+          androidPackageName: AssetsConfig.androidPackageName,
+          androidInstallApp: true,
+          androidMinimumVersion: AssetsConfig.androidMinimumVersion,
+        ),
+      );
+      print('Password reset email sent to: $email');
+      return 'Email đặt lại mật khẩu đã được gửi thành công';
+    } catch (e) {
+      print('Error sending password reset email: $e');
+      throw Exception('Gửi email thất bại: $e');
+    }
+  }
+
+  // Đặt lại mật khẩu với mã OOB
+  Future<void> resetPassword(String oobCode, String newPassword) async {
+    try {
+      final response = await http.post(
+        Uri.parse('${ApiRoutes.baseUrl}/auth/reset-password'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'oobCode': oobCode,
+          'newPassword': newPassword,
+        }),
+      );
+
+      if (response.statusCode != 200) {
+        throw Exception('Đặt lại mật khẩu thất bại: ${response.body}');
+      }
+
+      // Xác minh mã OOB và cập nhật mật khẩu client-side
+      await _auth.confirmPasswordReset(code: oobCode, newPassword: newPassword);
+    } catch (e) {
+      print('Error resetting password: $e');
+      throw Exception('Đặt lại mật khẩu thất bại: $e');
     }
   }
 

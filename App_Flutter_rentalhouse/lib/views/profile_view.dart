@@ -8,6 +8,7 @@ import 'package:flutter_rentalhouse/Widgets/item_menu_profile.dart';
 import 'package:flutter_rentalhouse/models/user.dart';
 import 'package:flutter_rentalhouse/viewmodels/vm_auth.dart';
 import 'package:flutter_rentalhouse/views/change_password_view.dart';
+import 'package:flutter_rentalhouse/views/forgot_password.dart';
 import 'package:flutter_rentalhouse/views/login_view.dart';
 import 'package:flutter_rentalhouse/views/my_profile_view.dart';
 import 'package:provider/provider.dart';
@@ -168,7 +169,7 @@ class _ProfileViewState extends State<ProfileView> {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                            builder: (context) => ChangePasswordScreen()),
+                            builder: (context) => ForgotPasswordScreen()),
                       );
                     },
                   ),

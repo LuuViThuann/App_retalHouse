@@ -1,5 +1,5 @@
 class ApiRoutes {
-  static const String rootUrl = 'http://192.168.1.236:3000';
+  static const String rootUrl = 'http://192.168.1.27:3000';
   static const String baseUrl = '$rootUrl/api';
   static const String serverBaseUrl = rootUrl;
   static const String socketUrl = serverBaseUrl;
@@ -11,6 +11,8 @@ class ApiRoutes {
   static const String register = '$baseUrl/auth/register';
   static const String login = '$baseUrl/auth/login';
   static const String changePassword = '$baseUrl/auth/change-password';
+  static const String sendResetEmail = '$baseUrl/auth/send-reset-email';
+  static const String resetPassword = '$baseUrl/auth/reset-password';
   static const String updateProfile = '$baseUrl/auth/update-profile';
   static const String users = '$baseUrl/auth/users';
   static const String favorites = '$baseUrl/favorites';

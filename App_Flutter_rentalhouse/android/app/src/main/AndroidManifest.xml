@@ -28,6 +28,18 @@
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
+            <!-- Thêm intent filter cho Firebase Dynamic Links -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <category android:name="android.intent.category.BROWSABLE"/>
+                <!-- Thay yourapp.page.link bằng domain Dynamic Links của bạn -->
+               <data android:scheme="https" android:host="flutterrentalhouse.page.link"/>
+                <!-- Nếu bạn dùng custom scheme (tùy chọn) -->
+                <data
+                    android:scheme="yourapp"
+                    android:host="reset-password"/>
+            </intent-filter>
         </activity>
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->

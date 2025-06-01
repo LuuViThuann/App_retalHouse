@@ -93,6 +93,40 @@ class AuthViewModel extends ChangeNotifier {
     }
   }
 
+// Gửi email đặt lại mật khẩu
+  Future<void> sendPasswordResetEmail(String email) async {
+    _isLoading = true;
+    _errorMessage = null;
+    notifyListeners();
+
+    try {
+      await _authService.sendPasswordResetEmail(email);
+      _errorMessage = null;
+    } catch (e) {
+      _errorMessage = e.toString();
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  // Đặt lại mật khẩu
+  Future<void> resetPassword(String oobCode, String newPassword) async {
+    _isLoading = true;
+    _errorMessage = null;
+    notifyListeners();
+
+    try {
+      await _authService.resetPassword(oobCode, newPassword);
+      _errorMessage = null;
+    } catch (e) {
+      _errorMessage = e.toString();
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
   // Thay đổi mật khẩu
   Future<void> changePassword({
     required String newPassword,

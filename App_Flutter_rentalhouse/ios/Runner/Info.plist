@@ -47,5 +47,25 @@
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	<!-- Thêm cấu hình cho Firebase Dynamic Links -->
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLName</key>
+			<string>com.example.flutter_rentalhouse</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<!-- Thay yourapp.page.link bằng domain Dynamic Links của bạn -->
+				<string>flutterrentalhouse.page.link</string>
+			</array>
+		</dict>
+	</array>
+	<!-- Thêm quyền để truy cập Universal Links -->
+	<key>com.apple.developer.associated-domains</key>
+	<array>
+		<string>applinks:flutterrentalhouse.page.link</string>
+	</array>
 </dict>
 </plist>
