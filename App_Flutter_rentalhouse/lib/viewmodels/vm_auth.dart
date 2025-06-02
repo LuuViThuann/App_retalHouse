@@ -32,6 +32,7 @@ class AuthViewModel extends ChangeNotifier {
   int get postsTotalPages => _postsTotalPages;
   int get commentsTotalPages => _commentsTotalPages;
   int get notificationsTotalPages => _notificationsTotalPages;
+
   // Đăng ký
   Future<void> register({
     required String email,
@@ -83,7 +84,7 @@ class AuthViewModel extends ChangeNotifier {
         _currentUser = user;
       } else {
         _errorMessage =
-            'Đăng nhập thất bại. Vui lòng kiểm tra email hoặc mật khẩu.';
+        'Đăng nhập thất bại. Vui lòng kiểm tra email hoặc mật khẩu.';
       }
     } catch (e) {
       _errorMessage = e.toString();
@@ -93,7 +94,28 @@ class AuthViewModel extends ChangeNotifier {
     }
   }
 
-// Gửi email đặt lại mật khẩu
+  // Đăng nhập bằng Google
+  Future<void> signInWithGoogle() async {
+    _isLoading = true;
+    _errorMessage = null;
+    notifyListeners();
+
+    try {
+      AppUser? user = await _authService.signInWithGoogle();
+      if (user != null) {
+        _currentUser = user;
+      } else {
+        _errorMessage = 'Đăng nhập Google thất bại. Vui lòng thử lại.';
+      }
+    } catch (e) {
+      _errorMessage = e.toString();
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  // Gửi email đặt lại mật khẩu
   Future<void> sendPasswordResetEmail(String email) async {
     _isLoading = true;
     _errorMessage = null;
@@ -166,15 +188,15 @@ class AuthViewModel extends ChangeNotifier {
       AppUser? updatedUser = await _authService.updateProfile(
         phoneNumber: phoneNumber,
         address: address,
-        username: username, // Update to 'username' as per API consistency
+        username: username,
       );
       if (updatedUser != null) {
         _currentUser = _currentUser?.copyWith(
           phoneNumber: phoneNumber,
           address: address,
           username: username,
-        ); // Immediate update
-        await fetchCurrentUser(); // Refresh with server data
+        );
+        await fetchCurrentUser();
         _errorMessage = null;
       } else {
         _errorMessage = 'Cập nhật hồ sơ thất bại. Vui lòng thử lại.';
@@ -197,7 +219,7 @@ class AuthViewModel extends ChangeNotifier {
 
     try {
       final avatarBase64 =
-          await _authService.uploadProfileImage(imageBase64: imageBase64);
+      await _authService.uploadProfileImage(imageBase64: imageBase64);
       if (avatarBase64 != null && _currentUser != null) {
         _currentUser = _currentUser!.copyWith(avatarBase64: avatarBase64);
       } else {
@@ -279,9 +301,9 @@ class AuthViewModel extends ChangeNotifier {
 
     try {
       final data =
-          await _authService.fetchRecentComments(page: page, limit: limit);
+      await _authService.fetchRecentComments(page: page, limit: limit);
       final comments =
-          (data['comments'] as List).map((e) => Comment.fromJson(e)).toList();
+      (data['comments'] as List).map((e) => Comment.fromJson(e)).toList();
       if (page == 1) {
         _recentComments = comments;
       } else {
@@ -309,7 +331,7 @@ class AuthViewModel extends ChangeNotifier {
 
     try {
       final data =
-          await _authService.fetchNotifications(page: page, limit: limit);
+      await _authService.fetchNotifications(page: page, limit: limit);
       _notifications = data['notifications'] as List<NotificationModel>;
       _notificationsPage = data['page'] as int;
       _notificationsTotalPages = data['pages'] as int;

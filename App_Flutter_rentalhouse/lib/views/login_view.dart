@@ -213,25 +213,25 @@ class _LoginScreenState extends State<LoginScreen> {
                                       context,
                                       PageRouteBuilder(
                                         pageBuilder: (context, animation,
-                                                secondaryAnimation) =>
-                                            const ForgotPasswordScreen(),
+                                            secondaryAnimation) =>
+                                        const ForgotPasswordScreen(),
                                         transitionsBuilder: (context, animation,
                                             secondaryAnimation, child) {
                                           const begin = Offset(0.0, 1.0);
                                           const end = Offset.zero;
                                           const curve = Curves.easeInOut;
                                           var tween = Tween(
-                                                  begin: begin, end: end)
+                                              begin: begin, end: end)
                                               .chain(CurveTween(curve: curve));
                                           var offsetAnimation =
-                                              animation.drive(tween);
+                                          animation.drive(tween);
                                           return SlideTransition(
                                             position: offsetAnimation,
                                             child: child,
                                           );
                                         },
                                         transitionDuration:
-                                            const Duration(milliseconds: 500),
+                                        const Duration(milliseconds: 500),
                                       ),
                                     );
                                   },
@@ -279,7 +279,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                         context,
                                         MaterialPageRoute(
                                             builder: (context) =>
-                                                const HomeScreen()),
+                                            const HomeScreen()),
                                       );
                                     } else {
                                       showCustomSnackBar(
@@ -299,7 +299,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                 child: Container(
                                   width: double.infinity,
                                   padding:
-                                      const EdgeInsets.symmetric(vertical: 16),
+                                  const EdgeInsets.symmetric(vertical: 16),
                                   decoration: const BoxDecoration(
                                     gradient: LinearGradient(
                                       colors: [
@@ -342,25 +342,25 @@ class _LoginScreenState extends State<LoginScreen> {
                                       context,
                                       PageRouteBuilder(
                                         pageBuilder: (context, animation,
-                                                secondaryAnimation) =>
-                                            const RegisterScreen(),
+                                            secondaryAnimation) =>
+                                        const RegisterScreen(),
                                         transitionsBuilder: (context, animation,
                                             secondaryAnimation, child) {
                                           const begin = Offset(0.0, 1.0);
                                           const end = Offset.zero;
                                           const curve = Curves.easeInOut;
                                           var tween = Tween(
-                                                  begin: begin, end: end)
+                                              begin: begin, end: end)
                                               .chain(CurveTween(curve: curve));
                                           var offsetAnimation =
-                                              animation.drive(tween);
+                                          animation.drive(tween);
                                           return SlideTransition(
                                             position: offsetAnimation,
                                             child: child,
                                           );
                                         },
                                         transitionDuration:
-                                            const Duration(milliseconds: 500),
+                                        const Duration(milliseconds: 500),
                                       ),
                                     );
                                   },
@@ -397,8 +397,36 @@ class _LoginScreenState extends State<LoginScreen> {
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
                                 GestureDetector(
-                                  onTap: () {
-                                    // Add Google login logic here
+                                  onTap: () async {
+                                    print('Google Sign-In button tapped');
+                                    await authViewModel.signInWithGoogle();
+                                    if (authViewModel.errorMessage == null && authViewModel.currentUser != null) {
+                                      showCustomSnackBar(
+                                        context,
+                                        'Đăng nhập Google thành công',
+                                        backgroundColor: Colors.green,
+                                        icon: Icons.check_circle,
+                                        actionLabel: 'Đóng',
+                                        onActionPressed: () {
+                                          ScaffoldMessenger.of(context).hideCurrentSnackBar();
+                                        },
+                                      );
+                                      Navigator.pushReplacement(
+                                        context,
+                                        MaterialPageRoute(builder: (context) => const HomeScreen()),
+                                      );
+                                    } else {
+                                      showCustomSnackBar(
+                                        context,
+                                        authViewModel.errorMessage ?? 'Đăng nhập Google thất bại',
+                                        backgroundColor: Colors.red,
+                                        icon: Icons.error_outline,
+                                        actionLabel: 'Đóng',
+                                        onActionPressed: () {
+                                          ScaffoldMessenger.of(context).hideCurrentSnackBar();
+                                        },
+                                      );
+                                    }
                                   },
                                   child: Container(
                                     padding: const EdgeInsets.all(10),

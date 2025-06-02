@@ -5,6 +5,7 @@ import 'package:flutter_rentalhouse/config/loading.dart';
 import 'package:flutter_rentalhouse/models/comments.dart';
 import 'package:flutter_rentalhouse/models/notification.dart';
 import 'package:flutter_rentalhouse/models/rental.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 import 'package:http/http.dart' as http;
 import '../config/api_routes.dart';
 import '../models/user.dart';
@@ -12,6 +13,8 @@ import '../models/user.dart';
 class AuthService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
+  final GoogleSignIn _googleSignIn = GoogleSignIn();
+
   // Đăng ký
   Future<AppUser?> register({
     required String email,
@@ -273,6 +276,8 @@ class AuthService {
   // Đăng xuất
   Future<bool> logout() async {
     try {
+    //  await GoogleSignIn().signOut();
+    //  await FacebookAuth.instance.logOut();
       await FirebaseAuth.instance.signOut();
       return true;
     } catch (e) {
@@ -446,6 +451,61 @@ class AuthService {
     } catch (e) {
       print('Error fetching notifications: $e');
       throw Exception('Lấy thông báo thất bại: $e');
+    }
+  }
+
+  // Login google
+// Đăng nhập bằng Google
+  Future<AppUser?> signInWithGoogle() async {
+    try {
+      final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
+      if (googleUser == null) return null; // Người dùng huỷ
+      final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
+      final credential = GoogleAuthProvider.credential(
+        accessToken: googleAuth.accessToken,
+        idToken: googleAuth.idToken,
+      );
+      final userCredential = await _auth.signInWithCredential(credential);
+      final user = userCredential.user;
+      if (user == null) return null;
+      final idToken = await user.getIdToken(true);
+      if (idToken == null) throw Exception('Không thể lấy ID token');
+      final response = await http.post(
+        Uri.parse(ApiRoutes.login),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'idToken': idToken}),
+      );
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        final docRef = _firestore.collection("Users").doc(user.uid);
+        final docSnapshot = await docRef.get();
+        if (!docSnapshot.exists) {
+          await docRef.set({
+            'email': user.email ?? '',
+            'phoneNumber': '',
+            'address': '',
+            'username': user.displayName ?? '',
+            'createdAt': FieldValue.serverTimestamp(),
+          });
+        }
+        final doc = await docRef.get();
+        final avatarBase64 = await fetchAvatarBase64(user.uid, idToken);
+        return AppUser(
+          id: data['id'] as String,
+          email: data['email'] as String,
+          phoneNumber: data['phoneNumber'] as String,
+          address: data['address'] as String,
+          createdAt: DateTime.parse(data['createdAt'] as String),
+          token: data['token'] ?? idToken,
+          username: data['username'] as String? ?? user.displayName ?? '',
+          avatarBase64: avatarBase64,
+        );
+      } else {
+        throw Exception('Đăng nhập Google thất bại: ${response.body}');
+      }
+    } catch (e) {
+      print("Lỗi khi đăng nhập Google: $e");
+      throw Exception('Đăng nhập Google thất bại: $e');
     }
   }
 }
