@@ -5,11 +5,6 @@ import 'package:lottie/lottie.dart';
 import 'package:provider/provider.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:convert';
-import 'dart:io';
-import 'dart:typed_data';
-import 'package:google_maps_flutter/google_maps_flutter.dart';
-import 'package:geocoding/geocoding.dart';
-import 'package:location/location.dart' as loc;
 import '../viewmodels/vm_auth.dart';
 import '../models/user.dart';
 
@@ -46,7 +41,6 @@ class _MyProfileViewState extends State<MyProfileView> {
     super.dispose();
   }
 
-  // Function to pick and upload image
   Future<void> _pickAndUploadImage() async {
     try {
       final XFile? image = await _picker.pickImage(source: ImageSource.gallery);
@@ -64,6 +58,14 @@ class _MyProfileViewState extends State<MyProfileView> {
               duration: Duration(seconds: 2),
             ),
           );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                  'Lỗi: ${Provider.of<AuthViewModel>(context, listen: false).errorMessage}'),
+              backgroundColor: Colors.red,
+            ),
+          );
         }
       }
     } catch (e) {
@@ -76,21 +78,19 @@ class _MyProfileViewState extends State<MyProfileView> {
     }
   }
 
-  // Function to pick address from Google Maps
   Future<void> _pickAddressFromMap() async {
     final selectedAddress = await Navigator.push(
       context,
-      MaterialPageRoute(builder: (context) => const ChangeAddressView()),
+      MaterialPageRoute(builder: (context) => ChangeAddressView()),
     );
 
-    if (selectedAddress != null && selectedAddress is String) {
+    if (selectedAddress != null && selectedAddress is String && mounted) {
       setState(() {
         _addressController.text = selectedAddress;
       });
     }
   }
 
-  // Helper function to convert Base64 string to ImageProvider
   ImageProvider getImageProvider(String? avatarUrl) {
     if (avatarUrl != null && avatarUrl.startsWith('data:image')) {
       final base64String = avatarUrl.split(',')[1];
@@ -359,16 +359,26 @@ class _MyProfileViewState extends State<MyProfileView> {
                                         address: _addressController.text,
                                         username: _userNameController.text,
                                       );
-                                      await authViewModel.fetchCurrentUser();
-                                      ScaffoldMessenger.of(context)
-                                          .showSnackBar(
-                                        const SnackBar(
-                                          content: Text(
-                                              'Thông tin đã được cập nhật thành công!'),
-                                          backgroundColor: Colors.green,
-                                          duration: Duration(seconds: 2),
-                                        ),
-                                      );
+                                      if (authViewModel.errorMessage == null) {
+                                        ScaffoldMessenger.of(context)
+                                            .showSnackBar(
+                                          const SnackBar(
+                                            content: Text(
+                                                'Thông tin đã được cập nhật thành công!'),
+                                            backgroundColor: Colors.green,
+                                            duration: Duration(seconds: 2),
+                                          ),
+                                        );
+                                      } else {
+                                        ScaffoldMessenger.of(context)
+                                            .showSnackBar(
+                                          SnackBar(
+                                            content: Text(
+                                                'Lỗi: ${authViewModel.errorMessage}'),
+                                            backgroundColor: Colors.red,
+                                          ),
+                                        );
+                                      }
                                     } catch (e) {
                                       ScaffoldMessenger.of(context)
                                           .showSnackBar(
@@ -411,5 +421,3 @@ class _MyProfileViewState extends State<MyProfileView> {
     );
   }
 }
-
-// New ChangeAddressView class

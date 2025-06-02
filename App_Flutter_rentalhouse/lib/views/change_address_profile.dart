@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:geocoding/geocoding.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:location/location.dart' as loc;
+import 'package:provider/provider.dart';
+import '../viewmodels/vm_auth.dart';
 
 class ChangeAddressView extends StatefulWidget {
   const ChangeAddressView({super.key});
@@ -18,7 +20,7 @@ class _ChangeAddressViewState extends State<ChangeAddressView> {
   List<MarkerData> _customMarkers = [];
   String _currentAddress = '';
   String? _errorMessage;
-  bool _isMapLoading = true; // Track map loading state
+  bool _isMapLoading = true;
 
   @override
   void initState() {
@@ -104,7 +106,6 @@ class _ChangeAddressViewState extends State<ChangeAddressView> {
           ];
         });
 
-        // Update camera position
         _controller?.animateCamera(CameraUpdate.newLatLngZoom(position, 16));
       } else {
         setState(() => _errorMessage = 'Không tìm thấy địa chỉ từ tọa độ.');
@@ -147,12 +148,11 @@ class _ChangeAddressViewState extends State<ChangeAddressView> {
 
         setState(() {
           _currentLatLng = latLng;
-          _isMapLoading = false; // Map is ready
+          _isMapLoading = false;
         });
 
         await _updateAddressFromLatLng(latLng);
 
-        // Ensure map is initialized before animating
         if (_controller != null) {
           await _controller!
               .animateCamera(CameraUpdate.newLatLngZoom(latLng, 16));
@@ -177,21 +177,55 @@ class _ChangeAddressViewState extends State<ChangeAddressView> {
   }
 
   void _showConfirmDialog(String title, String address) {
+    // Store the AuthViewModel reference before showing the dialog
+    final authViewModel = Provider.of<AuthViewModel>(context, listen: false);
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
         backgroundColor: Colors.white,
         title: Text(title),
         content: Text(address),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => Navigator.pop(dialogContext),
             child: const Text("Hủy"),
           ),
           TextButton(
-            onPressed: () {
-              Navigator.pop(context); // Close dialog
-              Navigator.pop(context, _currentAddress); // Return address
+            onPressed: () async {
+              // Close the dialog first
+              Navigator.pop(dialogContext);
+              try {
+                // Perform the update using the stored AuthViewModel
+                await authViewModel.updateUserProfile(
+                  phoneNumber: authViewModel.currentUser?.phoneNumber ?? '',
+                  address: address,
+                  username: authViewModel.currentUser?.username ?? '',
+                );
+                // Check if the widget is still mounted before updating state
+                if (!mounted) return;
+                if (authViewModel.errorMessage == null) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Địa chỉ đã được cập nhật thành công!'),
+                      backgroundColor: Colors.green,
+                      duration: Duration(seconds: 2),
+                    ),
+                  );
+                  // Return address to MyProfileView
+                  Navigator.pop(context, address);
+                } else {
+                  setState(() {
+                    _errorMessage = authViewModel.errorMessage ??
+                        'Lỗi khi cập nhật địa chỉ';
+                  });
+                }
+              } catch (e) {
+                if (mounted) {
+                  setState(() {
+                    _errorMessage = 'Lỗi khi cập nhật địa chỉ: $e';
+                  });
+                }
+              }
             },
             child: const Text("Xác nhận"),
           ),
@@ -248,7 +282,6 @@ class _ChangeAddressViewState extends State<ChangeAddressView> {
                             _errorMessage = null;
                             _isMapLoading = false;
                           });
-                          // Update camera if current location is available
                           if (_currentLatLng != null) {
                             controller.animateCamera(
                               CameraUpdate.newLatLngZoom(_currentLatLng!, 16),
