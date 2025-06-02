@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_rentalhouse/Widgets/Profile/enter_new_address.dart';
 import 'package:flutter_rentalhouse/config/loading.dart';
 import 'package:flutter_rentalhouse/views/change_address_profile.dart';
 import 'package:lottie/lottie.dart';
@@ -88,6 +89,83 @@ class _MyProfileViewState extends State<MyProfileView> {
       setState(() {
         _addressController.text = selectedAddress;
       });
+      try {
+        final authViewModel =
+            Provider.of<AuthViewModel>(context, listen: false);
+        await authViewModel.updateUserProfile(
+          phoneNumber: _phoneController.text,
+          address: selectedAddress,
+          username: _userNameController.text,
+        );
+        if (authViewModel.errorMessage == null) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Địa chỉ đã được cập nhật thành công!'),
+              backgroundColor: Colors.green,
+              duration: Duration(seconds: 2),
+            ),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Lỗi: ${authViewModel.errorMessage}'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      } catch (e) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Lỗi: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _pickAddressManually() async {
+    final selectedAddress = await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => NewAddressPage()),
+    );
+
+    if (selectedAddress != null && selectedAddress is String && mounted) {
+      setState(() {
+        _addressController.text = selectedAddress;
+      });
+      try {
+        final authViewModel =
+            Provider.of<AuthViewModel>(context, listen: false);
+        await authViewModel.updateUserProfile(
+          phoneNumber: _phoneController.text,
+          address: selectedAddress,
+          username: _userNameController.text,
+        );
+        if (authViewModel.errorMessage == null) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Địa chỉ đã được cập nhật thành công!'),
+              backgroundColor: Colors.green,
+              duration: Duration(seconds: 2),
+            ),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Lỗi: ${authViewModel.errorMessage}'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      } catch (e) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Lỗi: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     }
   }
 
@@ -98,6 +176,42 @@ class _MyProfileViewState extends State<MyProfileView> {
       return MemoryImage(bytes);
     }
     return const AssetImage('assets/img/imageuser.png');
+  }
+
+  void _showAddressPickerMenu() {
+    showMenu(
+      color: Colors.white,
+      context: context,
+      position: const RelativeRect.fromLTRB(100, 400, 100, 100),
+      items: [
+        const PopupMenuItem(
+          value: 'map',
+          child: Row(
+            children: [
+              Icon(Icons.map, color: Colors.blueAccent),
+              SizedBox(width: 8),
+              Text('Chọn từ bản đồ'),
+            ],
+          ),
+        ),
+        const PopupMenuItem(
+          value: 'manual',
+          child: Row(
+            children: [
+              Icon(Icons.edit, color: Colors.blueAccent),
+              SizedBox(width: 8),
+              Text('Nhập địa chỉ'),
+            ],
+          ),
+        ),
+      ],
+    ).then((value) {
+      if (value == 'map') {
+        _pickAddressFromMap();
+      } else if (value == 'manual') {
+        _pickAddressManually();
+      }
+    });
   }
 
   @override
@@ -300,19 +414,53 @@ class _MyProfileViewState extends State<MyProfileView> {
                                                       const InputDecoration(
                                                     border:
                                                         OutlineInputBorder(),
-                                                    hintText: 'Nhập địa chỉ...',
+                                                    hintText: 'Chọn địa chỉ...',
                                                   ),
                                                   readOnly: true,
-                                                  onTap: _pickAddressFromMap,
+                                                  onTap: _showAddressPickerMenu,
                                                 ),
                                               ),
                                               const SizedBox(width: 8),
-                                              IconButton(
+                                              PopupMenuButton<String>(
+                                                color: Colors.white,
                                                 icon: const Icon(
-                                                  Icons.map,
+                                                  Icons.place,
                                                   color: Colors.blueAccent,
                                                 ),
-                                                onPressed: _pickAddressFromMap,
+                                                onSelected: (value) {
+                                                  if (value == 'map') {
+                                                    _pickAddressFromMap();
+                                                  } else if (value ==
+                                                      'manual') {
+                                                    _pickAddressManually();
+                                                  }
+                                                },
+                                                itemBuilder: (context) => [
+                                                  const PopupMenuItem(
+                                                    value: 'map',
+                                                    child: Row(
+                                                      children: [
+                                                        Icon(Icons.map,
+                                                            color: Colors
+                                                                .blueAccent),
+                                                        SizedBox(width: 8),
+                                                        Text('Chọn từ bản đồ'),
+                                                      ],
+                                                    ),
+                                                  ),
+                                                  const PopupMenuItem(
+                                                    value: 'manual',
+                                                    child: Row(
+                                                      children: [
+                                                        Icon(Icons.edit,
+                                                            color: Colors
+                                                                .blueAccent),
+                                                        SizedBox(width: 8),
+                                                        Text('Nhập địa chỉ'),
+                                                      ],
+                                                    ),
+                                                  ),
+                                                ],
                                               ),
                                             ],
                                           )

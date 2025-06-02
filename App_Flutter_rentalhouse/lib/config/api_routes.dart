@@ -60,4 +60,10 @@ class ApiRoutes {
   static const String myPosts = '$baseUrl/profile/my-posts';
   static const String recentComments = '$baseUrl/profile/recent-comments';
   static const String notifications = '$baseUrl/profile/notifications';
+
+    // Gọi các API địa chỉ --------------------
+  static const String baseUrlAddress = 'https://provinces.open-api.vn/api';
+  static Uri get provinces => Uri.parse('$baseUrlAddress/p/');
+  static Uri getDistricts(String provinceCode) => Uri.parse('$baseUrlAddress/p/$provinceCode?depth=2');
+  static Uri getWards(String districtCode) => Uri.parse('$baseUrlAddress/d/$districtCode?depth=2');
 }

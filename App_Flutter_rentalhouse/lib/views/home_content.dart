@@ -8,8 +8,8 @@ import 'package:flutter_rentalhouse/viewmodels/vm_rental.dart';
 import 'package:flutter_rentalhouse/views/login_view.dart';
 import 'package:flutter_rentalhouse/views/my_profile_view.dart';
 import 'package:flutter_rentalhouse/views/search_rental.dart';
-
 import 'package:provider/provider.dart';
+import 'package:shimmer/shimmer.dart';
 import '../models/user.dart';
 import '../viewmodels/vm_auth.dart';
 import '../viewmodels/vm_favorite.dart';
@@ -53,7 +53,7 @@ class HomeContent extends StatelessWidget {
 
     String formatCurrency(double amount) {
       final formatter =
-          NumberFormat.currency(locale: 'vi_VN', symbol: '₫', decimalDigits: 0);
+      NumberFormat.currency(locale: 'vi_VN', symbol: '₫', decimalDigits: 0);
       return formatter.format(amount);
     }
 
@@ -61,8 +61,8 @@ class HomeContent extends StatelessWidget {
       final today = DateTime.now();
       final latestRentals = rentalViewModel.rentals
           .where((rental) =>
-              rental.createdAt.year == today.year &&
-              rental.createdAt.month == today.month)
+      rental.createdAt.year == today.year &&
+          rental.createdAt.month == today.month)
           .take(5)
           .toList();
 
@@ -109,26 +109,71 @@ class HomeContent extends StatelessWidget {
           const SizedBox(height: 10),
           latestRentals.isEmpty
               ? const Center(
-                  child: Padding(
-                    padding: EdgeInsets.all(20.0),
-                    child: Text(
-                      'Không có bài đăng mới trong tháng này!',
-                      style: TextStyle(fontSize: 16, color: Colors.grey),
-                    ),
-                  ),
-                )
+            child: Padding(
+              padding: EdgeInsets.all(20.0),
+              child: Text(
+                'Không có bài đăng mới trong tháng này!',
+                style: TextStyle(fontSize: 16, color: Colors.grey),
+              ),
+            ),
+          )
               : ListView.separated(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  itemCount: latestRentals.length,
-                  separatorBuilder: (context, index) =>
-                      const SizedBox(height: 12),
-                  itemBuilder: (context, index) {
-                    return RentalItemWidget(rental: latestRentals[index]);
-                  },
-                ),
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: latestRentals.length,
+            separatorBuilder: (context, index) =>
+            const SizedBox(height: 12),
+            itemBuilder: (context, index) {
+              return RentalItemWidget(rental: latestRentals[index]);
+            },
+          ),
           const SizedBox(height: 20),
         ],
+      );
+    }
+
+    Widget _buildShimmerLoading() {
+      return Shimmer.fromColors(
+        baseColor: Colors.grey[300]!,
+        highlightColor: Colors.grey[100]!,
+        period: const Duration(milliseconds: 1000),
+        child: Column(
+          children: [
+            Container(
+              height: 50,
+              width: double.infinity,
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            const SizedBox(height: 20),
+            Container(
+              height: MediaQuery.of(context).size.height * 0.22,
+              width: double.infinity,
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            const SizedBox(height: 20),
+            ListView.separated(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: 3,
+              separatorBuilder: (context, index) => const SizedBox(height: 12),
+              itemBuilder: (context, index) {
+                return Container(
+                  height: 100,
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                );
+              },
+            ),
+          ],
+        ),
       );
     }
 
@@ -138,7 +183,7 @@ class HomeContent extends StatelessWidget {
         child: SingleChildScrollView(
           child: Padding(
             padding:
-                const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+            const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -187,6 +232,10 @@ class HomeContent extends StatelessWidget {
                       child: CircleAvatar(
                         radius: 24,
                         backgroundImage: avatarImage,
+                        backgroundColor: Colors.grey[200], // Placeholder color
+                        child: avatarImage is AssetImage
+                            ? const Icon(Icons.person, color: Colors.grey)
+                            : null,
                       ),
                     ),
                   ],
@@ -239,46 +288,89 @@ class HomeContent extends StatelessWidget {
                   },
                 ),
                 const SizedBox(height: 25),
-                // Banner
+                // Banner with Shimmer
                 Container(
                   height: MediaQuery.of(context).size.height * 0.22,
                   width: double.infinity,
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(15.0),
-                    image: const DecorationImage(
-                      image: AssetImage('assets/img/banner.jpg'),
-                      fit: BoxFit.cover,
-                    ),
-                    gradient: LinearGradient(
-                      colors: [Colors.teal.shade300, Colors.teal.shade600],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
                     boxShadow: [
                       BoxShadow(
                         color: Colors.grey.withOpacity(0.3),
                         spreadRadius: 2,
                         blurRadius: 6,
                         offset: const Offset(0, 4),
-                      )
-                    ],
-                  ),
-                  child: Stack(
-                    children: [
-                      Padding(
-                        padding: const EdgeInsets.all(16.0),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [],
-                            ),
-                          ],
-                        ),
                       ),
                     ],
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(15.0),
+                    child: Stack(
+                      children: [
+                        // Background image with error handling
+                        Image.asset(
+                          'assets/img/banner.jpg',
+                          fit: BoxFit.cover,
+                          width: double.infinity,
+                          height: double.infinity,
+                          errorBuilder: (context, error, stackTrace) {
+                            return Container(
+                              color: Colors.grey[300],
+                              child: const Center(
+                                child: Icon(
+                                  Icons.broken_image,
+                                  color: Colors.grey,
+                                  size: 40,
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                        // Shimmer effect (only shown during loading)
+                        FutureBuilder(
+                          future: precacheImage(
+                              const AssetImage('assets/img/banner.jpg'), context),
+                          builder: (context, snapshot) {
+                            if (snapshot.connectionState ==
+                                ConnectionState.waiting) {
+                              return Shimmer.fromColors(
+                                baseColor: Colors.blue.shade300.withOpacity(0.5),
+                                highlightColor:
+                                Colors.teal.shade100.withOpacity(0.2),
+                                period: const Duration(milliseconds: 1500),
+                                child: Container(
+                                  decoration: BoxDecoration(
+                                    gradient: LinearGradient(
+                                      colors: [
+                                        Colors.teal.shade300.withOpacity(0.7),
+                                        Colors.teal.shade600.withOpacity(0.7),
+                                      ],
+                                      begin: Alignment.topLeft,
+                                      end: Alignment.bottomRight,
+                                    ),
+                                  ),
+                                ),
+                              );
+                            }
+                            return const SizedBox.shrink();
+                          },
+                        ),
+                        // Content
+                        Padding(
+                          padding: const EdgeInsets.all(16.0),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [],
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
                 const SizedBox(height: 25),
@@ -347,23 +439,18 @@ class HomeContent extends StatelessWidget {
                     ),
                   )
                 else if (rentalViewModel.isLoading)
-                  const Center(
-                    child: Padding(
-                      padding: EdgeInsets.all(30.0),
-                      child: CircularProgressIndicator(color: Colors.blue),
-                    ),
-                  )
+                  _buildShimmerLoading()
                 else if (rentalViewModel.errorMessage != null)
-                  Center(
-                    child: Padding(
-                      padding: const EdgeInsets.all(16.0),
-                      child: Text('Lỗi: ${rentalViewModel.errorMessage}',
-                          style:
-                              const TextStyle(color: Colors.red, fontSize: 16)),
-                    ),
-                  )
-                else
-                  _buildLatestPostsSection(),
+                    Center(
+                      child: Padding(
+                        padding: const EdgeInsets.all(16.0),
+                        child: Text('Lỗi: ${rentalViewModel.errorMessage}',
+                            style:
+                            const TextStyle(color: Colors.red, fontSize: 16)),
+                      ),
+                    )
+                  else
+                    _buildLatestPostsSection(),
               ],
             ),
           ),
@@ -380,10 +467,10 @@ class HomeContent extends StatelessWidget {
                 isScrollControlled: true,
                 shape: const RoundedRectangleBorder(
                   borderRadius:
-                      BorderRadius.vertical(top: Radius.circular(25.0)),
+                  BorderRadius.vertical(top: Radius.circular(25.0)),
                 ),
                 builder: (context) => ChatAIBottomSheet(
-                  apiKey: 'AIzaSyAQ2qxzF90d2Yj03y_vt1Sb9AdIlbiBauE', // KEY API
+                  apiKey: 'AIzaSyAQ2qxzF90d2Yj03y_vt1Sb9AdIlbiBauE',
                 ),
               );
             },
@@ -394,8 +481,15 @@ class HomeContent extends StatelessWidget {
             shape: const CircleBorder(),
             child: ClipOval(
               child: Image.asset(
-                "assets/img/chatbox.png",
+                'assets/img/chatbox.png',
                 fit: BoxFit.cover,
+                errorBuilder: (context, error, stackTrace) {
+                  return const Icon(
+                    Icons.broken_image,
+                    color: Colors.grey,
+                    size: 40,
+                  );
+                },
               ),
             ),
           ),
@@ -425,12 +519,12 @@ class HomeContent extends StatelessWidget {
           border: isSelected ? null : Border.all(color: Colors.grey.shade300),
           boxShadow: isSelected
               ? [
-                  BoxShadow(
-                    color: Colors.teal.withOpacity(0.3),
-                    blurRadius: 5,
-                    offset: const Offset(0, 2),
-                  )
-                ]
+            BoxShadow(
+              color: Colors.teal.withOpacity(0.3),
+              blurRadius: 5,
+              offset: const Offset(0, 2),
+            )
+          ]
               : [],
         ),
         child: Row(

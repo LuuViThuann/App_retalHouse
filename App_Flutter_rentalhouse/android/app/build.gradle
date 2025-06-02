@@ -6,6 +6,7 @@ plugins {
 }
 
 android {
+    namespace 'io.flutter.plugins.googleapiheaders'
     namespace = "com.example.flutter_rentalhouse"
     compileSdk = 35
     ndkVersion = flutter.ndkVersion
@@ -15,7 +16,7 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 
-    kotlinOptions {
+    kotlinOptions { 
         jvmTarget = "17"
     }
 
@@ -41,10 +42,9 @@ dependencies {
     implementation 'com.google.firebase:firebase-auth'
     implementation 'com.google.firebase:firebase-firestore'
     implementation 'androidx.multidex:multidex:2.0.1'
-    implementation 'com.google.android.gms:play-services-maps:18.2.0'
+    implementation 'com.google.android.gms:play-services-maps:19.0.0'
 }
 
 flutter {
     source = "../.."
 }
-

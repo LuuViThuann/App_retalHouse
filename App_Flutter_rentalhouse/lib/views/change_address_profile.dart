@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:custom_map_markers/custom_map_markers.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_rentalhouse/Widgets/Profile/enter_new_address.dart';
 import 'package:geocoding/geocoding.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:location/location.dart' as loc;
@@ -310,6 +311,7 @@ class _ChangeAddressViewState extends State<ChangeAddressView> {
               textAlign: TextAlign.center,
             ),
           ),
+
         ],
       ),
     );
