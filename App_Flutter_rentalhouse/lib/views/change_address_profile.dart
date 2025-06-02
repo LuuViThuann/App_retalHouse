@@ -1,10 +1,8 @@
-import 'dart:io';
-
+import 'dart:async';
 import 'package:custom_map_markers/custom_map_markers.dart';
 import 'package:flutter/material.dart';
 import 'package:geocoding/geocoding.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
-import 'package:google_maps_flutter_platform_interface/google_maps_flutter_platform_interface.dart';
 import 'package:location/location.dart' as loc;
 
 class ChangeAddressView extends StatefulWidget {
@@ -20,11 +18,11 @@ class _ChangeAddressViewState extends State<ChangeAddressView> {
   List<MarkerData> _customMarkers = [];
   String _currentAddress = '';
   String? _errorMessage;
+  bool _isMapLoading = true; // Track map loading state
 
   @override
   void initState() {
     super.initState();
-
     _getCurrentLocation();
   }
 
@@ -38,7 +36,7 @@ class _ChangeAddressViewState extends State<ChangeAddressView> {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Image.asset('assets/img/map_pin.png', width: 35, fit: BoxFit.contain),
+        Image.asset('assets/img/location.png', width: 35, fit: BoxFit.contain),
         const SizedBox(height: 4),
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -94,7 +92,6 @@ class _ChangeAddressViewState extends State<ChangeAddressView> {
           _currentLatLng = position;
           _currentAddress = fullAddress;
           _errorMessage = null;
-
           _customMarkers = [
             MarkerData(
               marker: Marker(
@@ -106,6 +103,9 @@ class _ChangeAddressViewState extends State<ChangeAddressView> {
             ),
           ];
         });
+
+        // Update camera position
+        _controller?.animateCamera(CameraUpdate.newLatLngZoom(position, 16));
       } else {
         setState(() => _errorMessage = 'Không tìm thấy địa chỉ từ tọa độ.');
       }
@@ -145,9 +145,18 @@ class _ChangeAddressViewState extends State<ChangeAddressView> {
           currentLocation.longitude!,
         );
 
-        await _controller
-            ?.animateCamera(CameraUpdate.newLatLngZoom(latLng, 16));
+        setState(() {
+          _currentLatLng = latLng;
+          _isMapLoading = false; // Map is ready
+        });
+
         await _updateAddressFromLatLng(latLng);
+
+        // Ensure map is initialized before animating
+        if (_controller != null) {
+          await _controller!
+              .animateCamera(CameraUpdate.newLatLngZoom(latLng, 16));
+        }
 
         _showConfirmDialog(
             "Bạn có muốn chọn địa chỉ hiện tại?", _currentAddress);
@@ -155,7 +164,10 @@ class _ChangeAddressViewState extends State<ChangeAddressView> {
         setState(() => _errorMessage = 'Không lấy được tọa độ hiện tại.');
       }
     } catch (e) {
-      setState(() => _errorMessage = 'Lỗi khi lấy vị trí hiện tại: $e');
+      setState(() {
+        _errorMessage = 'Lỗi khi lấy vị trí hiện tại: $e';
+        _isMapLoading = false;
+      });
     }
   }
 
@@ -168,6 +180,7 @@ class _ChangeAddressViewState extends State<ChangeAddressView> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
+        backgroundColor: Colors.white,
         title: Text(title),
         content: Text(address),
         actions: [
@@ -177,8 +190,8 @@ class _ChangeAddressViewState extends State<ChangeAddressView> {
           ),
           TextButton(
             onPressed: () {
-              Navigator.pop(context); // Đóng dialog
-              Navigator.pop(context, _currentAddress); // Trả về địa chỉ
+              Navigator.pop(context); // Close dialog
+              Navigator.pop(context, _currentAddress); // Return address
             },
             child: const Text("Xác nhận"),
           ),
@@ -196,7 +209,7 @@ class _ChangeAddressViewState extends State<ChangeAddressView> {
         elevation: 0,
         leading: IconButton(
           onPressed: () => Navigator.pop(context),
-          icon: Image.asset('assets/img/btn_back.png', width: 24, height: 24),
+          icon: const Icon(Icons.arrow_back, color: Colors.black),
         ),
         title: const Text(
           "Chọn địa chỉ",
@@ -218,33 +231,41 @@ class _ChangeAddressViewState extends State<ChangeAddressView> {
               ),
             ),
           Expanded(
-            child: CustomGoogleMapMarkerBuilder(
-              customMarkers: _customMarkers,
-              builder: (BuildContext context, Set<Marker>? markers) {
-                if (markers == null) {
-                  return const Center(child: CircularProgressIndicator());
-                }
-                return GoogleMap(
-                  mapType: MapType.normal,
-                  initialCameraPosition: CameraPosition(
-                    target: _currentLatLng ?? const LatLng(10.0, 105.0),
-                    zoom: 16.0,
+            child: _isMapLoading
+                ? const Center(child: CircularProgressIndicator())
+                : CustomGoogleMapMarkerBuilder(
+                    customMarkers: _customMarkers,
+                    builder: (BuildContext context, Set<Marker>? markers) {
+                      return GoogleMap(
+                        mapType: MapType.normal,
+                        initialCameraPosition: CameraPosition(
+                          target: _currentLatLng ?? const LatLng(10.0, 105.0),
+                          zoom: 16.0,
+                        ),
+                        onMapCreated: (GoogleMapController controller) {
+                          _controller = controller;
+                          setState(() {
+                            _errorMessage = null;
+                            _isMapLoading = false;
+                          });
+                          // Update camera if current location is available
+                          if (_currentLatLng != null) {
+                            controller.animateCamera(
+                              CameraUpdate.newLatLngZoom(_currentLatLng!, 16),
+                            );
+                          }
+                        },
+                        onTap: _onMapTapped,
+                        markers: markers ?? {},
+                        myLocationEnabled: true,
+                        myLocationButtonEnabled: true,
+                        zoomControlsEnabled: true,
+                        scrollGesturesEnabled: true,
+                        rotateGesturesEnabled: true,
+                        tiltGesturesEnabled: true,
+                      );
+                    },
                   ),
-                  onMapCreated: (controller) {
-                    _controller = controller;
-                    setState(() => _errorMessage = null);
-                  },
-                  onTap: _onMapTapped,
-                  markers: markers,
-                  myLocationEnabled: true,
-                  myLocationButtonEnabled: true,
-                  zoomControlsEnabled: true,
-                  scrollGesturesEnabled: true,
-                  rotateGesturesEnabled: true,
-                  tiltGesturesEnabled: true,
-                );
-              },
-            ),
           ),
           Padding(
             padding: const EdgeInsets.all(16.0),
