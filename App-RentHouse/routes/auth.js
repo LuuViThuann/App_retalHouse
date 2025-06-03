@@ -74,22 +74,43 @@ router.post('/login', async (req, res) => {
     const userDoc = await admin.firestore().collection('Users').doc(user.uid).get();
 
     if (!userDoc.exists) {
-      return res.status(404).json({ message: 'User not found in Firestore' });
+      // Tạo tài liệu Firestore nếu không tồn tại
+      const email = user.email || `user_${user.uid}@noemail.com`;
+      await admin.firestore().collection('Users').doc(user.uid).set({
+        email: email,
+        phoneNumber: '',
+        address: '',
+        username: user.displayName || '',
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+
+      // Tạo tài liệu MongoDB nếu không tồn tại
+      await User.findOneAndUpdate(
+        { _id: user.uid },
+        { email: email,
+          phoneNumber: '',
+          username: '',
+        },
+        { upsert: true, new: true }
+      ).exec();
     }
 
-    const userData = userDoc.data();
+    const userData = (await admin.firestore().collection('Users').doc(user.uid).get()).data();
+
     res.json({
       id: user.uid,
-      email: user.email,
-      phoneNumber: userData.phoneNumber,
-      address: userData.address,
-      username: userData.username,
-      createdAt: userData.createdAt.toDate().toISOString(),
+      email: user.email || userData.email,
+      phoneNumber: userData.phoneNumber || '',
+      address: userData.address || '',
+      username: userData.username || '',
+      createdAt: userData.createdAt ? userData.createdAt.toDate().toISOString() : new Date().toISOString(),
     });
   } catch (err) {
-    res.status(401).json({ message: 'Invalid token' });
+    console.error('Login error:', err);
+    res.status(401).json({ message: 'Invalid token or authentication failure' });
   }
 });
+
 // Gửi email đặt lại mật khẩu
 router.post('/send-reset-email', async (req, res) => {
   const { email } = req.body;
@@ -121,7 +142,8 @@ router.post('/send-reset-email', async (req, res) => {
     res.status(400).json({ message: 'Gửi email thất bại: ' + err.message });
   }
 });
-// Xác minh mã OOB (out-of-band) và đặt lại mật khẩu
+
+// Xác minh nhận mã OOB và đặt lại mật khẩu
 router.post('/reset-password', async (req, res) => {
   const { oobCode, newPassword } = req.body;
   if (!oobCode || !newPassword) {
@@ -143,25 +165,26 @@ router.post('/reset-password', async (req, res) => {
     res.status(400).json({ message: 'Đặt lại mật khẩu thất bại: ' + err.message });
   }
 });
+
 // Gửi mã OTP
 router.post('/send-otp', async (req, res) => {
   const { email } = req.body;
   if (!email) {
-    return res.status(400).json({ message: 'Missing email' });
+    return res.status(400).json({ message: 'Missing required fields' });
   }
 
   try {
-    // Kiểm tra email đã đăng ký
+    // Kiểm tra xem email đã đăng ký
     const user = await admin.auth().getUserByEmail(email).catch(() => null);
     if (!user) {
       return res.status(404).json({ message: 'Email chưa được đăng ký' });
     }
 
     // Tạo mã OTP
-    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    const otp = Math.floor(1000000 + Math.random() * 1000).toString();
     const expiryTime = new Date(Date.now() + 10 * 60 * 1000); // Hết hạn sau 10 phút
 
-    // Lưu OTP vào Firestore
+    // Lưu OTP lưu trữ
     await admin.firestore().collection('otps').doc(email).set({
       otp,
       expiryTime: admin.firestore.Timestamp.fromDate(expiryTime),
@@ -195,13 +218,15 @@ router.post('/send-otp', async (req, res) => {
     console.error('EmailJS error:', err.response?.status, err.response?.data, err.message);
     res.status(400).json({ message: 'Gửi OTP thất bại: ' + err.message });
   }
+
 });
+
 
 // Xác minh OTP và đặt lại mật khẩu
 router.post('/verify-otp', async (req, res) => {
   const { email, otp, newPassword } = req.body;
   if (!email || !otp) {
-    return res.status(400).json({ message: 'Missing email or OTP' });
+    return res.status(400).json({ message: 'Missing required fields' });
   }
 
   try {
@@ -257,13 +282,19 @@ router.post('/change-password', async (req, res) => {
 // Cập nhật thông tin người dùng
 router.post('/update-profile', async (req, res) => {
   const { idToken, phoneNumber, address, username } = req.body;
-  if (!idToken || !phoneNumber || !address) {
+  if (!idToken  || !address) {
     return res.status(400).json({ message: 'Missing required fields' });
   }
 
   try {
     const decodedToken = await admin.auth().verifyIdToken(idToken);
     const userId = decodedToken.uid;
+
+    // Fetch user data from Firebase Auth or Firestore to ensure email is included
+    const user = await admin.auth().getUser(userId);
+    const userDoc = await admin.firestore().collection('Users').doc(userId).get();
+    const userData = userDoc.data();
+    const email = user.email || userData?.email || `user_${userId}@noemail.com`;
 
     const updateData = {
       phoneNumber,
@@ -277,26 +308,26 @@ router.post('/update-profile', async (req, res) => {
 
     await admin.firestore().collection('Users').doc(userId).update(updateData);
 
-    if (username !== undefined) {
-      await User.findOneAndUpdate(
-        { _id: userId },
-        { username, phoneNumber, address },
-        { upsert: true, new: true }
-      ).exec();
-    }
+    // Update MongoDB, ensuring email is always set
+    await User.findOneAndUpdate(
+      { _id: userId },
+      { email, phoneNumber, address, username: username !== undefined ? username : userData?.username },
+      { upsert: true, new: true }
+    ).exec();
 
-    const userDoc = await admin.firestore().collection('Users').doc(userId).get();
-    const userData = userDoc.data();
+    const updatedUserDoc = await admin.firestore().collection('Users').doc(userId).get();
+    const updatedUserData = updatedUserDoc.data();
 
     res.json({
       id: userId,
-      email: decodedToken.email,
-      phoneNumber: userData.phoneNumber,
-      address: userData.address,
-      username: userData.username ?? '',
-      updatedAt: userData.updatedAt?.toDate().toISOString(),
+      email: email,
+      phoneNumber: updatedUserData.phoneNumber,
+      address: updatedUserData.address,
+      username: updatedUserData.username ?? '',
+      updatedAt: updatedUserData.updatedAt?.toDate().toISOString(),
     });
   } catch (err) {
+    console.error('Update profile error:', err);
     res.status(400).json({ message: err.message });
   }
 });
@@ -319,10 +350,11 @@ router.post('/upload-image', async (req, res) => {
         return res.status(404).json({ message: 'User not found in Firestore' });
       }
       const userData = userDoc.data();
+      const authUser = await admin.auth().getUser(userId);
       user = new User({
         _id: userId,
         username: userData.username || '',
-        email: decodedToken.email || userData.email,
+        email: authUser.email || userData.email || `user_${userId}@noemail.com`,
         phoneNumber: userData.phoneNumber || '',
       });
       await user.save();

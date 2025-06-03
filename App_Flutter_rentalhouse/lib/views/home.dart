@@ -47,8 +47,6 @@ class _HomeScreenState extends State<HomeScreen> {
             .fetchFavorites(authViewModel.currentUser!.token ?? '');
         chatViewModel
             .fetchConversations(authViewModel.currentUser!.token ?? '');
-      } else {
-        authViewModel.fetchCurrentUser();
       }
     });
   }

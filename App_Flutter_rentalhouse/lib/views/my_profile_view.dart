@@ -22,6 +22,7 @@ class _MyProfileViewState extends State<MyProfileView> {
   late TextEditingController _addressController;
   late TextEditingController _userNameController;
   final ImagePicker _picker = ImagePicker();
+  String? _email;
 
   @override
   void initState() {
@@ -30,7 +31,18 @@ class _MyProfileViewState extends State<MyProfileView> {
     _addressController = TextEditingController();
     _userNameController = TextEditingController();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      Provider.of<AuthViewModel>(context, listen: false).fetchCurrentUser();
+      final authViewModel = Provider.of<AuthViewModel>(context, listen: false);
+      final user = authViewModel.currentUser;
+      if (user != null) {
+        setState(() {
+          _phoneController.text = user.phoneNumber ?? '';
+          _addressController.text = user.address ?? '';
+          _userNameController.text = user.username ?? '';
+          _email = user.email.isNotEmpty
+              ? user.email
+              : 'user_${user.id}@noemail.com';
+        });
+      }
     });
   }
 
@@ -48,10 +60,10 @@ class _MyProfileViewState extends State<MyProfileView> {
       if (image != null) {
         final bytes = await image.readAsBytes();
         final base64Image = base64Encode(bytes);
-        await Provider.of<AuthViewModel>(context, listen: false)
-            .uploadProfileImage(imageBase64: base64Image);
-        if (Provider.of<AuthViewModel>(context, listen: false).errorMessage ==
-            null) {
+        final authViewModel =
+            Provider.of<AuthViewModel>(context, listen: false);
+        await authViewModel.uploadProfileImage(imageBase64: base64Image);
+        if (authViewModel.errorMessage == null) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
               content: Text('Ảnh đại diện đã được cập nhật thành công!'),
@@ -62,8 +74,7 @@ class _MyProfileViewState extends State<MyProfileView> {
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text(
-                  'Lỗi: ${Provider.of<AuthViewModel>(context, listen: false).errorMessage}'),
+              content: Text('Lỗi: ${authViewModel.errorMessage}'),
               backgroundColor: Colors.red,
             ),
           );
@@ -72,10 +83,69 @@ class _MyProfileViewState extends State<MyProfileView> {
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Lỗi: ${e.toString()}'),
+          content: Text('Lỗi khi tải ảnh: ${e.toString()}'),
           backgroundColor: Colors.red,
         ),
       );
+    }
+  }
+
+  Future<void> _updateProfile() async {
+    final authViewModel = Provider.of<AuthViewModel>(context, listen: false);
+    if (_phoneController.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Vui lòng nhập số điện thoại hợp lệ'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+    if (_addressController.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Vui lòng nhập địa chỉ'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    try {
+      await authViewModel.updateUserProfile(
+        phoneNumber: _phoneController.text.trim(),
+        address: _addressController.text.trim(),
+        username: _userNameController.text.trim(),
+      );
+      if (authViewModel.errorMessage == null && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Thông tin đã được cập nhật thành công!'),
+            backgroundColor: Colors.green,
+            duration: Duration(seconds: 2),
+          ),
+        );
+        setState(() {
+          _isEditing = false;
+        });
+      } else if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+                'Lỗi: ${authViewModel.errorMessage ?? 'Không thể cập nhật thông tin'}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Lỗi khi cập nhật: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     }
   }
 
@@ -89,38 +159,6 @@ class _MyProfileViewState extends State<MyProfileView> {
       setState(() {
         _addressController.text = selectedAddress;
       });
-      try {
-        final authViewModel =
-            Provider.of<AuthViewModel>(context, listen: false);
-        await authViewModel.updateUserProfile(
-          phoneNumber: _phoneController.text,
-          address: selectedAddress,
-          username: _userNameController.text,
-        );
-        if (authViewModel.errorMessage == null) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Địa chỉ đã được cập nhật thành công!'),
-              backgroundColor: Colors.green,
-              duration: Duration(seconds: 2),
-            ),
-          );
-        } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Lỗi: ${authViewModel.errorMessage}'),
-              backgroundColor: Colors.red,
-            ),
-          );
-        }
-      } catch (e) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Lỗi: ${e.toString()}'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
     }
   }
 
@@ -134,46 +172,18 @@ class _MyProfileViewState extends State<MyProfileView> {
       setState(() {
         _addressController.text = selectedAddress;
       });
-      try {
-        final authViewModel =
-            Provider.of<AuthViewModel>(context, listen: false);
-        await authViewModel.updateUserProfile(
-          phoneNumber: _phoneController.text,
-          address: selectedAddress,
-          username: _userNameController.text,
-        );
-        if (authViewModel.errorMessage == null) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Địa chỉ đã được cập nhật thành công!'),
-              backgroundColor: Colors.green,
-              duration: Duration(seconds: 2),
-            ),
-          );
-        } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Lỗi: ${authViewModel.errorMessage}'),
-              backgroundColor: Colors.red,
-            ),
-          );
-        }
-      } catch (e) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Lỗi: ${e.toString()}'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
     }
   }
 
   ImageProvider getImageProvider(String? avatarUrl) {
-    if (avatarUrl != null && avatarUrl.startsWith('data:image')) {
-      final base64String = avatarUrl.split(',')[1];
-      final bytes = base64Decode(base64String);
-      return MemoryImage(bytes);
+    if (avatarUrl != null && avatarUrl.isNotEmpty) {
+      if (avatarUrl.startsWith('data:image')) {
+        final base64String = avatarUrl.split(',')[1];
+        final bytes = base64Decode(base64String);
+        return MemoryImage(bytes);
+      } else if (avatarUrl.startsWith('http')) {
+        return NetworkImage(avatarUrl);
+      }
     }
     return const AssetImage('assets/img/imageuser.png');
   }
@@ -220,12 +230,6 @@ class _MyProfileViewState extends State<MyProfileView> {
       builder: (context, authViewModel, child) {
         final AppUser? user = authViewModel.currentUser;
 
-        if (user != null) {
-          _phoneController.text = user.phoneNumber ?? '';
-          _addressController.text = user.address ?? '';
-          _userNameController.text = user.username ?? '';
-        }
-
         return Scaffold(
           backgroundColor: Colors.white,
           appBar: AppBar(
@@ -239,15 +243,13 @@ class _MyProfileViewState extends State<MyProfileView> {
             ),
             leading: IconButton(
               icon: const Icon(Icons.arrow_back, color: Colors.black),
-              onPressed: () {
-                Navigator.pop(context);
-              },
+              onPressed: () => Navigator.pop(context),
             ),
             actions: [
               IconButton(
                 icon: const Icon(Icons.link, color: Colors.black),
                 onPressed: () {
-                  // Handle link button press
+                  // TODO: Implement link sharing functionality
                 },
               ),
             ],
@@ -262,7 +264,7 @@ class _MyProfileViewState extends State<MyProfileView> {
                   ),
                 )
               : user == null
-                  ? const Center(child: Text('No user data available'))
+                  ? const Center(child: Text('Không có dữ liệu người dùng'))
                   : SingleChildScrollView(
                       padding: const EdgeInsets.all(16.0),
                       child: Column(
@@ -276,7 +278,7 @@ class _MyProfileViewState extends State<MyProfileView> {
                                   backgroundColor: Colors.white,
                                   radius: 50,
                                   backgroundImage:
-                                      getImageProvider(user?.avatarUrl),
+                                      getImageProvider(user.avatarUrl),
                                 ),
                                 Positioned(
                                   bottom: 0,
@@ -349,7 +351,7 @@ class _MyProfileViewState extends State<MyProfileView> {
                                         style: TextStyle(
                                             color: Colors.grey, fontSize: 12)),
                                     Text(
-                                      user.email,
+                                      _email ?? 'Chưa cập nhật',
                                       style: const TextStyle(fontSize: 16),
                                       overflow: TextOverflow.ellipsis,
                                     ),
@@ -374,13 +376,17 @@ class _MyProfileViewState extends State<MyProfileView> {
                                     _isEditing
                                         ? TextField(
                                             controller: _phoneController,
+                                            keyboardType: TextInputType.phone,
                                             decoration: const InputDecoration(
                                               border: OutlineInputBorder(),
-                                              hintText: 'Nhập số điện thoại...',
+                                              hintText: 'Nhập số điện thoại',
                                             ),
                                           )
                                         : Text(
-                                            user.phoneNumber ?? 'Chưa cập nhật',
+                                            user.phoneNumber?.isNotEmpty ??
+                                                    false
+                                                ? user.phoneNumber!
+                                                : 'Chưa cập nhật',
                                             style:
                                                 const TextStyle(fontSize: 16),
                                             overflow: TextOverflow.ellipsis,
@@ -400,9 +406,13 @@ class _MyProfileViewState extends State<MyProfileView> {
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    const Text('Địa chỉ',
-                                        style: TextStyle(
-                                            color: Colors.grey, fontSize: 12)),
+                                    const Text(
+                                      'Địa chỉ',
+                                      style: TextStyle(
+                                        color: Colors.grey,
+                                        fontSize: 12,
+                                      ),
+                                    ),
                                     _isEditing
                                         ? Row(
                                             children: [
@@ -465,7 +475,9 @@ class _MyProfileViewState extends State<MyProfileView> {
                                             ],
                                           )
                                         : Text(
-                                            user.address ?? 'Chưa cập nhật',
+                                            user.address?.isNotEmpty ?? false
+                                                ? user.address!
+                                                : 'Chưa cập nhật',
                                             style:
                                                 const TextStyle(fontSize: 16),
                                           ),
@@ -478,8 +490,8 @@ class _MyProfileViewState extends State<MyProfileView> {
                           Center(
                             child: Container(
                               decoration: BoxDecoration(
-                                gradient: const LinearGradient(
-                                  colors: [
+                                gradient: LinearGradient(
+                                  colors: const [
                                     Colors.blueAccent,
                                     Colors.lightBlueAccent
                                   ],
@@ -496,46 +508,13 @@ class _MyProfileViewState extends State<MyProfileView> {
                                 ],
                               ),
                               child: ElevatedButton(
-                                onPressed: () async {
-                                  setState(() {
-                                    _isEditing = !_isEditing;
-                                  });
-                                  if (!_isEditing && user != null) {
-                                    try {
-                                      await authViewModel.updateUserProfile(
-                                        phoneNumber: _phoneController.text,
-                                        address: _addressController.text,
-                                        username: _userNameController.text,
-                                      );
-                                      if (authViewModel.errorMessage == null) {
-                                        ScaffoldMessenger.of(context)
-                                            .showSnackBar(
-                                          const SnackBar(
-                                            content: Text(
-                                                'Thông tin đã được cập nhật thành công!'),
-                                            backgroundColor: Colors.green,
-                                            duration: Duration(seconds: 2),
-                                          ),
-                                        );
-                                      } else {
-                                        ScaffoldMessenger.of(context)
-                                            .showSnackBar(
-                                          SnackBar(
-                                            content: Text(
-                                                'Lỗi: ${authViewModel.errorMessage}'),
-                                            backgroundColor: Colors.red,
-                                          ),
-                                        );
-                                      }
-                                    } catch (e) {
-                                      ScaffoldMessenger.of(context)
-                                          .showSnackBar(
-                                        SnackBar(
-                                          content: Text('Lỗi: ${e.toString()}'),
-                                          backgroundColor: Colors.red,
-                                        ),
-                                      );
-                                    }
+                                onPressed: () {
+                                  if (_isEditing) {
+                                    _updateProfile();
+                                  } else {
+                                    setState(() {
+                                      _isEditing = true;
+                                    });
                                   }
                                 },
                                 style: ElevatedButton.styleFrom(

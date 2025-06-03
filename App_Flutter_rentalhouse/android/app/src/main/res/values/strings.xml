@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Ứng dụng thuê nhà Online</string>
+
+    <!-- Facebook App ID -->
+    <string name="facebook_app_id">717671100816273</string>
+
+    <!-- Protocol Scheme: fb + App ID -->
+    <string name="fb_login_protocol_scheme">fb717671100816273</string>
+
+    <!-- Facebook Client Token -->
+    <string name="facebook_client_token"></string>
+</resources>

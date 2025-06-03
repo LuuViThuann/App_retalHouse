@@ -84,7 +84,7 @@ class AuthViewModel extends ChangeNotifier {
         _currentUser = user;
       } else {
         _errorMessage =
-        'Đăng nhập thất bại. Vui lòng kiểm tra email hoặc mật khẩu.';
+            'Đăng nhập thất bại. Vui lòng kiểm tra email hoặc mật khẩu.';
       }
     } catch (e) {
       _errorMessage = e.toString();
@@ -106,6 +106,27 @@ class AuthViewModel extends ChangeNotifier {
         _currentUser = user;
       } else {
         _errorMessage = 'Đăng nhập Google thất bại. Vui lòng thử lại.';
+      }
+    } catch (e) {
+      _errorMessage = e.toString();
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  // Đăng nhập bằng Facebook
+  Future<void> signInWithFacebook() async {
+    _isLoading = true;
+    _errorMessage = null;
+    notifyListeners();
+
+    try {
+      AppUser? user = await _authService.signInWithFacebook();
+      if (user != null) {
+        _currentUser = user;
+      } else {
+        _errorMessage = 'Đăng nhập Facebook thất bại. Vui lòng thử lại.';
       }
     } catch (e) {
       _errorMessage = e.toString();
@@ -196,7 +217,6 @@ class AuthViewModel extends ChangeNotifier {
           address: address,
           username: username,
         );
-        await fetchCurrentUser();
         _errorMessage = null;
       } else {
         _errorMessage = 'Cập nhật hồ sơ thất bại. Vui lòng thử lại.';
@@ -219,7 +239,7 @@ class AuthViewModel extends ChangeNotifier {
 
     try {
       final avatarBase64 =
-      await _authService.uploadProfileImage(imageBase64: imageBase64);
+          await _authService.uploadProfileImage(imageBase64: imageBase64);
       if (avatarBase64 != null && _currentUser != null) {
         _currentUser = _currentUser!.copyWith(avatarBase64: avatarBase64);
       } else {
@@ -246,23 +266,6 @@ class AuthViewModel extends ChangeNotifier {
       } else {
         _errorMessage = 'Đăng xuất thất bại. Vui lòng thử lại.';
       }
-    } catch (e) {
-      _errorMessage = e.toString();
-    } finally {
-      _isLoading = false;
-      notifyListeners();
-    }
-  }
-
-  // Lấy thông tin user hiện tại
-  Future<void> fetchCurrentUser() async {
-    _isLoading = true;
-    _errorMessage = null;
-    notifyListeners();
-
-    try {
-      AppUser? user = await _authService.getCurrentUser();
-      _currentUser = user;
     } catch (e) {
       _errorMessage = e.toString();
     } finally {
@@ -301,9 +304,9 @@ class AuthViewModel extends ChangeNotifier {
 
     try {
       final data =
-      await _authService.fetchRecentComments(page: page, limit: limit);
+          await _authService.fetchRecentComments(page: page, limit: limit);
       final comments =
-      (data['comments'] as List).map((e) => Comment.fromJson(e)).toList();
+          (data['comments'] as List).map((e) => Comment.fromJson(e)).toList();
       if (page == 1) {
         _recentComments = comments;
       } else {
@@ -331,7 +334,7 @@ class AuthViewModel extends ChangeNotifier {
 
     try {
       final data =
-      await _authService.fetchNotifications(page: page, limit: limit);
+          await _authService.fetchNotifications(page: page, limit: limit);
       _notifications = data['notifications'] as List<NotificationModel>;
       _notificationsPage = data['page'] as int;
       _notificationsTotalPages = data['pages'] as int;

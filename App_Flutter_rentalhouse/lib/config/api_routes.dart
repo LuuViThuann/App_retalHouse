@@ -1,5 +1,5 @@
 class ApiRoutes {
-  static const String rootUrl = 'http://192.168.1.52:3000';
+  static const String rootUrl = 'http://192.168.1.223:3000';
   static const String baseUrl = '$rootUrl/api';
   static const String serverBaseUrl = rootUrl;
   static const String socketUrl = serverBaseUrl;
@@ -61,9 +61,11 @@ class ApiRoutes {
   static const String recentComments = '$baseUrl/profile/recent-comments';
   static const String notifications = '$baseUrl/profile/notifications';
 
-    // Gọi các API địa chỉ --------------------
+  // Gọi các API địa chỉ --------------------
   static const String baseUrlAddress = 'https://provinces.open-api.vn/api';
   static Uri get provinces => Uri.parse('$baseUrlAddress/p/');
-  static Uri getDistricts(String provinceCode) => Uri.parse('$baseUrlAddress/p/$provinceCode?depth=2');
-  static Uri getWards(String districtCode) => Uri.parse('$baseUrlAddress/d/$districtCode?depth=2');
+  static Uri getDistricts(String provinceCode) =>
+      Uri.parse('$baseUrlAddress/p/$provinceCode?depth=2');
+  static Uri getWards(String districtCode) =>
+      Uri.parse('$baseUrlAddress/d/$districtCode?depth=2');
 }

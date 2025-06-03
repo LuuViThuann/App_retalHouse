@@ -13,7 +13,20 @@
           "package_name": "com.example.flutter_rentalhouse"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "616377322079-8jb2mm3ldag9mj4b48157hh1oppnn97a.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.flutter_rentalhouse",
+            "certificate_hash": "4c8f634b42ec8b9e13c218c2f78b78b31eb281d4"
+          }
+        },
+        {
+          "client_id": "616377322079-oisslbp48n6v1jkkv344qvi7hokn7be7.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyAbbz8YWmnpy-N8wCUUnStTphrFdjjNqkg"
@@ -21,7 +34,19 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "616377322079-oisslbp48n6v1jkkv344qvi7hokn7be7.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "616377322079-q54j4vm082itqt4l00dguu15b6apul9i.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.flutterRentalhouse"
+              }
+            }
+          ]
         }
       }
     }

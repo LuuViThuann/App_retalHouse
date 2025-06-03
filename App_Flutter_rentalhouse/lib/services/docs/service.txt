@@ -1,0 +1,21 @@
+* Step by step login google ----------------------------------------------
+- Vào firebase chọn kết nối Google
+- Chọn tài khoản Google muốn kết nối
+- Mở powershell chạy lệnh lấy SHA-1 và SHA-256 : keytool -list -v -alias androiddebugkey -keystore "$env:USERPROFILE\.android\debug.keystore" -storepass android -keypass android
+- Chọn Project → Project Settings (⚙️)
+- Tab General → Phần Your apps → Android app (com.example.flutter_rentalhouse)
+- Bấm nút "Add fingerprint"
+- Dán SHA-1 và SHA-256 vào.
+- Xóa file google-services.json trong thư mục android/app
+- Tải file google-services.json về và đặt vào thư mục android/app
+
+* Step by step login facebook ----------------------------------------------
+- Vào firebase chọn kết nối Facebook
+- Chọn tài khoản Facebook muốn kết nối
+- Mở powershell chạy lệnh lấy SHA-1 và SHA-256 : keytool -list -v -alias androiddebugkey -keystore "$env:USERPROFILE\.android\debug.keystore" -storepass android -keypass android
+- Chọn Project → Project Settings (⚙️)
+- Tab General → Phần Your apps → Android app (com.example.flutter_rentalhouse)
+- Bấm nút "Add fingerprint"
+- Dán SHA-1 và SHA-256 vào.
+- Xóa file google-services.json trong thư mục android/app
+- Tải file google-services.json về và đặt vào thư mục android/app

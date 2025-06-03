@@ -61,11 +61,32 @@
 				<string>flutterrentalhouse.page.link</string>
 			</array>
 		</dict>
+		<!-- Thêm URL scheme cho Facebook -->
+        		<dict>
+        			<key>CFBundleTypeRole</key>
+        			<string>Editor</string>
+        			<key>CFBundleURLSchemes</key>
+        			<array>
+        				<string>fbYOUR_FACEBOOK_APP_ID</string>
+        			</array>
+        		</dict>
 	</array>
 	<!-- Thêm quyền để truy cập Universal Links -->
 	<key>com.apple.developer.associated-domains</key>
 	<array>
 		<string>applinks:flutterrentalhouse.page.link</string>
+	</array>
+	<!-- Thêm cấu hình cho Facebook Sign-In -->
+	<key>FacebookAppID</key>
+	<string>YOUR_FACEBOOK_APP_ID</string>
+	<key>FacebookClientToken</key>
+	<string>YOUR_FACEBOOK_CLIENT_TOKEN</string>
+	<key>FacebookDisplayName</key>
+	<string>Flutter Rentalhouse</string>
+	<key>LSApplicationQueriesSchemes</key>
+	<array>
+		<string>fbapi</string>
+		<string>fb-messenger-share-api</string>
 	</array>
 	<key>io.flutter.embedded_views_preview</key>
 <true/>

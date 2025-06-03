@@ -19,23 +19,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
-  bool _stayLoggedIn = false;
   bool _isPasswordVisible = false;
-
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) async {
-      final authViewModel = Provider.of<AuthViewModel>(context, listen: false);
-      await authViewModel.fetchCurrentUser();
-      if (authViewModel.currentUser != null) {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (context) => const HomeScreen()),
-        );
-      }
-    });
-  }
 
   @override
   void dispose() {
@@ -213,25 +197,25 @@ class _LoginScreenState extends State<LoginScreen> {
                                       context,
                                       PageRouteBuilder(
                                         pageBuilder: (context, animation,
-                                            secondaryAnimation) =>
-                                        const ForgotPasswordScreen(),
+                                                secondaryAnimation) =>
+                                            const ForgotPasswordScreen(),
                                         transitionsBuilder: (context, animation,
                                             secondaryAnimation, child) {
                                           const begin = Offset(0.0, 1.0);
                                           const end = Offset.zero;
                                           const curve = Curves.easeInOut;
                                           var tween = Tween(
-                                              begin: begin, end: end)
+                                                  begin: begin, end: end)
                                               .chain(CurveTween(curve: curve));
                                           var offsetAnimation =
-                                          animation.drive(tween);
+                                              animation.drive(tween);
                                           return SlideTransition(
                                             position: offsetAnimation,
                                             child: child,
                                           );
                                         },
                                         transitionDuration:
-                                        const Duration(milliseconds: 500),
+                                            const Duration(milliseconds: 500),
                                       ),
                                     );
                                   },
@@ -275,11 +259,12 @@ class _LoginScreenState extends State<LoginScreen> {
                                               .hideCurrentSnackBar();
                                         },
                                       );
-                                      Navigator.pushReplacement(
+                                      Navigator.pushAndRemoveUntil(
                                         context,
                                         MaterialPageRoute(
                                             builder: (context) =>
-                                            const HomeScreen()),
+                                                const HomeScreen()),
+                                        (Route<dynamic> route) => false,
                                       );
                                     } else {
                                       showCustomSnackBar(
@@ -299,7 +284,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                 child: Container(
                                   width: double.infinity,
                                   padding:
-                                  const EdgeInsets.symmetric(vertical: 16),
+                                      const EdgeInsets.symmetric(vertical: 16),
                                   decoration: const BoxDecoration(
                                     gradient: LinearGradient(
                                       colors: [
@@ -342,25 +327,25 @@ class _LoginScreenState extends State<LoginScreen> {
                                       context,
                                       PageRouteBuilder(
                                         pageBuilder: (context, animation,
-                                            secondaryAnimation) =>
-                                        const RegisterScreen(),
+                                                secondaryAnimation) =>
+                                            const RegisterScreen(),
                                         transitionsBuilder: (context, animation,
                                             secondaryAnimation, child) {
                                           const begin = Offset(0.0, 1.0);
                                           const end = Offset.zero;
                                           const curve = Curves.easeInOut;
                                           var tween = Tween(
-                                              begin: begin, end: end)
+                                                  begin: begin, end: end)
                                               .chain(CurveTween(curve: curve));
                                           var offsetAnimation =
-                                          animation.drive(tween);
+                                              animation.drive(tween);
                                           return SlideTransition(
                                             position: offsetAnimation,
                                             child: child,
                                           );
                                         },
                                         transitionDuration:
-                                        const Duration(milliseconds: 500),
+                                            const Duration(milliseconds: 500),
                                       ),
                                     );
                                   },
@@ -400,7 +385,8 @@ class _LoginScreenState extends State<LoginScreen> {
                                   onTap: () async {
                                     print('Google Sign-In button tapped');
                                     await authViewModel.signInWithGoogle();
-                                    if (authViewModel.errorMessage == null && authViewModel.currentUser != null) {
+                                    if (authViewModel.errorMessage == null &&
+                                        authViewModel.currentUser != null) {
                                       showCustomSnackBar(
                                         context,
                                         'Đăng nhập Google thành công',
@@ -408,22 +394,28 @@ class _LoginScreenState extends State<LoginScreen> {
                                         icon: Icons.check_circle,
                                         actionLabel: 'Đóng',
                                         onActionPressed: () {
-                                          ScaffoldMessenger.of(context).hideCurrentSnackBar();
+                                          ScaffoldMessenger.of(context)
+                                              .hideCurrentSnackBar();
                                         },
                                       );
-                                      Navigator.pushReplacement(
+                                      Navigator.pushAndRemoveUntil(
                                         context,
-                                        MaterialPageRoute(builder: (context) => const HomeScreen()),
+                                        MaterialPageRoute(
+                                            builder: (context) =>
+                                                const HomeScreen()),
+                                        (Route<dynamic> route) => false,
                                       );
                                     } else {
                                       showCustomSnackBar(
                                         context,
-                                        authViewModel.errorMessage ?? 'Đăng nhập Google thất bại',
+                                        authViewModel.errorMessage ??
+                                            'Đăng nhập Google thất bại',
                                         backgroundColor: Colors.red,
                                         icon: Icons.error_outline,
                                         actionLabel: 'Đóng',
                                         onActionPressed: () {
-                                          ScaffoldMessenger.of(context).hideCurrentSnackBar();
+                                          ScaffoldMessenger.of(context)
+                                              .hideCurrentSnackBar();
                                         },
                                       );
                                     }
@@ -450,8 +442,43 @@ class _LoginScreenState extends State<LoginScreen> {
                                 ),
                                 const SizedBox(width: 20),
                                 GestureDetector(
-                                  onTap: () {
-                                    // Add Facebook login logic here
+                                  onTap: () async {
+                                    print('FaceBook Sign-In button tapped');
+                                    await authViewModel.signInWithFacebook();
+                                    if (authViewModel.errorMessage == null &&
+                                        authViewModel.currentUser != null) {
+                                      showCustomSnackBar(
+                                        context,
+                                        'Đăng nhập FaceBook thành công !',
+                                        backgroundColor: Colors.green,
+                                        icon: Icons.check_circle,
+                                        actionLabel: 'Đóng',
+                                        onActionPressed: () {
+                                          ScaffoldMessenger.of(context)
+                                              .hideCurrentSnackBar();
+                                        },
+                                      );
+                                      Navigator.pushAndRemoveUntil(
+                                        context,
+                                        MaterialPageRoute(
+                                            builder: (context) =>
+                                                const HomeScreen()),
+                                        (Route<dynamic> route) => false,
+                                      );
+                                    } else {
+                                      showCustomSnackBar(
+                                        context,
+                                        authViewModel.errorMessage ??
+                                            'Đăng nhập FaceBook thất bại',
+                                        backgroundColor: Colors.red,
+                                        icon: Icons.error_outline,
+                                        actionLabel: 'Đóng',
+                                        onActionPressed: () {
+                                          ScaffoldMessenger.of(context)
+                                              .hideCurrentSnackBar();
+                                        },
+                                      );
+                                    }
                                   },
                                   child: Container(
                                     padding: const EdgeInsets.all(10),

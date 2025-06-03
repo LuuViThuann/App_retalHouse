@@ -22,29 +22,26 @@ class ProfileView extends StatefulWidget {
 
 class _ProfileViewState extends State<ProfileView> {
   @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      final authViewModel = Provider.of<AuthViewModel>(context, listen: false);
-      if (authViewModel.currentUser == null) {
-        // Fetch only if no user data
-        authViewModel.fetchCurrentUser();
-      }
-    });
-  }
-
-  @override
   Widget build(BuildContext context) {
     return Consumer<AuthViewModel>(
       builder: (context, authViewModel, child) {
         final AppUser? user = authViewModel.currentUser;
 
+        // Nếu không có user, chuyển hướng về màn hình đăng nhập
+        if (user == null) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (context) => const LoginScreen()),
+            );
+          });
+          return const SizedBox.shrink();
+        }
+
         // Use a default image or avatarBase64 if available
         ImageProvider avatarImage =
             const AssetImage('assets/img/imageuser.jpg');
-        if (user != null &&
-            user.avatarBase64 != null &&
-            user.avatarBase64!.isNotEmpty) {
+        if (user.avatarBase64 != null && user.avatarBase64!.isNotEmpty) {
           try {
             final bytes = base64Decode(user.avatarBase64!);
             avatarImage = MemoryImage(bytes);
@@ -104,11 +101,11 @@ class _ProfileViewState extends State<ProfileView> {
                   ),
                   SizedBox(height: 16),
                   Text(
-                    user?.username ?? 'Tên người dùng',
+                    user.username ?? 'Tên người dùng',
                     style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                   ),
                   Text(
-                    user?.email ?? 'Email@gmail.com',
+                    user.email ?? 'Email@gmail.com',
                     style: TextStyle(color: Colors.grey),
                   ),
                   SizedBox(height: 24),

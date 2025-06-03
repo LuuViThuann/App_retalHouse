@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter_facebook_auth/flutter_facebook_auth.dart';
 import 'package:flutter_rentalhouse/config/loading.dart';
 import 'package:flutter_rentalhouse/models/comments.dart';
 import 'package:flutter_rentalhouse/models/notification.dart';
@@ -14,6 +15,14 @@ class AuthService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final GoogleSignIn _googleSignIn = GoogleSignIn();
+  final FacebookAuth _facebookAuth = FacebookAuth.instance;
+
+  AuthService() {
+    // Đảm bảo không lưu trữ session
+    _auth.setPersistence(Persistence.NONE).catchError((e) {
+      print('Error setting persistence: $e');
+    });
+  }
 
   // Đăng ký
   Future<AppUser?> register({
@@ -44,15 +53,17 @@ class AuthService {
           phoneNumber: data['phoneNumber'] as String,
           address: data['address'] as String,
           createdAt: DateTime.parse(data['createdAt'] as String),
-          token: data['token'] ?? '',
           username: data['username'] as String,
+          token: '', // Không lưu token
         );
       } else {
-        throw Exception('Đăng ký thất bại: ${response.body}');
+        final errorData = jsonDecode(response.body);
+        throw Exception(
+            'Đăng ký thất bại: ${errorData['message'] ?? response.body}');
       }
     } catch (e) {
       print('Error during registration: $e');
-      throw Exception('Đăng ký thất bại: $e');
+      throw Exception('Đăng ký thất bại: ${e.toString()}');
     }
   }
 
@@ -62,8 +73,10 @@ class AuthService {
     required String password,
   }) async {
     try {
-      final userCredential =
-          await FirebaseAuth.instance.signInWithEmailAndPassword(
+      // Đặt lại persistence trước khi đăng nhập
+      await _auth.setPersistence(Persistence.NONE);
+
+      final userCredential = await _auth.signInWithEmailAndPassword(
         email: email,
         password: password,
       );
@@ -84,36 +97,204 @@ class AuthService {
           phoneNumber: data['phoneNumber'] as String,
           address: data['address'] as String,
           createdAt: DateTime.parse(data['createdAt'] as String),
-          token: data['token'] ?? idToken,
           username: data['username'] as String? ?? '',
+          token: '', // Không lưu token
         );
       } else {
-        throw Exception('Đăng nhập thất bại: ${response.body}');
+        final errorData = jsonDecode(response.body);
+        throw Exception(
+            'Đăng nhập thất bại: ${errorData['message'] ?? response.body}');
       }
     } catch (e) {
       print('Error during login: $e');
-      throw Exception('Đăng nhập thất bại: $e');
+      throw Exception('Đăng nhập thất bại: ${e.toString()}');
     }
   }
 
+  // Đăng nhập bằng Google
+  Future<AppUser?> signInWithGoogle() async {
+    try {
+      // Đăng xuất và ngắt kết nối Google trước để buộc chọn tài khoản
+      await _googleSignIn.signOut();
+      await _googleSignIn.disconnect().catchError((e) {
+        print('Error disconnecting Google before login: $e');
+      });
+
+      // Buộc chọn tài khoản Google
+      final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
+      if (googleUser == null) {
+        print('Google Sign-In cancelled by user');
+        return null; // Người dùng hủy
+      }
+
+      final GoogleSignInAuthentication googleAuth =
+          await googleUser.authentication;
+      final credential = GoogleAuthProvider.credential(
+        accessToken: googleAuth.accessToken,
+        idToken: googleAuth.idToken,
+      );
+      final userCredential = await _auth.signInWithCredential(credential);
+      final user = userCredential.user;
+      if (user == null) throw Exception('Firebase user is null');
+
+      final idToken = await user.getIdToken(true);
+      if (idToken == null) throw Exception('Không thể lấy ID token');
+
+      // Đặt Persistence.NONE sau khi đăng nhập
+      await _auth.setPersistence(Persistence.NONE).catchError((e) {
+        print('Error setting persistence after Google sign-in: $e');
+      });
+
+      // Kiểm tra và tạo tài liệu Firestore
+      final docRef = _firestore.collection('Users').doc(user.uid);
+      final docSnapshot = await docRef.get();
+      if (!docSnapshot.exists) {
+        await docRef.set({
+          'email': user.email ?? '',
+          'phoneNumber': '',
+          'address': '',
+          'username': user.displayName ?? '',
+          'createdAt': FieldValue.serverTimestamp(),
+        });
+      }
+
+      final response = await http.post(
+        Uri.parse(ApiRoutes.login),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'idToken': idToken}),
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        final avatarBase64 = await fetchAvatarBase64(user.uid, idToken);
+        return AppUser(
+          id: data['id'] as String,
+          email: data['email'] as String,
+          phoneNumber: data['phoneNumber'] as String,
+          address: data['address'] as String,
+          createdAt: DateTime.parse(data['createdAt'] as String),
+          username: data['username'] as String? ?? user.displayName ?? '',
+          avatarBase64: avatarBase64,
+          token: '', // Không lưu token
+        );
+      } else {
+        final errorData = jsonDecode(response.body);
+        throw Exception(
+            'Đăng nhập Google thất bại: ${errorData['message'] ?? response.body}');
+      }
+    } catch (e) {
+      print('Error during Google sign-in: $e');
+      throw Exception('Đăng nhập Google thất bại: ${e.toString()}');
+    }
+  }
+
+  // Đăng nhập bằng Facebook
+  Future<AppUser?> signInWithFacebook() async {
+    try {
+      // Đăng xuất và xóa token Facebook trước để buộc chọn tài khoản
+      await _facebookAuth.logOut().catchError((e) {
+        print('Error logging out Facebook before login: $e');
+      });
+
+      final LoginResult result = await _facebookAuth.login(
+        permissions: ['email', 'public_profile'],
+        loginBehavior: LoginBehavior.dialogOnly,
+      );
+
+      if (result.status != LoginStatus.success) {
+        print('Facebook login failed: ${result.message}');
+        return null;
+      }
+
+      final AccessToken? accessToken = result.accessToken;
+      if (accessToken == null) {
+        print('Facebook access token is null');
+        return null;
+      }
+
+      final facebookAuthCredential =
+          FacebookAuthProvider.credential(accessToken.token);
+      final userCredential =
+          await _auth.signInWithCredential(facebookAuthCredential);
+      final user = userCredential.user;
+      if (user == null) {
+        print('Firebase user is null');
+        return null;
+      }
+
+      final idToken = await user.getIdToken(true);
+      if (idToken == null) {
+        throw Exception('Không thể lấy ID token');
+      }
+
+      // Đặt Persistence.NONE sau khi đăng nhập
+      await _auth.setPersistence(Persistence.NONE).catchError((e) {
+        print('Error setting persistence after Facebook sign-in: $e');
+      });
+
+      // Kiểm tra và tạo tài liệu Firestore
+      final docRef = _firestore.collection('Users').doc(user.uid);
+      final docSnapshot = await docRef.get();
+      if (!docSnapshot.exists) {
+        await docRef.set({
+          'email': user.email ?? '',
+          'phoneNumber': '',
+          'address': '',
+          'username': user.displayName ?? '',
+          'createdAt': FieldValue.serverTimestamp(),
+        });
+      }
+
+      final response = await http.post(
+        Uri.parse(ApiRoutes.login),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'idToken': idToken}),
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        final avatarBase64 = await fetchAvatarBase64(user.uid, idToken);
+        return AppUser(
+          id: data['id'] as String,
+          email: data['email'] as String,
+          phoneNumber: data['phoneNumber'] as String,
+          address: data['address'] as String,
+          createdAt: DateTime.parse(data['createdAt'] as String),
+          username: data['username'] as String? ?? user.displayName ?? '',
+          avatarBase64: avatarBase64,
+          token: '', // Không lưu token
+        );
+      } else {
+        final errorData = jsonDecode(response.body);
+        throw Exception(
+            'Đăng nhập Facebook thất bại: ${errorData['message'] ?? response.body}');
+      }
+    } catch (e) {
+      print('Error during Facebook sign-in: $e');
+      throw Exception('Đăng nhập Facebook thất bại: ${e.toString()}');
+    }
+  }
+
+  // Gửi email đặt lại mật khẩu
   Future<String> sendPasswordResetEmail(String email) async {
     try {
-      await FirebaseAuth.instance.sendPasswordResetEmail(
-        email: email,
-        actionCodeSettings: ActionCodeSettings(
-          url: AssetsConfig.resetPasswordUrl,
-          handleCodeInApp: true,
-          iOSBundleId: AssetsConfig.iosBundleId,
-          androidPackageName: AssetsConfig.androidPackageName,
-          androidInstallApp: true,
-          androidMinimumVersion: AssetsConfig.androidMinimumVersion,
-        ),
+      final response = await http.post(
+        Uri.parse(ApiRoutes.sendResetEmail),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'email': email}),
       );
-      print('Password reset email sent to: $email');
-      return 'Email đặt lại mật khẩu đã được gửi thành công';
+
+      if (response.statusCode == 200) {
+        print('Password reset email sent to: $email');
+        return 'Email đặt lại mật khẩu đã được gửi thành công';
+      } else {
+        final errorData = jsonDecode(response.body);
+        throw Exception(
+            'Gửi email thất bại: ${errorData['message'] ?? response.body}');
+      }
     } catch (e) {
       print('Error sending password reset email: $e');
-      throw Exception('Gửi email thất bại: $e');
+      throw Exception('Gửi email thất bại: ${e.toString()}');
     }
   }
 
@@ -130,14 +311,13 @@ class AuthService {
       );
 
       if (response.statusCode != 200) {
-        throw Exception('Đặt lại mật khẩu thất bại: ${response.body}');
+        final errorData = jsonDecode(response.body);
+        throw Exception(
+            'Đặt lại mật khẩu thất bại: ${errorData['message'] ?? response.body}');
       }
-
-      // Xác minh mã OOB và cập nhật mật khẩu client-side
-      await _auth.confirmPasswordReset(code: oobCode, newPassword: newPassword);
     } catch (e) {
       print('Error resetting password: $e');
-      throw Exception('Đặt lại mật khẩu thất bại: $e');
+      throw Exception('Đặt lại mật khẩu thất bại: ${e.toString()}');
     }
   }
 
@@ -146,7 +326,7 @@ class AuthService {
     required String newPassword,
   }) async {
     try {
-      final user = FirebaseAuth.instance.currentUser;
+      final user = _auth.currentUser;
       if (user == null) throw Exception('Không tìm thấy người dùng');
 
       final idToken = await user.getIdToken(true);
@@ -163,11 +343,13 @@ class AuthService {
         await user.updatePassword(newPassword);
         return true;
       } else {
-        throw Exception('Thay đổi mật khẩu thất bại: ${response.body}');
+        final errorData = jsonDecode(response.body);
+        throw Exception(
+            'Thay đổi mật khẩu thất bại: ${errorData['message'] ?? response.body}');
       }
     } catch (e) {
       print('Error during password change: $e');
-      throw Exception('Thay đổi mật khẩu thất bại: $e');
+      throw Exception('Thay đổi mật khẩu thất bại: ${e.toString()}');
     }
   }
 
@@ -178,7 +360,7 @@ class AuthService {
     required String username,
   }) async {
     try {
-      final user = FirebaseAuth.instance.currentUser;
+      final user = _auth.currentUser;
       if (user == null) throw Exception('Không tìm thấy người dùng');
 
       final idToken = await user.getIdToken(true);
@@ -202,15 +384,17 @@ class AuthService {
           address: data['address'] as String,
           createdAt: DateTime.parse(
               data['createdAt'] as String? ?? DateTime.now().toIso8601String()),
-          token: idToken,
           username: data['username'] as String? ?? '',
+          token: '', // Không lưu token
         );
       } else {
-        throw Exception('Cập nhật hồ sơ thất bại: ${response.body}');
+        final errorData = jsonDecode(response.body);
+        throw Exception(
+            'Cập nhật hồ sơ thất bại: ${errorData['message'] ?? response.body}');
       }
     } catch (e) {
       print('Error during profile update: $e');
-      throw Exception('Cập nhật hồ sơ thất bại: $e');
+      throw Exception('Cập nhật hồ sơ thất bại: ${e.toString()}');
     }
   }
 
@@ -219,7 +403,7 @@ class AuthService {
     required String imageBase64,
   }) async {
     try {
-      final user = FirebaseAuth.instance.currentUser;
+      final user = _auth.currentUser;
       if (user == null) throw Exception('Không tìm thấy người dùng');
 
       final idToken = await user.getIdToken(true);
@@ -236,18 +420,19 @@ class AuthService {
         final data = jsonDecode(response.body);
         return data['avatarBase64'] as String?;
       } else {
-        throw Exception('Tải ảnh lên thất bại: ${response.body}');
+        final errorData = jsonDecode(response.body);
+        throw Exception(
+            'Tải ảnh lên thất bại: ${errorData['message'] ?? response.body}');
       }
     } catch (e) {
       print('Error during image upload: $e');
-      throw Exception('Tải ảnh lên thất bại: $e');
+      throw Exception('Tải ảnh lên thất bại: ${e.toString()}');
     }
   }
 
   // Fetch avatarBase64 from MongoDB
   Future<String?> fetchAvatarBase64(String userId, String idToken) async {
     try {
-      print('Fetching avatarBase64 for userId: $userId');
       final response = await http.get(
         Uri.parse('${ApiRoutes.baseUrl}/auth/user/$userId/avatar'),
         headers: {
@@ -256,13 +441,9 @@ class AuthService {
         },
       );
 
-      print(
-          'Avatar fetch response status: ${response.statusCode}, body: ${response.body}');
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        final avatarBase64 = data['avatarBase64'] as String?;
-        print('Fetched avatarBase64: $avatarBase64');
-        return avatarBase64;
+        return data['avatarBase64'] as String?;
       } else {
         print('Failed to fetch avatarBase64: ${response.body}');
         return null;
@@ -273,69 +454,41 @@ class AuthService {
     }
   }
 
-  // Đăng xuất
   Future<bool> logout() async {
     try {
-    //  await GoogleSignIn().signOut();
-    //  await FacebookAuth.instance.logOut();
-      await FirebaseAuth.instance.signOut();
+      // Đăng xuất khỏi Google và ngắt kết nối hoàn toàn
+      await _googleSignIn.signOut();
+      await _googleSignIn.disconnect().catchError((e) {
+        print('Error disconnecting Google: $e');
+      });
+
+      // Đăng xuất khỏi Facebook
+      await _facebookAuth.logOut().catchError((e) {
+        print('Error logging out Facebook: $e');
+      });
+
+      // Đăng xuất khỏi Firebase
+      await _auth.signOut();
+
+      // Đảm bảo xóa cache phiên
+      await _auth.setPersistence(Persistence.NONE).catchError((e) {
+        print('Error setting persistence after logout: $e');
+      });
+
+      // Xác minh không còn người dùng hiện tại
+      print('Firebase user after logout: ${_auth.currentUser}');
+
       return true;
     } catch (e) {
       print('Error during logout: $e');
-      throw Exception('Đăng xuất thất bại: $e');
-    }
-  }
-
-  // Lấy thông tin user hiện tại
-  Future<AppUser?> getCurrentUser() async {
-    try {
-      final user = FirebaseAuth.instance.currentUser;
-      if (user == null) return null;
-
-      final idToken = await user.getIdToken(true);
-      final doc = await _firestore
-          .collection('Users')
-          .doc(user.uid)
-          .get(GetOptions(source: Source.server));
-      if (doc.exists) {
-        final avatarBase64 = await fetchAvatarBase64(user.uid, idToken!);
-        return AppUser.fromFirestore(doc.data(), doc.id).copyWith(
-          token: idToken,
-          avatarBase64: avatarBase64,
-        );
-      }
-
-      await _firestore.collection('Users').doc(user.uid).set({
-        'email': user.email ?? '',
-        'phoneNumber': '',
-        'address': '',
-        'username': '',
-        'createdAt': FieldValue.serverTimestamp(),
-      });
-
-      return AppUser(
-        id: user.uid,
-        email: user.email ?? '',
-        phoneNumber: '',
-        address: '',
-        createdAt: DateTime.now(),
-        token: idToken,
-        username: '',
-      );
-    } catch (e) {
-      print('Error getting current user: $e');
-      if (e.toString().contains('permission-denied')) {
-        throw Exception(
-            'Lỗi quyền truy cập Firestore. Vui lòng kiểm tra quy tắc bảo mật.');
-      }
-      throw Exception('Lỗi khi lấy thông tin người dùng: $e');
+      throw Exception('Đăng xuất thất bại: ${e.toString()}');
     }
   }
 
   // Lấy ID token của người dùng hiện tại
   Future<String?> getIdToken() async {
     try {
-      final user = FirebaseAuth.instance.currentUser;
+      final user = _auth.currentUser;
       if (user == null) return null;
       final idToken = await user.getIdToken(true);
       return idToken;
@@ -345,10 +498,12 @@ class AuthService {
     }
   }
 
-  Future<Map<String, dynamic>> fetchMyPosts(
-      {int page = 1, int limit = 10}) async {
+  Future<Map<String, dynamic>> fetchMyPosts({
+    int page = 1,
+    int limit = 10,
+  }) async {
     try {
-      final user = FirebaseAuth.instance.currentUser;
+      final user = _auth.currentUser;
       if (user == null) throw Exception('Không tìm thấy người dùng');
 
       final idToken = await user.getIdToken(true);
@@ -367,24 +522,27 @@ class AuthService {
             .toList();
         return {
           'rentals': rentals,
-          'total': data['total'],
-          'page': data['page'],
-          'pages': data['pages'],
+          'total': data['total'] ?? 0,
+          'page': data['page'] ?? page,
+          'pages': data['pages'] ?? 1,
         };
       } else {
-        throw Exception('Lấy bài đăng thất bại: ${response.body}');
+        final errorData = jsonDecode(response.body);
+        throw Exception(
+            'Lấy bài đăng thất bại: ${errorData['message'] ?? response.body}');
       }
     } catch (e) {
       print('Error fetching posts: $e');
-      throw Exception('Lấy bài đăng thất bại: $e');
+      throw Exception('Lấy bài đăng thất bại: ${e.toString()}');
     }
   }
 
-  // Fetch user's recent comments
-  Future<Map<String, dynamic>> fetchRecentComments(
-      {int page = 1, int limit = 10}) async {
+  Future<Map<String, dynamic>> fetchRecentComments({
+    int page = 1,
+    int limit = 10,
+  }) async {
     try {
-      final user = FirebaseAuth.instance.currentUser;
+      final user = _auth.currentUser;
       if (user == null) throw Exception('Không tìm thấy người dùng');
 
       final idToken = await user.getIdToken(true);
@@ -396,8 +554,6 @@ class AuthService {
         },
       );
 
-      print(
-          'Recent comments response: ${response.statusCode} ${response.body}');
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         final comments = (data['comments'] as List)
@@ -410,19 +566,22 @@ class AuthService {
           'pages': data['pages'] ?? 1,
         };
       } else {
-        throw Exception('Lấy bình luận thất bại: ${response.body}');
+        final errorData = jsonDecode(response.body);
+        throw Exception(
+            'Lấy bình luận thất bại: ${errorData['message'] ?? response.body}');
       }
     } catch (e) {
       print('Error fetching recent comments: $e');
-      throw Exception('Lấy bình luận thất bại: $e');
+      throw Exception('Lấy bình luận thất bại: ${e.toString()}');
     }
   }
 
-  // Fetch user's notifications
-  Future<Map<String, dynamic>> fetchNotifications(
-      {int page = 1, int limit = 10}) async {
+  Future<Map<String, dynamic>> fetchNotifications({
+    int page = 1,
+    int limit = 10,
+  }) async {
     try {
-      final user = FirebaseAuth.instance.currentUser;
+      final user = _auth.currentUser;
       if (user == null) throw Exception('Không tìm thấy người dùng');
 
       final idToken = await user.getIdToken(true);
@@ -441,76 +600,22 @@ class AuthService {
             .toList();
         return {
           'notifications': notifications,
-          'total': data['total'],
-          'page': data['page'],
-          'pages': data['pages'],
+          'total': data['total'] ?? 0,
+          'page': data['page'] ?? page,
+          'pages': data['pages'] ?? 1,
         };
       } else {
-        throw Exception('Lấy thông báo thất bại: ${response.body}');
+        final errorData = jsonDecode(response.body);
+        throw Exception(
+            'Lấy thông báo thất bại: ${errorData['message'] ?? response.body}');
       }
     } catch (e) {
       print('Error fetching notifications: $e');
-      throw Exception('Lấy thông báo thất bại: $e');
-    }
-  }
-
-  // Login google
-// Đăng nhập bằng Google
-  Future<AppUser?> signInWithGoogle() async {
-    try {
-      final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
-      if (googleUser == null) return null; // Người dùng huỷ
-      final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
-      final credential = GoogleAuthProvider.credential(
-        accessToken: googleAuth.accessToken,
-        idToken: googleAuth.idToken,
-      );
-      final userCredential = await _auth.signInWithCredential(credential);
-      final user = userCredential.user;
-      if (user == null) return null;
-      final idToken = await user.getIdToken(true);
-      if (idToken == null) throw Exception('Không thể lấy ID token');
-      final response = await http.post(
-        Uri.parse(ApiRoutes.login),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'idToken': idToken}),
-      );
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        final docRef = _firestore.collection("Users").doc(user.uid);
-        final docSnapshot = await docRef.get();
-        if (!docSnapshot.exists) {
-          await docRef.set({
-            'email': user.email ?? '',
-            'phoneNumber': '',
-            'address': '',
-            'username': user.displayName ?? '',
-            'createdAt': FieldValue.serverTimestamp(),
-          });
-        }
-        final doc = await docRef.get();
-        final avatarBase64 = await fetchAvatarBase64(user.uid, idToken);
-        return AppUser(
-          id: data['id'] as String,
-          email: data['email'] as String,
-          phoneNumber: data['phoneNumber'] as String,
-          address: data['address'] as String,
-          createdAt: DateTime.parse(data['createdAt'] as String),
-          token: data['token'] ?? idToken,
-          username: data['username'] as String? ?? user.displayName ?? '',
-          avatarBase64: avatarBase64,
-        );
-      } else {
-        throw Exception('Đăng nhập Google thất bại: ${response.body}');
-      }
-    } catch (e) {
-      print("Lỗi khi đăng nhập Google: $e");
-      throw Exception('Đăng nhập Google thất bại: $e');
+      throw Exception('Lấy thông báo thất bại: ${e.toString()}');
     }
   }
 }
 
-// Thêm extension để hỗ trợ copyWith cho AppUser
 extension AppUserExtension on AppUser {
   AppUser copyWith({
     String? id,
