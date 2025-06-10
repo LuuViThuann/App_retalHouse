@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_rentalhouse/config/loading.dart';
 import 'package:flutter_rentalhouse/utils/snackbar.dart';
+import 'package:flutter_rentalhouse/viewmodels/vm_chat.dart';
 import 'package:flutter_rentalhouse/views/forgot_password.dart';
 import 'package:flutter_rentalhouse/views/home.dart';
 import 'package:lottie/lottie.dart';
@@ -28,10 +29,58 @@ class _LoginScreenState extends State<LoginScreen> {
     super.dispose();
   }
 
+  Future<void> _handleLoginSuccess(BuildContext context,
+      AuthViewModel authViewModel, ChatViewModel chatViewModel) async {
+    if (authViewModel.errorMessage == null &&
+        authViewModel.currentUser != null) {
+      final token = authViewModel.currentUser!.token;
+      if (token == null || token.isEmpty) {
+        print(
+            'LoginScreen: Empty token for user: ${authViewModel.currentUser!.id}');
+        showCustomSnackBar(
+          context,
+          'Đăng nhập thất bại: Token không hợp lệ',
+          backgroundColor: Colors.red,
+          icon: Icons.error_outline,
+          actionLabel: 'Đóng',
+          onActionPressed: () =>
+              ScaffoldMessenger.of(context).hideCurrentSnackBar(),
+        );
+        return;
+      }
+      print('LoginScreen: Setting token: ${token.substring(0, 10)}...');
+      chatViewModel.setToken(token);
+      showCustomSnackBar(
+        context,
+        'Đăng nhập thành công',
+        backgroundColor: Colors.green,
+        icon: Icons.check_circle,
+        actionLabel: 'Đóng',
+        onActionPressed: () =>
+            ScaffoldMessenger.of(context).hideCurrentSnackBar(),
+      );
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(builder: (context) => const HomeScreen()),
+        (Route<dynamic> route) => false,
+      );
+    } else {
+      showCustomSnackBar(
+        context,
+        authViewModel.errorMessage ?? 'Đăng nhập thất bại',
+        backgroundColor: Colors.red,
+        icon: Icons.error_outline,
+        actionLabel: 'Đóng',
+        onActionPressed: () =>
+            ScaffoldMessenger.of(context).hideCurrentSnackBar(),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final authViewModel = Provider.of<AuthViewModel>(context);
-
+    final chatViewModel = Provider.of<ChatViewModel>(context, listen: false);
     return Scaffold(
       body: Stack(
         children: [
@@ -80,9 +129,9 @@ class _LoginScreenState extends State<LoginScreen> {
                       tag: 'screen-title',
                       child: Material(
                         color: Colors.transparent,
-                        child: Text(
+                        child: const Text(
                           'ĐĂNG NHẬP',
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 32,
                             fontWeight: FontWeight.bold,
                             color: Colors.white,
@@ -247,38 +296,8 @@ class _LoginScreenState extends State<LoginScreen> {
                                       email: _emailController.text,
                                       password: _passwordController.text,
                                     );
-                                    if (authViewModel.errorMessage == null) {
-                                      showCustomSnackBar(
-                                        context,
-                                        'Đăng nhập thành công',
-                                        backgroundColor: Colors.green,
-                                        icon: Icons.check_circle,
-                                        actionLabel: 'Đóng',
-                                        onActionPressed: () {
-                                          ScaffoldMessenger.of(context)
-                                              .hideCurrentSnackBar();
-                                        },
-                                      );
-                                      Navigator.pushAndRemoveUntil(
-                                        context,
-                                        MaterialPageRoute(
-                                            builder: (context) =>
-                                                const HomeScreen()),
-                                        (Route<dynamic> route) => false,
-                                      );
-                                    } else {
-                                      showCustomSnackBar(
-                                        context,
-                                        authViewModel.errorMessage!,
-                                        backgroundColor: Colors.red,
-                                        icon: Icons.error_outline,
-                                        actionLabel: 'Đóng',
-                                        onActionPressed: () {
-                                          ScaffoldMessenger.of(context)
-                                              .hideCurrentSnackBar();
-                                        },
-                                      );
-                                    }
+                                    await _handleLoginSuccess(
+                                        context, authViewModel, chatViewModel);
                                   }
                                 },
                                 child: Container(
@@ -294,9 +313,8 @@ class _LoginScreenState extends State<LoginScreen> {
                                       begin: Alignment.topLeft,
                                       end: Alignment.bottomRight,
                                     ),
-                                    borderRadius: BorderRadius.all(
-                                      Radius.circular(10),
-                                    ),
+                                    borderRadius:
+                                        BorderRadius.all(Radius.circular(10)),
                                   ),
                                   child: const Center(
                                     child: Text(
@@ -383,42 +401,11 @@ class _LoginScreenState extends State<LoginScreen> {
                               children: [
                                 GestureDetector(
                                   onTap: () async {
-                                    print('Google Sign-In button tapped');
+                                    print(
+                                        'LoginScreen: Google Sign-In button tapped');
                                     await authViewModel.signInWithGoogle();
-                                    if (authViewModel.errorMessage == null &&
-                                        authViewModel.currentUser != null) {
-                                      showCustomSnackBar(
-                                        context,
-                                        'Đăng nhập Google thành công',
-                                        backgroundColor: Colors.green,
-                                        icon: Icons.check_circle,
-                                        actionLabel: 'Đóng',
-                                        onActionPressed: () {
-                                          ScaffoldMessenger.of(context)
-                                              .hideCurrentSnackBar();
-                                        },
-                                      );
-                                      Navigator.pushAndRemoveUntil(
-                                        context,
-                                        MaterialPageRoute(
-                                            builder: (context) =>
-                                                const HomeScreen()),
-                                        (Route<dynamic> route) => false,
-                                      );
-                                    } else {
-                                      showCustomSnackBar(
-                                        context,
-                                        authViewModel.errorMessage ??
-                                            'Đăng nhập Google thất bại',
-                                        backgroundColor: Colors.red,
-                                        icon: Icons.error_outline,
-                                        actionLabel: 'Đóng',
-                                        onActionPressed: () {
-                                          ScaffoldMessenger.of(context)
-                                              .hideCurrentSnackBar();
-                                        },
-                                      );
-                                    }
+                                    await _handleLoginSuccess(
+                                        context, authViewModel, chatViewModel);
                                   },
                                   child: Container(
                                     padding: const EdgeInsets.all(10),
@@ -443,42 +430,11 @@ class _LoginScreenState extends State<LoginScreen> {
                                 const SizedBox(width: 20),
                                 GestureDetector(
                                   onTap: () async {
-                                    print('FaceBook Sign-In button tapped');
+                                    print(
+                                        'LoginScreen: Facebook Sign-In button tapped');
                                     await authViewModel.signInWithFacebook();
-                                    if (authViewModel.errorMessage == null &&
-                                        authViewModel.currentUser != null) {
-                                      showCustomSnackBar(
-                                        context,
-                                        'Đăng nhập FaceBook thành công !',
-                                        backgroundColor: Colors.green,
-                                        icon: Icons.check_circle,
-                                        actionLabel: 'Đóng',
-                                        onActionPressed: () {
-                                          ScaffoldMessenger.of(context)
-                                              .hideCurrentSnackBar();
-                                        },
-                                      );
-                                      Navigator.pushAndRemoveUntil(
-                                        context,
-                                        MaterialPageRoute(
-                                            builder: (context) =>
-                                                const HomeScreen()),
-                                        (Route<dynamic> route) => false,
-                                      );
-                                    } else {
-                                      showCustomSnackBar(
-                                        context,
-                                        authViewModel.errorMessage ??
-                                            'Đăng nhập FaceBook thất bại',
-                                        backgroundColor: Colors.red,
-                                        icon: Icons.error_outline,
-                                        actionLabel: 'Đóng',
-                                        onActionPressed: () {
-                                          ScaffoldMessenger.of(context)
-                                              .hideCurrentSnackBar();
-                                        },
-                                      );
-                                    }
+                                    await _handleLoginSuccess(
+                                        context, authViewModel, chatViewModel);
                                   },
                                   child: Container(
                                     padding: const EdgeInsets.all(10),

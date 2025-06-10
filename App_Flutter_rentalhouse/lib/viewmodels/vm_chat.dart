@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_rentalhouse/config/api_routes.dart';
 import 'package:flutter_rentalhouse/models/conversation.dart';
 import 'package:flutter_rentalhouse/models/message.dart';
+import 'package:flutter_rentalhouse/services/chat_service.dart';
 import 'package:http/http.dart' as http;
 import 'package:socket_io_client/socket_io_client.dart' as io;
 
@@ -21,6 +22,7 @@ class ChatViewModel extends ChangeNotifier {
   String? _lastSearchQuery;
   static const int _messageLimit = 50;
   static const int _maxMessagesInMemory = 200;
+  final ChatService _chatService = ChatService();
 
   List<Conversation> get conversations => List.unmodifiable(_conversations);
   List<Message> get messages => List.unmodifiable(_messages);
@@ -37,8 +39,29 @@ class ChatViewModel extends ChangeNotifier {
   }
 
   void setToken(String token) {
+    if (token.isEmpty) {
+      print('ChatViewModel: Attempted to set empty token, ignoring');
+      _setError('Invalid token provided');
+      return;
+    }
+    print('ChatViewModel: Setting token: ${token.substring(0, 10)}...');
     _token = token;
+    _chatService.setToken(token, onTokenExpired: _handleTokenExpired);
     _initializeSocket();
+  }
+
+  void _handleTokenExpired(String oldToken) async {
+    print('ChatViewModel: Token expired, refreshing...');
+    final newToken =
+        await _chatService.refreshGoogleToken(forceInteractive: true);
+    if (newToken != null) {
+      setToken(newToken);
+      if (_currentConversationId != null) {
+        await fetchConversations(newToken);
+      }
+    } else {
+      _setError('Failed to refresh token. Please sign in again.');
+    }
   }
 
   void _initializeSocket() {
@@ -47,9 +70,12 @@ class ChatViewModel extends ChangeNotifier {
       _socket = null;
     }
 
-    if (_token == null) return;
+    if (_token == null || _token!.isEmpty) {
+      print('ChatViewModel: Cannot initialize socket: No token');
+      return;
+    }
 
-    _socket = io.io(ApiRoutes.serverBaseUrl, <String, dynamic>{
+    _socket = io.io(ApiRoutes.socketUrl, <String, dynamic>{
       'transports': ['websocket'],
       'autoConnect': false,
       'reconnection': true,
@@ -59,22 +85,27 @@ class ChatViewModel extends ChangeNotifier {
     });
 
     _socket?.onConnect((_) {
+      print('ChatViewModel: Socket connected');
       if (_currentConversationId != null) {
         joinConversation(_currentConversationId!);
       }
     });
 
-    _socket?.onDisconnect((_) {});
+    _socket?.onDisconnect((_) {
+      print('ChatViewModel: Socket disconnected');
+    });
 
     _socket?.onConnectError((data) {
-      _setError('Failed to connect to server');
+      _setError('Failed to connect to server: $data');
     });
 
     _socket?.onError((data) {
       _setError('Socket error: $data');
     });
 
-    _socket?.on('joinedConversation', (_) {});
+    _socket?.on('joinedConversation', (_) {
+      print('ChatViewModel: Joined conversation');
+    });
 
     _socket?.on('receiveMessage', (data) {
       try {
@@ -85,7 +116,9 @@ class ChatViewModel extends ChangeNotifier {
         }
         _updateConversationUnreadCount(
             message.conversationId, message.senderId);
-      } catch (_) {}
+      } catch (e) {
+        print('ChatViewModel: Error processing receiveMessage: $e');
+      }
     });
 
     _socket?.on('deleteMessage', (data) {
@@ -97,7 +130,9 @@ class ChatViewModel extends ChangeNotifier {
           _updateSearchIfNeeded();
           _notify();
         }
-      } catch (_) {}
+      } catch (e) {
+        print('ChatViewModel: Error processing deleteMessage: $e');
+      }
     });
 
     _socket?.on('updateMessage', (data) {
@@ -107,7 +142,9 @@ class ChatViewModel extends ChangeNotifier {
           _addOrUpdateMessage(updatedMessage);
           _updateSearchIfNeeded();
         }
-      } catch (_) {}
+      } catch (e) {
+        print('ChatViewModel: Error processing updateMessage: $e');
+      }
     });
 
     _socket?.on('updateConversation', (data) {
@@ -122,7 +159,9 @@ class ChatViewModel extends ChangeNotifier {
         }
         _sortConversations();
         _notify();
-      } catch (_) {}
+      } catch (e) {
+        print('ChatViewModel: Error processing updateConversation: $e');
+      }
     });
 
     _socket?.on('deleteConversation', (data) {
@@ -139,10 +178,13 @@ class ChatViewModel extends ChangeNotifier {
           }
           _notify();
         }
-      } catch (_) {}
+      } catch (e) {
+        print('ChatViewModel: Error processing deleteConversation: $e');
+      }
     });
 
     _socket?.on('reconnect', (_) {
+      print('ChatViewModel: Socket reconnected');
       if (_currentConversationId != null) {
         joinConversation(_currentConversationId!);
       }
@@ -224,12 +266,19 @@ class ChatViewModel extends ChangeNotifier {
   }
 
   Future<bool> deleteConversation(String conversationId, String token) async {
+    if (token.isEmpty) {
+      print('ChatViewModel: Invalid token for deleteConversation');
+      _setError('Invalid token');
+      return false;
+    }
     try {
       final response = await http.delete(
-        Uri.parse(
-            '${ApiRoutes.serverBaseUrl}/api/conversations/$conversationId'),
+        Uri.parse(ApiRoutes.conversationById(conversationId)),
         headers: {'Authorization': 'Bearer $token'},
       );
+
+      print(
+          'ChatViewModel: Delete conversation status: ${response.statusCode}, body: ${response.body}');
 
       if (response.statusCode == 200) {
         _conversations.removeWhere((conv) => conv.id == conversationId);
@@ -247,6 +296,7 @@ class ChatViewModel extends ChangeNotifier {
         return false;
       }
     } catch (e) {
+      print('ChatViewModel: Error deleting conversation: $e');
       _setError('Error deleting conversation: $e');
       return false;
     }
@@ -269,24 +319,22 @@ class ChatViewModel extends ChangeNotifier {
   }
 
   Future<void> fetchConversations(String token) async {
+    if (token.isEmpty) {
+      print('ChatViewModel: Invalid token for fetchConversations');
+      _setError('No token available. Please sign in.');
+      return;
+    }
+    _token = token;
     _setLoading(true);
     try {
-      final response = await http.get(
-        Uri.parse('${ApiRoutes.serverBaseUrl}/api/conversations'),
-        headers: {'Authorization': 'Bearer $token'},
-      );
-
-      if (response.statusCode == 200) {
-        final List<dynamic> data = jsonDecode(response.body);
-        _conversations
-          ..clear()
-          ..addAll(data.map((json) => Conversation.fromJson(json)));
-        _sortConversations();
-        _setError(null);
-      } else {
-        _setError('Failed to load conversations: ${response.body}');
-      }
+      final conversations = await _chatService.fetchConversations(token);
+      _conversations
+        ..clear()
+        ..addAll(conversations);
+      _sortConversations();
+      _setError(null);
     } catch (e) {
+      print('ChatViewModel: Error fetching conversations: $e');
       _setError('Error fetching conversations: $e');
     }
     _setLoading(false);
@@ -294,93 +342,96 @@ class ChatViewModel extends ChangeNotifier {
 
   Future<Conversation?> fetchConversationById(
       String conversationId, String token) async {
+    if (token.isEmpty) {
+      print('ChatViewModel: Invalid token for fetchConversationById');
+      _setError('Invalid token');
+      return null;
+    }
     try {
       final response = await http.get(
-        Uri.parse(
-            '${ApiRoutes.serverBaseUrl}/api/conversations/$conversationId'),
+        Uri.parse(ApiRoutes.conversationById(conversationId)),
         headers: {'Authorization': 'Bearer $token'},
       );
+
+      print(
+          'ChatViewModel: Fetch conversation byId status: ${response.statusCode}, body: ${response.body}');
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         return Conversation.fromJson(data);
       }
-    } catch (_) {}
+    } catch (e) {
+      print('ChatViewModel: Error fetching conversation by ID: $e');
+      _setError('Error fetching conversation: $e');
+    }
     return null;
   }
 
   Future<bool> fetchMessages(String conversationId, String token,
       {String? cursor, int limit = _messageLimit}) async {
+    if (token.isEmpty) {
+      print('ChatViewModel: Invalid token for messages');
+      _setError('Invalid token');
+      return false;
+    }
     if (_isLoading) return _hasMoreMessages;
     _setLoading(true);
     _currentConversationId = conversationId;
     try {
-      final queryParameters = {
-        'limit': limit.toString(),
-        if (cursor != null) 'cursor': cursor,
-        'sort': 'asc',
-      };
-      final uri =
-          Uri.parse('${ApiRoutes.serverBaseUrl}/api/messages/$conversationId')
-              .replace(queryParameters: queryParameters);
-      final response = await http.get(
-        uri,
-        headers: {'Authorization': 'Bearer $token'},
+      final result = await _chatService.fetchMessages(
+        conversationId: conversationId,
+        token: token,
+        cursor: cursor,
+        limit: limit,
       );
+      final newMessages = result['messages'] as List<Message>;
+      final nextCursor = result['nextCursor'] as String?;
 
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        final List<dynamic> messageData = data['messages'];
-        final newMessages =
-            messageData.map((json) => Message.fromJson(json)).toList();
-        final existingIds = _messages.map((m) => m.id).toSet();
-        final filteredMessages = newMessages
-            .where((newMsg) => !existingIds.contains(newMsg.id))
-            .toList();
+      final existingIds = _messages.map((m) => m.id).toSet();
+      final filteredMessages = newMessages
+          .where((newMsg) => !existingIds.contains(newMsg.id))
+          .toList();
 
-        if (cursor != null) {
-          _messages.addAll(filteredMessages);
-        } else {
-          _messages
-            ..clear()
-            ..addAll(filteredMessages);
-        }
-
-        if (_messages.length > _maxMessagesInMemory) {
-          final excessCount = _messages.length - _maxMessagesInMemory;
-          for (int i = 0; i < excessCount; i++) {
-            _highlightedMessageIds.remove(_messages[i].id);
-          }
-          _messages.removeRange(0, excessCount);
-        }
-        _setError(null);
-        _hasMoreMessages = newMessages.length == limit;
-
-        final index =
-            _conversations.indexWhere((conv) => conv.id == conversationId);
-        if (index != -1) {
-          _conversations[index] = Conversation(
-            id: _conversations[index].id,
-            rentalId: _conversations[index].rentalId,
-            participants: _conversations[index].participants,
-            lastMessage: _conversations[index].lastMessage,
-            isPending: _conversations[index].isPending,
-            createdAt: _conversations[index].createdAt,
-            updatedAt: _conversations[index].updatedAt,
-            landlord: _conversations[index].landlord,
-            rental: _conversations[index].rental,
-            unreadCount: 0,
-          );
-          _notify();
-        }
-
-        _updateSearchIfNeeded();
-        return _hasMoreMessages;
+      if (cursor != null) {
+        _messages.addAll(filteredMessages);
       } else {
-        _setError('Failed to load messages: ${response.body}');
-        return _hasMoreMessages;
+        _messages
+          ..clear()
+          ..addAll(filteredMessages);
       }
+
+      if (_messages.length > _maxMessagesInMemory) {
+        final excessCount = _messages.length - _maxMessagesInMemory;
+        for (int i = 0; i < excessCount; i++) {
+          _highlightedMessageIds.remove(_messages[i].id);
+        }
+        _messages.removeRange(0, excessCount);
+      }
+      _setError(null);
+      _hasMoreMessages = newMessages.length == limit;
+
+      final index =
+          _conversations.indexWhere((conv) => conv.id == conversationId);
+      if (index != -1) {
+        _conversations[index] = Conversation(
+          id: _conversations[index].id,
+          rentalId: _conversations[index].rentalId,
+          participants: _conversations[index].participants,
+          lastMessage: _conversations[index].lastMessage,
+          isPending: _conversations[index].isPending,
+          createdAt: _conversations[index].createdAt,
+          updatedAt: _conversations[index].updatedAt,
+          landlord: _conversations[index].landlord,
+          rental: _conversations[index].rental,
+          unreadCount: 0,
+        );
+        _notify();
+      }
+
+      _updateSearchIfNeeded();
+      return _hasMoreMessages;
     } catch (e) {
+      print('ChatViewModel: Error fetching messages: $e');
       _setError('Error fetching messages: $e');
       return _hasMoreMessages;
     } finally {
@@ -393,35 +444,32 @@ class ChatViewModel extends ChangeNotifier {
     required String landlordId,
     required String token,
   }) async {
+    if (token.isEmpty) {
+      print('ChatViewModel: Invalid token for getOrCreateConversation');
+      _setError('Invalid token');
+      return null;
+    }
     try {
-      final response = await http.post(
-        Uri.parse('${ApiRoutes.serverBaseUrl}/api/conversations'),
-        headers: {
-          'Authorization': 'Bearer $token',
-          'Content-Type': 'application/json',
-        },
-        body: jsonEncode({
-          'rentalId': rentalId,
-          'landlordId': landlordId,
-        }),
+      final conversation = await _chatService.getOrCreateConversation(
+        rentalId: rentalId,
+        landlordId: landlordId,
+        token: token,
       );
-
-      if (response.statusCode == 201) {
-        final data = jsonDecode(response.body);
-        final newConversation = Conversation.fromJson(data);
-        final index =
-            _conversations.indexWhere((conv) => conv.id == newConversation.id);
-        if (index != -1) {
-          _conversations[index] = newConversation;
-        } else {
-          _conversations.add(newConversation);
-        }
-        _sortConversations();
-        _notify();
-        return newConversation;
+      final index =
+          _conversations.indexWhere((conv) => conv.id == conversation.id);
+      if (index != -1) {
+        _conversations[index] = conversation;
+      } else {
+        _conversations.add(conversation);
       }
-    } catch (_) {}
-    return null;
+      _sortConversations();
+      _notify();
+      return conversation;
+    } catch (e) {
+      print('ChatViewModel: Error creating conversation: $e');
+      _setError('Error creating conversation: $e');
+      return null;
+    }
   }
 
   Future<bool> sendMessage({
@@ -431,6 +479,11 @@ class ChatViewModel extends ChangeNotifier {
     List<String> imagePaths = const [],
     required String senderId,
   }) async {
+    if (token.isEmpty) {
+      print('ChatViewModel: Invalid token for sendMessage');
+      _setError('Invalid token');
+      return false;
+    }
     final tempId = 'temp_${DateTime.now().millisecondsSinceEpoch}';
     try {
       if (content.isNotEmpty || imagePaths.isNotEmpty) {
@@ -451,25 +504,28 @@ class ChatViewModel extends ChangeNotifier {
 
       final request = http.MultipartRequest(
         'POST',
-        Uri.parse('${ApiRoutes.serverBaseUrl}/api/messages'),
+        Uri.parse(ApiRoutes.messages),
       );
       request.headers['Authorization'] = 'Bearer $token';
       request.fields['conversationId'] = conversationId;
       request.fields['content'] = content;
 
       for (final path in imagePaths) {
-        request.files.add(await http.MultipartFile.fromPath('images', path));
+        request.files.add(await http.MultipartFile.fromPath('data', path));
       }
 
       final response = await request.send();
       final responseBody = await response.stream.bytesToString();
       final responseData = jsonDecode(responseBody);
 
+      print(
+          'ChatViewModel: Send message response: ${response.statusCode}, body: $responseBody');
+
       if (response.statusCode == 201) {
         final message = Message.fromJson(responseData);
         if (_currentConversationId == conversationId) {
           _addOrUpdateMessage(message);
-          _clearHighlightsOnNewMessage();
+          _clearHighlightsMessages();
         }
         final index =
             _conversations.indexWhere((conv) => conv.id == conversationId);
@@ -501,6 +557,7 @@ class ChatViewModel extends ChangeNotifier {
     } catch (e) {
       _messages.removeWhere((msg) => msg.id == tempId);
       _highlightedMessageIds.remove(tempId);
+      print('ChatViewModel: Error sending message: $e');
       _setError('Error sending message: $e');
       _notify();
       return false;
@@ -509,6 +566,11 @@ class ChatViewModel extends ChangeNotifier {
 
   Future<bool> deleteMessage(
       {required String messageId, required String token}) async {
+    if (token.isEmpty) {
+      print('ChatViewModel: Invalid token for deleteMessage');
+      _setError('Invalid token');
+      return false;
+    }
     Message? backupMessage;
     int index = _messages.indexWhere((msg) => msg.id == messageId);
     if (index != -1) {
@@ -519,9 +581,12 @@ class ChatViewModel extends ChangeNotifier {
     }
     try {
       final response = await http.delete(
-        Uri.parse('${ApiRoutes.serverBaseUrl}/api/messages/$messageId'),
+        Uri.parse('${ApiRoutes.messages}/$messageId'),
         headers: {'Authorization': 'Bearer $token'},
       );
+
+      print(
+          'ChatViewModel: Delete message status: ${response.statusCode}, body: ${response.body}');
 
       if (response.statusCode == 200) {
         return true;
@@ -536,6 +601,7 @@ class ChatViewModel extends ChangeNotifier {
       if (backupMessage != null && _currentConversationId != null) {
         _addOrUpdateMessage(backupMessage);
       }
+      print('ChatViewModel: Error deleting message: $e');
       _setError('Error deleting message: $e');
       return false;
     }
@@ -548,6 +614,11 @@ class ChatViewModel extends ChangeNotifier {
     List<String> imagePaths = const [],
     List<String> removeImages = const [],
   }) async {
+    if (token.isEmpty) {
+      print('ChatViewModel: Invalid token for editMessage');
+      _setError('Invalid token');
+      return false;
+    }
     Message? backupMessage;
     int index = _messages.indexWhere((msg) => msg.id == messageId);
     if (index != -1 && _currentConversationId != null) {
@@ -572,19 +643,22 @@ class ChatViewModel extends ChangeNotifier {
     try {
       final request = http.MultipartRequest(
         'PATCH',
-        Uri.parse('${ApiRoutes.serverBaseUrl}/api/messages/$messageId'),
+        Uri.parse('${ApiRoutes.messages}/$messageId'),
       );
       request.headers['Authorization'] = 'Bearer $token';
       request.fields['content'] = content;
       request.fields['removeImages'] = jsonEncode(removeImages);
 
       for (final path in imagePaths) {
-        request.files.add(await http.MultipartFile.fromPath('images', path));
+        request.files.add(await http.MultipartFile.fromPath('data', path));
       }
 
       final response = await request.send();
       final responseBody = await response.stream.bytesToString();
       final responseData = jsonDecode(responseBody);
+
+      print(
+          'ChatViewModel: Edit message status: ${response.statusCode}, body: $responseBody');
 
       if (response.statusCode == 200) {
         final updatedMessage = Message.fromJson(responseData);
@@ -608,6 +682,7 @@ class ChatViewModel extends ChangeNotifier {
           _currentConversationId != null) {
         _addOrUpdateMessage(backupMessage);
       }
+      print('ChatViewModel: Error editing message: $e');
       _setError('Error editing message: $e');
       return false;
     }
@@ -725,7 +800,7 @@ class ChatViewModel extends ChangeNotifier {
     }
   }
 
-  void _clearHighlightsOnNewMessage() {
+  void _clearHighlightsMessages() {
     _highlightedMessageIds.clear();
     _lastSearchResults.clear();
     _lastSearchQuery = null;
