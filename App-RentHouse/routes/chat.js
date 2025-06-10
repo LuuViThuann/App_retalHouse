@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const mongoose = require('mongoose');
 const admin = require('firebase-admin');
+const { OAuth2Client } = require('google-auth-library');
 const multer = require('multer');
 const redis = require('redis');
 const { v4: uuidv4 } = require('uuid');
@@ -9,6 +10,7 @@ const Rental = require('../models/Rental');
 const Conversation = require('../models/conversation');
 const Message = require('../models/message');
 
+const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
 const storage = multer.diskStorage({
   destination: './Uploads/',
@@ -24,15 +26,85 @@ const redisClient = redis.createClient({
 redisClient.on('error', (err) => console.log('Redis Client Error', err));
 redisClient.connect().catch((err) => console.error('Redis Connection Error:', err));
 
+Conversation.collection.createIndex({ participants: 1, rentalId: 1 });
+Message.collection.createIndex({ conversationId: 1, createdAt: 1 });
+
 const authMiddleware = async (req, res, next) => {
-  const token = req.header('Authorization')?.replace('Bearer ', '');
-  if (!token) return res.status(401).json({ message: 'No token provided' });
   try {
-    const decodedToken = await admin.auth().verifyIdToken(token);
-    req.userId = decodedToken.uid;
+    const authHeader = req.header('Authorization');
+    if (!authHeader?.startsWith('Bearer ')) {
+      console.error('No token provided in Authorization header');
+      return res.status(401).json({ message: 'No token provided', error: 'Missing Authorization header' });
+    }
+    const token = authHeader.replace('Bearer ', '');
+
+    let decodedToken;
+    try {
+      decodedToken = await admin.auth().verifyIdToken(token, true);
+      req.userId = decodedToken.uid;
+    } catch (firebaseError) {
+      try {
+        const ticket = await googleClient.verifyIdToken({
+          idToken: token,
+          audience: process.env.GOOGLE_CLIENT_ID,
+        });
+        const payload = ticket.getPayload();
+        if (!payload) {
+          console.error('Invalid Google token payload');
+          throw new Error('Invalid Google token payload');
+        }
+        if (payload.exp * 1000 < Date.now()) {
+          console.error('Google token expired');
+          return res.status(401).json({ message: 'Token expired', error: 'Google token has expired' });
+        }
+        req.userId = payload['sub'];
+        decodedToken = {
+          uid: payload['sub'],
+          name: payload['name'] || payload['email'],
+          email: payload['email'],
+          picture: payload['picture'] || '',
+        };
+      } catch (googleError) {
+        console.error('Token verification error:', {
+          firebaseError: firebaseError.message,
+          googleError: googleError.message,
+        });
+        return res.status(401).json({
+          message: 'Invalid or expired token',
+          error: 'Token verification failed',
+        });
+      }
+    }
+
+    const userCacheKey = `user:${req.userId}`;
+    let userData = await redisClient.get(userCacheKey);
+
+    if (!userData) {
+      const userDoc = await admin.firestore().collection('Users').doc(req.userId).get();
+      userData = userDoc.exists ? userDoc.data() : {
+        uid: req.userId,
+        username: decodedToken.name || decodedToken.email,
+        avatarBase64: decodedToken.picture || '',
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      };
+
+      await redisClient.setEx(userCacheKey, 86400, JSON.stringify(userData));
+
+      if (!userDoc.exists) {
+        await admin.firestore().collection('Users').doc(req.userId).set(userData);
+      }
+    } else {
+      userData = JSON.parse(userData);
+    }
+
+    req.userData = userData;
     next();
   } catch (err) {
-    res.status(401).json({ message: 'Invalid token' });
+    console.error('Authentication error:', err.message);
+    res.status(401).json({ 
+      message: 'Invalid or expired token',
+      error: err.message 
+    });
   }
 };
 
@@ -43,7 +115,6 @@ const adjustTimestamps = (obj) => {
   return adjusted;
 };
 
-// Helper function to safely convert unreadCounts Map to object
 const convertUnreadCounts = (unreadCounts) => {
   if (unreadCounts instanceof Map) {
     return Object.fromEntries(unreadCounts);
@@ -53,8 +124,28 @@ const convertUnreadCounts = (unreadCounts) => {
   return {};
 };
 
+const getUserData = async (userId) => {
+  const cacheKey = `user:${userId}`;
+  let userData = await redisClient.get(cacheKey);
+  if (userData) {
+    return JSON.parse(userData);
+  }
+  try {
+    const userDoc = await admin.firestore().collection('Users').doc(userId).get();
+    userData = userDoc.exists ? userDoc.data() : { username: 'User', avatarBase64: '' };
+    const userMongo = await mongoose.model('User').findOne({ _id: userId }).select('avatarBase64 username').lean();
+    if (userMongo) {
+      userData = { ...userData, ...userMongo };
+    }
+    await redisClient.setEx(cacheKey, 86400, JSON.stringify(userData));
+    return userData;
+  } catch (err) {
+    console.error(`Error fetching user data for ${userId}:`, err.message);
+    return { username: 'User', avatarBase64: '' };
+  }
+};
+
 module.exports = (io) => {
-  // Create or get a conversation
   router.post('/conversations', authMiddleware, async (req, res) => {
     try {
       const { rentalId, landlordId } = req.body;
@@ -250,7 +341,101 @@ module.exports = (io) => {
     }
   });
 
-  // Delete a conversation
+  router.get('/conversations', authMiddleware, async (req, res) => {
+    try {
+      const userId = req.userId;
+      const cached = await redisClient.get(`conversations:${userId}`);
+      if (cached) {
+        return res.json(JSON.parse(cached));
+      }
+      const conversations = await Conversation.find({ participants: userId }).populate('lastMessage').lean();
+      if (!conversations || conversations.length === 0) {
+        return res.status(200).json([]); // Return empty array if no conversations
+      }
+      const enrichedConversations = await Promise.all(
+        conversations.map(async (conv) => {
+          const otherParticipantId = conv.participants.find((p) => p !== userId) || '';
+          let participantData = { username: 'Chủ nhà', avatarBase64: '' };
+          let userData = { username: 'Chủ nhà', avatarBase64: '' };
+          let rentalData = null;
+          try {
+            const rentalDoc = await Rental.findById(conv.rentalId).select('contactInfo');
+            if (rentalDoc) {
+              participantData.username = rentalDoc.contactInfo?.name || 'Chủ nhà';
+            }
+          } catch (err) {}
+          try {
+            const participantDoc = await admin.firestore().collection('Users').doc(otherParticipantId).get();
+            if (participantDoc.exists) participantData = { ...participantDoc.data(), username: participantDoc.data().username || participantData.username };
+          } catch (err) {}
+          try {
+            const participantMongo = await mongoose.model('User').findOne({ _id: otherParticipantId }).select('avatarBase64 username');
+            if (participantMongo) {
+              participantData.avatarBase64 = participantMongo.avatarBase64 || '';
+              participantData.username = participantMongo.username || participantData.username;
+            }
+          } catch (err) {}
+          try {
+            const userDoc = await admin.firestore().collection('Users').doc(userId).get();
+            if (userDoc.exists) userData = userDoc.data();
+          } catch (err) {}
+          try {
+            const userMongo = await mongoose.model('User').findOne({ _id: userId }).select('avatarBase64 username');
+            if (userMongo) {
+              userData.avatarBase64 = userMongo.avatarBase64 || '';
+              userData.username = userMongo.username || userData.username;
+            }
+          } catch (err) {}
+          try {
+            const rental = await Rental.findById(conv.rentalId).select('title images contactInfo');
+            if (rental) {
+              rentalData = {
+                id: rental._id.toString(),
+                title: rental.title,
+                image: rental.images[0] || '',
+                contactName: rental.contactInfo?.name || 'Chủ nhà',
+              };
+            }
+          } catch (err) {}
+          return {
+            ...adjustTimestamps(conv),
+            _id: conv._id.toString(),
+            unreadCounts: convertUnreadCounts(conv.unreadCounts),
+            lastMessage: conv.lastMessage
+              ? {
+                  ...adjustTimestamps(conv.lastMessage),
+                  _id: conv.lastMessage._id.toString(),
+                  conversationId: conv.lastMessage.conversationId.toString(),
+                  sender: {
+                    id: conv.lastMessage.senderId,
+                    username: conv.lastMessage.senderId === userId ? userData.username : participantData.username,
+                    avatarBase64: conv.lastMessage.senderId === userId ? userData.avatarBase64 : participantData.avatarBase64,
+                  }
+                }
+              : null,
+            landlord: {
+              id: otherParticipantId,
+              username: participantData.username,
+              avatarBase64: participantData.avatarBase64,
+            },
+            user: {
+              id: userId,
+              username: userData.username,
+              avatarBase64: userData.avatarBase64,
+            },
+            rental: rentalData,
+          };
+        })
+      );
+      await redisClient.setEx(`conversations:${userId}`, 3600, JSON.stringify(enrichedConversations));
+      res.json(enrichedConversations);
+    } catch (err) {
+      console.error('Error in GET /conversations:', err.message);
+      res.status(500).json({ message: 'Failed to load conversations', error: err.message });
+    }
+  });
+
+  // Other routes remain unchanged
   router.delete('/conversations/:conversationId', authMiddleware, async (req, res) => {
     try {
       const { conversationId } = req.params;
@@ -298,7 +483,6 @@ module.exports = (io) => {
         return res.status(403).json({ message: 'Unauthorized or conversation not found' });
       }
 
-      // Reset unread count for the user when they view the conversation
       conversation.unreadCounts.set(userId, 0);
       await conversation.save();
       await redisClient.del(`conversations:${userId}`);
@@ -382,7 +566,7 @@ module.exports = (io) => {
       if (recipientId) {
         const currentCount = conversation.unreadCounts.get(recipientId) || 0;
         conversation.unreadCounts.set(recipientId, currentCount + 1);
-        conversation.unreadCounts.set(userId, 0); // Reset sender's unread count
+        conversation.unreadCounts.set(userId, 0);
       }
 
       const imageUrls = req.files ? req.files.map(file => `/uploads/${file.filename}`) : [];
@@ -514,7 +698,7 @@ module.exports = (io) => {
       }
       const message = await Message.findById(messageId);
       if (!message) {
-        return res.status(404).json({ message: 'Message not found' });
+        return res.status(404).json({ message: ' now found' });
       }
       if (message.senderId !== req.userId) {
         return res.status(403).json({ message: 'Unauthorized: You can only edit your own messages' });
@@ -596,97 +780,6 @@ module.exports = (io) => {
       res.status(200).json(messageData);
     } catch (err) {
       console.error('Error in PATCH /messages:', err.message);
-      res.status(500).json({ message: err.message });
-    }
-  });
-
-  router.get('/conversations', authMiddleware, async (req, res) => {
-    try {
-      const userId = req.userId;
-      const cached = await redisClient.get(`conversations:${userId}`);
-      if (cached) {
-        return res.json(JSON.parse(cached));
-      }
-      const conversations = await Conversation.find({ participants: userId }).populate('lastMessage').lean();
-      const enrichedConversations = await Promise.all(
-        conversations.map(async (conv) => {
-          const otherParticipantId = conv.participants.find((p) => p !== userId) || '';
-          let participantData = { username: 'Chủ nhà', avatarBase64: '' };
-          let userData = { username: 'Chủ nhà', avatarBase64: '' };
-          let rentalData = null;
-          try {
-            const rentalDoc = await Rental.findById(conv.rentalId).select('contactInfo');
-            if (rentalDoc) {
-              participantData.username = rentalDoc.contactInfo?.name || 'Chủ nhà';
-            }
-          } catch (err) {}
-          try {
-            const participantDoc = await admin.firestore().collection('Users').doc(otherParticipantId).get();
-            if (participantDoc.exists) participantData = { ...participantDoc.data(), username: participantDoc.data().username || participantData.username };
-          } catch (err) {}
-          try {
-            const participantMongo = await mongoose.model('User').findOne({ _id: otherParticipantId }).select('avatarBase64 username');
-            if (participantMongo) {
-              participantData.avatarBase64 = participantMongo.avatarBase64 || '';
-              participantData.username = participantMongo.username || participantData.username;
-            }
-          } catch (err) {}
-          try {
-            const userDoc = await admin.firestore().collection('Users').doc(userId).get();
-            if (userDoc.exists) userData = userDoc.data();
-          } catch (err) {}
-          try {
-            const userMongo = await mongoose.model('User').findOne({ _id: userId }).select('avatarBase64 username');
-            if (userMongo) {
-              userData.avatarBase64 = userMongo.avatarBase64 || '';
-              userData.username = userMongo.username || userData.username;
-            }
-          } catch (err) {}
-          try {
-            const rental = await Rental.findById(conv.rentalId).select('title images contactInfo');
-            if (rental) {
-              rentalData = {
-                id: rental._id.toString(),
-                title: rental.title,
-                image: rental.images[0] || '',
-                contactName: rental.contactInfo?.name || 'Chủ nhà',
-              };
-            }
-          } catch (err) {}
-          return {
-            ...adjustTimestamps(conv),
-            _id: conv._id.toString(),
-            unreadCounts: convertUnreadCounts(conv.unreadCounts),
-            lastMessage: conv.lastMessage
-              ? {
-                  ...adjustTimestamps(conv.lastMessage),
-                  _id: conv.lastMessage._id.toString(),
-                  conversationId: conv.lastMessage.conversationId.toString(),
-                  sender: {
-                    id: conv.lastMessage.senderId,
-                    username: conv.lastMessage.senderId === userId ? userData.username : participantData.username,
-                    avatarBase64: conv.lastMessage.senderId === userId ? userData.avatarBase64 : participantData.avatarBase64,
-                  }
-                }
-              : null,
-            landlord: {
-              id: otherParticipantId,
-              username: participantData.username,
-              avatarBase64: participantData.avatarBase64,
-            },
-            user: {
-              id: userId,
-              username: userData.username,
-              avatarBase64: userData.avatarBase64,
-            },
-            rental: rentalData,
-          };
-        })
-      );
-      await redisClient.setEx(`conversations:${userId}`, 3600, JSON.stringify(enrichedConversations));
-      res.json(enrichedConversations);
-    } catch (err) {
-      console.error('Error in GET /conversations:', err.message);
       res.status(500).json({ message: err.message });
     }
   });

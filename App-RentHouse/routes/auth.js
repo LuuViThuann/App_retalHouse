@@ -74,28 +74,27 @@ router.post('/login', async (req, res) => {
     const userDoc = await admin.firestore().collection('Users').doc(user.uid).get();
 
     if (!userDoc.exists) {
-      // Tạo tài liệu Firestore nếu không tồn tại
       const email = user.email || `user_${user.uid}@noemail.com`;
-      await admin.firestore().collection('Users').doc(user.uid).set({
-        email: email,
+      const userData = {
+        email,
         phoneNumber: '',
         address: '',
         username: user.displayName || '',
+        avatarBase64: user.photoURL || '',
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
-      });
+      };
 
-      // Tạo tài liệu MongoDB nếu không tồn tại
+      await admin.firestore().collection('Users').doc(user.uid).set(userData);
+
       await User.findOneAndUpdate(
         { _id: user.uid },
-        { email: email,
-          phoneNumber: '',
-          username: '',
-        },
+        { ...userData, _id: user.uid },
         { upsert: true, new: true }
       ).exec();
     }
 
-    const userData = (await admin.firestore().collection('Users').doc(user.uid).get()).data();
+    const userData = userDoc.data();
+    const mongoUser = await User.findOne({ _id: user.uid });
 
     res.json({
       id: user.uid,
@@ -103,6 +102,7 @@ router.post('/login', async (req, res) => {
       phoneNumber: userData.phoneNumber || '',
       address: userData.address || '',
       username: userData.username || '',
+      avatarBase64: mongoUser?.avatarBase64 || userData.avatarBase64 || '',
       createdAt: userData.createdAt ? userData.createdAt.toDate().toISOString() : new Date().toISOString(),
     });
   } catch (err) {
@@ -110,6 +110,7 @@ router.post('/login', async (req, res) => {
     res.status(401).json({ message: 'Invalid token or authentication failure' });
   }
 });
+
 
 // Gửi email đặt lại mật khẩu
 router.post('/send-reset-email', async (req, res) => {

@@ -9,5 +9,5 @@
     <string name="fb_login_protocol_scheme">fb717671100816273</string>
 
     <!-- Facebook Client Token -->
-    <string name="facebook_client_token"></string>
+    <string name="facebook_client_token">3522273bf768fc126565c5b0c017998b</string>
 </resources>

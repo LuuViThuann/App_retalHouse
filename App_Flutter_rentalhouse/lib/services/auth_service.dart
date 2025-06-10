@@ -17,13 +17,6 @@ class AuthService {
   final GoogleSignIn _googleSignIn = GoogleSignIn();
   final FacebookAuth _facebookAuth = FacebookAuth.instance;
 
-  AuthService() {
-    // Đảm bảo không lưu trữ session
-    _auth.setPersistence(Persistence.NONE).catchError((e) {
-      print('Error setting persistence: $e');
-    });
-  }
-
   // Đăng ký
   Future<AppUser?> register({
     required String email,
@@ -73,10 +66,8 @@ class AuthService {
     required String password,
   }) async {
     try {
-      // Đặt lại persistence trước khi đăng nhập
-      await _auth.setPersistence(Persistence.NONE);
-
-      final userCredential = await _auth.signInWithEmailAndPassword(
+      final userCredential =
+          await FirebaseAuth.instance.signInWithEmailAndPassword(
         email: email,
         password: password,
       );
@@ -91,23 +82,24 @@ class AuthService {
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
+        final avatarBase64 =
+            await fetchAvatarBase64(userCredential.user!.uid, idToken);
         return AppUser(
           id: data['id'] as String,
           email: data['email'] as String,
           phoneNumber: data['phoneNumber'] as String,
           address: data['address'] as String,
           createdAt: DateTime.parse(data['createdAt'] as String),
+          token: data['token'] ?? idToken,
+          avatarBase64: avatarBase64,
           username: data['username'] as String? ?? '',
-          token: '', // Không lưu token
         );
       } else {
-        final errorData = jsonDecode(response.body);
-        throw Exception(
-            'Đăng nhập thất bại: ${errorData['message'] ?? response.body}');
+        throw Exception('Đăng nhập thất bại: ${response.body}');
       }
     } catch (e) {
       print('Error during login: $e');
-      throw Exception('Đăng nhập thất bại: ${e.toString()}');
+      throw Exception('Đăng nhập thất bại: $e');
     }
   }
 
