@@ -345,4 +345,56 @@ class AuthViewModel extends ChangeNotifier {
       notifyListeners();
     }
   }
+
+  // new -----------------
+  Future<void> deleteRental(String rentalId) async {
+    _isLoading = true;
+    _errorMessage = null;
+    notifyListeners();
+
+    try {
+      await _authService.deleteRental(rentalId);
+      _myPosts.removeWhere((rental) => rental.id == rentalId);
+      print('AuthViewModel: Successfully deleted rental (rentalId: $rentalId)');
+    } catch (e) {
+      _errorMessage = e.toString().replaceAll('Exception: ', '');
+      print('AuthViewModel: Error deleting rental (rentalId: $rentalId): $e');
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> updateRental({
+    required String rentalId,
+    required Map<String, dynamic> updatedData,
+    List<String>? imagePaths,
+    List<String>? removedImages,
+  }) async {
+    _isLoading = true;
+    _errorMessage = null;
+    notifyListeners();
+
+    try {
+      final updatedRental = await _authService.updateRental(
+        rentalId: rentalId,
+        updatedData: updatedData,
+        imagePaths: imagePaths,
+        removedImages: removedImages,
+      );
+      final index = _myPosts.indexWhere((rental) => rental.id == rentalId);
+      if (index != -1) {
+        _myPosts[index] = updatedRental;
+      }
+      print('AuthViewModel: Successfully updated rental (rentalId: $rentalId)');
+    } catch (e) {
+      _errorMessage = e.toString().replaceAll('Exception: ', '');
+      print('AuthViewModel: Error updating rental (rentalId: $rentalId): $e');
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  // -------------------------
 }

@@ -96,4 +96,7 @@ class RentalViewModel extends ChangeNotifier {
       throw Exception('Không thể tải lịch sử tìm kiếm: $e');
     }
   }
+
+  // new -------
+  
 }

@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:dio/dio.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_facebook_auth/flutter_facebook_auth.dart';
 import 'package:flutter_rentalhouse/models/comments.dart';
@@ -23,6 +24,10 @@ class AuthService {
       'https://www.googleapis.com/auth/userinfo.profile'
     ],
   );
+  final Dio _dio = Dio(BaseOptions(
+    baseUrl: ApiRoutes.baseUrl,
+    headers: {'Content-Type': 'multipart/form-data'},
+  ));
 
   Future<AppUser?> register({
     required String email,
@@ -657,6 +662,108 @@ class AuthService {
     } catch (e) {
       print('AuthService: Error fetching notifications: $e');
       throw Exception('Lấy thông báo thất bại: $e');
+    }
+  }
+
+  Future<void> deleteRental(String rentalId) async {
+    try {
+      final user = _auth.currentUser;
+      if (user == null) {
+        print(
+            'AuthService: No user found for deleting rental (rentalId: $rentalId)');
+        throw Exception('User not found');
+      }
+      final idToken = await user.getIdToken(true);
+      if (idToken == null) {
+        print(
+            'AuthService: No ID token for deleting rental ID (rentalId: $rentalId)');
+        throw Exception('Failed to get token');
+      }
+      final response = await http.delete(
+        Uri.parse('${ApiRoutes.baseUrl}/rentals/$rentalId'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $idToken',
+        },
+      );
+      print(
+          'AuthService: Delete rental ID response (rentalId ID: $rentalId): ${response.statusCode}, body: ${response.body}');
+      if (response.statusCode != 200) {
+        final errorData = jsonDecode(response.body);
+        throw Exception(
+            'Failed to delete rental id: ${errorData['message'] ?? response.body}');
+      }
+    } catch (e) {
+      print('AuthService: Error deleting rental id (rentalId): $rentalId: $e');
+      rethrow;
+    }
+  }
+
+  Future<Rental> updateRental({
+    required String rentalId,
+    required Map<String, dynamic> updatedData,
+    List<String>? imagePaths,
+    List<String>? removedImages,
+  }) async {
+    try {
+      final user = _auth.currentUser;
+      if (user == null) {
+        print(
+            'AuthService: No user found for updating rental (rentalId: $rentalId)');
+        throw Exception('User not found');
+      }
+      final idToken = await user.getIdToken(true);
+      if (idToken == null) {
+        print(
+            'AuthService: No ID token for updating rental (rentalId: $rentalId)');
+        throw Exception('Failed to obtain token');
+      }
+
+      var request = http.MultipartRequest(
+          'PATCH', Uri.parse('${ApiRoutes.baseUrl}/rentals/$rentalId'));
+      request.headers['Authorization'] = 'Bearer $idToken';
+
+      // Add updatedData fields
+      updatedData.forEach((key, value) {
+        request.fields[key] = value.toString();
+      });
+
+      // Add removedImages
+      if (removedImages != null && removedImages.isNotEmpty) {
+        request.fields['removedImages'] = jsonEncode(removedImages);
+      }
+
+      // Add image files
+      if (imagePaths != null && imagePaths.isNotEmpty) {
+        for (var i = 0; i < imagePaths.length; i++) {
+          request.files.add(await http.MultipartFile.fromPath(
+            'images[$i]',
+            imagePaths[i],
+            filename: imagePaths[i].split('/').last,
+          ));
+        }
+      }
+
+      print(
+          'AuthService: Sending PATCH request for rental $rentalId with fields: ${request.fields}, files: ${request.files.length}');
+
+      final response = await request.send();
+      final responseBody = await response.stream.bytesToString();
+
+      print(
+          'AuthService: Update rental response (rentalId: $rentalId): ${response.statusCode}, body: $responseBody');
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(responseBody);
+        return Rental.fromJson(data);
+      } else {
+        final errorData = jsonDecode(responseBody);
+        throw Exception(
+            'Failed to update rental: ${errorData['message'] ?? responseBody}');
+      }
+    } catch (e) {
+      print('AuthService: Error updating rental (rentalId: $rentalId): $e');
+      throw Exception('Failed to update rental: $e');
     }
   }
 }

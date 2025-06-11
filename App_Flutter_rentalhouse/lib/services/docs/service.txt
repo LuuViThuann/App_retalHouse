@@ -19,3 +19,22 @@
 - Dán SHA-1 và SHA-256 vào.
 - Xóa file google-services.json trong thư mục android/app
 - Tải file google-services.json về và đặt vào thư mục android/app
+
+*Sử dụng Dio 
+Dio là một HTTP client cho Dart, tương tự như http package, nhưng mạnh mẽ hơn nhiều, hỗ trợ các tính năng nâng cao như:
+
+Interceptors (chặn và chỉnh sửa request/response)
+
+Timeout
+
+Upload/Download file
+
+Cancel request
+
+Tự động parse JSON
+
+Hỗ trợ FormData
+
+Retry logic (bằng plugin)
+
+Logging (qua plugin)

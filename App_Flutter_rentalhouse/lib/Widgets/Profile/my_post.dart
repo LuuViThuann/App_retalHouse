@@ -1,5 +1,6 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_rentalhouse/Widgets/Rental/edit_rental.dart';
 import 'package:flutter_rentalhouse/config/api_routes.dart';
 import 'package:flutter_rentalhouse/config/loading.dart';
 import 'package:flutter_rentalhouse/viewmodels/vm_auth.dart';
@@ -7,10 +8,13 @@ import 'package:flutter_rentalhouse/views/rental_detail_view.dart';
 import 'package:lottie/lottie.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
-
 import 'package:shimmer/shimmer.dart';
 
+enum PostAction { edit, delete }
+
 class MyPostsView extends StatefulWidget {
+  const MyPostsView({super.key});
+
   @override
   _MyPostsViewState createState() => _MyPostsViewState();
 }
@@ -35,11 +39,58 @@ class _MyPostsViewState extends State<MyPostsView> {
       case 'available':
         return 'Đang cho thuê';
       case 'rented':
-        return 'Đã cho thuê';
+        return 'Đã thuê';
       case 'inactive':
         return 'Không hoạt động';
       default:
         return 'Không xác định';
+    }
+  }
+
+  Future<void> _confirmDelete(BuildContext context, String rentalId) async {
+    final authViewModel = Provider.of<AuthViewModel>(context, listen: false);
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Xác nhận xóa'),
+        content: const Text(
+            'Bạn có chắc chắn muốn xóa bài đăng này? Hành động này không thể hoàn tác.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Hủy'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Xóa', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+    if (result == true) {
+      try {
+        print('MyPostsView: Initiating delete for rentalId: $rentalId');
+        await authViewModel.deleteRental(rentalId);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Xóa bài đăng thành công'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
+      } catch (e) {
+        print('MyPostsView: Error deleting rentalId: $rentalId: $e');
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                  'Lỗi khi xóa: ${e.toString().replaceAll('Exception: ', '')}'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
     }
   }
 
@@ -80,8 +131,8 @@ class _MyPostsViewState extends State<MyPostsView> {
               ? Center(
                   child: Lottie.asset(
                     AssetsConfig.loadingLottie,
-                    width: 100,
-                    height: 100,
+                    width: 150,
+                    height: 150,
                     fit: BoxFit.fill,
                   ),
                 )
@@ -141,46 +192,69 @@ class _MyPostsViewState extends State<MyPostsView> {
                                     );
                                   },
                                   borderRadius: BorderRadius.circular(12),
-                                  child: Row(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
+                                  child: Stack(
                                     children: [
-                                      // Image on the left
-                                      ClipRRect(
-                                        borderRadius: const BorderRadius.only(
-                                          topLeft: Radius.circular(12),
-                                          bottomLeft: Radius.circular(12),
-                                        ),
-                                        child: rental.images.isNotEmpty
-                                            ? CachedNetworkImage(
-                                                imageUrl:
-                                                    '${ApiRoutes.serverBaseUrl}${rental.images[0]}',
-                                                width: 160,
-                                                height: MediaQuery.of(context)
-                                                        .size
-                                                        .height *
-                                                    0.2,
-                                                fit: BoxFit.cover,
-                                                placeholder: (context, url) =>
-                                                    Shimmer.fromColors(
-                                                  baseColor: Colors.grey[300]!,
-                                                  highlightColor:
-                                                      Colors.grey[100]!,
-                                                  child: Container(
+                                      Row(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          ClipRRect(
+                                            borderRadius:
+                                                const BorderRadius.only(
+                                              topLeft: Radius.circular(12),
+                                              bottomLeft: Radius.circular(12),
+                                            ),
+                                            child: rental.images.isNotEmpty
+                                                ? CachedNetworkImage(
+                                                    imageUrl:
+                                                        '${ApiRoutes.serverBaseUrl}${rental.images[0]}',
                                                     width: 160,
                                                     height:
                                                         MediaQuery.of(context)
                                                                 .size
                                                                 .height *
                                                             0.2,
-                                                    color: Colors.grey[300],
-                                                  ),
-                                                ),
-                                                errorWidget:
-                                                    (context, url, error) {
-                                                  print(
-                                                      'Image load error: $error for URL: ${ApiRoutes.serverBaseUrl}${rental.images[0]}');
-                                                  return Container(
+                                                    fit: BoxFit.cover,
+                                                    placeholder:
+                                                        (context, url) =>
+                                                            Shimmer.fromColors(
+                                                      baseColor:
+                                                          Colors.grey[300]!,
+                                                      highlightColor:
+                                                          Colors.grey[100]!,
+                                                      child: Container(
+                                                        width: 160,
+                                                        height: MediaQuery.of(
+                                                                    context)
+                                                                .size
+                                                                .height *
+                                                            0.2,
+                                                        color: Colors.grey[300],
+                                                      ),
+                                                    ),
+                                                    errorWidget:
+                                                        (context, url, error) {
+                                                      print(
+                                                          'Image load error: $error for URL: ${ApiRoutes.serverBaseUrl}${rental.images[0]}');
+                                                      return Container(
+                                                        width: 160,
+                                                        height: MediaQuery.of(
+                                                                    context)
+                                                                .size
+                                                                .height *
+                                                            0.2,
+                                                        color: Colors.grey[300],
+                                                        child: Icon(
+                                                          Icons
+                                                              .image_not_supported,
+                                                          size: 30,
+                                                          color:
+                                                              Colors.grey[600],
+                                                        ),
+                                                      );
+                                                    },
+                                                  )
+                                                : Container(
                                                     width: 160,
                                                     height:
                                                         MediaQuery.of(context)
@@ -193,181 +267,181 @@ class _MyPostsViewState extends State<MyPostsView> {
                                                       size: 30,
                                                       color: Colors.grey[600],
                                                     ),
-                                                  );
-                                                },
-                                              )
-                                            : Container(
-                                                width: 160,
-                                                height: MediaQuery.of(context)
-                                                        .size
-                                                        .height *
-                                                    0.2,
-                                                color: Colors.grey[300],
-                                                child: Icon(
-                                                  Icons.image_not_supported,
-                                                  size: 30,
-                                                  color: Colors.grey[600],
-                                                ),
-                                              ),
-                                      ),
-                                      // Content on the right
-                                      Expanded(
-                                        child: Padding(
-                                          padding: const EdgeInsets.all(10),
-                                          child: Column(
-                                            crossAxisAlignment:
-                                                CrossAxisAlignment.start,
-                                            children: [
-                                              Text(
-                                                rental.title,
-                                                style: const TextStyle(
-                                                  fontSize: 14,
-                                                  fontWeight: FontWeight.w600,
-                                                  fontFamily: 'Roboto',
-                                                ),
-                                                maxLines: 2,
-                                                overflow: TextOverflow.ellipsis,
-                                              ),
-                                              const SizedBox(height: 6),
-                                              Text(
-                                                '${formatCurrency(rental.price)}/tháng',
-                                                style: TextStyle(
-                                                  fontSize: 14,
-                                                  color: Colors.blue[700],
-                                                  fontWeight: FontWeight.w600,
-                                                  fontFamily: 'Roboto',
-                                                ),
-                                              ),
-                                              const SizedBox(height: 4),
-                                              Row(
-                                                children: [
-                                                  Icon(
-                                                    Icons.location_on,
-                                                    size: 14,
-                                                    color: Colors.grey[600],
                                                   ),
-                                                  const SizedBox(width: 4),
-                                                  Expanded(
-                                                    child: Text(
-                                                      rental.location['short'],
-                                                      style: TextStyle(
-                                                        fontSize: 12,
+                                          ),
+                                          Expanded(
+                                            child: Padding(
+                                              padding: const EdgeInsets.all(10),
+                                              child: Column(
+                                                crossAxisAlignment:
+                                                    CrossAxisAlignment.start,
+                                                children: [
+                                                  Text(
+                                                    rental.title,
+                                                    style: const TextStyle(
+                                                      fontSize: 14,
+                                                      fontWeight:
+                                                          FontWeight.w600,
+                                                      fontFamily: 'Roboto',
+                                                    ),
+                                                    maxLines: 2,
+                                                    overflow:
+                                                        TextOverflow.ellipsis,
+                                                  ),
+                                                  const SizedBox(height: 6),
+                                                  Text(
+                                                    '${formatCurrency(rental.price)}/tháng',
+                                                    style: TextStyle(
+                                                      fontSize: 14,
+                                                      color: Colors.blue[700],
+                                                      fontWeight:
+                                                          FontWeight.w600,
+                                                      fontFamily: 'Roboto',
+                                                    ),
+                                                  ),
+                                                  const SizedBox(height: 4),
+                                                  Row(
+                                                    children: [
+                                                      Icon(
+                                                        Icons.location_on,
+                                                        size: 14,
                                                         color: Colors.grey[600],
-                                                        fontFamily: 'Roboto',
                                                       ),
-                                                      maxLines: 1,
-                                                      overflow:
-                                                          TextOverflow.ellipsis,
-                                                    ),
-                                                  ),
-                                                ],
-                                              ),
-                                              const SizedBox(height: 4),
-                                              Row(
-                                                children: [
-                                                  Icon(
-                                                    Icons.square_foot,
-                                                    size: 14,
-                                                    color: Colors.grey[600],
-                                                  ),
-                                                  const SizedBox(width: 4),
-                                                  Text(
-                                                    '${rental.area['total']} m²',
-                                                    style: TextStyle(
-                                                      fontSize: 12,
-                                                      color: Colors.grey[600],
-                                                      fontFamily: 'Roboto',
-                                                    ),
-                                                  ),
-                                                  const SizedBox(width: 8),
-                                                  Icon(
-                                                    Icons.home,
-                                                    size: 14,
-                                                    color: Colors.grey[600],
-                                                  ),
-                                                  const SizedBox(width: 4),
-                                                  Text(
-                                                    rental.propertyType,
-                                                    style: TextStyle(
-                                                      fontSize: 12,
-                                                      color: Colors.grey[600],
-                                                      fontFamily: 'Roboto',
-                                                    ),
-                                                  ),
-                                                ],
-                                              ),
-                                              const SizedBox(height: 4),
-                                              Row(
-                                                children: [
-                                                  Icon(
-                                                    Icons.info_outline,
-                                                    size: 14,
-                                                    color: Colors.grey[600],
-                                                  ),
-                                                  const SizedBox(width: 4),
-                                                  Text(
-                                                    formatStatus(rental.status),
-                                                    style: TextStyle(
-                                                      fontSize: 12,
-                                                      color: Colors.grey[600],
-                                                      fontFamily: 'Roboto',
-                                                    ),
-                                                  ),
-                                                ],
-                                              ),
-                                              const SizedBox(height: 6),
-                                              Align(
-                                                alignment:
-                                                    Alignment.bottomRight,
-                                                child: TextButton(
-                                                  onPressed: () {
-                                                    Navigator.push(
-                                                      context,
-                                                      MaterialPageRoute(
-                                                        builder: (context) =>
-                                                            RentalDetailScreen(
-                                                                rental: rental),
+                                                      const SizedBox(width: 4),
+                                                      Expanded(
+                                                        child: Text(
+                                                          rental.location[
+                                                              'short'],
+                                                          style: TextStyle(
+                                                            fontSize: 12,
+                                                            color: Colors
+                                                                .grey[600],
+                                                            fontFamily:
+                                                                'Roboto',
+                                                          ),
+                                                          maxLines: 1,
+                                                          overflow: TextOverflow
+                                                              .ellipsis,
+                                                        ),
                                                       ),
-                                                    );
-                                                  },
-                                                  style: TextButton.styleFrom(
-                                                    foregroundColor:
-                                                        Colors.blue[700],
-                                                    padding: const EdgeInsets
-                                                        .symmetric(
-                                                        horizontal: 12,
-                                                        vertical: 6),
-                                                    shape:
-                                                        RoundedRectangleBorder(
-                                                      borderRadius:
-                                                          BorderRadius.circular(
-                                                              8),
-                                                    ),
-                                                    backgroundColor:
-                                                        Colors.blue[50],
+                                                    ],
                                                   ),
-                                                  child: Row(
-                                                    mainAxisSize:
-                                                        MainAxisSize.min,
-                                                    children: const [
+                                                  const SizedBox(height: 4),
+                                                  Row(
+                                                    children: [
+                                                      Icon(
+                                                        Icons.square_foot,
+                                                        size: 14,
+                                                        color: Colors.grey[600],
+                                                      ),
+                                                      const SizedBox(width: 4),
                                                       Text(
-                                                        'Xem chi tiết',
+                                                        '${rental.area['total']} m²',
                                                         style: TextStyle(
                                                           fontSize: 12,
-                                                          fontWeight:
-                                                              FontWeight.w500,
+                                                          color:
+                                                              Colors.grey[600],
                                                           fontFamily: 'Roboto',
                                                         ),
                                                       ),
-                                                      SizedBox(width: 6),
-                                                      Icon(Icons.arrow_forward,
-                                                          size: 16),
+                                                      const SizedBox(width: 8),
+                                                      Icon(
+                                                        Icons.home,
+                                                        size: 14,
+                                                        color: Colors.grey[600],
+                                                      ),
+                                                      const SizedBox(width: 4),
+                                                      Text(
+                                                        rental.propertyType,
+                                                        style: TextStyle(
+                                                          fontSize: 12,
+                                                          color:
+                                                              Colors.grey[600],
+                                                          fontFamily: 'Roboto',
+                                                        ),
+                                                      ),
                                                     ],
                                                   ),
-                                                ),
+                                                  const SizedBox(height: 4),
+                                                  Row(
+                                                    children: [
+                                                      Icon(
+                                                        Icons.info_outline,
+                                                        size: 14,
+                                                        color: Colors.grey[600],
+                                                      ),
+                                                      const SizedBox(width: 4),
+                                                      Text(
+                                                        formatStatus(
+                                                            rental.status),
+                                                        style: TextStyle(
+                                                          fontSize: 12,
+                                                          color:
+                                                              Colors.grey[600],
+                                                          fontFamily: 'Roboto',
+                                                        ),
+                                                      ),
+                                                    ],
+                                                  ),
+                                                ],
                                               ),
-                                            ],
+                                            ),
                                           ),
+                                        ],
+                                      ),
+                                      Positioned(
+                                        top: 8,
+                                        right: 8,
+                                        child: PopupMenuButton<PostAction>(
+                                          icon: Icon(
+                                            Icons.more_vert,
+                                            color: Colors.grey[600],
+                                            size: 24,
+                                          ),
+                                          onSelected: (value) {
+                                            print(
+                                                'MyPostsView: Menu action selected: $value for rentalId: ${rental.id}');
+                                            switch (value) {
+                                              case PostAction.edit:
+                                                Navigator.push(
+                                                  context,
+                                                  MaterialPageRoute(
+                                                    builder: (context) =>
+                                                        EditRentalScreen(
+                                                            rental: rental),
+                                                  ),
+                                                );
+                                                break;
+                                              case PostAction.delete:
+                                                _confirmDelete(
+                                                    context, rental.id);
+                                                break;
+                                            }
+                                          },
+                                          itemBuilder: (context) => [
+                                            const PopupMenuItem(
+                                              value: PostAction.edit,
+                                              child: Row(
+                                                children: [
+                                                  Icon(Icons.edit,
+                                                      color: Colors.green),
+                                                  SizedBox(width: 8),
+                                                  Text('Chỉnh sửa'),
+                                                ],
+                                              ),
+                                            ),
+                                            const PopupMenuItem(
+                                              value: PostAction.delete,
+                                              child: Row(
+                                                children: [
+                                                  Icon(Icons.delete,
+                                                      color: Colors.red),
+                                                  SizedBox(width: 8),
+                                                  Text('Xóa'),
+                                                ],
+                                              ),
+                                            ),
+                                          ],
                                         ),
                                       ),
                                     ],

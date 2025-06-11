@@ -12,6 +12,7 @@ const path = require('path');
 const redis = require('redis');
 const sharp = require('sharp');
 const { Client } = require('@elastic/elasticsearch');
+const fs = require('fs').promises; // Add fs for file operations
 
 // Redis client
 const redisClient = redis.createClient({
@@ -37,6 +38,7 @@ const storage = multer.diskStorage({
   },
 });
 const upload = multer({ storage });
+router.use('/uploads', express.static(path.join(__dirname, '..', 'uploads')));
 
 // Authentication middleware
 const authMiddleware = async (req, res, next) => {
@@ -84,7 +86,6 @@ const syncRentalToElasticsearch = async (rental) => {
     console.log(`Synced rental ${rental._id} to Elasticsearch`, response);
   } catch (err) {
     console.error('Error syncing to Elasticsearch:', err);
-    // Log error but don't throw
   }
 };
 
@@ -109,10 +110,7 @@ const buildMongoQuery = ({ search, minPrice, maxPrice, propertyTypes, status }) 
   return query;
 };
 
-// Hàm này dùng để làm sạch các header không cần thiết
-// và đảm bảo rằng các header được sử dụng đúng cách trong các yêu cầu đến Elasticsearch.
-// Middleware này sẽ được sử dụng trước khi thực hiện các yêu cầu đến Elasticsearch.
-
+// Sanitize headers middleware
 const sanitizeHeadersMiddleware = (req, res, next) => {
   if (req.headers.accept && req.headers.accept.includes('application/vnd.elasticsearch+json')) {
     req.headers.accept = 'application/json';
@@ -233,184 +231,288 @@ router.get('/rentals', async (req, res) => {
     if (search) query.$or = [{ title: { $regex: search, $options: 'i' } }, { 'location.short': { $regex: search, $options: 'i' } }];
     if (minPrice || maxPrice) {
       query.price = {};
-    if (minPrice) query.price.$gte = Number(minPrice);
-    if (maxPrice) query.price.$lte = Number(maxPrice);
+      if (minPrice) query.price.$gte = Number(minPrice);
+      if (maxPrice) query.price.$lte = Number(maxPrice);
+    }
+    if (propertyType) query.propertyType = propertyType;
+    if (status) query.status = status;
+    const rentals = await Rental.find(query);
+    res.json(rentals);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
   }
-  if (propertyType) query.propertyType = propertyType;
-  if (status) query.status = status;
-  const rentals = await Rental.find(query);
-  res.json(rentals);
-} catch (err) {
-  res.status(500).json({ message: err.message });
-}
 });
 
 // Get search history
 router.get('/search-history', [sanitizeHeadersMiddleware, authMiddleware], async (req, res) => {
-try {
-  const searchKey = `search:${req.userId}`;
-  const history = await redisClient.lRange(searchKey, 0, -1);
-  res.json(history);
-} catch (err) {
-  console.error('Error fetching search history:', err);
-  res.status(500).json({ message: 'Failed to fetch search history', error: err.message });
-}
+  try {
+    const searchKey = `search:${req.userId}`;
+    const history = await redisClient.lRange(searchKey, 0, -1);
+    res.json(history);
+  } catch (err) {
+    console.error('Error fetching search history:', err);
+    res.status(500).json({ message: 'Failed to fetch search history', error: err.message });
+  }
 });
 
 // Get rental by ID
 router.get('/rentals/:id', async (req, res) => {
-try {
-  const rental = await Rental.findById(req.params.id);
-  if (!rental) return res.status(404).json({ message: 'Rental not found' });
+  try {
+    const rental = await Rental.findById(req.params.id);
+    if (!rental) return res.status(404).json({ message: 'Rental not found' });
 
-  const comments = await Comment.find({ rentalId: req.params.id })
-    .populate('userId', 'avatarBase64 username');
+    const comments = await Comment.find({ rentalId: req.params.id })
+      .populate('userId', 'avatarBase64 username');
 
-  const commentIds = comments.map(c => c._id);
-  const replies = await Reply.find({ commentId: { $in: commentIds } })
-    .populate('userId', 'username')
-    .lean();
+    const commentIds = comments.map(c => c._id);
+    const replies = await Reply.find({ commentId: { $in: commentIds } })
+      .populate('userId', 'username')
+      .lean();
 
-  const likes = await LikeComment.find({
-    $or: [
-      { targetId: { $in: commentIds }, targetType: 'Comment' },
-      { targetId: { $in: replies.map(r => r._id) }, targetType: 'Reply' },
-    ]
-  }).populate('userId', 'username').lean();
+    const likes = await LikeComment.find({
+      $or: [
+        { targetId: { $in: commentIds }, targetType: 'Comment' },
+        { targetId: { $in: replies.map(r => r._id) }, targetType: 'Reply' },
+      ]
+    }).populate('userId', 'username').lean();
 
-  const replyMap = new Map();
-  replies.forEach(reply => {
-    reply.createdAt = new Date(reply.createdAt.getTime() + 7 * 60 * 60 * 1000);
-    reply.likes = likes.filter(like => like.targetId.toString() === reply._id.toString() && like.targetType === 'Reply')
-      .map(like => ({ ...like, createdAt: new Date(like.createdAt.getTime() + 7 * 60 * 60 * 1000) }));
-    const commentIdStr = reply.commentId.toString();
-    if (!replyMap.has(commentIdStr)) {
-      replyMap.set(commentIdStr, []);
-    }
-    replyMap.get(commentIdStr).push(reply);
-  });
+    const replyMap = new Map();
+    replies.forEach(reply => {
+      reply.createdAt = new Date(reply.createdAt.getTime() + 7 * 60 * 60 * 1000);
+      reply.likes = likes.filter(like => like.targetId.toString() === reply._id.toString() && like.targetType === 'Reply')
+        .map(like => ({ ...like, createdAt: new Date(like.createdAt.getTime() + 7 * 60 * 60 * 1000) }));
+      const commentIdStr = reply.commentId.toString();
+      if (!replyMap.has(commentIdStr)) {
+        replyMap.set(commentIdStr, []);
+      }
+      replyMap.get(commentIdStr).push(reply);
+    });
 
-  const buildReplyTree = (replyList, parentId = null) => {
-    return replyList
-      .filter(reply => (parentId ? reply.parentReplyId?.toString() === parentId : !reply.parentReplyId))
-      .map(reply => ({
-        ...reply,
-        replies: buildReplyTree(replyList, reply._id.toString())
-      }));
-  };
+    const buildReplyTree = (replyList, parentId = null) => {
+      return replyList
+        .filter(reply => (parentId ? reply.parentReplyId?.toString() === parentId : !reply.parentReplyId))
+        .map(reply => ({
+          ...reply,
+          replies: buildReplyTree(replyList, reply._id.toString())
+        }));
+    };
 
-  const adjustedComments = comments.map(comment => {
-    const commentObj = adjustTimestamps(comment);
-    commentObj.replies = buildReplyTree(replyMap.get(comment._id.toString()) || []);
-    commentObj.likes = likes.filter(like => like.targetId.toString() === comment._id.toString() && like.targetType === 'Comment')
-      .map(like => ({ ...like, createdAt: new Date(like.createdAt.getTime() + 7 * 60 * 60 * 1000) }));
-    return commentObj;
-  });
+    const adjustedComments = comments.map(comment => {
+      const commentObj = adjustTimestamps(comment);
+      commentObj.replies = buildReplyTree(replyMap.get(comment._id.toString()) || []);
+      commentObj.likes = likes.filter(like => like.targetId.toString() === comment._id.toString() && like.targetType === 'Comment')
+        .map(like => ({ ...like, createdAt: new Date(like.createdAt.getTime() + 7 * 60 * 60 * 1000) }));
+      return commentObj;
+    });
 
-  const totalRatings = adjustedComments.reduce((sum, comment) => sum + (comment.rating || 0), 0);
-  const averageRating = adjustedComments.length > 0 ? totalRatings / adjustedComments.length : 0;
+    const totalRatings = adjustedComments.reduce((sum, comment) => sum + (comment.rating || 0), 0);
+    const averageRating = adjustedComments.length > 0 ? totalRatings / adjustedComments.length : 0;
 
-  res.json({
-    ...rental.toObject(),
-    comments: adjustedComments,
-    averageRating,
-    reviewCount: adjustedComments.length
-  });
-} catch (err) {
-  res.status(500).json({ message: err.message });
-}
+    res.json({
+      ...rental.toObject(),
+      comments: adjustedComments,
+      averageRating,
+      reviewCount: adjustedComments.length
+    });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
 });
 
 // Create rental
 router.post('/rentals', authMiddleware, upload.array('images'), async (req, res) => {
-try {
-  const imageUrls = req.files.map(file => `/uploads/${file.filename}`);
-  const contactInfoName = req.body.contactInfoName || req.user.displayName || 'Chủ nhà';
-  const contactInfoPhone = req.body.contactInfoPhone || req.user.phoneNumber || 'Không có số điện thoại';
-  const rental = new Rental({
-    title: req.body.title,
-    price: req.body.price,
-    area: { total: req.body.areaTotal, livingRoom: req.body.areaLivingRoom, bedrooms: req.body.areaBedrooms, bathrooms: req.body.areaBathrooms },
-    location: { short: req.body.locationShort, fullAddress: req.body.locationFullAddress },
-    propertyType: req.body.propertyType,
-    furniture: req.body.furniture ? req.body.furniture.split(',').map(item => item.trim()) : [],
-    amenities: req.body.amenities ? req.body.amenities.split(',').map(item => item.trim()) : [],
-    surroundings: req.body.surroundings ? req.body.surroundings.split(',').map(item => item.trim()) : [],
-    rentalTerms: { minimumLease: req.body.rentalTermsMinimumLease, deposit: req.body.rentalTermsDeposit, paymentMethod: req.body.rentalTermsPaymentMethod, renewalTerms: req.body.rentalTermsRenewalTerms },
-    contactInfo: { name: contactInfoName, phone: contactInfoPhone, availableHours: req.body.contactInfoAvailableHours },
-    userId: req.userId,
-    images: imageUrls,
-    status: req.body.status || 'available',
-  });
-  const newRental = await rental.save();
-  // Run sync asynchronously
-  syncRentalToElasticsearch(newRental);
-  res.status(201).json(newRental);
-} catch (err) {
-  console.error('Error creating rental:', err);
-  res.status(400).json({ message: 'Failed to create rental', error: err.message });
-}
+  try {
+    const imageUrls = req.files.map(file => `/uploads/${file.filename}`);
+    const contactInfoName = req.body.contactInfoName || req.user.displayName || 'Chủ nhà';
+    const contactInfoPhone = req.body.contactInfoPhone || req.user.phoneNumber || 'Không có số điện thoại';
+    const rental = new Rental({
+      title: req.body.title,
+      price: req.body.price,
+      area: { total: req.body.areaTotal, livingRoom: req.body.areaLivingRoom, bedrooms: req.body.areaBedrooms, bathrooms: req.body.areaBathrooms },
+      location: { short: req.body.locationShort, fullAddress: req.body.locationFullAddress },
+      propertyType: req.body.propertyType,
+      furniture: req.body.furniture ? req.body.furniture.split(',').map(item => item.trim()) : [],
+      amenities: req.body.amenities ? req.body.amenities.split(',').map(item => item.trim()) : [],
+      surroundings: req.body.surroundings ? req.body.surroundings.split(',').map(item => item.trim()) : [],
+      rentalTerms: { minimumLease: req.body.rentalTermsMinimumLease, deposit: req.body.rentalTermsDeposit, paymentMethod: req.body.rentalTermsPaymentMethod, renewalTerms: req.body.rentalTermsRenewalTerms },
+      contactInfo: { name: contactInfoName, phone: contactInfoPhone, availableHours: req.body.contactInfoAvailableHours },
+      userId: req.userId,
+      images: imageUrls,
+      status: req.body.status || 'available',
+    });
+    const newRental = await rental.save();
+    syncRentalToElasticsearch(newRental);
+    res.status(201).json(newRental);
+  } catch (err) {
+    console.error('Error creating rental:', err);
+    res.status(400).json({ message: 'Failed to create rental', error: err.message });
+  }
 });
 
 // Update rental
-router.put('/rentals/:id', authMiddleware, upload.array('images'), async (req, res) => {
-try {
-  const rental = await Rental.findById(req.params.id);
-  if (!rental || rental.userId !== req.userId) return res.status(403).json({ message: 'Unauthorized or not found' });
-  const updatedData = {};
-  if (req.body.title) updatedData.title = req.body.title;
-  if (req.body.price) updatedData.price = req.body.price;
-  if (req.body.areaTotal || req.body.areaLivingRoom || req.body.areaBedrooms || req.body.areaBathrooms) {
-    updatedData.area = { total: req.body.areaTotal || rental.area.total, livingRoom: req.body.areaLivingRoom || rental.area.livingRoom, bedrooms: req.body.areaBedrooms || rental.area.bedrooms, bathrooms: req.body.areaBathrooms || rental.area.bathrooms };
+router.patch('/rentals/:id', authMiddleware, upload.array('images'), async (req, res) => {
+  try {
+    console.log(`Received ${req.method} request for rental ${req.params.id}:`, {
+      headers: req.headers,
+      body: req.body,
+      files: req.files?.map(f => f.filename),
+    });
+
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(400).json({ message: 'Invalid rental ID' });
+    }
+
+    const rental = await Rental.findById(req.params.id);
+    if (!rental) {
+      return res.status(404).json({ message: 'Rental not found' });
+    }
+    if (rental.userId !== req.userId) {
+      return res.status(403).json({ message: 'Unauthorized: You do not own this rental' });
+    }
+
+    const updatedData = {};
+    if (req.body.title) updatedData.title = req.body.title;
+    if (req.body.price) updatedData.price = parseFloat(req.body.price) || rental.price;
+    if (req.body.areaTotal || req.body.areaLivingRoom || req.body.areaBedrooms || req.body.areaBathrooms) {
+      updatedData.area = {
+        total: parseFloat(req.body.areaTotal) || rental.area.total,
+        livingRoom: parseFloat(req.body.areaLivingRoom) || rental.area.livingRoom,
+        bedrooms: parseFloat(req.body.areaBedrooms) || rental.area.bedrooms,
+        bathrooms: parseFloat(req.body.areaBathrooms) || rental.area.bathrooms
+      };
+    }
+    if (req.body.locationShort || req.body.locationFullAddress) {
+      updatedData.location = {
+        short: req.body.locationShort || rental.location.short,
+        fullAddress: req.body.locationFullAddress || rental.location.fullAddress
+      };
+    }
+    if (req.body.propertyType) updatedData.propertyType = req.body.propertyType;
+    if (req.body.furniture) updatedData.furniture = req.body.furniture.split(',').map(item => item.trim());
+    if (req.body.amenities) updatedData.amenities = req.body.amenities.split(',').map(item => item.trim());
+    if (req.body.surroundings) updatedData.surroundings = req.body.surroundings.split(',').map(item => item.trim());
+    if (req.body.rentalTermsMinimumLease || req.body.rentalTermsDeposit || req.body.rentalTermsPaymentMethod || req.body.rentalTermsRenewalTerms) {
+      updatedData.rentalTerms = {
+        minimumLease: req.body.rentalTermsMinimumLease || rental.rentalTerms.minimumLease,
+        deposit: req.body.rentalTermsDeposit || rental.rentalTerms.deposit,
+        paymentMethod: req.body.rentalTermsPaymentMethod || rental.rentalTerms.paymentMethod,
+        renewalTerms: req.body.rentalTermsRenewalTerms || rental.rentalTerms.renewalTerms
+      };
+    }
+    if (req.body.contactInfoName || req.body.contactInfoPhone || req.body.contactInfoAvailableHours) {
+      updatedData.contactInfo = {
+        name: req.body.contactInfoName || rental.contactInfo.name,
+        phone: req.body.contactInfoPhone || rental.contactInfo.phone,
+        availableHours: req.body.contactInfoAvailableHours || rental.contactInfo.availableHours
+      };
+    }
+    if (req.body.status) updatedData.status = req.body.status;
+
+    // Handle image updates
+    let updatedImages = [...rental.images];
+    if (req.body.removedImages) {
+      const removedImages = Array.isArray(req.body.removedImages) ? req.body.removedImages : [req.body.removedImages];
+      for (const image of removedImages) {
+        if (updatedImages.includes(image)) {
+          updatedImages = updatedImages.filter(img => img !== image);
+          const filePath = path.join(__dirname, '..', image.replace('/uploads/', 'uploads/'));
+          try {
+            await fs.unlink(filePath);
+            console.log(`Deleted image: ${filePath}`);
+          } catch (err) {
+            console.error(`Error deleting image ${filePath}:`, err);
+          }
+        }
+      }
+    }
+    if (req.files && req.files.length > 0) {
+      const newImages = req.files.map(file => `/uploads/${file.filename}`);
+      updatedImages = [...updatedImages, ...newImages];
+    }
+    if (req.body.removedImages || req.files.length > 0) {
+      updatedData.images = updatedImages;
+    }
+
+    const updatedRental = await Rental.findByIdAndUpdate(
+      req.params.id,
+      { $set: updatedData },
+      { new: true, runValidators: true }
+    );
+
+    if (!updatedRental) {
+      return res.status(404).json({ message: 'Rental not found after update' });
+    }
+
+    syncRentalToElasticsearch(updatedRental);
+    res.json(updatedRental);
+  } catch (err) {
+    console.error('Error updating rental:', err);
+    res.status(500).json({ message: 'Failed to update rental', error: err.message });
   }
-  if (req.body.locationShort || req.body.locationFullAddress) {
-    updatedData.location = { short: req.body.locationShort || rental.location.short, fullAddress: req.body.locationFullAddress || rental.location.fullAddress };
-  }
-  if (req.body.propertyType) updatedData.propertyType = req.body.propertyType;
-  if (req.body.furniture) updatedData.furniture = req.body.furniture.split(',').map(item => item.trim());
-  if (req.body.amenities) updatedData.amenities = req.body.amenities.split(',').map(item => item.trim());
-  if (req.body.surroundings) updatedData.surroundings = req.body.surroundings.split(',').map(item => item.trim());
-  if (req.body.rentalTermsMinimumLease || req.body.rentalTermsDeposit || req.body.rentalTermsPaymentMethod || req.body.rentalTermsRenewalTerms) {
-    updatedData.rentalTerms = { minimumLease: req.body.rentalTermsMinimumLease || rental.rentalTerms.minimumLease, deposit: req.body.rentalTermsDeposit || rental.rentalTerms.deposit, paymentMethod: req.body.rentalTermsPaymentMethod || rental.rentalTerms.paymentMethod, renewalTerms: req.body.rentalTermsRenewalTerms || rental.rentalTerms.renewalTerms };
-  }
-  if (req.body.contactInfoName || req.body.contactInfoPhone || req.body.contactInfoAvailableHours) {
-    updatedData.contactInfo = { name: req.body.contactInfoName || rental.contactInfo.name, phone: req.body.contactInfoPhone || rental.contactInfo.phone, availableHours: req.body.contactInfoAvailableHours || rental.contactInfo.availableHours };
-  }
-  if (req.files.length > 0) updatedData.images = req.files.map(file => `/uploads/${file.filename}`);
-  if (req.body.status) updatedData.status = req.body.status;
-  const updatedRental = await Rental.findByIdAndUpdate(req.params.id, updatedData, { new: true });
-  // Run sync asynchronously
-  syncRentalToElasticsearch(updatedRental);
-  res.json(updatedRental);
-} catch (err) {
-  console.error('Error updating rental:', err);
-  res.status(400).json({ message: 'Failed to update rental', error: err.message });
-}
 });
 
 // Delete rental
 router.delete('/rentals/:id', authMiddleware, async (req, res) => {
-try {
-  const rental = await Rental.findById(req.params.id);
-  if (!rental || rental.userId !== req.userId) return res.status(403).json({ message: 'Unauthorized or not found' });
-  await Rental.findByIdAndDelete(req.params.id);
   try {
-    await elasticClient.delete({
-      index: 'rentals',
-      id: req.params.id,
-      headers: {
-        Accept: 'application/json',
-        'Content-Type': 'application/json',
-      },
-    });
-  } catch (esErr) {
-    console.error('Error deleting from Elasticsearch:', esErr);
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(400).json({ message: 'Invalid rental ID' });
+    }
+
+    const rental = await Rental.findById(req.params.id);
+    if (!rental) {
+      return res.status(404).json({ message: 'Rental not found' });
+    }
+    if (rental.userId !== req.userId) {
+      return res.status(403).json({ message: 'Unauthorized: You do not own this rental' });
+    }
+
+    for (const image of rental.images) {
+      const filePath = path.join(__dirname, '..', image.replace('/uploads/', 'uploads/'));
+      try {
+        await fs.unlink(filePath);
+        console.log(`Deleted image: ${filePath}`);
+      } catch (err) {
+        console.error(`Error deleting image ${filePath}:`, err);
+      }
+    }
+
+    await Comment.deleteMany({ rentalId: req.params.id });
+    await Reply.deleteMany({ commentId: { $in: await Comment.find({ rentalId: req.params.id }).distinct('_id') } });
+    await LikeComment.deleteMany({ targetId: req.params.id, targetType: 'Comment' });
+    await Favorite.deleteMany({ rentalId: req.params.id });
+
+    await Rental.findByIdAndDelete(req.params.id);
+
+    try {
+      await elasticClient.delete({
+        index: 'rentals',
+        id: req.params.id,
+        headers: {
+          Accept: 'application/json',
+          'Content-Type': 'application/json',
+        },
+      });
+      console.log(`Deleted rental ${req.params.id} from Elasticsearch`);
+    } catch (esErr) {
+      console.error('Error deleting from Elasticsearch:', esErr);
+    }
+
+    res.json({ message: 'Rental deleted successfully' });
+  } catch (err) {
+    console.error('Error deleting rental:', err);
+    res.status(500).json({ message: 'Failed to delete rental', error: err.message });
   }
-  res.json({ message: 'Rental deleted successfully' });
-} catch (err) {
-  console.error('Error deleting rental:', err);
-  res.status(500).json({ message: 'Failed to delete rental', error: err.message });
-}
+});
+
+// Handle unsupported methods
+router.all('/rentals/:id', (req, res) => {
+  console.warn(`Received unsupported method ${req.method} for /rentals/:id`, {
+    headers: req.headers,
+    body: req.body,
+  });
+  res.status(405).json({
+    message: `Method ${req.method} not allowed. Use PATCH to update rentals.`,
+  });
 });
 
 module.exports = router;
