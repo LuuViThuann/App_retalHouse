@@ -305,8 +305,7 @@ class AuthViewModel extends ChangeNotifier {
     try {
       final data =
           await _authService.fetchRecentComments(page: page, limit: limit);
-      final comments =
-          (data['comments'] as List).map((e) => Comment.fromJson(e)).toList();
+      final comments = data['comments'] as List<Comment>;
       if (page == 1) {
         _recentComments = comments;
       } else {

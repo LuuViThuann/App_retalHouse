@@ -241,7 +241,7 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                               ),
                               const SizedBox(height: 20),
                               const Text(
-                                'Chào Mừng Đến Với',
+                                'Chào mừng đến với',
                                 style: TextStyle(
                                   fontSize: 32,
                                   fontWeight: FontWeight.bold,
@@ -250,7 +250,7 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                               ),
                               const SizedBox(height: 10),
                               const Text(
-                                'Ứng Dụng Thuê Nhà',
+                                'Mạng xã hội thuê nhà',
                                 style: TextStyle(
                                   fontSize: 28,
                                   fontWeight: FontWeight.w500,
