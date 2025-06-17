@@ -665,6 +665,43 @@ class AuthService {
     }
   }
 
+  Future<Rental> fetchRental(String rentalId) async {
+    try {
+      final user = _auth.currentUser;
+      if (user == null) {
+        print(
+            'AuthService: No user found for fetching rental (rentalId: $rentalId)');
+        throw Exception('User not found');
+      }
+      final idToken = await user.getIdToken(true);
+      if (idToken == null) {
+        print(
+            'AuthService: No ID token for fetching rental (rentalId: $rentalId)');
+        throw Exception('Failed to obtain token');
+      }
+      final response = await http.get(
+        Uri.parse('${ApiRoutes.baseUrl}/rentals/$rentalId'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $idToken',
+        },
+      );
+      print(
+          'AuthService: Fetch rental response (rentalId: $rentalId): ${response.statusCode}, body: ${response.body}');
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return Rental.fromJson(data);
+      } else {
+        final errorData = jsonDecode(response.body);
+        throw Exception(
+            'Failed to fetch rental: ${errorData['message'] ?? response.body}');
+      }
+    } catch (e) {
+      print('AuthService: Error fetching rental (rentalId: $rentalId): $e');
+      throw Exception('Failed to fetch rental: $e');
+    }
+  }
+
   Future<void> deleteRental(String rentalId) async {
     try {
       final user = _auth.currentUser;
@@ -676,8 +713,8 @@ class AuthService {
       final idToken = await user.getIdToken(true);
       if (idToken == null) {
         print(
-            'AuthService: No ID token for deleting rental ID (rentalId: $rentalId)');
-        throw Exception('Failed to get token');
+            'AuthService: No ID token for deleting rental (rentalId: $rentalId)');
+        throw Exception('Failed to obtain token');
       }
       final response = await http.delete(
         Uri.parse('${ApiRoutes.baseUrl}/rentals/$rentalId'),
@@ -687,15 +724,15 @@ class AuthService {
         },
       );
       print(
-          'AuthService: Delete rental ID response (rentalId ID: $rentalId): ${response.statusCode}, body: ${response.body}');
+          'AuthService: Delete rental response (rentalId: $rentalId): ${response.statusCode}, body: ${response.body}');
       if (response.statusCode != 200) {
         final errorData = jsonDecode(response.body);
         throw Exception(
-            'Failed to delete rental id: ${errorData['message'] ?? response.body}');
+            'Failed to delete rental: ${errorData['message'] ?? response.body}');
       }
     } catch (e) {
-      print('AuthService: Error deleting rental id (rentalId): $rentalId: $e');
-      rethrow;
+      print('AuthService: Error deleting rental (rentalId: $rentalId): $e');
+      throw Exception('Failed to delete rental: $e');
     }
   }
 
@@ -708,50 +745,64 @@ class AuthService {
     try {
       final user = _auth.currentUser;
       if (user == null) {
-        print(
-            'AuthService: No user found for updating rental (rentalId: $rentalId)');
-        throw Exception('User not found');
+        throw Exception('Không tìm thấy người dùng');
       }
       final idToken = await user.getIdToken(true);
       if (idToken == null) {
-        print(
-            'AuthService: No ID token for updating rental (rentalId: $rentalId)');
-        throw Exception('Failed to obtain token');
+        throw Exception('Không lấy được token xác thực');
       }
 
+      // Lấy thông tin bài đăng hiện tại để xác thực ảnh cần xóa
+      final currentRental = await fetchRental(rentalId);
+
+      // Lọc ra các ảnh thực sự hợp lệ để xóa
+      final validRemovedImages = (removedImages ?? [])
+          .where((url) =>
+              url.isNotEmpty &&
+              url.startsWith('/uploads/') &&
+              currentRental.images.contains(url))
+          .toList();
+
+      // Tạo request PATCH dạng multipart
       var request = http.MultipartRequest(
-          'PATCH', Uri.parse('${ApiRoutes.baseUrl}/rentals/$rentalId'));
+        'PATCH',
+        Uri.parse('${ApiRoutes.baseUrl}/rentals/$rentalId'),
+      );
       request.headers['Authorization'] = 'Bearer $idToken';
 
-      // Add updatedData fields
+      // Thêm các trường dữ liệu cập nhật
       updatedData.forEach((key, value) {
-        request.fields[key] = value.toString();
+        if (value != null) {
+          request.fields[key] = value.toString();
+        }
       });
 
-      // Add removedImages
-      if (removedImages != null && removedImages.isNotEmpty) {
-        request.fields['removedImages'] = jsonEncode(removedImages);
+      // Thêm danh sách ảnh cần xóa (nếu có)
+      if (validRemovedImages.isNotEmpty) {
+        request.fields['removedImages'] = jsonEncode(validRemovedImages);
       }
 
-      // Add image files
+      // Thêm các file ảnh mới (nếu có)
       if (imagePaths != null && imagePaths.isNotEmpty) {
-        for (var i = 0; i < imagePaths.length; i++) {
-          request.files.add(await http.MultipartFile.fromPath(
-            'images[$i]',
-            imagePaths[i],
-            filename: imagePaths[i].split('/').last,
-          ));
+        for (var path in imagePaths) {
+          if (path.isNotEmpty) {
+            request.files.add(await http.MultipartFile.fromPath(
+              'images',
+              path,
+              filename: path.split('/').last,
+            ));
+          }
         }
       }
 
       print(
-          'AuthService: Sending PATCH request for rental $rentalId with fields: ${request.fields}, files: ${request.files.length}');
+          'AuthService: PATCH rental $rentalId, fields: ${request.fields}, files: ${request.files.length}');
 
       final response = await request.send();
       final responseBody = await response.stream.bytesToString();
 
       print(
-          'AuthService: Update rental response (rentalId: $rentalId): ${response.statusCode}, body: $responseBody');
+          'AuthService: Update rental response ($rentalId): ${response.statusCode}, body: $responseBody');
 
       if (response.statusCode == 200) {
         final data = jsonDecode(responseBody);
@@ -759,11 +810,11 @@ class AuthService {
       } else {
         final errorData = jsonDecode(responseBody);
         throw Exception(
-            'Failed to update rental: ${errorData['message'] ?? responseBody}');
+            'Cập nhật bài đăng thất bại: ${errorData['message'] ?? responseBody}');
       }
     } catch (e) {
-      print('AuthService: Error updating rental (rentalId: $rentalId): $e');
-      throw Exception('Failed to update rental: $e');
+      print('AuthService: Lỗi cập nhật bài đăng ($rentalId): $e');
+      throw Exception('Cập nhật bài đăng thất bại: $e');
     }
   }
 }

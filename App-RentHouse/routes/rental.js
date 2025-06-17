@@ -12,7 +12,7 @@ const path = require('path');
 const redis = require('redis');
 const sharp = require('sharp');
 const { Client } = require('@elastic/elasticsearch');
-const fs = require('fs').promises; // Add fs for file operations
+const fs = require('fs').promises;
 
 // Redis client
 const redisClient = redis.createClient({
@@ -345,6 +345,9 @@ router.post('/rentals', authMiddleware, upload.array('images'), async (req, res)
     res.status(201).json(newRental);
   } catch (err) {
     console.error('Error creating rental:', err);
+    if (err instanceof multer.MulterError) {
+      return res.status(400).json({ message: `File upload error: ${err.message}` });
+    }
     res.status(400).json({ message: 'Failed to create rental', error: err.message });
   }
 });
@@ -352,16 +355,12 @@ router.post('/rentals', authMiddleware, upload.array('images'), async (req, res)
 // Update rental
 router.patch('/rentals/:id', authMiddleware, upload.array('images'), async (req, res) => {
   try {
-    console.log(`Received ${req.method} request for rental ${req.params.id}:`, {
-      headers: req.headers,
-      body: req.body,
-      files: req.files?.map(f => f.filename),
-    });
-
+    // Kiểm tra ID hợp lệ
     if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
       return res.status(400).json({ message: 'Invalid rental ID' });
     }
 
+    // Tìm rental
     const rental = await Rental.findById(req.params.id);
     if (!rental) {
       return res.status(404).json({ message: 'Rental not found' });
@@ -370,6 +369,7 @@ router.patch('/rentals/:id', authMiddleware, upload.array('images'), async (req,
       return res.status(403).json({ message: 'Unauthorized: You do not own this rental' });
     }
 
+    // Chuẩn bị dữ liệu cập nhật
     const updatedData = {};
     if (req.body.title) updatedData.title = req.body.title;
     if (req.body.price) updatedData.price = parseFloat(req.body.price) || rental.price;
@@ -408,31 +408,53 @@ router.patch('/rentals/:id', authMiddleware, upload.array('images'), async (req,
     }
     if (req.body.status) updatedData.status = req.body.status;
 
-    // Handle image updates
+    // Xử lý ảnh
     let updatedImages = [...rental.images];
+    let removedImages = [];
     if (req.body.removedImages) {
-      const removedImages = Array.isArray(req.body.removedImages) ? req.body.removedImages : [req.body.removedImages];
+      try {
+        // Nếu là string, thử parse JSON, nếu lỗi thì tách theo dấu phẩy
+        if (typeof req.body.removedImages === 'string') {
+          try {
+            removedImages = JSON.parse(req.body.removedImages);
+          } catch (e) {
+            removedImages = req.body.removedImages.split(',').map(s => s.trim()).filter(Boolean);
+          }
+        } else if (Array.isArray(req.body.removedImages)) {
+          removedImages = req.body.removedImages;
+        }
+      } catch (e) {
+        removedImages = [req.body.removedImages].filter(Boolean);
+      }
+      if (!Array.isArray(removedImages)) removedImages = [removedImages];
+
       for (const image of removedImages) {
+        if (typeof image !== 'string' || !image.startsWith('/uploads/')) continue;
         if (updatedImages.includes(image)) {
           updatedImages = updatedImages.filter(img => img !== image);
-          const filePath = path.join(__dirname, '..', image.replace('/uploads/', 'uploads/'));
+          const filePath = path.join(__dirname, '..', 'uploads', image.replace(/^\/uploads\//, ''));
           try {
             await fs.unlink(filePath);
-            console.log(`Deleted image: ${filePath}`);
           } catch (err) {
-            console.error(`Error deleting image ${filePath}:`, err);
+            // Nếu file không tồn tại thì bỏ qua, lỗi khác thì báo lỗi
+            if (err.code !== 'ENOENT') {
+              return res.status(500).json({ message: `Failed to delete image: ${image}`, error: err.message });
+            }
           }
         }
       }
     }
+
+    // Thêm ảnh mới
     if (req.files && req.files.length > 0) {
       const newImages = req.files.map(file => `/uploads/${file.filename}`);
-      updatedImages = [...updatedImages, ...newImages];
-    }
-    if (req.body.removedImages || req.files.length > 0) {
-      updatedData.images = updatedImages;
+      updatedImages = [...new Set([...updatedImages, ...newImages])];
     }
 
+    // Luôn cập nhật lại trường images
+    updatedData.images = updatedImages;
+
+    // Cập nhật rental
     const updatedRental = await Rental.findByIdAndUpdate(
       req.params.id,
       { $set: updatedData },
@@ -443,10 +465,14 @@ router.patch('/rentals/:id', authMiddleware, upload.array('images'), async (req,
       return res.status(404).json({ message: 'Rental not found after update' });
     }
 
+    // Đồng bộ Elasticsearch
     syncRentalToElasticsearch(updatedRental);
+
     res.json(updatedRental);
   } catch (err) {
-    console.error('Error updating rental:', err);
+    if (err instanceof multer.MulterError) {
+      return res.status(400).json({ message: `File upload error: ${err.message}` });
+    }
     res.status(500).json({ message: 'Failed to update rental', error: err.message });
   }
 });
@@ -467,12 +493,20 @@ router.delete('/rentals/:id', authMiddleware, async (req, res) => {
     }
 
     for (const image of rental.images) {
-      const filePath = path.join(__dirname, '..', image.replace('/uploads/', 'uploads/'));
+      if (!image.startsWith('/uploads/')) {
+        console.warn(`Invalid image path format during deletion: ${image}`);
+        continue;
+      }
+      const filePath = path.join(__dirname, '..', 'Uploads', image.replace(/^\/uploads\//, ''));
       try {
+        await fs.access(filePath);
         await fs.unlink(filePath);
         console.log(`Deleted image: ${filePath}`);
       } catch (err) {
-        console.error(`Error deleting image ${filePath}:`, err);
+        console.error(`Error deleting image ${filePath}: ${err.message}`);
+        if (err.code !== 'ENOENT') {
+          console.warn(`Non-ENOENT error during deletion: ${err.message}`);
+        }
       }
     }
 

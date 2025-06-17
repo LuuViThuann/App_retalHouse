@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 import 'dart:io';
 import 'image_rental_edit.dart'; // Import ImageRentalEdit
 import 'full_image_edit_rental.dart'; // Import FullImageEditRental
+import 'dart:convert';
 
 class EditRentalScreen extends StatefulWidget {
   final Rental rental;
@@ -306,11 +307,15 @@ class _EditRentalScreenState extends State<EditRentalScreen> {
           'status': _updatedData['status'],
       };
 
+      if (_removedImages.isNotEmpty) {
+        print('Removed images to send: $_removedImages');
+        updatedData['removedImages'] = jsonEncode(_removedImages);
+      }
+
       await authViewModel.updateRental(
         rentalId: widget.rental.id!,
         updatedData: updatedData,
         imagePaths: _newImages.map((file) => file.path).toList(),
-        // removedImages: _removedImages, // Gửi danh sách ảnh cần xóa
       );
 
       if (mounted) {

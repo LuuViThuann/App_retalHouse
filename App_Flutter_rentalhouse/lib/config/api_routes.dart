@@ -1,5 +1,5 @@
 class ApiRoutes {
-  static const String rootUrl = 'http://192.168.1.51:3000';
+  static const String rootUrl = 'http://192.168.1.65:3000';
   static const String baseUrl = '$rootUrl/api';
   static const String serverBaseUrl = rootUrl;
   static const String socketUrl = serverBaseUrl;
