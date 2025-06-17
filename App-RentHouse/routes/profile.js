@@ -166,14 +166,20 @@ router.get('/notifications', authMiddleware, async (req, res) => {
     const rentalIds = userRentals.map((rental) => rental._id);
 
     const [comments, total] = await Promise.all([
-      Comment.find({ rentalId: { $in: rentalIds } })
+      Comment.find({ 
+        rentalId: { $in: rentalIds },
+        userId: { $ne: req.userId } // Exclude comments from current user
+      })
         .populate('userId', 'username')
         .populate('rentalId', 'title')
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(Number(limit))
         .lean(),
-      Comment.countDocuments({ rentalId: { $in: rentalIds } }),
+      Comment.countDocuments({ 
+        rentalId: { $in: rentalIds },
+        userId: { $ne: req.userId } // Exclude comments from current user
+      }),
     ]);
 
     const notifications = comments.map((comment) => ({
@@ -195,6 +201,28 @@ router.get('/notifications', authMiddleware, async (req, res) => {
     console.error('Fetch notifications error:', err.stack);
     res.status(500).json({ message: 'Failed to fetch notifications', error: err.message });
   }
-});
+}); 
 
+// Delete notification
+router.delete('/notifications/:id', authMiddleware, async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    // Verify that the notification belongs to the user
+    const notification = await Notification.findOne({ 
+      _id: id,
+      userId: req.userId 
+    });
+
+    if (!notification) {
+      return res.status(404).json({ message: 'Notification not found or unauthorized' });
+    }
+
+    await Notification.findByIdAndDelete(id);
+    res.json({ message: 'Notification deleted successfully' });
+  } catch (err) {
+    console.error('Delete notification error:', err);
+    res.status(500).json({ message: 'Failed to delete notification', error: err.message });
+  }
+});
 module.exports = router;

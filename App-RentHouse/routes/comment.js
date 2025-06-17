@@ -54,7 +54,7 @@ module.exports = (io) => {
 
       const commentIds = comments.map(c => c._id);
       const replies = await Reply.find({ commentId: { $in: commentIds } })
-        .populate('userId', 'username')
+      .populate('userId', 'avatarBase64 username')
         .lean();
 
       const likes = await LikeComment.find({
@@ -63,7 +63,7 @@ module.exports = (io) => {
           { targetId: { $in: replies.map(r => r._id) }, targetType: 'Reply' },
         ],
       })
-        .populate('userId', 'username')
+      .populate('userId', 'avatarBase64 username')
         .lean();
 
       const totalComments = await Comment.countDocuments({ rentalId });
@@ -196,14 +196,14 @@ module.exports = (io) => {
           'avatarBase64 username'
         );
 
-        const replies = await Reply.find({ commentId }).populate('userId', 'username').lean();
+        const replies = await Reply.find({ commentId }).populate('userId', 'avatarBase64 username').lean();
         const likes = await LikeComment.find({
           $or: [
             { targetId: commentId, targetType: 'Comment' },
             { targetId: { $in: replies.map((r) => r._id) }, targetType: 'Reply' },
           ],
         })
-          .populate('userId', 'username')
+        .populate('userId', 'avatarBase64 username')
           .lean();
 
         const replyMap = new Map();
@@ -325,14 +325,14 @@ module.exports = (io) => {
           'userId',
           'avatarBase64 username'
         );
-        const replies = await Reply.find({ commentId }).populate('userId', 'username').lean();
+        const replies = await Reply.find({ commentId }).populate('userId', 'avatarBase64 username').lean();
         const likes = await LikeComment.find({
           $or: [
             { targetId: commentId, targetType: 'Comment' },
             { targetId: { $in: replies.map((r) => r._id) }, targetType: 'Reply' },
           ],
         })
-          .populate('userId', 'username')
+        .populate('userId', 'avatarBase64 username')
           .lean();
 
         const replyMap = new Map();
@@ -434,14 +434,14 @@ module.exports = (io) => {
           'userId',
           'avatarBase64 username'
         );
-        const replies = await Reply.find({ commentId }).populate('userId', 'username').lean();
+        const replies = await Reply.find({ commentId }).populate('userId', 'avatarBase64 username').lean();
         const likes = await LikeComment.find({
           $or: [
             { targetId: commentId, targetType: 'Comment' },
             { targetId: { $in: replies.map((r) => r._id) }, targetType: 'Reply' },
           ],
         })
-          .populate('userId', 'username')
+        .populate('userId', 'avatarBase64 username')
           .lean();
 
         const replyMap = new Map();
@@ -529,14 +529,14 @@ module.exports = (io) => {
           'userId',
           'avatarBase64 username'
         );
-        const replies = await Reply.find({ commentId }).populate('userId', 'username').lean();
+        const replies = await Reply.find({ commentId }).populate('userId', 'avatarBase64 username').lean();
         const likes = await LikeComment.find({
           $or: [
             { targetId: commentId, targetType: 'Comment' },
             { targetId: { $in: replies.map((r) => r._id) }, targetType: 'Reply' },
           ],
         })
-          .populate('userId', 'username')
+        .populate('userId', 'avatarBase64 username')
           .lean();
 
         const replyMap = new Map();
@@ -617,14 +617,14 @@ module.exports = (io) => {
           'userId',
           'avatarBase64 username'
         );
-        const replies = await Reply.find({ commentId }).populate('userId', 'username').lean();
+        const replies = await Reply.find({ commentId }).populate('userId', 'avatarBase64 username').lean();
         const likes = await LikeComment.find({
           $or: [
             { targetId: commentId, targetType: 'Comment' },
             { targetId: { $in: replies.map((r) => r._id) }, targetType: 'Reply' },
           ],
         })
-          .populate('userId', 'username')
+        .populate('userId', 'avatarBase64 username')
           .lean();
 
         const replyMap = new Map();
@@ -693,14 +693,14 @@ module.exports = (io) => {
         'userId',
         'avatarBase64 username'
       );
-      const replies = await Reply.find({ commentId }).populate('userId', 'username').lean();
+      const replies = await Reply.find({ commentId }).populate('userId', 'avatarBase64 username').lean();
       const likes = await LikeComment.find({
         $or: [
           { targetId: commentId, targetType: 'Comment' },
           { targetId: { $in: replies.map((r) => r._id) }, targetType: 'Reply' },
         ],
       })
-        .populate('userId', 'username')
+        .populate('userId', 'avatarBase64 username')
         .lean();
 
       const replyMap = new Map();
@@ -780,14 +780,14 @@ module.exports = (io) => {
         'userId',
         'avatarBase64 username'
       );
-      const replies = await Reply.find({ commentId }).populate('userId', 'username').lean();
+      const replies = await Reply.find({ commentId }).populate('userId', 'avatarBase64 username').lean();
       const likes = await LikeComment.find({
         $or: [
           { targetId: commentId, targetType: 'Comment' },
           { targetId: { $in: replies.map((r) => r._id) }, targetType: 'Reply' },
         ],
       })
-        .populate('userId', 'username')
+        .populate('userId', 'avatarBase64 username')
         .lean();
 
       const replyMap = new Map();
@@ -877,7 +877,7 @@ module.exports = (io) => {
             'avatarBase64 username'
           );
           const replies = await Reply.find({ commentId })
-            .populate('userId', 'username')
+            .populate('userId', 'avatarBase64 username')
             .lean();
           const likes = await LikeComment.find({
             $or: [
@@ -885,7 +885,7 @@ module.exports = (io) => {
               { targetId: { $in: replies.map((r) => r._id) }, targetType: 'Reply' },
             ],
           })
-            .populate('userId', 'username')
+            .populate('userId', 'avatarBase64 username')
             .lean();
 
           const replyMap = new Map();
@@ -957,14 +957,14 @@ module.exports = (io) => {
           'userId',
           'avatarBase64 username'
         );
-        const replies = await Reply.find({ commentId }).populate('userId', 'username').lean();
+        const replies = await Reply.find({ commentId }).populate('userId', 'avatarBase64 username')
         const likes = await LikeComment.find({
           $or: [
             { targetId: commentId, targetType: 'Comment' },
             { targetId: { $in: replies.map((r) => r._id) }, targetType: 'Reply' },
           ],
         })
-          .populate('userId', 'username')
+          .populate('userId', 'avatarBase64 username')
           .lean();
 
         const replyMap = new Map();
@@ -1055,14 +1055,14 @@ module.exports = (io) => {
           'userId',
           'avatarBase64 username'
         );
-        const replies = await Reply.find({ commentId }).populate('userId', 'username').lean();
+        const replies = await Reply.find({ commentId }).populate('userId', 'avatarBase64 username').lean();
         const likes = await LikeComment.find({
           $or: [
             { targetId: commentId, targetType: 'Comment' },
             { targetId: { $in: replies.map((r) => r._id) }, targetType: 'Reply' },
           ],
         })
-          .populate('userId', 'username')
+        .populate('userId', 'avatarBase64 username')
           .lean();
 
         const replyMap = new Map();

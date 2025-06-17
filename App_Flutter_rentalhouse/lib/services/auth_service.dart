@@ -601,9 +601,36 @@ class AuthService {
           'AuthService: Fetch comments response: ${response.statusCode}, body: ${response.body}');
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        final comments = (data['comments'] as List)
-            .map((comment) => Comment.fromJson(comment))
-            .toList();
+        final comments = (data['comments'] as List).map((comment) {
+          final commentMap = Map<String, dynamic>.from(comment);
+          if (commentMap['userId'] != null) {
+            final userId = Map<String, dynamic>.from(commentMap['userId']);
+            commentMap['userId'] = {
+              ...userId,
+              'avatarBytes': userId['avatarBase64'] != null
+                  ? base64Decode(userId['avatarBase64'])
+                  : null,
+            };
+          }
+          if (commentMap['replies'] != null) {
+            commentMap['replies'] =
+                (commentMap['replies'] as List).map((reply) {
+              final replyMap = Map<String, dynamic>.from(reply);
+              if (replyMap['userId'] != null) {
+                final replyUserId =
+                    Map<String, dynamic>.from(replyMap['userId']);
+                replyMap['userId'] = {
+                  ...replyUserId,
+                  'avatarBytes': replyUserId['avatarBase64'] != null
+                      ? base64Decode(replyUserId['avatarBase64'])
+                      : null,
+                };
+              }
+              return replyMap;
+            }).toList();
+          }
+          return Comment.fromJson(commentMap);
+        }).toList();
         return {
           'comments': comments,
           'total': data['total'] ?? 0,
@@ -624,44 +651,39 @@ class AuthService {
   Future<Map<String, dynamic>> fetchNotifications(
       {int page = 1, int limit = 10}) async {
     try {
-      final user = _auth.currentUser;
-      if (user == null) {
-        print('AuthService: No user for fetching notifications');
-        throw Exception('Không tìm thấy người dùng');
-      }
-      final idToken = await user.getIdToken(true);
-      if (idToken == null) {
-        print('AuthService: No ID token for fetching notifications');
-        throw Exception('Failed to obtain ID token');
-      }
       final response = await http.get(
-        Uri.parse('${ApiRoutes.notifications}?page=$page&limit=$limit'),
+        Uri.parse('${ApiRoutes.baseUrl}/notifications?page=$page&limit=$limit'),
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': 'Bearer $idToken',
+          'Authorization': 'Bearer ${_auth.currentUser?.uid}',
         },
       );
-      print(
-          'AuthService: Fetch notifications response: ${response.statusCode}, body: ${response.body}');
+
       if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        final notifications = (data['notifications'] as List)
-            .map((notification) => NotificationModel.fromJson(notification))
-            .toList();
-        return {
-          'notifications': notifications,
-          'total': data['total'] ?? 0,
-          'page': data['page'] ?? page,
-          'pages': data['pages'] ?? 1,
-        };
+        return jsonDecode(response.body);
       } else {
-        final errorData = jsonDecode(response.body);
-        throw Exception(
-            'Lấy thông báo thất bại: ${errorData['message'] ?? response.body}');
+        throw Exception('Failed to fetch notifications');
       }
     } catch (e) {
-      print('AuthService: Error fetching notifications: $e');
-      throw Exception('Lấy thông báo thất bại: $e');
+      throw Exception('Error fetching notifications: $e');
+    }
+  }
+
+  Future<void> deleteNotification(String notificationId) async {
+    try {
+      final response = await http.delete(
+        Uri.parse('${ApiRoutes.baseUrl}/notifications/$notificationId'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ${_auth.currentUser?.uid}',
+        },
+      );
+
+      if (response.statusCode != 200) {
+        throw Exception('Failed to delete notification');
+      }
+    } catch (e) {
+      throw Exception('Error deleting notification: $e');
     }
   }
 

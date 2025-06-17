@@ -1,0 +1,1 @@
+const replies = await Reply.find({ commentId }).populate('userId', 'avatarBase64 username').lean(); 

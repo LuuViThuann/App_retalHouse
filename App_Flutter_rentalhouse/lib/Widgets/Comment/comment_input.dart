@@ -75,13 +75,15 @@ class CommentInputField extends StatelessWidget {
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    StarRating(rating: rating, onRatingChanged: onRatingChanged),
+                    StarRating(
+                        rating: rating, onRatingChanged: onRatingChanged),
                     if (ratingError != null)
                       Padding(
                         padding: const EdgeInsets.only(top: 4),
                         child: Text(
                           ratingError!,
-                          style: const TextStyle(color: Colors.red, fontSize: 12),
+                          style:
+                              const TextStyle(color: Colors.red, fontSize: 12),
                         ),
                       ),
                   ],
@@ -89,7 +91,8 @@ class CommentInputField extends StatelessWidget {
               GestureDetector(
                 onTap: onPickImages,
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                   decoration: BoxDecoration(
                     color: Colors.blue.withOpacity(0.1),
                     borderRadius: BorderRadius.circular(16),
@@ -134,7 +137,8 @@ class CommentInputField extends StatelessWidget {
                               onTap: () => onRemoveImage(index),
                               child: Container(
                                 color: Colors.black54,
-                                child: const Icon(Icons.close, color: Colors.white, size: 16),
+                                child: const Icon(Icons.close,
+                                    color: Colors.white, size: 16),
                               ),
                             ),
                           ),
@@ -158,14 +162,16 @@ class CommentInputField extends StatelessWidget {
                 onPressed: isPosting ? null : onSubmit,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.blue,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8)),
                 ),
                 child: isPosting
                     ? const SizedBox(
-                  width: 20,
-                  height: 20,
-                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                )
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                            strokeWidth: 2, color: Colors.white),
+                      )
                     : const Text('Đăng', style: TextStyle(color: Colors.white)),
               ),
             ],
@@ -180,7 +186,9 @@ class StarRating extends StatelessWidget {
   final double rating;
   final ValueChanged<double> onRatingChanged;
 
-  const StarRating({Key? key, required this.rating, required this.onRatingChanged}) : super(key: key);
+  const StarRating(
+      {Key? key, required this.rating, required this.onRatingChanged})
+      : super(key: key);
 
   @override
   Widget build(BuildContext context) {
@@ -209,8 +217,8 @@ class StarRating extends StatelessWidget {
               starValue <= rating
                   ? Icons.star
                   : starValue - 0.5 <= rating
-                  ? Icons.star_half
-                  : Icons.star_border,
+                      ? Icons.star_half
+                      : Icons.star_border,
               color: Colors.amber,
               size: 24,
             );

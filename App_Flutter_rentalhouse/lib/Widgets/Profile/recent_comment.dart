@@ -6,6 +6,7 @@ import 'package:flutter_rentalhouse/models/rental.dart';
 import 'package:flutter_rentalhouse/services/rental_service.dart';
 import 'package:flutter_rentalhouse/views/rental_detail_view.dart';
 import 'package:flutter_rentalhouse/services/comment_service.dart';
+import 'dart:convert';
 
 class RecentCommentsView extends StatefulWidget {
   @override
@@ -118,19 +119,9 @@ class _RecentCommentsViewState extends State<RecentCommentsView> {
         return Scaffold(
           backgroundColor: Colors.white,
           appBar: AppBar(
+            backgroundColor: Colors.white,
             title: Text('Bình luận gần đây',
-                style: TextStyle(color: Colors.white)),
-            flexibleSpace: Container(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [Colors.blue, Colors.blueAccent.shade700],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-              ),
-            ),
-            elevation: 4,
-            shadowColor: Colors.black26,
+                style: TextStyle(color: Colors.black)),
           ),
           body: Column(
             children: [
@@ -173,7 +164,6 @@ class _RecentCommentsViewState extends State<RecentCommentsView> {
                                     child: Stack(
                                       children: [
                                         Card(
-                                          elevation: 2,
                                           margin:
                                               EdgeInsets.symmetric(vertical: 8),
                                           shape: RoundedRectangleBorder(
@@ -197,7 +187,7 @@ class _RecentCommentsViewState extends State<RecentCommentsView> {
                                                 Row(
                                                   children: [
                                                     CircleAvatar(
-                                                      radius: 20,
+                                                      radius: 16,
                                                       backgroundImage: comment
                                                                   .userId
                                                                   .avatarBytes !=
@@ -205,8 +195,8 @@ class _RecentCommentsViewState extends State<RecentCommentsView> {
                                                           ? MemoryImage(comment
                                                               .userId
                                                               .avatarBytes!)
-                                                          : AssetImage(
-                                                                  'assets/images/default_avatar.jpg')
+                                                          : const AssetImage(
+                                                                  'assets/img/imageuser.png')
                                                               as ImageProvider,
                                                     ),
                                                     SizedBox(width: 8),

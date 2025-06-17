@@ -334,13 +334,48 @@ class AuthViewModel extends ChangeNotifier {
     try {
       final data =
           await _authService.fetchNotifications(page: page, limit: limit);
-      _notifications = data['notifications'] as List<NotificationModel>;
+      if (page == 1) {
+        _notifications = (data['notifications'] as List)
+            .map((notification) => NotificationModel.fromJson(notification))
+            .toList();
+      } else {
+        final newNotifications = (data['notifications'] as List)
+            .map((notification) => NotificationModel.fromJson(notification))
+            .toList();
+        _notifications.addAll(newNotifications);
+      }
       _notificationsPage = data['page'] as int;
       _notificationsTotalPages = data['pages'] as int;
     } catch (e) {
       _errorMessage = e.toString();
     } finally {
       _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> removeNotification(String notificationId) async {
+    try {
+      await _authService.deleteNotification(notificationId);
+      _notifications
+          .removeWhere((notification) => notification.id == notificationId);
+      notifyListeners();
+    } catch (e) {
+      _errorMessage = e.toString();
+      notifyListeners();
+    }
+  }
+
+  Future<void> restoreNotification(NotificationModel notification) async {
+    try {
+      // Refresh notifications to ensure we have the latest data
+      await fetchNotifications(page: 1);
+      if (!_notifications.any((n) => n.id == notification.id)) {
+        _notifications.add(notification);
+        notifyListeners();
+      }
+    } catch (e) {
+      _errorMessage = e.toString();
       notifyListeners();
     }
   }
