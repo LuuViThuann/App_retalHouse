@@ -623,22 +623,6 @@ class ChatViewModel extends ChangeNotifier {
     int index = _messages.indexWhere((msg) => msg.id == messageId);
     if (index != -1 && _currentConversationId != null) {
       backupMessage = _messages[index];
-      final oldMessage = _messages[index];
-      _messages[index] = Message(
-        id: messageId,
-        conversationId: oldMessage.conversationId,
-        senderId: oldMessage.senderId,
-        content: content,
-        images: [
-          ...oldMessage.images.where((img) => !removeImages.contains(img)),
-          ...imagePaths
-        ],
-        createdAt: oldMessage.createdAt,
-        updatedAt: DateTime.now(),
-        sender: oldMessage.sender,
-      );
-      _updateSearchIfNeeded();
-      _notify();
     }
     try {
       final request = http.MultipartRequest(

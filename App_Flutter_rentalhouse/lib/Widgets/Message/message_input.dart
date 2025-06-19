@@ -142,6 +142,8 @@ class ChatInputArea extends StatelessWidget {
   Widget build(BuildContext context) {
     final chatViewModel = Provider.of<ChatViewModel>(context);
     final authViewModel = Provider.of<AuthViewModel>(context);
+    // Thêm biến loading để disable nút khi đang gửi/chỉnh sửa
+    final ValueNotifier<bool> isEditingLoading = ValueNotifier(false);
 
     return Container(
       padding: const EdgeInsets.all(12),
@@ -202,7 +204,6 @@ class ChatInputArea extends StatelessWidget {
                                   child: GestureDetector(
                                     onTap: () {
                                       existingImagesToRemove.add(imageUrl);
-                                      // Chỉ notifyListeners cho message đang chỉnh sửa
                                       chatViewModel.updateMessageById(
                                         editingMessageId!,
                                         chatViewModel.messages.firstWhere(
@@ -234,7 +235,7 @@ class ChatInputArea extends StatelessWidget {
                               ],
                             ),
                           )),
-                  // Render ảnh local (mới thêm)
+                  // Render ảnh local (mới thêm) chỉ bằng Image.file
                   ...selectedImages.map((img) => Padding(
                         padding: const EdgeInsets.only(right: 12),
                         child: Stack(
@@ -256,7 +257,6 @@ class ChatInputArea extends StatelessWidget {
                               child: GestureDetector(
                                 onTap: () {
                                   selectedImages.remove(img);
-                                  // Chỉ notifyListeners cho message đang chỉnh sửa
                                   chatViewModel.updateMessageById(
                                     editingMessageId!,
                                     chatViewModel.messages.firstWhere(
@@ -352,33 +352,115 @@ class ChatInputArea extends StatelessWidget {
               const SizedBox(width: 8),
               AnimatedContainer(
                 duration: Duration(milliseconds: 200),
-                child: IconButton(
-                  icon: Icon(
-                    editingMessageId != null ? Icons.check : Icons.send,
-                    color: Colors.blue[600],
-                  ),
-                  onPressed: () async {
-                    final content = messageController.text.trim();
-                    if (!checkAuthentication(authViewModel, context)) return;
-                    if (editingMessageId != null) {
-                      if (!validateEditInput(content, selectedImages,
-                          existingImagesToRemove, context)) return;
-                      await _editMessage(
-                          context, chatViewModel, authViewModel, content);
-                    } else {
-                      if (!validateSendInput(content, selectedImages, context))
-                        return;
-                      await _sendMessage(
-                          context, chatViewModel, authViewModel, content);
-                    }
+                child: ValueListenableBuilder<bool>(
+                  valueListenable: isEditingLoading,
+                  builder: (context, loading, child) {
+                    return IconButton(
+                      icon: Icon(
+                        editingMessageId != null ? Icons.check : Icons.send,
+                        color: Colors.blue[600],
+                      ),
+                      onPressed: loading
+                          ? null
+                          : () async {
+                              final content = messageController.text.trim();
+                              if (!checkAuthentication(authViewModel, context))
+                                return;
+                              isEditingLoading.value = true;
+                              if (editingMessageId != null) {
+                                if (!validateEditInput(content, selectedImages,
+                                    existingImagesToRemove, context)) {
+                                  isEditingLoading.value = false;
+                                  return;
+                                }
+                                final success = await chatViewModel.editMessage(
+                                  messageId: editingMessageId!,
+                                  content: content,
+                                  token: authViewModel.currentUser!.token!,
+                                  imagePaths: selectedImages
+                                      .map((x) => x.path)
+                                      .toList(),
+                                  removeImages: existingImagesToRemove,
+                                );
+                                isEditingLoading.value = false;
+                                if (success) {
+                                  onCancelEditing();
+                                  selectedImages.clear();
+                                  existingImagesToRemove.clear();
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content:
+                                          Text('Tin nhắn đã được chỉnh sửa'),
+                                      backgroundColor: Colors.green[600],
+                                      behavior: SnackBarBehavior.floating,
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(10),
+                                      ),
+                                    ),
+                                  );
+                                  _scrollToMessage(editingMessageId);
+                                } else {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text(
+                                          chatViewModel.errorMessage ??
+                                              'Lỗi khi chỉnh sửa tin nhắn'),
+                                      backgroundColor: Colors.redAccent,
+                                      behavior: SnackBarBehavior.floating,
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(10),
+                                      ),
+                                    ),
+                                  );
+                                }
+                              } else {
+                                if (!validateSendInput(
+                                    content, selectedImages, context)) {
+                                  isEditingLoading.value = false;
+                                  return;
+                                }
+                                final success = await chatViewModel.sendMessage(
+                                  conversationId: conversationId,
+                                  content: content,
+                                  token: authViewModel.currentUser!.token!,
+                                  imagePaths: selectedImages
+                                      .map((x) => x.path)
+                                      .toList(),
+                                  senderId: authViewModel.currentUser!.id,
+                                );
+                                isEditingLoading.value = false;
+                                if (success) {
+                                  messageController.clear();
+                                  selectedImages.clear();
+                                  Provider.of<ChatViewModel>(context,
+                                          listen: false)
+                                      .notifyListeners();
+                                  _scrollToMessage(null);
+                                } else {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text(
+                                          chatViewModel.errorMessage ??
+                                              'Lỗi khi gửi tin nhắn'),
+                                      backgroundColor: Colors.redAccent,
+                                      behavior: SnackBarBehavior.floating,
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(10),
+                                      ),
+                                    ),
+                                  );
+                                }
+                              }
+                            },
+                      padding: EdgeInsets.all(12),
+                      style: ButtonStyle(
+                        backgroundColor:
+                            MaterialStateProperty.all(Colors.grey[100]),
+                        shape: MaterialStateProperty.all(CircleBorder()),
+                        elevation: MaterialStateProperty.all(2),
+                      ),
+                    );
                   },
-                  padding: EdgeInsets.all(12),
-                  style: ButtonStyle(
-                    backgroundColor:
-                        MaterialStateProperty.all(Colors.grey[100]),
-                    shape: MaterialStateProperty.all(CircleBorder()),
-                    elevation: MaterialStateProperty.all(2),
-                  ),
                 ),
               ),
             ],
