@@ -162,135 +162,131 @@ class ChatInputArea extends StatelessWidget {
             Container(
               height: 80,
               margin: const EdgeInsets.only(bottom: 12),
-              child: ListView.builder(
+              child: ListView(
                 scrollDirection: Axis.horizontal,
-                itemCount: chatViewModel.messages
-                    .firstWhere((msg) => msg.id == editingMessageId)
-                    .images
-                    .length,
-                itemBuilder: (context, index) {
-                  final imageUrl = chatViewModel.messages
+                children: [
+                  // Render ảnh network (cũ)
+                  ...chatViewModel.messages
                       .firstWhere((msg) => msg.id == editingMessageId)
-                      .images[index];
-                  return Stack(
-                    children: [
-                      Padding(
-                        padding: const EdgeInsets.only(right: 12),
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(12),
-                          child: CachedNetworkImage(
-                            imageUrl: '${ApiRoutes.serverBaseUrl}$imageUrl',
-                            width: 80,
-                            height: 80,
-                            fit: BoxFit.cover,
-                            placeholder: (context, url) => Container(
-                              width: 80,
-                              height: 80,
-                              color: Colors.grey[200],
-                              child: Center(
-                                  child: CircularProgressIndicator(
-                                color: Colors.blue[400],
-                              )),
-                            ),
-                            errorWidget: (context, url, error) =>
-                                Icon(Icons.error, color: Colors.red[400]),
-                          ),
-                        ),
-                      ),
-                      if (!existingImagesToRemove.contains(imageUrl))
-                        Positioned(
-                          top: 4,
-                          right: 4,
-                          child: GestureDetector(
-                            onTap: () {
-                              existingImagesToRemove.add(imageUrl);
-                              Provider.of<ChatViewModel>(context, listen: false)
-                                  .notifyListeners();
-                            },
-                            child: Container(
-                              decoration: BoxDecoration(
-                                color: Colors.red[600],
-                                shape: BoxShape.circle,
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.black.withOpacity(0.2),
-                                    blurRadius: 4,
-                                    offset: Offset(0, 2),
+                      .images
+                      .where((img) => !existingImagesToRemove.contains(img))
+                      .map((imageUrl) => Padding(
+                            padding: const EdgeInsets.only(right: 12),
+                            child: Stack(
+                              children: [
+                                ClipRRect(
+                                  borderRadius: BorderRadius.circular(12),
+                                  child: CachedNetworkImage(
+                                    imageUrl:
+                                        '${ApiRoutes.serverBaseUrl}$imageUrl',
+                                    width: 80,
+                                    height: 80,
+                                    fit: BoxFit.cover,
+                                    placeholder: (context, url) => Container(
+                                      width: 80,
+                                      height: 80,
+                                      color: Colors.grey[200],
+                                      child: Center(
+                                          child: CircularProgressIndicator(
+                                        color: Colors.blue[400],
+                                      )),
+                                    ),
+                                    errorWidget: (context, url, error) => Icon(
+                                        Icons.error,
+                                        color: Colors.red[400]),
                                   ),
-                                ],
-                              ),
-                              child: Icon(
-                                Icons.cancel,
-                                color: Colors.white,
-                                size: 24,
-                              ),
-                            ),
-                          ),
-                        ),
-                    ],
-                  );
-                },
-              ),
-            ),
-          if (selectedImages.isNotEmpty)
-            Container(
-              height: 80,
-              margin: const EdgeInsets.only(bottom: 12),
-              child: ListView.builder(
-                scrollDirection: Axis.horizontal,
-                itemCount: selectedImages.length,
-                itemBuilder: (context, index) {
-                  if (index >= selectedImages.length) return SizedBox.shrink();
-                  return Stack(
-                    children: [
-                      Padding(
-                        padding: const EdgeInsets.only(right: 12),
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(12),
-                          child: Image.file(
-                            File(selectedImages[index].path),
-                            width: 80,
-                            height: 80,
-                            fit: BoxFit.cover,
-                            errorBuilder: (context, error, stackTrace) =>
-                                Icon(Icons.error, color: Colors.red[400]),
-                          ),
-                        ),
-                      ),
-                      Positioned(
-                        top: 4,
-                        right: 4,
-                        child: GestureDetector(
-                          onTap: () {
-                            if (index < selectedImages.length) {
-                              selectedImages.removeAt(index);
-                              Provider.of<ChatViewModel>(context, listen: false)
-                                  .notifyListeners();
-                            }
-                          },
-                          child: Container(
-                            decoration: BoxDecoration(
-                              color: Colors.red[600],
-                              shape: BoxShape.circle,
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withOpacity(0.2),
-                                  blurRadius: 4,
-                                  offset: Offset(0, 2),
+                                ),
+                                Positioned(
+                                  top: 4,
+                                  right: 4,
+                                  child: GestureDetector(
+                                    onTap: () {
+                                      existingImagesToRemove.add(imageUrl);
+                                      // Chỉ notifyListeners cho message đang chỉnh sửa
+                                      chatViewModel.updateMessageById(
+                                        editingMessageId!,
+                                        chatViewModel.messages.firstWhere(
+                                            (msg) =>
+                                                msg.id == editingMessageId!),
+                                      );
+                                    },
+                                    child: Container(
+                                      decoration: BoxDecoration(
+                                        color: Colors.red[600],
+                                        shape: BoxShape.circle,
+                                        boxShadow: [
+                                          BoxShadow(
+                                            color:
+                                                Colors.black.withOpacity(0.2),
+                                            blurRadius: 4,
+                                            offset: Offset(0, 2),
+                                          ),
+                                        ],
+                                      ),
+                                      child: Icon(
+                                        Icons.cancel,
+                                        color: Colors.white,
+                                        size: 24,
+                                      ),
+                                    ),
+                                  ),
                                 ),
                               ],
                             ),
-                            child: Icon(
-                              Icons.cancel,
-                              color: Colors.white,
-                              size: 24,
+                          )),
+                  // Render ảnh local (mới thêm)
+                  ...selectedImages.map((img) => Padding(
+                        padding: const EdgeInsets.only(right: 12),
+                        child: Stack(
+                          children: [
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(12),
+                              child: Image.file(
+                                File(img.path),
+                                width: 80,
+                                height: 80,
+                                fit: BoxFit.cover,
+                                errorBuilder: (context, error, stackTrace) =>
+                                    Icon(Icons.error, color: Colors.red[400]),
+                              ),
                             ),
-                          ),
+                            Positioned(
+                              top: 4,
+                              right: 4,
+                              child: GestureDetector(
+                                onTap: () {
+                                  selectedImages.remove(img);
+                                  // Chỉ notifyListeners cho message đang chỉnh sửa
+                                  chatViewModel.updateMessageById(
+                                    editingMessageId!,
+                                    chatViewModel.messages.firstWhere(
+                                        (msg) => msg.id == editingMessageId!),
+                                  );
+                                },
+                                child: Container(
+                                  decoration: BoxDecoration(
+                                    color: Colors.red[600],
+                                    shape: BoxShape.circle,
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Colors.black.withOpacity(0.2),
+                                        blurRadius: 4,
+                                        offset: Offset(0, 2),
+                                      ),
+                                    ],
+                                  ),
+                                  child: Icon(
+                                    Icons.cancel,
+                                    color: Colors.white,
+                                    size: 24,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
-                      ),
-                    ],
-                  );
-                },
+                      )),
+                ],
               ),
             ),
           Row(

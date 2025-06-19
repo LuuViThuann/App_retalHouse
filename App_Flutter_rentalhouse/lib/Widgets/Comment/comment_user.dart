@@ -18,13 +18,15 @@ class CommentSection extends StatefulWidget {
   final String rentalId;
   final ValueChanged<int>? onCommentCountChanged;
 
-  const CommentSection({super.key, required this.rentalId, this.onCommentCountChanged});
+  const CommentSection(
+      {super.key, required this.rentalId, this.onCommentCountChanged});
 
   @override
   State<CommentSection> createState() => _CommentSectionState();
 }
 
-class _CommentSectionState extends State<CommentSection> with SingleTickerProviderStateMixin {
+class _CommentSectionState extends State<CommentSection>
+    with SingleTickerProviderStateMixin {
   final TextEditingController _commentController = TextEditingController();
   final TextEditingController _replyController = TextEditingController();
   final TextEditingController _editController = TextEditingController();
@@ -238,10 +240,13 @@ class _CommentSectionState extends State<CommentSection> with SingleTickerProvid
       newContent: newContent,
       editSelectedImages: _editSelectedImages,
       editImagesToRemove: _editImagesToRemove,
-      onReplyEdited: (updatedComment) {
+      onReplyEdited: (updatedReply) {
         setState(() {
           final index = _comments.indexWhere((c) => c.id == commentId);
-          if (index != -1) _comments[index] = updatedComment;
+          if (index != -1) {
+            _comments[index] = CommentService.updateReplyInComment(
+                _comments[index], replyId, updatedReply);
+          }
           _editingReplyId = null;
           _editSelectedImages.clear();
           _editImagesToRemove.clear();
@@ -259,10 +264,13 @@ class _CommentSectionState extends State<CommentSection> with SingleTickerProvid
       authViewModel: authViewModel,
       commentId: commentId,
       replyId: replyId,
-      onReplyDeleted: (updatedComment) {
+      onReplyDeleted: (deletedReplyId) {
         setState(() {
           final index = _comments.indexWhere((c) => c.id == commentId);
-          if (index != -1) _comments[index] = updatedComment;
+          if (index != -1) {
+            _comments[index] = CommentService.removeReplyFromComment(
+                _comments[index], deletedReplyId);
+          }
         });
         _showSuccessSnackBar('Xóa phản hồi thành công');
       },
@@ -296,24 +304,30 @@ class _CommentSectionState extends State<CommentSection> with SingleTickerProvid
       commentId: commentId,
       replyId: replyId,
       comments: _comments,
-      onReplyLikeToggled: (updatedComment) {
+      onReplyLikeToggled: (updatedReply) {
         setState(() {
           final index = _comments.indexWhere((c) => c.id == commentId);
-          if (index != -1) _comments[index] = updatedComment;
+          if (index != -1) {
+            _comments[index] = CommentService.updateReplyInComment(
+                _comments[index], replyId, updatedReply);
+          }
           _showLikeAnimation();
         });
       },
       onError: _showErrorSnackBar,
-      setTogglingReplyLike: (value) => setState(() => _isTogglingReplyLike = value),
+      setTogglingReplyLike: (value) =>
+          setState(() => _isTogglingReplyLike = value),
     );
   }
 
   void _showErrorSnackBar(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(message)));
   }
 
   void _showSuccessSnackBar(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(message)));
   }
 
   void _showFullScreenImage(String imageUrl) {
@@ -326,7 +340,8 @@ class _CommentSectionState extends State<CommentSection> with SingleTickerProvid
             children: [
               Center(
                 child: PhotoView(
-                  imageProvider: NetworkImage('${ApiRoutes.serverBaseUrl}$imageUrl'),
+                  imageProvider:
+                      NetworkImage('${ApiRoutes.serverBaseUrl}$imageUrl'),
                   minScale: PhotoViewComputedScale.contained * 0.8,
                   maxScale: PhotoViewComputedScale.covered * 2.0,
                 ),
@@ -387,10 +402,12 @@ class _CommentSectionState extends State<CommentSection> with SingleTickerProvid
             isPosting: _isPostingComment,
             onSubmit: _postComment,
             rating: _selectedRating,
-            onRatingChanged: (rating) => setState(() => _selectedRating = rating),
+            onRatingChanged: (rating) =>
+                setState(() => _selectedRating = rating),
             selectedImages: _selectedImages,
             onPickImages: () => _pickImages(),
-            onRemoveImage: (index) => setState(() => _selectedImages.removeAt(index)),
+            onRemoveImage: (index) =>
+                setState(() => _selectedImages.removeAt(index)),
             onCancel: () => setState(() {
               _commentController.clear();
               _selectedRating = 0.0;
@@ -405,7 +422,8 @@ class _CommentSectionState extends State<CommentSection> with SingleTickerProvid
             ListView.separated(
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
-              itemCount: _comments.length + (_currentPage < _totalPages ? 1 : 0),
+              itemCount:
+                  _comments.length + (_currentPage < _totalPages ? 1 : 0),
               separatorBuilder: (context, index) => const SizedBox(height: 12),
               itemBuilder: (context, index) {
                 if (index == _comments.length && _currentPage < _totalPages) {
@@ -417,7 +435,8 @@ class _CommentSectionState extends State<CommentSection> with SingleTickerProvid
                 }
                 final comment = _comments[index];
                 final user = comment.userId;
-                final hasLiked = comment.likes.any((like) => like.userId == currentUserId);
+                final hasLiked =
+                    comment.likes.any((like) => like.userId == currentUserId);
                 final isOwnComment = user.id == currentUserId;
                 final isExpanded = _expandedReplies.contains(comment.id);
                 return CommentItem(
@@ -440,8 +459,10 @@ class _CommentSectionState extends State<CommentSection> with SingleTickerProvid
                   editImagesToRemove: _editImagesToRemove,
                   onDelete: () => _deleteComment(comment.id),
                   onToggleLike: () => _toggleLike(comment.id),
-                  onToggleReplyLike: (replyId) => _toggleReplyLike(comment.id, replyId),
-                  onReply: () => setState(() => _selectedCommentId = comment.id),
+                  onToggleReplyLike: (replyId) =>
+                      _toggleReplyLike(comment.id, replyId),
+                  onReply: () =>
+                      setState(() => _selectedCommentId = comment.id),
                   onReplyToReply: (replyId) => setState(() {
                     _selectedCommentId = comment.id;
                     _selectedReplyId = replyId;
@@ -452,7 +473,8 @@ class _CommentSectionState extends State<CommentSection> with SingleTickerProvid
                     _replyController.clear();
                     _selectedReplyImages.clear();
                   }),
-                  onSubmitReply: () => _postReply(comment.id, parentReplyId: _selectedReplyId),
+                  onSubmitReply: () =>
+                      _postReply(comment.id, parentReplyId: _selectedReplyId),
                   onEditComment: () {
                     setState(() {
                       _editingCommentId = comment.id;
@@ -461,7 +483,8 @@ class _CommentSectionState extends State<CommentSection> with SingleTickerProvid
                       _editSelectedImages.clear();
                     });
                   },
-                  onSaveEditComment: (newContent) => _editComment(comment.id, newContent),
+                  onSaveEditComment: (newContent) =>
+                      _editComment(comment.id, newContent),
                   onCancelEdit: () => setState(() {
                     _editingCommentId = null;
                     _editingReplyId = null;
@@ -483,13 +506,16 @@ class _CommentSectionState extends State<CommentSection> with SingleTickerProvid
                       _editSelectedImages.clear();
                     });
                   },
-                  onSaveEditReply: (replyId, newContent) => _editReply(comment.id, replyId, newContent),
+                  onSaveEditReply: (replyId, newContent) =>
+                      _editReply(comment.id, replyId, newContent),
                   onDeleteReply: (replyId) => _deleteReply(comment.id, replyId),
                   onImageTap: _showFullScreenImage,
                   onPickReplyImages: () => _pickImages(forReply: true),
-                  onRemoveReplyImage: (index) => setState(() => _selectedReplyImages.removeAt(index)),
+                  onRemoveReplyImage: (index) =>
+                      setState(() => _selectedReplyImages.removeAt(index)),
                   onPickEditImages: () => _pickImages(forEdit: true),
-                  onRemoveEditImage: (index) => setState(() => _editSelectedImages.removeAt(index)),
+                  onRemoveEditImage: (index) =>
+                      setState(() => _editSelectedImages.removeAt(index)),
                   onRemoveExistingImage: (imageUrl) => setState(() {
                     _editImagesToRemove.add(imageUrl);
                   }),
@@ -504,7 +530,9 @@ class _CommentSectionState extends State<CommentSection> with SingleTickerProvid
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: const Center(child: Text('Chưa có bình luận nào!', style: TextStyle(color: Colors.grey))),
+              child: const Center(
+                  child: Text('Chưa có bình luận nào!',
+                      style: TextStyle(color: Colors.grey))),
             ),
         ],
       ),
@@ -536,7 +564,8 @@ class _LoadMoreButton extends StatelessWidget {
   final VoidCallback onPressed;
   final String label;
 
-  const _LoadMoreButton({required this.isLoading, required this.onPressed, required this.label});
+  const _LoadMoreButton(
+      {required this.isLoading, required this.onPressed, required this.label});
 
   @override
   Widget build(BuildContext context) {
@@ -544,9 +573,9 @@ class _LoadMoreButton extends StatelessWidget {
       child: isLoading
           ? const CircularProgressIndicator()
           : TextButton(
-        onPressed: onPressed,
-        child: Text(label, style: const TextStyle(color: Colors.blue)),
-      ),
+              onPressed: onPressed,
+              child: Text(label, style: const TextStyle(color: Colors.blue)),
+            ),
     );
   }
 }

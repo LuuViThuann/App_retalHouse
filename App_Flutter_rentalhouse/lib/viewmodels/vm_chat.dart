@@ -511,7 +511,7 @@ class ChatViewModel extends ChangeNotifier {
       request.fields['content'] = content;
 
       for (final path in imagePaths) {
-        request.files.add(await http.MultipartFile.fromPath('data', path));
+        request.files.add(await http.MultipartFile.fromPath('images', path));
       }
 
       final response = await request.send();
@@ -650,7 +650,7 @@ class ChatViewModel extends ChangeNotifier {
       request.fields['removeImages'] = jsonEncode(removeImages);
 
       for (final path in imagePaths) {
-        request.files.add(await http.MultipartFile.fromPath('data', path));
+        request.files.add(await http.MultipartFile.fromPath('images', path));
       }
 
       final response = await request.send();
@@ -810,6 +810,14 @@ class ChatViewModel extends ChangeNotifier {
 
   void _notify() {
     if (hasListeners) {
+      notifyListeners();
+    }
+  }
+
+  void updateMessageById(String messageId, Message updatedMessage) {
+    final index = _messages.indexWhere((msg) => msg.id == messageId);
+    if (index != -1) {
+      _messages[index] = updatedMessage;
       notifyListeners();
     }
   }

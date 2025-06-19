@@ -90,7 +90,7 @@ router.get('/recent-comments', authMiddleware, async (req, res) => {
       })
       .populate({
         path: 'userId',
-        select: 'username',
+        select: 'avatarBase64 username',
       })
       .sort({ createdAt: -1 })
       .skip(skip)
@@ -123,10 +123,10 @@ router.get('/recent-comments', authMiddleware, async (req, res) => {
         commentId: reply.commentId?._id?.toString() || '',
         rentalId: reply.commentId?.rentalId?._id?.toString() || '',
         rentalTitle: reply.commentId?.rentalId?.title || 'Unknown Rental',
-        userId: {
+       userId: {
           _id: reply.userId?._id?.toString() || req.userId,
           username: reply.userId?.username || 'Unknown User',
-          avatarBase64: '', // Replies don't need avatarBase64
+          avatarBase64: reply.userId?.avatarBase64 || '',
         },
         content: reply.content || '',
         images: reply.images || [],
@@ -156,6 +156,33 @@ router.get('/recent-comments', authMiddleware, async (req, res) => {
   }
 });
 
+router.delete('/reply/:id', authMiddleware, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const reply = await Reply.findById(id);
+    if (!reply) {
+      return res.status(404).json({ message: 'Reply not found' });
+    }
+    if (reply.userId.toString() !== req.userId) {
+      return res.status(401).json({ message: 'Unauthorized' });
+    }
+
+    // Xóa reply khỏi replies của comment cha (nếu có)
+    if (reply.commentId) {
+      await Comment.findByIdAndUpdate(
+        reply.commentId,
+        { $pull: { replies: id } }
+      );
+    }
+
+    await Reply.findByIdAndDelete(id);
+    res.json({ message: 'Reply deleted successfully' });
+  } catch (err) {
+    console.error('Delete reply error:', err);
+    res.status(500).json({ message: 'Failed to delete reply', error: err.message });
+  }
+});
+
 // Get user's notifications (Thông báo)
 router.get('/notifications', authMiddleware, async (req, res) => {
   try {
@@ -170,7 +197,7 @@ router.get('/notifications', authMiddleware, async (req, res) => {
         rentalId: { $in: rentalIds },
         userId: { $ne: req.userId } // Exclude comments from current user
       })
-        .populate('userId', 'username')
+        .populate('userId', 'avatarBase64 username')
         .populate('rentalId', 'title')
         .sort({ createdAt: -1 })
         .skip(skip)

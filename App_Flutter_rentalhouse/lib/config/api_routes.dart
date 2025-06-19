@@ -1,5 +1,5 @@
 class ApiRoutes {
-  static const String rootUrl = 'http://192.168.1.65:3000';
+  static const String rootUrl = 'http://192.168.1.158:3000';
   static const String baseUrl = '$rootUrl/api';
   static const String serverBaseUrl = rootUrl;
   static const String socketUrl = serverBaseUrl;
@@ -40,6 +40,8 @@ class ApiRoutes {
       '$comments/$commentId/replies/$replyId/like';
   static String unlikeReply(String commentId, String replyId) =>
       '$comments/$commentId/replies/$replyId/unlike';
+  static String deleteReply(String replyId) =>
+      '$baseUrl/profile/reply/$replyId';
 
   // Chat Endpoints
   static const String conversations = '$baseUrl/conversations';

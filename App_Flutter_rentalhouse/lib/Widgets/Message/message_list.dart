@@ -383,8 +383,7 @@ class ChatMessageList extends StatelessWidget {
                                 border:
                                     highlightedMessageIds.contains(message.id)
                                         ? Border.all(
-                                            color: Colors.red[700]!,
-                                            width: 2)
+                                            color: Colors.red[700]!, width: 2)
                                         : null,
                               ),
                               child: Column(

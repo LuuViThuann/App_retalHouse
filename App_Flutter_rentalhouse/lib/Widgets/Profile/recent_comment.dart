@@ -90,18 +90,18 @@ class _RecentCommentsViewState extends State<RecentCommentsView> {
     );
     if (confirm != true) return;
     setState(() => _loadingCommentId = comment.id);
-    await CommentService().deleteComment(
+    await CommentService().deleteCommentOrReply(
       authViewModel: authViewModel,
-      commentId: comment.id,
+      id: comment.id,
+      type: comment.type ?? 'Comment', // 'Reply' hoặc 'Comment'
       onCommentDeleted: (total, totalPages) async {
-        // Sau khi xóa, reload lại danh sách bình luận gần đây
         await authViewModel.fetchRecentComments(page: 1);
         setState(() {
           _loadingCommentId = null;
           if (_selectedCommentId == comment.id) _selectedCommentId = null;
         });
         ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('Đã xóa bình luận.')));
+            .showSnackBar(SnackBar(content: Text('Đã xóa bình luận !')));
       },
       onError: (err) {
         setState(() => _loadingCommentId = null);
@@ -125,14 +125,6 @@ class _RecentCommentsViewState extends State<RecentCommentsView> {
           ),
           body: Column(
             children: [
-              if (authViewModel.errorMessage != null)
-                Padding(
-                  padding: const EdgeInsets.all(8.0),
-                  child: Text(
-                    authViewModel.errorMessage!,
-                    style: TextStyle(color: Colors.red),
-                  ),
-                ),
               Expanded(
                 child: authViewModel.isLoading &&
                         authViewModel.recentComments.isEmpty
@@ -141,8 +133,10 @@ class _RecentCommentsViewState extends State<RecentCommentsView> {
                         padding: const EdgeInsets.all(16.0),
                         child: authViewModel.recentComments.isEmpty
                             ? Center(
-                                child:
-                                    Text('Chưa có bình luận hoặc phản hồi nào'))
+                                child: Text(
+                                'Chưa có bình luận hoặc phản hồi nào !',
+                                style: TextStyle(color: Colors.red),
+                              ))
                             : ListView.builder(
                                 itemCount: authViewModel.recentComments.length,
                                 itemBuilder: (context, index) {

@@ -59,34 +59,24 @@ class _ProfileViewState extends State<ProfileView> {
         return Scaffold(
           backgroundColor: Colors.white,
           appBar: AppBar(
+            backgroundColor: Colors.white,
             title: Row(
               children: [
                 Icon(
                   Icons.person,
-                  color: Colors.white,
+                  color: Colors.black,
                 ),
                 SizedBox(width: 8),
                 Text(
                   'Hồ sơ người dùng',
                   style: TextStyle(
-                    color: Colors.white,
+                    color: Colors.black,
                     fontWeight: FontWeight.bold,
                     fontSize: 22,
                   ),
                 ),
               ],
             ),
-            flexibleSpace: Container(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [Colors.blue, Colors.blueAccent.shade700],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-              ),
-            ),
-            elevation: 4,
-            shadowColor: Colors.black26,
           ),
           body: SingleChildScrollView(
             child: Padding(
