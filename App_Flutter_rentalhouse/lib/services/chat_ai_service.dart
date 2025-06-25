@@ -62,8 +62,10 @@ class _ChatAIBottomSheetState extends State<ChatAIBottomSheet> {
     });
 
     final lowerInput = userInput.toLowerCase();
+    List<Map<String, String>> newMessages = [];
+    List<Rental> foundRentals = [];
 
-    // 1. Tìm bài đăng theo loại hình bất động sản (propertyType) -------------------
+    // 1. Tìm bài đăng theo loại hình bất động sản (propertyType)
     final matchedPropertyTypes = rentals
         .where(
             (rental) => lowerInput.contains(rental.propertyType.toLowerCase()))
@@ -76,26 +78,14 @@ class _ChatAIBottomSheetState extends State<ChatAIBottomSheet> {
         final typeRentals = rentals
             .where((rental) =>
                 rental.propertyType.toLowerCase() == type.toLowerCase())
-            .map((e) => e.title)
             .toList();
-
         if (typeRentals.isNotEmpty) {
-          setState(() {
-            messages.add({
-              'role': 'ai',
-              'text':
-                  "🏠 Các bài đăng loại *$type* bao gồm:\n- ${typeRentals.join("\n- ")}. Bạn có muốn xem chi tiết bài đăng nào không?"
-            });
-          });
+          foundRentals.addAll(typeRentals);
         }
       }
-      setState(() {
-        isLoading = false;
-      });
-      return;
     }
 
-    // 2. Tìm bài đăng theo từ khóa (tiêu đề, vị trí, tiện nghi) -------------------
+    // 2. Tìm bài đăng theo từ khóa (tiêu đề, vị trí, tiện nghi)
     final matchingRentals = rentals
         .where((rental) =>
             rental.title.toLowerCase().contains(lowerInput) ||
@@ -103,14 +93,68 @@ class _ChatAIBottomSheetState extends State<ChatAIBottomSheet> {
             rental.amenities
                 .any((amenity) => amenity.toLowerCase().contains(lowerInput)))
         .toList();
-
     if (matchingRentals.isNotEmpty) {
+      foundRentals.addAll(matchingRentals);
+    }
+
+    // 3. Tìm nhà giá rẻ nhất
+    if (lowerInput.contains('giá rẻ nhất')) {
+      final cheapestRental = rentals
+          .where((rental) => rental.price != null)
+          .toList()
+        ..sort((a, b) => a.price.compareTo(b.price));
+      if (cheapestRental.isNotEmpty) {
+        foundRentals.add(cheapestRental.first);
+      }
+    }
+
+    // 4. Tìm nhà giá cao nhất
+    if (lowerInput.contains('giá cao nhất') ||
+        lowerInput.contains('đắt nhất')) {
+      final mostExpensiveRental = rentals
+          .where((rental) => rental.price != null)
+          .toList()
+        ..sort((a, b) => b.price.compareTo(a.price));
+      if (mostExpensiveRental.isNotEmpty) {
+        foundRentals.add(mostExpensiveRental.first);
+      }
+    }
+
+    // 5. Tìm nhà theo diện tích
+    if (lowerInput.contains('diện tích')) {
+      final areaMatch = RegExp(r'\d+').firstMatch(lowerInput);
+      if (areaMatch != null) {
+        final targetArea = double.parse(areaMatch.group(0)!);
+        final areaRentals = rentals
+            .where((rental) => (rental.area['total'] - targetArea).abs() <= 10)
+            .toList();
+        if (areaRentals.isNotEmpty) {
+          foundRentals.addAll(areaRentals);
+        }
+      }
+    }
+
+    // 6. Tìm nhà theo vị trí
+    if (lowerInput.contains('vị trí') || lowerInput.contains('khu vực')) {
+      final locationRentals = rentals
+          .where((rental) =>
+              rental.location['short'].toLowerCase().contains(lowerInput))
+          .toList();
+      if (locationRentals.isNotEmpty) {
+        foundRentals.addAll(locationRentals);
+      }
+    }
+
+    // Nếu có kết quả bài viết liên quan, hiển thị chi tiết các bài viết
+    if (foundRentals.isNotEmpty) {
       setState(() {
-        for (var rental in matchingRentals) {
+        // Xóa trùng lặp bài viết
+        final uniqueRentals =
+            {for (var r in foundRentals) r.id: r}.values.toList();
+        for (var rental in uniqueRentals) {
           messages.add({
             'role': 'ai',
-            'text':
-                '🏡 Tìm thấy bài đăng: ${rental.title}\n- Giá: ${formatCurrency(rental.price)}\n- Vị trí: ${rental.location['short']}\n- Diện tích: ${rental.area['total']} m²\n- Tiện nghi: ${rental.amenities.join(", ")}',
+            'text': '🏡 Gợi ý bài viết liên quan:',
             'type': 'rental',
             'rental': jsonEncode(rental.toJson()),
           });
@@ -120,117 +164,7 @@ class _ChatAIBottomSheetState extends State<ChatAIBottomSheet> {
       return;
     }
 
-    // 3. Tìm nhà giá rẻ nhất -----------------------------------------------
-    if (lowerInput.contains('giá rẻ nhất')) {
-      final cheapestRental = rentals
-          .where((rental) => rental.price != null)
-          .toList()
-        ..sort((a, b) => a.price.compareTo(b.price));
-
-      if (cheapestRental.isNotEmpty) {
-        setState(() {
-          messages.add({
-            'role': 'ai',
-            'text':
-                "💸 Bài đăng rẻ nhất: ${cheapestRental.first.title}\n- Giá: ${formatCurrency(cheapestRental.first.price)}\n- Vị trí: ${cheapestRental.first.location['short']}\n- Diện tích: ${cheapestRental.first.area['total']} m²"
-          });
-          isLoading = false;
-        });
-        return;
-      } else {
-        setState(() {
-          messages.add({
-            'role': 'ai',
-            'text': '❌ Không tìm thấy bài đăng nào có giá trong dữ liệu.'
-          });
-          isLoading = false;
-        });
-        return;
-      }
-    }
-
-    // 4. Tìm nhà giá cao nhất -----------------------------------------------
-    if (lowerInput.contains('giá cao nhất') ||
-        lowerInput.contains('đắt nhất')) {
-      final mostExpensiveRental = rentals
-          .where((rental) => rental.price != null)
-          .toList()
-        ..sort((a, b) => b.price.compareTo(a.price));
-
-      if (mostExpensiveRental.isNotEmpty) {
-        setState(() {
-          messages.add({
-            'role': 'ai',
-            'text':
-                "💰 Bài đăng đắt nhất: ${mostExpensiveRental.first.title}\n- Giá: ${formatCurrency(mostExpensiveRental.first.price)}\n- Vị trí: ${mostExpensiveRental.first.location['short']}\n- Diện tích: ${mostExpensiveRental.first.area['total']} m²"
-          });
-          isLoading = false;
-        });
-        return;
-      } else {
-        setState(() {
-          messages.add({
-            'role': 'ai',
-            'text': '❌ Không tìm thấy bài đăng nào có giá trong dữ liệu.'
-          });
-          isLoading = false;
-        });
-        return;
-      }
-    }
-
-    // 5. Tìm nhà theo diện tích -----------------------------------------------
-    if (lowerInput.contains('diện tích')) {
-      final areaMatch = RegExp(r'\d+').firstMatch(lowerInput);
-      if (areaMatch != null) {
-        final targetArea = double.parse(areaMatch.group(0)!);
-        final areaRentals = rentals
-            .where((rental) => (rental.area['total'] - targetArea).abs() <= 10)
-            .toList();
-
-        if (areaRentals.isNotEmpty) {
-          setState(() {
-            messages.add({
-              'role': 'ai',
-              'text':
-                  "🏠 Các bài đăng có diện tích gần $targetArea m²:\n- ${areaRentals.map((e) => "${e.title} (${e.area['total']} m²)").join("\n- ")}"
-            });
-          });
-          isLoading = false;
-        } else {
-          setState(() {
-            messages.add({
-              'role': 'ai',
-              'text': '❌ Không tìm thấy bài đăng nào có diện tích phù hợp.'
-            });
-          });
-          isLoading = false;
-        }
-        return;
-      }
-    }
-
-    // 6. Tìm nhà theo vị trí -----------------------------------------------
-    if (lowerInput.contains('vị trí') || lowerInput.contains('khu vực')) {
-      final locationRentals = rentals
-          .where((rental) =>
-              rental.location['short'].toLowerCase().contains(lowerInput))
-          .toList();
-
-      if (locationRentals.isNotEmpty) {
-        setState(() {
-          messages.add({
-            'role': 'ai',
-            'text':
-                "📍 Các bài đăng tại khu vực phù hợp:\n- ${locationRentals.map((e) => "${e.title} (${e.location['short']})").join("\n- ")}"
-          });
-          isLoading = false;
-        });
-        return;
-      }
-    }
-
-    // 7. Nếu không có kết quả, gọi API AI ---------------------------------------
+    // Nếu không có kết quả, gọi API AI
     try {
       final url = Uri.parse(
           'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${widget.apiKey}');

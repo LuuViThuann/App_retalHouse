@@ -33,13 +33,13 @@ class AuthViewModel extends ChangeNotifier {
   int get commentsTotalPages => _commentsTotalPages;
   int get notificationsTotalPages => _notificationsTotalPages;
 
-  // Đăng ký
   Future<void> register({
     required String email,
     required String password,
     required String phoneNumber,
     required String address,
     required String username,
+    required String avatarBase64,
   }) async {
     _isLoading = true;
     _errorMessage = null;
@@ -52,6 +52,7 @@ class AuthViewModel extends ChangeNotifier {
         phoneNumber: phoneNumber,
         address: address,
         username: username,
+        avatarBase64: avatarBase64,
       );
       if (user != null) {
         _currentUser = user;
@@ -59,14 +60,28 @@ class AuthViewModel extends ChangeNotifier {
         _errorMessage = 'Đăng ký thất bại. Vui lòng thử lại.';
       }
     } catch (e) {
-      _errorMessage = e.toString();
+      // Xử lý lỗi cụ thể từ backend
+      if (e.toString().contains('Email đã được sử dụng')) {
+        _errorMessage = 'Email đã được sử dụng';
+      } else if (e.toString().contains('Số điện thoại đã được sử dụng')) {
+        _errorMessage = 'Số điện thoại đã được sử dụng';
+      } else if (e.toString().contains('Email không hợp lệ')) {
+        _errorMessage = 'Email không hợp lệ';
+      } else if (e.toString().contains('Số điện thoại phải có 10 chữ số')) {
+        _errorMessage = 'Số điện thoại phải có 10 chữ số';
+      } else if (e.toString().contains('Mật khẩu phải có ít nhất 6 ký tự')) {
+        _errorMessage = 'Mật khẩu phải có ít nhất 6 ký tự';
+      } else if (e.toString().contains('Ảnh đại diện không hợp lệ')) {
+        _errorMessage = 'Ảnh đại diện không hợp lệ';
+      } else {
+        _errorMessage = 'Đăng ký thất bại: ${e.toString()}';
+      }
     } finally {
       _isLoading = false;
       notifyListeners();
     }
   }
 
-  // Đăng nhập
   Future<void> login({
     required String email,
     required String password,
@@ -94,7 +109,6 @@ class AuthViewModel extends ChangeNotifier {
     }
   }
 
-  // Đăng nhập bằng Google
   Future<void> signInWithGoogle() async {
     _isLoading = true;
     _errorMessage = null;
@@ -115,7 +129,6 @@ class AuthViewModel extends ChangeNotifier {
     }
   }
 
-  // Đăng nhập bằng Facebook
   Future<void> signInWithFacebook() async {
     _isLoading = true;
     _errorMessage = null;
@@ -136,7 +149,6 @@ class AuthViewModel extends ChangeNotifier {
     }
   }
 
-  // Gửi email đặt lại mật khẩu
   Future<void> sendPasswordResetEmail(String email) async {
     _isLoading = true;
     _errorMessage = null;
@@ -153,7 +165,6 @@ class AuthViewModel extends ChangeNotifier {
     }
   }
 
-  // Đặt lại mật khẩu
   Future<void> resetPassword(String oobCode, String newPassword) async {
     _isLoading = true;
     _errorMessage = null;
@@ -170,7 +181,6 @@ class AuthViewModel extends ChangeNotifier {
     }
   }
 
-  // Thay đổi mật khẩu
   Future<void> changePassword({
     required String newPassword,
   }) async {
@@ -195,7 +205,6 @@ class AuthViewModel extends ChangeNotifier {
     }
   }
 
-  // Cập nhật thông tin người dùng
   Future<void> updateUserProfile({
     required String phoneNumber,
     required String address,
@@ -229,7 +238,6 @@ class AuthViewModel extends ChangeNotifier {
     }
   }
 
-  // Upload profile image
   Future<void> uploadProfileImage({
     required String imageBase64,
   }) async {
@@ -253,7 +261,6 @@ class AuthViewModel extends ChangeNotifier {
     }
   }
 
-  // Đăng xuất
   Future<void> logout() async {
     _isLoading = true;
     _errorMessage = null;
@@ -287,6 +294,7 @@ class AuthViewModel extends ChangeNotifier {
         _myPosts.addAll(data['rentals'] as List<Rental>);
       }
       _postsPage = data['page'] as int;
+      _postsPage = data['page'] as int;
       _postsTotalPages = data['pages'] as int;
     } catch (e) {
       _errorMessage = 'Failed to fetch posts: $e';
@@ -296,7 +304,6 @@ class AuthViewModel extends ChangeNotifier {
     }
   }
 
-  // Fetch recent comments
   Future<void> fetchRecentComments({int page = 1, int limit = 10}) async {
     _isLoading = true;
     _errorMessage = null;
@@ -325,7 +332,6 @@ class AuthViewModel extends ChangeNotifier {
     }
   }
 
-  // Fetch notifications
   Future<void> fetchNotifications({int page = 1, int limit = 10}) async {
     _isLoading = true;
     _errorMessage = null;
@@ -347,7 +353,7 @@ class AuthViewModel extends ChangeNotifier {
       _notificationsPage = data['page'] as int;
       _notificationsTotalPages = data['pages'] as int;
     } catch (e) {
-      _errorMessage = e.toString();
+      _errorMessage = 'Failed to fetch notifications: $e';
     } finally {
       _isLoading = false;
       notifyListeners();
@@ -361,26 +367,24 @@ class AuthViewModel extends ChangeNotifier {
           .removeWhere((notification) => notification.id == notificationId);
       notifyListeners();
     } catch (e) {
-      _errorMessage = e.toString();
+      _errorMessage = 'Failed to remove notification: $e';
       notifyListeners();
     }
   }
 
   Future<void> restoreNotification(NotificationModel notification) async {
     try {
-      // Refresh notifications to ensure we have the latest data
       await fetchNotifications(page: 1);
       if (!_notifications.any((n) => n.id == notification.id)) {
         _notifications.add(notification);
         notifyListeners();
       }
     } catch (e) {
-      _errorMessage = e.toString();
+      _errorMessage = 'Failed to restore notification: $e';
       notifyListeners();
     }
   }
 
-  // new -----------------
   Future<void> deleteRental(String rentalId) async {
     _isLoading = true;
     _errorMessage = null;
@@ -429,6 +433,4 @@ class AuthViewModel extends ChangeNotifier {
       notifyListeners();
     }
   }
-
-  // -------------------------
 }

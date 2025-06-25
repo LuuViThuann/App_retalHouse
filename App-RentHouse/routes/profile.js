@@ -5,6 +5,7 @@ const mongoose = require('mongoose');
 const admin = require('firebase-admin');
 const Rental = require('../models/Rental');
 const { Comment, Reply } = require('../models/comments');
+const Notification = require('../models/notification');
 
 // Authentication middleware
 const authMiddleware = async (req, res, next) => {
@@ -21,7 +22,6 @@ const authMiddleware = async (req, res, next) => {
 
 // Helper function to adjust timestamps for +7 timezone
 const adjustTimestamps = (obj) => {
-  // Handle both Mongoose documents and plain objects
   const adjusted = { ...obj };
   adjusted.createdAt = new Date(new Date(adjusted.createdAt).getTime() + 7 * 60 * 60 * 1000);
   if (adjusted.updatedAt) {
@@ -30,7 +30,97 @@ const adjustTimestamps = (obj) => {
   return adjusted;
 };
 
-// Get user's posts (Danh sách bài đăng của tôi)
+// Create notification helper
+const createNotification = async ({ userId, type, message, content, rentalId, commentId, replyId }) => {
+  try {
+    const notification = new Notification({
+      userId,
+      type,
+      message,
+      content,
+      rentalId,
+      commentId,
+      replyId
+    });
+    await notification.save();
+  } catch (err) {
+    console.error('Error creating notification:', err);
+  }
+};
+
+// Post a comment (Add this endpoint if not already present)
+router.post('/comment', authMiddleware, async (req, res) => {
+  try {
+    const { rentalId, content, rating, images } = req.body;
+    const comment = new Comment({
+      userId: req.userId,
+      rentalId,
+      content,
+      rating,
+      images
+    });
+    await comment.save();
+
+    // Create notification for the rental owner (if not the same user)
+    const rental = await Rental.findById(rentalId).select('userId title');
+    if (rental.userId !== req.userId) {
+      const user = await admin.auth().getUser(req.userId);
+      await createNotification({
+        userId: rental.userId,
+        type: 'Comment',
+        message: `${user.displayName || 'Unknown'} đã bình luận về bài viết của bạn: "${rental.title}"`,
+        content,
+        rentalId,
+        commentId: comment._id
+      });
+    }
+
+    res.status(201).json(comment);
+  } catch (err) {
+    console.error('Error posting comment:', err);
+    res.status(500).json({ message: 'Failed to post comment', error: err.message });
+  }
+});
+
+// Post a reply (Add this endpoint if not already present)
+router.post('/reply', authMiddleware, async (req, res) => {
+  try {
+    const { commentId, content, images, parentReplyId } = req.body;
+    const reply = new Reply({
+      userId: req.userId,
+      commentId,
+      content,
+      images,
+      parentReplyId
+    });
+    await reply.save();
+
+    // Update comment with reply
+    await Comment.findByIdAndUpdate(commentId, { $push: { replies: reply._id } });
+
+    // Create notification for the rental owner (if not the same user)
+    const comment = await Comment.findById(commentId).populate('rentalId');
+    if (comment.rentalId.userId !== req.userId) {
+      const user = await admin.auth().getUser(req.userId);
+      await createNotification({
+        userId: comment.rentalId.userId,
+        type: 'Reply',
+        message: `${user.displayName || 'Unknown'} đã phản hồi bình luận trên bài viết của bạn: "${comment.rentalId.title}"`,
+        content,
+        rentalId: comment.rentalId._id,
+        commentId,
+        replyId: reply._id
+      });
+    }
+
+    res.status(201).json(reply);
+  } catch (err) {
+    console.error('Error posting reply:', err);
+    res.status(500).json({ message: 'Failed to post reply', error: err.message });
+  }
+});
+
+// Get user's posts
 router.get('/my-posts', authMiddleware, async (req, res) => {
   try {
     const { page = 1, limit = 10 } = req.query;
@@ -58,13 +148,12 @@ router.get('/my-posts', authMiddleware, async (req, res) => {
   }
 });
 
-// Get user's recent comments and replies (Bình luận gần đây nhất)
+// Get user's recent comments and replies
 router.get('/recent-comments', authMiddleware, async (req, res) => {
   try {
     const { page = 1, limit = 10 } = req.query;
     const skip = (Number(page) - 1) * Number(limit);
 
-    // Fetch comments by user
     const comments = await Comment.find({ userId: req.userId })
       .populate({
         path: 'rentalId',
@@ -79,7 +168,6 @@ router.get('/recent-comments', authMiddleware, async (req, res) => {
       .limit(Number(limit))
       .lean();
 
-    // Fetch replies by user
     const replies = await Reply.find({ userId: req.userId })
       .populate({
         path: 'commentId',
@@ -97,7 +185,6 @@ router.get('/recent-comments', authMiddleware, async (req, res) => {
       .limit(Number(limit))
       .lean();
 
-    // Combine comments and replies
     const combined = [
       ...comments.map((comment) => ({
         type: 'Comment',
@@ -123,7 +210,7 @@ router.get('/recent-comments', authMiddleware, async (req, res) => {
         commentId: reply.commentId?._id?.toString() || '',
         rentalId: reply.commentId?.rentalId?._id?.toString() || '',
         rentalTitle: reply.commentId?.rentalId?.title || 'Unknown Rental',
-       userId: {
+        userId: {
           _id: reply.userId?._id?.toString() || req.userId,
           username: reply.userId?.username || 'Unknown User',
           avatarBase64: reply.userId?.avatarBase64 || '',
@@ -136,10 +223,8 @@ router.get('/recent-comments', authMiddleware, async (req, res) => {
       })),
     ];
 
-    // Adjust timestamps
     const adjustedCombined = combined.map(adjustTimestamps);
 
-    // Sort by createdAt and apply pagination
     adjustedCombined.sort((a, b) => b.createdAt - a.createdAt);
     const paginated = adjustedCombined.slice(skip, skip + Number(limit));
     const total = adjustedCombined.length;
@@ -167,7 +252,6 @@ router.delete('/reply/:id', authMiddleware, async (req, res) => {
       return res.status(401).json({ message: 'Unauthorized' });
     }
 
-    // Xóa reply khỏi replies của comment cha (nếu có)
     if (reply.commentId) {
       await Comment.findByIdAndUpdate(
         reply.commentId,
@@ -182,44 +266,118 @@ router.delete('/reply/:id', authMiddleware, async (req, res) => {
     res.status(500).json({ message: 'Failed to delete reply', error: err.message });
   }
 });
+// Lấy tất cả comment và reply trên các bài đăng của user hiện tại
+router.get('/my-posts-comments', authMiddleware, async (req, res) => {
+  try {
+    const { page = 1, limit = 10 } = req.query;
+    const skip = (Number(page) - 1) * Number(limit);
 
-// Get user's notifications (Thông báo)
+    // Lấy danh sách bài đăng của user hiện tại
+    const myRentals = await Rental.find({ userId: req.userId }).select('_id');
+    const myRentalIds = myRentals.map(r => r._id);
+
+    // Lấy comment trên các bài đăng đó (không phải của user hiện tại)
+    const comments = await Comment.find({
+      rentalId: { $in: myRentalIds },
+      userId: { $ne: req.userId }
+    })
+      .populate('userId', 'avatarBase64 username')
+      .populate('rentalId', 'title')
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(Number(limit))
+      .lean();
+
+    // Lấy reply trên các comment của các bài đăng đó (không phải của user hiện tại)
+    const commentIds = comments.map(c => c._id);
+    const replies = await Reply.find({
+      commentId: { $in: commentIds },
+      userId: { $ne: req.userId }
+    })
+      .populate('userId', 'avatarBase64 username')
+      .populate({
+        path: 'commentId',
+        populate: { path: 'rentalId', select: 'title' }
+      })
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(Number(limit))
+      .lean();
+
+    // Gộp lại
+    const combined = [
+      ...comments.map(comment => ({
+        type: 'Comment',
+        _id: comment._id?.toString() || '',
+        rentalId: comment.rentalId?._id?.toString() || '',
+        rentalTitle: comment.rentalId?.title || 'Unknown Rental',
+        userId: {
+          _id: comment.userId?._id?.toString() || '',
+          username: comment.userId?.username || 'Unknown User',
+          avatarBase64: comment.userId?.avatarBase64 || '',
+        },
+        content: comment.content || '',
+        rating: comment.rating || 0,
+        images: comment.images || [],
+        isHidden: comment.isHidden || false,
+        createdAt: new Date(comment.createdAt),
+        replies: comment.replies || [],
+        likes: comment.likes || [],
+      })),
+      ...replies.map(reply => ({
+        type: 'Reply',
+        _id: reply._id?.toString() || '',
+        commentId: reply.commentId?._id?.toString() || '',
+        rentalId: reply.commentId?.rentalId?._id?.toString() || '',
+        rentalTitle: reply.commentId?.rentalId?.title || 'Unknown Rental',
+        userId: {
+          _id: reply.userId?._id?.toString() || '',
+          username: reply.userId?.username || 'Unknown User',
+          avatarBase64: reply.userId?.avatarBase64 || '',
+        },
+        content: reply.content || '',
+        images: reply.images || [],
+        parentReplyId: reply.parentReplyId?.toString() || null,
+        createdAt: new Date(reply.createdAt),
+        likes: reply.likes || [],
+      })),
+    ];
+
+    // Sắp xếp và phân trang
+    combined.sort((a, b) => b.createdAt - a.createdAt);
+    const paginated = combined.slice(0, Number(limit));
+    const total = combined.length;
+
+    res.json({
+      comments: paginated,
+      total,
+      page: Number(page),
+      pages: Math.ceil(total / Number(limit)),
+    });
+  } catch (err) {
+    console.error('Error fetching comments on my posts:', err);
+    res.status(500).json({ message: 'Failed to fetch comments on my posts', error: err.message });
+  }
+});
 router.get('/notifications', authMiddleware, async (req, res) => {
   try {
     const { page = 1, limit = 10 } = req.query;
     const skip = (Number(page) - 1) * Number(limit);
 
-    const userRentals = await Rental.find({ userId: req.userId }).select('_id').lean();
-    const rentalIds = userRentals.map((rental) => rental._id);
+    const notifications = await Notification.find({ userId: req.userId })
+      .populate('rentalId', 'title')
+      .populate('userId', 'avatarBase64 username')
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(Number(limit))
+      .lean();
 
-    const [comments, total] = await Promise.all([
-      Comment.find({ 
-        rentalId: { $in: rentalIds },
-        userId: { $ne: req.userId } // Exclude comments from current user
-      })
-        .populate('userId', 'avatarBase64 username')
-        .populate('rentalId', 'title')
-        .sort({ createdAt: -1 })
-        .skip(skip)
-        .limit(Number(limit))
-        .lean(),
-      Comment.countDocuments({ 
-        rentalId: { $in: rentalIds },
-        userId: { $ne: req.userId } // Exclude comments from current user
-      }),
-    ]);
+    const total = await Notification.countDocuments({ userId: req.userId });
 
-    const notifications = comments.map((comment) => ({
-      type: 'Comment',
-      message: `${comment.userId?.username || 'Unknown'} đã bình luận về bài viết của bạn : "${comment.rentalId?.title || 'Unknown'}"`,
-      content: comment.content,
-      createdAt: new Date(comment.createdAt.getTime() + 7 * 60 * 60 * 1000),
-      rentalId: comment.rentalId?._id,
-      commentId: comment._id,
-    }));
+    const adjustedNotifications = notifications.map(adjustTimestamps);
 
     res.json({
-      notifications,
+      notifications: adjustedNotifications,
       total,
       page: Number(page),
       pages: Math.ceil(total / Number(limit)),
@@ -228,14 +386,12 @@ router.get('/notifications', authMiddleware, async (req, res) => {
     console.error('Fetch notifications error:', err.stack);
     res.status(500).json({ message: 'Failed to fetch notifications', error: err.message });
   }
-}); 
+});
 
-// Delete notification
 router.delete('/notifications/:id', authMiddleware, async (req, res) => {
   try {
     const { id } = req.params;
     
-    // Verify that the notification belongs to the user
     const notification = await Notification.findOne({ 
       _id: id,
       userId: req.userId 
@@ -252,4 +408,5 @@ router.delete('/notifications/:id', authMiddleware, async (req, res) => {
     res.status(500).json({ message: 'Failed to delete notification', error: err.message });
   }
 });
+
 module.exports = router;

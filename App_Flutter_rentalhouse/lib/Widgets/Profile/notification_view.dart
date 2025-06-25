@@ -44,10 +44,10 @@ class _NotificationsViewState extends State<NotificationsView> {
           rentalId: notification.rentalId,
           token: Provider.of<AuthViewModel>(context, listen: false)
               .currentUser
-              ?.token,
+              ?.id,
         );
 
-        if (rental != null) {
+        if (rental != null && mounted) {
           await Navigator.push(
             context,
             PageRouteBuilder(
@@ -70,7 +70,8 @@ class _NotificationsViewState extends State<NotificationsView> {
         } else if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-                content: Text('Không tìm thấy bài đăng hoặc lỗi tải dữ liệu.')),
+              content: Text('Không tìm thấy bài đăng hoặc lỗi tải dữ liệu.'),
+            ),
           );
         }
       } else if (notification.postId != null) {
@@ -83,7 +84,7 @@ class _NotificationsViewState extends State<NotificationsView> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Lỗi khi tải chi tiết bài đăng: $e')),
+          SnackBar(content: Text('Lỗi khi tải chi tiết bài đăng: $e}')),
         );
       }
     } finally {
@@ -109,7 +110,7 @@ class _NotificationsViewState extends State<NotificationsView> {
                 fontSize: 20,
                 fontWeight: FontWeight.w600,
                 color: Colors.black,
-                fontFamily: 'Roboto',
+                fontFamily: 'Inter',
               ),
             ),
             elevation: 0,
@@ -143,7 +144,7 @@ class _NotificationsViewState extends State<NotificationsView> {
                                 style: TextStyle(
                                   fontSize: 18,
                                   color: Colors.grey.shade600,
-                                  fontFamily: 'Roboto',
+                                  fontFamily: 'Inter',
                                 ),
                               ),
                             ],
@@ -248,7 +249,7 @@ class _NotificationsViewState extends State<NotificationsView> {
                                             fontSize: 16,
                                             fontWeight: FontWeight.w600,
                                             color: Colors.black,
-                                            fontFamily: 'Roboto',
+                                            fontFamily: 'Inter',
                                           ),
                                         ),
                                         subtitle: Padding(
@@ -259,7 +260,7 @@ class _NotificationsViewState extends State<NotificationsView> {
                                             style: TextStyle(
                                               fontSize: 14,
                                               color: Colors.grey.shade700,
-                                              fontFamily: 'Roboto',
+                                              fontFamily: 'Inter',
                                             ),
                                           ),
                                         ),

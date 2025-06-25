@@ -37,7 +37,10 @@ const storage = multer.diskStorage({
     cb(null, `${Date.now()}-${file.originalname}`);
   },
 });
-const upload = multer({ storage });
+const upload = multer({ 
+  storage,
+  limits: { fileSize: 20 * 1024 * 1024 } // 20MB
+});
 router.use('/uploads', express.static(path.join(__dirname, '..', 'uploads')));
 
 // Authentication middleware

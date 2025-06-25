@@ -5,17 +5,16 @@ import 'package:flutter_rentalhouse/Widgets/Profile/enter_new_address.dart';
 import 'package:geocoding/geocoding.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:location/location.dart' as loc;
-import 'package:provider/provider.dart';
-import '../viewmodels/vm_auth.dart';
 
-class ChangeAddressView extends StatefulWidget {
-  const ChangeAddressView({super.key});
+class SelectAddressRegisterView extends StatefulWidget {
+  const SelectAddressRegisterView({super.key});
 
   @override
-  State<ChangeAddressView> createState() => _ChangeAddressViewState();
+  State<SelectAddressRegisterView> createState() =>
+      _SelectAddressRegisterViewState();
 }
 
-class _ChangeAddressViewState extends State<ChangeAddressView> {
+class _SelectAddressRegisterViewState extends State<SelectAddressRegisterView> {
   GoogleMapController? _controller;
   LatLng? _currentLatLng;
   List<MarkerData> _customMarkers = [];
@@ -159,8 +158,30 @@ class _ChangeAddressViewState extends State<ChangeAddressView> {
               .animateCamera(CameraUpdate.newLatLngZoom(latLng, 16));
         }
 
-        _showConfirmDialog(
-            "Bạn có muốn chọn địa chỉ hiện tại?", _currentAddress);
+        if (_currentAddress.isNotEmpty && mounted) {
+          final confirm = await showDialog<bool>(
+            context: context,
+            builder: (context) => AlertDialog(
+              title: const Text('Xác nhận'),
+              content: Text(
+                  'Bạn có muốn sử dụng vị trí hiện tại này để đăng ký không?\n\n$_currentAddress'),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(false),
+                  child: const Text('Không'),
+                ),
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(true),
+                  child: const Text('Có'),
+                ),
+              ],
+            ),
+          );
+          if (confirm == true) {
+            Navigator.pop(context, _currentAddress);
+            return;
+          }
+        }
       } else {
         setState(() => _errorMessage = 'Không lấy được tọa độ hiện tại.');
       }
@@ -174,12 +195,10 @@ class _ChangeAddressViewState extends State<ChangeAddressView> {
 
   void _onMapTapped(LatLng position) async {
     await _updateAddressFromLatLng(position);
-    _showConfirmDialog("Bạn có muốn chọn địa chỉ mới?", _currentAddress);
+    _showConfirmDialog("Bạn có muốn chọn địa chỉ này?", _currentAddress);
   }
 
   void _showConfirmDialog(String title, String address) {
-    // Store the AuthViewModel reference before showing the dialog
-    final authViewModel = Provider.of<AuthViewModel>(context, listen: false);
     showDialog(
       context: context,
       builder: (dialogContext) => AlertDialog(
@@ -192,47 +211,25 @@ class _ChangeAddressViewState extends State<ChangeAddressView> {
             child: const Text("Hủy"),
           ),
           TextButton(
-            onPressed: () async {
-              // Close the dialog first
-              Navigator.pop(dialogContext);
-              try {
-                // Perform the update using the stored AuthViewModel
-                await authViewModel.updateUserProfile(
-                  phoneNumber: authViewModel.currentUser?.phoneNumber ?? '',
-                  address: address,
-                  username: authViewModel.currentUser?.username ?? '',
-                );
-                // Check if the widget is still mounted before updating state
-                if (!mounted) return;
-                if (authViewModel.errorMessage == null) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Địa chỉ đã được cập nhật thành công!'),
-                      backgroundColor: Colors.green,
-                      duration: Duration(seconds: 2),
-                    ),
-                  );
-                  // Return address to MyProfileView
-                  Navigator.pop(context, address);
-                } else {
-                  setState(() {
-                    _errorMessage = authViewModel.errorMessage ??
-                        'Lỗi khi cập nhật địa chỉ';
-                  });
-                }
-              } catch (e) {
-                if (mounted) {
-                  setState(() {
-                    _errorMessage = 'Lỗi khi cập nhật địa chỉ: $e';
-                  });
-                }
-              }
+            onPressed: () {
+              Navigator.pop(dialogContext); // Close dialog
+              Navigator.pop(context, address); // Return address to parent
             },
             child: const Text("Xác nhận"),
           ),
         ],
       ),
     );
+  }
+
+  Future<void> _pickAddressManually() async {
+    final selectedAddress = await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => NewAddressPage()),
+    );
+    if (selectedAddress != null && selectedAddress is String && mounted) {
+      Navigator.pop(context, selectedAddress);
+    }
   }
 
   @override
@@ -254,6 +251,13 @@ class _ChangeAddressViewState extends State<ChangeAddressView> {
             fontWeight: FontWeight.bold,
           ),
         ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.edit_location_alt, color: Colors.blueAccent),
+            tooltip: 'Nhập địa chỉ thủ công',
+            onPressed: _pickAddressManually,
+          ),
+        ],
       ),
       body: Column(
         children: [
@@ -305,7 +309,7 @@ class _ChangeAddressViewState extends State<ChangeAddressView> {
             padding: const EdgeInsets.all(16.0),
             child: Text(
               _currentAddress.isEmpty
-                  ? 'Vui lòng chọn địa chỉ'
+                  ? 'Vui lòng chọn địa chỉ trên bản đồ hoặc nhập thủ công'
                   : _currentAddress,
               style: const TextStyle(fontSize: 14, color: Colors.black87),
               textAlign: TextAlign.center,

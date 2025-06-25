@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_rentalhouse/Widgets/conversation/conversation_title.dart';
+import 'package:flutter_rentalhouse/config/loading.dart';
 import 'package:flutter_rentalhouse/constants/app_style.dart';
 import 'package:flutter_rentalhouse/models/conversation.dart';
 import 'package:flutter_rentalhouse/utils/sort_conversation.dart';
 import 'package:flutter_rentalhouse/viewmodels/vm_auth.dart';
 import 'package:flutter_rentalhouse/viewmodels/vm_chat.dart';
+import 'package:lottie/lottie.dart';
 
 class ConversationList extends StatelessWidget {
   final AuthViewModel authViewModel;
@@ -98,15 +100,18 @@ class ConversationList extends StatelessWidget {
   Widget _buildLoadingState() {
     return Center(
       child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
+        mainAxisSize: MainAxisSize.min,
         children: [
-          CircularProgressIndicator(
-            valueColor: AlwaysStoppedAnimation<Color>(AppStyles.primaryColor),
+          Lottie.asset(
+            AssetsConfig.loadingLottie,
+            width: 100,
+            height: 100,
+            fit: BoxFit.fill,
           ),
-          SizedBox(height: 16),
-          Text(
+          const SizedBox(height: 16), // Khoảng cách giữa animation và text
+          const Text(
             'Đang tải cuộc trò chuyện...',
-            style: AppStyles.loadingText,
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
           ),
         ],
       ),

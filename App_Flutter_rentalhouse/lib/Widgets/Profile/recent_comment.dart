@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_rentalhouse/config/loading.dart';
 import 'package:flutter_rentalhouse/models/comments.dart';
 import 'package:flutter_rentalhouse/viewmodels/vm_auth.dart';
+import 'package:lottie/lottie.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_rentalhouse/models/rental.dart';
 import 'package:flutter_rentalhouse/services/rental_service.dart';
@@ -128,7 +130,14 @@ class _RecentCommentsViewState extends State<RecentCommentsView> {
               Expanded(
                 child: authViewModel.isLoading &&
                         authViewModel.recentComments.isEmpty
-                    ? Center(child: CircularProgressIndicator())
+                    ? Center(
+                        child: Lottie.asset(
+                          AssetsConfig.loadingLottie,
+                          width: 100,
+                          height: 100,
+                          fit: BoxFit.fill,
+                        ),
+                      )
                     : Padding(
                         padding: const EdgeInsets.all(16.0),
                         child: authViewModel.recentComments.isEmpty

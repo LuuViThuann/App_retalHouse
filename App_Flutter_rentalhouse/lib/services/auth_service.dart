@@ -28,6 +28,29 @@ class AuthService {
     baseUrl: ApiRoutes.baseUrl,
     headers: {'Content-Type': 'multipart/form-data'},
   ));
+  // Hàm kiểm tra định dạng đầu vào
+  bool _isValidEmail(String email) =>
+      RegExp(r'^[^@]+@[^@]+\.[^@]+').hasMatch(email);
+  bool _isValidPhoneNumber(String phoneNumber) =>
+      RegExp(r'^\d{10}$').hasMatch(phoneNumber);
+  bool _isValidPassword(String password) => password.length >= 6;
+  bool _isValidAvatarBase64(String? avatarBase64) {
+    if (avatarBase64 == null) return false;
+    final regex = RegExp(r'^(data:image/(jpeg|png);base64,)?[A-Za-z0-9+/=]+$');
+    return regex.hasMatch(avatarBase64);
+  }
+
+  bool _isValidUsername(String username) => username.length >= 3;
+  bool _isValidAddress(String address) => address.isNotEmpty;
+  // Hàm loại bỏ tiền tố MIME
+  String _stripMimePrefix(String base64) {
+    return base64.replaceAll(RegExp(r'^data:image/(jpeg|png);base64,'), '');
+  }
+
+  // Hàm thêm tiền tố MIME khi cần hiển thị
+  String _addMimePrefix(String base64, {String mimeType = 'image/png'}) {
+    return 'data:$mimeType;base64,$base64';
+  }
 
   Future<AppUser?> register({
     required String email,
@@ -35,20 +58,34 @@ class AuthService {
     required String phoneNumber,
     required String address,
     required String username,
+    required String avatarBase64,
   }) async {
+    // Kiểm tra định dạng đầu vào
+    if (!_isValidEmail(email)) {
+      throw Exception('Email không hợp lệ');
+    }
+    if (!_isValidPhoneNumber(phoneNumber)) {
+      throw Exception('Số điện thoại phải có 10 chữ số');
+    }
+    if (!_isValidPassword(password)) {
+      throw Exception('Mật khẩu phải có ít nhất 6 ký tự');
+    }
+    if (!_isValidAvatarBase64(avatarBase64)) {
+      print('AuthService: Invalid avatarBase64: $avatarBase64');
+      throw Exception('Ảnh đại diện không hợp lệ');
+    }
+    if (!_isValidUsername(username)) {
+      throw Exception('Tên người dùng phải có ít nhất 3 ký tự');
+    }
+    if (!_isValidAddress(address)) {
+      throw Exception('Vui lòng nhập địa chỉ');
+    }
+
     try {
-      final userCredential = await _auth.createUserWithEmailAndPassword(
-          email: email, password: password);
-      final user = userCredential.user;
-      if (user == null) {
-        print('AuthService: No user created during registration');
-        throw Exception('Failed to create user');
-      }
-      final idToken = await user.getIdToken(true);
-      if (idToken == null) {
-        print('AuthService: No ID token for registered user');
-        throw Exception('Failed to obtain ID token');
-      }
+      // Loại bỏ tiền tố MIME trước khi gửi
+      final rawBase64 = _stripMimePrefix(avatarBase64);
+
+      // Gửi request tới backend
       final response = await http.post(
         Uri.parse(ApiRoutes.register),
         headers: {'Content-Type': 'application/json'},
@@ -58,14 +95,16 @@ class AuthService {
           'phoneNumber': phoneNumber,
           'address': address,
           'username': username,
-          'idToken': idToken,
+          'avatarBase64': rawBase64,
         }),
       );
+
       print(
           'AuthService: Register response: ${response.statusCode}, body: ${response.body}');
+
       if (response.statusCode == 201) {
         final data = jsonDecode(response.body);
-        final avatarBase64 = await fetchAvatarBase64(user.uid, idToken);
+        final idToken = await _auth.currentUser?.getIdToken(true);
         return AppUser(
           id: data['id'] as String,
           email: data['email'] as String,
@@ -74,15 +113,15 @@ class AuthService {
           createdAt: DateTime.parse(data['createdAt'] as String),
           username: data['username'] as String,
           token: idToken,
-          avatarBase64: avatarBase64,
+          avatarBase64: data['avatarBase64'] as String?,
         );
       } else {
         final errorData = jsonDecode(response.body);
-        throw Exception(
-            'Đăng ký thất bại: ${errorData['message'] ?? response.body}');
+        print('AuthService: Register error: ${errorData['message']}');
+        throw Exception(errorData['message'] ?? 'Đăng ký thất bại');
       }
     } catch (e) {
-      print('AuthService: Error during registration: $e');
+      print('AuthService: Registration error: $e');
       throw Exception('Đăng ký thất bại: $e');
     }
   }
@@ -99,7 +138,7 @@ class AuthService {
         print('AuthService: No user found for login');
         throw Exception('Failed to login');
       }
-      final idToken = await user.getIdToken(true);
+      final idToken = await user.getIdToken();
       if (idToken == null) {
         print('AuthService: No ID token for logged-in user');
         throw Exception('Failed to obtain ID token');
@@ -113,11 +152,13 @@ class AuthService {
           'idToken': idToken,
         }),
       );
-      print(
-          'AuthService: Login response: ${response.statusCode}, body: ${response.body}');
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        final avatarBase64 = await fetchAvatarBase64(user.uid, idToken);
+        // final avatarBase64 = await fetchAvatarBase64(user.uid, idToken);
+        String? avatarBase64 = data['avatarBase64'];
+        if (avatarBase64 == null || avatarBase64.isEmpty) {
+          avatarBase64 = await fetchAvatarBase64(user.uid, idToken);
+        }
         return AppUser(
           id: data['id'] as String,
           email: data['email'] as String,
@@ -351,13 +392,11 @@ class AuthService {
     try {
       final user = _auth.currentUser;
       if (user == null) {
-        print('AuthService: No user found for password change');
-        throw Exception('Không tìm thấy người dùng');
+        return false;
       }
       final idToken = await user.getIdToken(true);
       if (idToken == null) {
-        print('AuthService: No ID token for password change');
-        throw Exception('Failed to obtain ID token');
+        return false;
       }
       final response = await http.post(
         Uri.parse(ApiRoutes.changePassword),
@@ -367,8 +406,6 @@ class AuthService {
           'newPassword': newPassword,
         }),
       );
-      print(
-          'AuthService: Change password response: ${response.statusCode}, body: ${response.body}');
       if (response.statusCode == 200) {
         await user.updatePassword(newPassword);
         return true;
@@ -391,13 +428,11 @@ class AuthService {
     try {
       final user = _auth.currentUser;
       if (user == null) {
-        print('AuthService: No user found for profile update');
-        throw Exception('Không tìm thấy người dùng');
+        return null;
       }
       final idToken = await user.getIdToken(true);
       if (idToken == null) {
-        print('AuthService: No ID token for profile update');
-        throw Exception('Failed to obtain ID token');
+        return null;
       }
       final response = await http.post(
         Uri.parse(ApiRoutes.updateProfile),
@@ -409,8 +444,6 @@ class AuthService {
           'username': username,
         }),
       );
-      print(
-          'AuthService: Update profile response: ${response.statusCode}, body: ${response.body}');
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         final avatarBase64 = await fetchAvatarBase64(user.uid, idToken);
@@ -440,13 +473,11 @@ class AuthService {
     try {
       final user = _auth.currentUser;
       if (user == null) {
-        print('AuthService: No user found for image upload');
-        throw Exception('Không tìm thấy người dùng');
+        return null;
       }
       final idToken = await user.getIdToken(true);
       if (idToken == null) {
-        print('AuthService: No ID token for image upload');
-        throw Exception('Failed to obtain ID token');
+        return null;
       }
       final response = await http.post(
         Uri.parse(ApiRoutes.uploadImage),
@@ -456,8 +487,6 @@ class AuthService {
           'imageBase64': imageBase64,
         }),
       );
-      print(
-          'AuthService: Upload image response: ${response.statusCode}, body: ${response.body}');
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         return data['avatarBase64'] as String?;
@@ -538,13 +567,11 @@ class AuthService {
     try {
       final user = _auth.currentUser;
       if (user == null) {
-        print('AuthService: No user for fetching posts');
-        throw Exception('Không tìm thấy người dùng');
+        return {'rentals': [], 'total': 0, 'page': page, 'pages': 1};
       }
       final idToken = await user.getIdToken(true);
       if (idToken == null) {
-        print('AuthService: No ID token for fetching posts');
-        throw Exception('Failed to obtain ID token');
+        return {'rentals': [], 'total': 0, 'page': page, 'pages': 1};
       }
       final response = await http.get(
         Uri.parse('${ApiRoutes.myPosts}?page=$page&limit=$limit'),
@@ -553,8 +580,6 @@ class AuthService {
           'Authorization': 'Bearer $idToken',
         },
       );
-      print(
-          'AuthService: Fetch posts response: ${response.statusCode}, body: ${response.body}');
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         final rentals = (data['rentals'] as List)
@@ -582,13 +607,11 @@ class AuthService {
     try {
       final user = _auth.currentUser;
       if (user == null) {
-        print('AuthService: No user for fetching comments');
-        throw Exception('Không tìm thấy người dùng');
+        return {'comments': [], 'total': 0, 'page': page, 'pages': 1};
       }
       final idToken = await user.getIdToken(true);
       if (idToken == null) {
-        print('AuthService: No ID token for fetching comments');
-        throw Exception('Failed to obtain ID token');
+        return {'comments': [], 'total': 0, 'page': page, 'pages': 1};
       }
       final response = await http.get(
         Uri.parse('${ApiRoutes.recentComments}?page=$page&limit=$limit'),
@@ -597,8 +620,6 @@ class AuthService {
           'Authorization': 'Bearer $idToken',
         },
       );
-      print(
-          'AuthService: Fetch comments response: ${response.statusCode}, body: ${response.body}');
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         final comments = (data['comments'] as List).map((comment) {
@@ -728,15 +749,11 @@ class AuthService {
     try {
       final user = _auth.currentUser;
       if (user == null) {
-        print(
-            'AuthService: No user found for deleting rental (rentalId: $rentalId)');
-        throw Exception('User not found');
+        return;
       }
       final idToken = await user.getIdToken(true);
       if (idToken == null) {
-        print(
-            'AuthService: No ID token for deleting rental (rentalId: $rentalId)');
-        throw Exception('Failed to obtain token');
+        return;
       }
       final response = await http.delete(
         Uri.parse('${ApiRoutes.baseUrl}/rentals/$rentalId'),
@@ -745,8 +762,6 @@ class AuthService {
           'Authorization': 'Bearer $idToken',
         },
       );
-      print(
-          'AuthService: Delete rental response (rentalId: $rentalId): ${response.statusCode}, body: ${response.body}');
       if (response.statusCode != 200) {
         final errorData = jsonDecode(response.body);
         throw Exception(

@@ -18,7 +18,10 @@ const storage = multer.diskStorage({
     cb(null, `${Date.now()}-${file.originalname}`);
   },
 });
-const upload = multer({ storage });
+const upload = multer({ 
+  storage,
+  limits: { fileSize: 20 * 1024 * 1024 } // 20MB
+});
 
 const redisClient = redis.createClient({
   url: process.env.REDIS_URL || 'redis://localhost:6379',

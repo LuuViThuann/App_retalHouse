@@ -14,16 +14,66 @@ const EMAILJS_API_TOKEN = process.env.EMAILJS_API_TOKEN; // Private Key from .en
 
 // Đăng ký người dùng
 router.post('/register', async (req, res) => {
-  const { email, password, phoneNumber, address, username } = req.body;
-  if (!email || !password || !phoneNumber || !address || !username) {
-    return res.status(400).json({ message: 'Missing required fields' });
+  const { email, password, phoneNumber, address, username, avatarBase64 } = req.body;
+
+  // Kiểm tra các trường bắt buộc
+  if (!email || !password || !phoneNumber || !address || !username || !avatarBase64) {
+    console.error('Missing required fields:', req.body);
+    return res.status(400).json({ message: 'Vui lòng điền đầy đủ các trường bắt buộc' });
   }
 
+  // Kiểm tra định dạng email
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(email)) {
+    return res.status(400).json({ message: 'Email không hợp lệ' });
+  }
+
+  // Kiểm tra định dạng số điện thoại (10 chữ số)
+  const phoneRegex = /^\d{10}$/;
+  if (!phoneRegex.test(phoneNumber)) {
+    return res.status(400).json({ message: 'Số điện thoại phải có 10 chữ số' });
+  }
+
+  // Kiểm tra độ dài mật khẩu
+  if (password.length < 6) {
+    return res.status(400).json({ message: 'Mật khẩu phải có ít nhất 6 ký tự' });
+  }
+
+ // Kiểm tra định dạng và tính toàn vẹn avatarBase64
+const avatarRegex = /^(data:image\/(jpeg|png);base64,)?[A-Za-z0-9+/=]+$/;
+if (!avatarRegex.test(avatarBase64)) {
+  return res.status(400).json({ message: 'Ảnh đại diện không hợp lệ. Chỉ hỗ trợ định dạng JPEG hoặc PNG.' });
+}
+
+// Luôn loại bỏ tiền tố MIME nếu có
+const base64Data = avatarBase64.replace(/^data:image\/(jpeg|png);base64,/, '');
+
+try {
+  Buffer.from(base64Data, 'base64');
+  if (base64Data.length > 5 * 1024 * 1024) {
+    return res.status(400).json({ message: 'Ảnh đại diện quá lớn (tối đa 5MB)' });
+  }
+} catch (err) {
+  return res.status(400).json({ message: 'Ảnh đại diện không hợp lệ: Dữ liệu base64 không đúng' });
+}
+
   try {
-    // Kiểm tra số điện thoại đã tồn tại
+    // Kiểm tra email đã tồn tại trong Firebase
+    const existingUser = await admin.auth().getUserByEmail(email).catch(() => null);
+    if (existingUser) {
+      return res.status(400).json({ message: 'Email đã được sử dụng' });
+    }
+
+    // Kiểm tra số điện thoại đã tồn tại trong Firestore
     const usersSnapshot = await admin.firestore().collection('Users').where('phoneNumber', '==', phoneNumber).get();
     if (!usersSnapshot.empty) {
       return res.status(400).json({ message: 'Số điện thoại đã được sử dụng' });
+    }
+
+    // Kiểm tra số điện thoại trong MongoDB
+    const mongoUserByPhone = await User.findOne({ phoneNumber });
+    if (mongoUserByPhone) {
+      return res.status(400).json({ message: 'Số điện thoại đã được sử dụng trong MongoDB' });
     }
 
     // Tạo người dùng trong Firebase Authentication
@@ -32,34 +82,49 @@ router.post('/register', async (req, res) => {
       password,
     });
 
-    // Lưu thông tin người dùng vào Firestore
-    await admin.firestore().collection('Users').doc(userRecord.uid).set({
-      email,
-      phoneNumber,
-      address,
-      username,
-      createdAt: admin.firestore.FieldValue.serverTimestamp(),
-    });
+    try {
+      // Lưu thông tin người dùng vào Firestore (không lưu avatarBase64)
+      await admin.firestore().collection('Users').doc(userRecord.uid).set({
+        email,
+        phoneNumber,
+        address,
+        username,
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
 
-    // Lưu thông tin người dùng vào MongoDB
-    await User.findOneAndUpdate(
-      { _id: userRecord.uid },
-      { email, phoneNumber, address, username },
-      { upsert: true, new: true }
-    ).exec();
+      // Lưu thông tin người dùng vào MongoDB (sử dụng base64 đã loại bỏ tiền tố)
+      const newUser = new User({
+        _id: userRecord.uid,
+        email,
+        phoneNumber,
+        address,
+        username,
+        avatarBase64: base64Data,
+      });
+      await newUser.save();
 
-    res.status(201).json({
-      id: userRecord.uid,
-      email: userRecord.email,
-      phoneNumber,
-      address,
-      username,
-      createdAt: new Date().toISOString(),
-    });
+      // Trả về thông tin người dùng với base64 không có tiền tố
+      res.status(201).json({
+        id: userRecord.uid,
+        email: userRecord.email,
+        phoneNumber,
+        address,
+        username,
+        avatarBase64: base64Data,
+        createdAt: new Date().toISOString(),
+      });
+    } catch (innerErr) {
+      // Rollback: Xóa người dùng trong Firebase nếu lưu vào Firestore hoặc MongoDB thất bại
+      await admin.auth().deleteUser(userRecord.uid);
+      console.error('Rollback: Deleted Firebase user due to error:', innerErr);
+      throw innerErr;
+    }
   } catch (err) {
-    res.status(400).json({ message: err.message });
+    console.error('Registration error:', err);
+    res.status(400).json({ message: `Đăng ký thất bại: ${err.message}` });
   }
 });
+
 
 // Đăng nhập
 router.post('/login', async (req, res) => {

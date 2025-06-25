@@ -21,9 +21,23 @@ class AppUser {
     required this.username,
   });
 
+  factory AppUser.fromJson(Map<String, dynamic> data) {
+    return AppUser(
+      id: data['id'] as String,
+      email: data['email'] as String? ?? '',
+      phoneNumber: data['phoneNumber'] as String? ?? '',
+      address: data['address'] as String? ?? '',
+      createdAt: DateTime.parse(
+          data['createdAt'] as String? ?? DateTime.now().toIso8601String()),
+      token: data['token'] as String?,
+      avatarBase64: data['avatarBase64'] as String?,
+      username: data['username'] as String? ?? '',
+    );
+  }
+
   factory AppUser.fromFirestore(Map<String, dynamic>? data, String id) {
     if (data == null) {
-      throw Exception('User data is null');
+      throw Exception('Dữ liệu người dùng không tồn tại');
     }
     return AppUser(
       id: id,
@@ -33,11 +47,10 @@ class AppUser {
       createdAt: (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
       token: data['token'] as String?,
       avatarBase64: data['avatarBase64'] as String?,
-      username: data?['username'] ?? '',
+      username: data['username'] as String? ?? '',
     );
   }
 
-  // Update avatarUrl getter to use Base64 if available
   String? get avatarUrl {
     if (avatarBase64 != null && avatarBase64!.isNotEmpty) {
       return 'data:image/jpeg;base64,$avatarBase64';
@@ -52,7 +65,29 @@ class AppUser {
       'address': address,
       'createdAt': Timestamp.fromDate(createdAt),
       'token': token,
-      'avatarBase64': avatarBase64,
+      // Không lưu avatarBase64 vào Firestore
     };
+  }
+
+  AppUser copyWith({
+    String? id,
+    String? email,
+    String? phoneNumber,
+    String? address,
+    DateTime? createdAt,
+    String? token,
+    String? avatarBase64,
+    String? username,
+  }) {
+    return AppUser(
+      id: id ?? this.id,
+      email: email ?? this.email,
+      phoneNumber: phoneNumber ?? this.phoneNumber,
+      address: address ?? this.address,
+      createdAt: createdAt ?? this.createdAt,
+      token: token ?? this.token,
+      avatarBase64: avatarBase64 ?? this.avatarBase64,
+      username: username ?? this.username,
+    );
   }
 }
