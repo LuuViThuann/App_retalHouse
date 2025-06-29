@@ -359,22 +359,28 @@ router.get('/my-posts-comments', authMiddleware, async (req, res) => {
     res.status(500).json({ message: 'Failed to fetch comments on my posts', error: err.message });
   }
 });
+
+
 router.get('/notifications', authMiddleware, async (req, res) => {
   try {
     const { page = 1, limit = 10 } = req.query;
     const skip = (Number(page) - 1) * Number(limit);
 
-    const notifications = await Notification.find({ userId: req.userId })
-      .populate('rentalId', 'title')
-      .populate('userId', 'avatarBase64 username')
-      .sort({ createdAt: -1 })
-      .skip(skip)
-      .limit(Number(limit))
-      .lean();
+    const [notifications, total] = await Promise.all([
+      Notification.find({ userId: req.userId })
+        .populate('rentalId', 'title')
+        .populate('userId', 'avatarBase64 username')
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(Number(limit))
+        .lean(),
+      Notification.countDocuments({ userId: req.userId }),
+    ]);
 
-    const total = await Notification.countDocuments({ userId: req.userId });
-
-    const adjustedNotifications = notifications.map(adjustTimestamps);
+    const adjustedNotifications = notifications.map(notification => ({
+      ...adjustTimestamps(notification),
+      isRead: notification.isRead || false,
+    }));
 
     res.json({
       notifications: adjustedNotifications,
@@ -388,15 +394,11 @@ router.get('/notifications', authMiddleware, async (req, res) => {
   }
 });
 
+// Delete notification
 router.delete('/notifications/:id', authMiddleware, async (req, res) => {
   try {
     const { id } = req.params;
-    
-    const notification = await Notification.findOne({ 
-      _id: id,
-      userId: req.userId 
-    });
-
+    const notification = await Notification.findOne({ _id: id, userId: req.userId });
     if (!notification) {
       return res.status(404).json({ message: 'Notification not found or unauthorized' });
     }
@@ -408,5 +410,4 @@ router.delete('/notifications/:id', authMiddleware, async (req, res) => {
     res.status(500).json({ message: 'Failed to delete notification', error: err.message });
   }
 });
-
 module.exports = router;

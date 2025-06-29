@@ -1,12 +1,14 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
 import 'package:flutter_rentalhouse/Widgets/Comment/comment_user.dart';
 import 'package:flutter_rentalhouse/Widgets/Detail/detail_tab.dart';
 import 'package:flutter_rentalhouse/Widgets/Detail/info_chip.dart';
 import 'package:flutter_rentalhouse/models/rental.dart';
 import 'package:flutter_rentalhouse/services/rental_service.dart';
-
+import 'package:flutter_rentalhouse/views/booking_view.dart';
+import 'package:flutter_rentalhouse/viewmodels/vm_auth.dart';
 
 import 'package:intl/intl.dart';
 import 'package:photo_view/photo_view.dart';
@@ -144,7 +146,7 @@ class _RentalDetailScreenState extends State<RentalDetailScreen>
 
   String formatCurrency(double amount) {
     final formatter =
-    NumberFormat.currency(locale: 'vi_VN', symbol: 'VNĐ', decimalDigits: 0);
+        NumberFormat.currency(locale: 'vi_VN', symbol: 'VNĐ', decimalDigits: 0);
     return formatter.format(amount);
   }
 
@@ -181,9 +183,9 @@ class _RentalDetailScreenState extends State<RentalDetailScreen>
                     imageUrl: mainImageUrl,
                     fit: BoxFit.cover,
                     placeholder: (context, url) =>
-                    const Center(child: CircularProgressIndicator()),
+                        const Center(child: CircularProgressIndicator()),
                     errorWidget: (context, url, error) =>
-                    const Icon(Icons.error, size: 50),
+                        const Icon(Icons.error, size: 50),
                   ),
                 ),
               ),
@@ -196,7 +198,8 @@ class _RentalDetailScreenState extends State<RentalDetailScreen>
           ),
           SliverToBoxAdapter(
             child: ClipRRect(
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(30)),
+              borderRadius:
+                  const BorderRadius.vertical(top: Radius.circular(30)),
               child: Container(
                 color: Colors.white,
                 child: Padding(
@@ -291,8 +294,8 @@ class _RentalDetailScreenState extends State<RentalDetailScreen>
                                         starValue <= _averageRating
                                             ? Icons.star
                                             : starValue - 0.5 <= _averageRating
-                                            ? Icons.star_half
-                                            : Icons.star_border,
+                                                ? Icons.star_half
+                                                : Icons.star_border,
                                         color: Colors.amber,
                                         size: 20,
                                       );
@@ -319,21 +322,22 @@ class _RentalDetailScreenState extends State<RentalDetailScreen>
                               ),
                               child: _isLoadingFavorite
                                   ? const SizedBox(
-                                width: 24,
-                                height: 24,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: Colors.grey,
-                                ),
-                              )
+                                      width: 24,
+                                      height: 24,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        color: Colors.grey,
+                                      ),
+                                    )
                                   : Icon(
-                                _isFavorite
-                                    ? Icons.favorite
-                                    : Icons.favorite_border,
-                                color:
-                                _isFavorite ? Colors.red : Colors.grey,
-                                size: 24,
-                              ),
+                                      _isFavorite
+                                          ? Icons.favorite
+                                          : Icons.favorite_border,
+                                      color: _isFavorite
+                                          ? Colors.red
+                                          : Colors.grey,
+                                      size: 24,
+                                    ),
                             ),
                           ),
                         ],
@@ -365,7 +369,7 @@ class _RentalDetailScreenState extends State<RentalDetailScreen>
                                           ? Colors.blue[700]!
                                           : Colors.grey[300]!,
                                       width:
-                                      _selectedImageIndex == index ? 2 : 1,
+                                          _selectedImageIndex == index ? 2 : 1,
                                     ),
                                     borderRadius: BorderRadius.circular(12),
                                   ),
@@ -374,10 +378,12 @@ class _RentalDetailScreenState extends State<RentalDetailScreen>
                                     child: CachedNetworkImage(
                                       imageUrl: imageUrl,
                                       fit: BoxFit.cover,
-                                      placeholder: (context, url) => const Center(
-                                          child: CircularProgressIndicator()),
+                                      placeholder: (context, url) =>
+                                          const Center(
+                                              child:
+                                                  CircularProgressIndicator()),
                                       errorWidget: (context, url, error) =>
-                                      const Icon(Icons.error),
+                                          const Icon(Icons.error),
                                     ),
                                   ),
                                 ),
@@ -387,28 +393,76 @@ class _RentalDetailScreenState extends State<RentalDetailScreen>
                         ),
                       const SizedBox(height: 24),
                       Center(
-                        child: ElevatedButton.icon(
-                          onPressed: () {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                  content:
-                                  Text('Chức năng đặt chỗ đang phát triển')),
+                        child: Consumer<AuthViewModel>(
+                          builder: (context, authViewModel, child) {
+                            // Kiểm tra nếu là bài viết của chính mình thì ẩn nút đặt chỗ
+                            if (authViewModel.currentUser?.id ==
+                                widget.rental.userId) {
+                              return Container(
+                                padding: const EdgeInsets.all(16),
+                                decoration: BoxDecoration(
+                                  color: Colors.orange[50],
+                                  borderRadius: BorderRadius.circular(12),
+                                  border:
+                                      Border.all(color: Colors.orange[200]!),
+                                ),
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(Icons.info_outline,
+                                        color: Colors.orange[600], size: 20),
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      'Đây là bài viết của bạn',
+                                      style: TextStyle(
+                                        color: Colors.orange[600],
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              );
+                            }
+
+                            return ElevatedButton.icon(
+                              onPressed: () {
+                                if (authViewModel.currentUser == null) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text(
+                                          'Vui lòng đăng nhập để đặt chỗ xem nhà'),
+                                      backgroundColor: Colors.orange,
+                                    ),
+                                  );
+                                  return;
+                                }
+
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) =>
+                                        BookingView(rental: widget.rental),
+                                  ),
+                                );
+                              },
+                              icon: const Icon(Icons.event_available,
+                                  size: 24, color: Colors.white),
+                              label: const Text(
+                                'Đặt chỗ ngay',
+                                style: TextStyle(
+                                    fontSize: 18, color: Colors.white),
+                              ),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.blue[700],
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 32, vertical: 16),
+                                shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(20)),
+                                elevation: 3,
+                              ),
                             );
                           },
-                          icon: const Icon(Icons.event_available,
-                              size: 24, color: Colors.white),
-                          label: const Text(
-                            'Đặt chỗ ngay',
-                            style: TextStyle(fontSize: 18, color: Colors.white),
-                          ),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.blue[700],
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 32, vertical: 16),
-                            shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(20)),
-                            elevation: 3,
-                          ),
                         ),
                       ),
                       const SizedBox(height: 25),

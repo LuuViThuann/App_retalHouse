@@ -52,6 +52,16 @@ class ApiRoutes {
   static String messagesByConversation(String conversationId) =>
       '$baseUrl/messages/$conversationId';
 
+  // Booking Endpoints
+  static const String bookings = '$baseUrl/bookings';
+  static String myBookings = '$bookings/my-bookings';
+  static String rentalBookings(String rentalId) => '$bookings/rental/$rentalId';
+  static String bookingById(String bookingId) => '$bookings/$bookingId';
+  static String updateBookingStatus(String bookingId) =>
+      '$bookings/$bookingId/status';
+  static String cancelBooking(String bookingId) =>
+      '$bookings/$bookingId/cancel';
+
   // Cấu hình EmailJS
   static const String emailJsApi =
       'https://api.emailjs.com/api/v1.0/email/send';
