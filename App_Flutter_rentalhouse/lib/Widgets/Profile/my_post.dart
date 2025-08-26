@@ -47,6 +47,19 @@ class _MyPostsViewState extends State<MyPostsView> {
     }
   }
 
+  Color getStatusColor(String status) {
+    switch (status.toLowerCase()) {
+      case 'available':
+        return Colors.green;
+      case 'rented':
+        return Colors.blueAccent;
+      case 'inactive':
+        return Colors.grey;
+      default:
+        return Colors.grey;
+    }
+  }
+
   Future<void> _confirmDelete(BuildContext context, String rentalId) async {
     final authViewModel = Provider.of<AuthViewModel>(context, listen: false);
     final result = await showDialog<bool>(
@@ -113,49 +126,85 @@ class _MyPostsViewState extends State<MyPostsView> {
           });
         }
         return Scaffold(
-          backgroundColor: Colors.white,
+          backgroundColor: const Color(0xFFF8F9FA),
           appBar: AppBar(
-            backgroundColor: Colors.white,
+            backgroundColor: Colors.blueAccent,
+            elevation: 0,
             title: const Text(
               'Danh sách bài đăng của bạn',
               style: TextStyle(
-                fontSize: 20,
+                fontSize: 18,
                 fontWeight: FontWeight.w600,
-                color: Colors.black,
-                fontFamily: 'Roboto',
+                color: Colors.white,
               ),
             ),
-            elevation: 0,
+            leading: IconButton(
+              icon: const Icon(Icons.arrow_back, color: Colors.white),
+              onPressed: () => Navigator.pop(context),
+            ),
+            shape: const RoundedRectangleBorder(
+              borderRadius: BorderRadius.vertical(
+                bottom: Radius.circular(20),
+              ),
+            ),
           ),
           body: authViewModel.isLoading && authViewModel.myPosts.isEmpty
               ? Center(
-                  child: Lottie.asset(
-                    AssetsConfig.loadingLottie,
-                    width: 150,
-                    height: 150,
-                    fit: BoxFit.fill,
+                  child: Container(
+                    padding: const EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(16),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.grey.withOpacity(0.1),
+                          blurRadius: 20,
+                          offset: const Offset(0, 8),
+                        ),
+                      ],
+                    ),
+                    child: Lottie.asset(
+                      AssetsConfig.loadingLottie,
+                      width: 100,
+                      height: 100,
+                      fit: BoxFit.fill,
+                    ),
                   ),
                 )
               : authViewModel.myPosts.isEmpty
                   ? Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            Icons.post_add,
-                            size: 60,
-                            color: Colors.grey[400],
-                          ),
-                          const SizedBox(height: 12),
-                          Text(
-                            'Chưa có bài đăng nào',
-                            style: TextStyle(
-                              fontSize: 18,
-                              color: Colors.grey[600],
-                              fontFamily: 'Roboto',
+                      child: Container(
+                        padding: const EdgeInsets.all(20),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(16),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.grey.withOpacity(0.1),
+                              blurRadius: 20,
+                              offset: const Offset(0, 8),
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.post_add,
+                              size: 60,
+                              color: Colors.grey[400],
+                            ),
+                            const SizedBox(height: 12),
+                            Text(
+                              'Chưa có bài đăng nào',
+                              style: TextStyle(
+                                fontSize: 18,
+                                color: Colors.grey[600],
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     )
                   : Column(
@@ -163,21 +212,25 @@ class _MyPostsViewState extends State<MyPostsView> {
                         Expanded(
                           child: ListView.separated(
                             padding: const EdgeInsets.symmetric(
-                                horizontal: 12, vertical: 10),
+                                horizontal: 16, vertical: 20),
                             itemCount: authViewModel.myPosts.length,
                             separatorBuilder: (context, index) =>
-                                const SizedBox(height: 10),
+                                const SizedBox(height: 16),
                             itemBuilder: (context, index) {
                               final rental = authViewModel.myPosts[index];
+                              final statusColor = getStatusColor(rental.status);
                               return Container(
                                 decoration: BoxDecoration(
                                   color: Colors.white,
-                                  borderRadius: BorderRadius.circular(12),
+                                  borderRadius: BorderRadius.circular(16),
+                                  border: Border.all(
+                                    color: Colors.grey.withOpacity(0.1),
+                                  ),
                                   boxShadow: [
                                     BoxShadow(
-                                      color: Colors.black.withOpacity(0.1),
-                                      blurRadius: 4,
-                                      offset: const Offset(0, 2),
+                                      color: Colors.grey.withOpacity(0.1),
+                                      blurRadius: 15,
+                                      offset: const Offset(0, 5),
                                     ),
                                   ],
                                 ),
@@ -191,7 +244,7 @@ class _MyPostsViewState extends State<MyPostsView> {
                                       ),
                                     );
                                   },
-                                  borderRadius: BorderRadius.circular(12),
+                                  borderRadius: BorderRadius.circular(16),
                                   child: Stack(
                                     children: [
                                       Row(
@@ -201,19 +254,15 @@ class _MyPostsViewState extends State<MyPostsView> {
                                           ClipRRect(
                                             borderRadius:
                                                 const BorderRadius.only(
-                                              topLeft: Radius.circular(12),
-                                              bottomLeft: Radius.circular(12),
+                                              topLeft: Radius.circular(16),
+                                              bottomLeft: Radius.circular(16),
                                             ),
                                             child: rental.images.isNotEmpty
                                                 ? CachedNetworkImage(
                                                     imageUrl:
                                                         '${ApiRoutes.serverBaseUrl}${rental.images[0]}',
-                                                    width: 160,
-                                                    height:
-                                                        MediaQuery.of(context)
-                                                                .size
-                                                                .height *
-                                                            0.2,
+                                                    width: 140,
+                                                    height: 190,
                                                     fit: BoxFit.cover,
                                                     placeholder:
                                                         (context, url) =>
@@ -223,12 +272,8 @@ class _MyPostsViewState extends State<MyPostsView> {
                                                       highlightColor:
                                                           Colors.grey[100]!,
                                                       child: Container(
-                                                        width: 160,
-                                                        height: MediaQuery.of(
-                                                                    context)
-                                                                .size
-                                                                .height *
-                                                            0.2,
+                                                        width: 140,
+                                                        height: 190,
                                                         color: Colors.grey[300],
                                                       ),
                                                     ),
@@ -237,41 +282,33 @@ class _MyPostsViewState extends State<MyPostsView> {
                                                       print(
                                                           'Image load error: $error for URL: ${ApiRoutes.serverBaseUrl}${rental.images[0]}');
                                                       return Container(
-                                                        width: 160,
-                                                        height: MediaQuery.of(
-                                                                    context)
-                                                                .size
-                                                                .height *
-                                                            0.2,
-                                                        color: Colors.grey[300],
+                                                        width: 140,
+                                                        height: 190,
+                                                        color: Colors.grey[200],
                                                         child: Icon(
                                                           Icons
                                                               .image_not_supported,
                                                           size: 30,
                                                           color:
-                                                              Colors.grey[600],
+                                                              Colors.grey[400],
                                                         ),
                                                       );
                                                     },
                                                   )
                                                 : Container(
-                                                    width: 160,
-                                                    height:
-                                                        MediaQuery.of(context)
-                                                                .size
-                                                                .height *
-                                                            0.2,
-                                                    color: Colors.grey[300],
+                                                    width: 140,
+                                                    height: 140,
+                                                    color: Colors.grey[200],
                                                     child: Icon(
                                                       Icons.image_not_supported,
                                                       size: 30,
-                                                      color: Colors.grey[600],
+                                                      color: Colors.grey[400],
                                                     ),
                                                   ),
                                           ),
                                           Expanded(
                                             child: Padding(
-                                              padding: const EdgeInsets.all(10),
+                                              padding: const EdgeInsets.all(12),
                                               child: Column(
                                                 crossAxisAlignment:
                                                     CrossAxisAlignment.start,
@@ -279,45 +316,44 @@ class _MyPostsViewState extends State<MyPostsView> {
                                                   Text(
                                                     rental.title,
                                                     style: const TextStyle(
-                                                      fontSize: 14,
+                                                      fontSize: 16,
                                                       fontWeight:
-                                                          FontWeight.w600,
-                                                      fontFamily: 'Roboto',
+                                                          FontWeight.bold,
+                                                      color: Color(0xFF424242),
                                                     ),
                                                     maxLines: 2,
                                                     overflow:
                                                         TextOverflow.ellipsis,
                                                   ),
-                                                  const SizedBox(height: 6),
+                                                  const SizedBox(height: 8),
                                                   Text(
                                                     '${formatCurrency(rental.price)}/tháng',
                                                     style: TextStyle(
-                                                      fontSize: 14,
-                                                      color: Colors.blue[700],
+                                                      fontSize: 16,
+                                                      color: Colors.green,
                                                       fontWeight:
                                                           FontWeight.w600,
-                                                      fontFamily: 'Roboto',
                                                     ),
                                                   ),
-                                                  const SizedBox(height: 4),
+                                                  const SizedBox(height: 8),
                                                   Row(
                                                     children: [
                                                       Icon(
                                                         Icons.location_on,
-                                                        size: 14,
+                                                        size: 16,
                                                         color: Colors.grey[600],
                                                       ),
-                                                      const SizedBox(width: 4),
+                                                      const SizedBox(width: 6),
                                                       Expanded(
                                                         child: Text(
                                                           rental.location[
                                                               'short'],
                                                           style: TextStyle(
-                                                            fontSize: 12,
+                                                            fontSize: 14,
                                                             color: Colors
                                                                 .grey[600],
-                                                            fontFamily:
-                                                                'Roboto',
+                                                            fontWeight:
+                                                                FontWeight.w500,
                                                           ),
                                                           maxLines: 1,
                                                           overflow: TextOverflow
@@ -326,59 +362,70 @@ class _MyPostsViewState extends State<MyPostsView> {
                                                       ),
                                                     ],
                                                   ),
-                                                  const SizedBox(height: 4),
+                                                  const SizedBox(height: 8),
                                                   Row(
                                                     children: [
                                                       Icon(
                                                         Icons.square_foot,
-                                                        size: 14,
+                                                        size: 16,
                                                         color: Colors.grey[600],
                                                       ),
-                                                      const SizedBox(width: 4),
+                                                      const SizedBox(width: 6),
                                                       Text(
                                                         '${rental.area['total']} m²',
                                                         style: TextStyle(
-                                                          fontSize: 12,
+                                                          fontSize: 14,
                                                           color:
                                                               Colors.grey[600],
-                                                          fontFamily: 'Roboto',
+                                                          fontWeight:
+                                                              FontWeight.w500,
                                                         ),
                                                       ),
-                                                      const SizedBox(width: 8),
+                                                      const SizedBox(width: 12),
                                                       Icon(
                                                         Icons.home,
-                                                        size: 14,
+                                                        size: 16,
                                                         color: Colors.grey[600],
                                                       ),
-                                                      const SizedBox(width: 4),
+                                                      const SizedBox(width: 6),
                                                       Text(
                                                         rental.propertyType,
                                                         style: TextStyle(
-                                                          fontSize: 12,
+                                                          fontSize: 14,
                                                           color:
                                                               Colors.grey[600],
-                                                          fontFamily: 'Roboto',
+                                                          fontWeight:
+                                                              FontWeight.w500,
                                                         ),
                                                       ),
                                                     ],
                                                   ),
-                                                  const SizedBox(height: 4),
+                                                  const SizedBox(height: 8),
                                                   Row(
                                                     children: [
-                                                      Icon(
-                                                        Icons.info_outline,
-                                                        size: 14,
-                                                        color: Colors.grey[600],
-                                                      ),
-                                                      const SizedBox(width: 4),
-                                                      Text(
-                                                        formatStatus(
-                                                            rental.status),
-                                                        style: TextStyle(
-                                                          fontSize: 12,
-                                                          color:
-                                                              Colors.grey[600],
-                                                          fontFamily: 'Roboto',
+                                                      Container(
+                                                        padding:
+                                                            const EdgeInsets
+                                                                .symmetric(
+                                                                horizontal: 8,
+                                                                vertical: 4),
+                                                        decoration:
+                                                            BoxDecoration(
+                                                          color: statusColor
+                                                              .withOpacity(0.1),
+                                                          borderRadius:
+                                                              BorderRadius
+                                                                  .circular(8),
+                                                        ),
+                                                        child: Text(
+                                                          formatStatus(
+                                                              rental.status),
+                                                          style: TextStyle(
+                                                            fontSize: 12,
+                                                            color: statusColor,
+                                                            fontWeight:
+                                                                FontWeight.w600,
+                                                          ),
                                                         ),
                                                       ),
                                                     ],
@@ -398,6 +445,48 @@ class _MyPostsViewState extends State<MyPostsView> {
                                             color: Colors.grey[600],
                                             size: 24,
                                           ),
+                                          color: Colors.white,
+                                          itemBuilder: (context) => [
+                                            PopupMenuItem(
+                                              value: PostAction.edit,
+                                              child: Container(
+                                                padding:
+                                                    const EdgeInsets.symmetric(
+                                                        vertical: 8,
+                                                        horizontal: 12),
+                                                child: Row(
+                                                  children: [
+                                                    Icon(Icons.edit,
+                                                        color: Colors.green),
+                                                    const SizedBox(width: 8),
+                                                    Text('Chỉnh sửa',
+                                                        style: TextStyle(
+                                                            color:
+                                                                Colors.green)),
+                                                  ],
+                                                ),
+                                              ),
+                                            ),
+                                            PopupMenuItem(
+                                              value: PostAction.delete,
+                                              child: Container(
+                                                padding:
+                                                    const EdgeInsets.symmetric(
+                                                        vertical: 8,
+                                                        horizontal: 12),
+                                                child: Row(
+                                                  children: [
+                                                    Icon(Icons.delete,
+                                                        color: Colors.red),
+                                                    const SizedBox(width: 8),
+                                                    Text('Xóa',
+                                                        style: TextStyle(
+                                                            color: Colors.red)),
+                                                  ],
+                                                ),
+                                              ),
+                                            ),
+                                          ],
                                           onSelected: (value) {
                                             print(
                                                 'MyPostsView: Menu action selected: $value for rentalId: ${rental.id}');
@@ -418,30 +507,6 @@ class _MyPostsViewState extends State<MyPostsView> {
                                                 break;
                                             }
                                           },
-                                          itemBuilder: (context) => [
-                                            const PopupMenuItem(
-                                              value: PostAction.edit,
-                                              child: Row(
-                                                children: [
-                                                  Icon(Icons.edit,
-                                                      color: Colors.green),
-                                                  SizedBox(width: 8),
-                                                  Text('Chỉnh sửa'),
-                                                ],
-                                              ),
-                                            ),
-                                            const PopupMenuItem(
-                                              value: PostAction.delete,
-                                              child: Row(
-                                                children: [
-                                                  Icon(Icons.delete,
-                                                      color: Colors.red),
-                                                  SizedBox(width: 8),
-                                                  Text('Xóa'),
-                                                ],
-                                              ),
-                                            ),
-                                          ],
                                         ),
                                       ),
                                     ],
@@ -454,44 +519,66 @@ class _MyPostsViewState extends State<MyPostsView> {
                         if (authViewModel.postsPage <
                             authViewModel.postsTotalPages)
                           Container(
-                            padding: const EdgeInsets.symmetric(vertical: 10),
+                            padding: const EdgeInsets.symmetric(
+                                vertical: 16, horizontal: 16),
                             decoration: BoxDecoration(
                               color: Colors.white,
                               boxShadow: [
                                 BoxShadow(
-                                  color: Colors.black.withOpacity(0.1),
-                                  blurRadius: 4,
+                                  color: Colors.grey.withOpacity(0.1),
+                                  blurRadius: 10,
                                   offset: const Offset(0, -2),
                                 ),
                               ],
                             ),
                             child: Center(
-                              child: ElevatedButton(
-                                onPressed: authViewModel.isLoading
-                                    ? null
-                                    : () => authViewModel.fetchMyPosts(
-                                        page: authViewModel.postsPage + 1),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.blue[700],
-                                  foregroundColor: Colors.white,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(12),
+                              child: Container(
+                                width: double.infinity,
+                                height: 50,
+                                decoration: BoxDecoration(
+                                  gradient: LinearGradient(
+                                    colors: [
+                                      Colors.blueAccent,
+                                      Colors.blueAccent.withOpacity(0.8),
+                                    ],
+                                    begin: Alignment.topLeft,
+                                    end: Alignment.bottomRight,
                                   ),
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 20, vertical: 12),
-                                  elevation: 2,
+                                  borderRadius: BorderRadius.circular(12),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.blueAccent.withOpacity(0.3),
+                                      blurRadius: 8,
+                                      offset: const Offset(0, 2),
+                                    ),
+                                  ],
                                 ),
-                                child: authViewModel.isLoading
-                                    ? const CircularProgressIndicator(
-                                        color: Colors.white)
-                                    : const Text(
-                                        'Tải thêm',
-                                        style: TextStyle(
-                                          fontSize: 16,
-                                          fontWeight: FontWeight.w500,
-                                          fontFamily: 'Roboto',
+                                child: ElevatedButton(
+                                  onPressed: authViewModel.isLoading
+                                      ? null
+                                      : () => authViewModel.fetchMyPosts(
+                                          page: authViewModel.postsPage + 1),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.transparent,
+                                    foregroundColor: Colors.white,
+                                    shadowColor: Colors.transparent,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                  ),
+                                  child: authViewModel.isLoading
+                                      ? const CircularProgressIndicator(
+                                          color: Colors.white,
+                                          strokeWidth: 2,
+                                        )
+                                      : const Text(
+                                          'Tải thêm',
+                                          style: TextStyle(
+                                            fontSize: 16,
+                                            fontWeight: FontWeight.w600,
+                                          ),
                                         ),
-                                      ),
+                                ),
                               ),
                             ),
                           ),

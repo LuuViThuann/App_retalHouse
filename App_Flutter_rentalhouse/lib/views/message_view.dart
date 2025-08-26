@@ -73,17 +73,40 @@ class _ConversationsScreenState extends State<ConversationsScreen>
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        automaticallyImplyLeading: false,
-        title: Row(
-          children: [
-            Icon(Icons.chat, color: AppStyles.whiteColor),
-            SizedBox(width: 8),
-            Text('Cuộc Trò Chuyện', style: AppStyles.appBarTitle),
-          ],
+        backgroundColor: Colors.blue.shade50,
+        elevation: 0,
+        flexibleSpace: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [Colors.blue.shade700, Colors.blue.shade900],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            borderRadius: const BorderRadius.vertical(
+              bottom: Radius.circular(24),
+            ),
+          ),
+        ),
+        title: const Text(
+          'Danh sách cuộc trò chuyện',
+          style: TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.w700,
+            fontSize: 20,
+            letterSpacing: 0.2,
+          ),
+        ),
+        leading: IconButton(
+          icon: const Icon(Icons.chat, color: Colors.white, size: 26),
+          onPressed: () => Navigator.pop(context),
         ),
         actions: [
           IconButton(
-            icon: Icon(Icons.search, color: AppStyles.whiteColor),
+            icon: AnimatedScale(
+              scale: 1.0,
+              duration: const Duration(milliseconds: 200),
+              child: Icon(Icons.search, color: AppStyles.whiteColor, size: 26),
+            ),
             onPressed: () {
               showSearchBottomSheet(
                 context: context,
@@ -96,17 +119,6 @@ class _ConversationsScreenState extends State<ConversationsScreen>
             },
           ),
         ],
-        flexibleSpace: Container(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [AppStyles.primaryColor, AppStyles.primaryDarkColor],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-          ),
-        ),
-        elevation: 4,
-        shadowColor: AppStyles.shadowColor,
       ),
       body: GestureDetector(
         onTap: () {
@@ -115,7 +127,7 @@ class _ConversationsScreenState extends State<ConversationsScreen>
         child: Container(
           decoration: BoxDecoration(
             gradient: LinearGradient(
-              colors: [AppStyles.backgroundLight, AppStyles.whiteColor],
+              colors: [Colors.blue.shade50, Colors.white],
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
             ),
@@ -126,7 +138,7 @@ class _ConversationsScreenState extends State<ConversationsScreen>
                 authViewModel: authViewModel,
                 chatViewModel: chatViewModel,
                 onRetry: _loadConversations,
-                searchQuery: '', // No longer needed in the main UI
+                searchQuery: '',
               );
             },
           ),

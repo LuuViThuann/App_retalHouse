@@ -46,7 +46,6 @@ class ConversationList extends StatelessWidget {
       );
     }
 
-    // Filter and sort conversations only once per build
     final filteredConversations =
         chatViewModel.conversations.where((conversation) {
       final landlordUsername =
@@ -66,13 +65,13 @@ class ConversationList extends StatelessWidget {
     }
 
     return ListView.separated(
-      padding: EdgeInsets.all(16),
+      padding: const EdgeInsets.all(20),
       itemCount: sortedConversations.length,
-      separatorBuilder: (context, index) => const SizedBox(height: 12),
+      separatorBuilder: (context, index) => const SizedBox(height: 16),
       itemBuilder: (context, index) {
         final conversation = sortedConversations[index];
         return ConversationTile(
-          key: ValueKey(conversation.id), // Ensure stable keys for optimization
+          key: ValueKey(conversation.id),
           conversation: conversation,
           token: authViewModel.currentUser!.token!,
         );
@@ -82,61 +81,145 @@ class ConversationList extends StatelessWidget {
 
   Widget _buildEmptyState({required IconData icon, required String message}) {
     return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(icon, size: 64, color: AppStyles.grey400),
-          SizedBox(height: 16),
-          Text(
-            message,
-            style: AppStyles.emptyStateText,
-            textAlign: TextAlign.center,
-          ),
-        ],
+      child: Container(
+        padding: const EdgeInsets.all(24),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.blue.shade100.withOpacity(0.2),
+              blurRadius: 8,
+              spreadRadius: 1,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            AnimatedScale(
+              scale: 1.0,
+              duration: const Duration(milliseconds: 200),
+              child: Icon(icon, size: 64, color: Colors.grey.shade400),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              message,
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w500,
+                color: Colors.grey.shade600,
+                letterSpacing: 0.2,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
       ),
     );
   }
 
   Widget _buildLoadingState() {
     return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Lottie.asset(
-            AssetsConfig.loadingLottie,
-            width: 100,
-            height: 100,
-            fit: BoxFit.fill,
-          ),
-          const SizedBox(height: 16), // Khoảng cách giữa animation và text
-          const Text(
-            'Đang tải cuộc trò chuyện...',
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
-          ),
-        ],
+      child: Container(
+        padding: const EdgeInsets.all(24),
+        decoration: BoxDecoration(),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Lottie.asset(
+              AssetsConfig.loadingLottie,
+              width: 120,
+              height: 120,
+              fit: BoxFit.fill,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Đang tải cuộc trò chuyện...',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w500,
+                color: Colors.grey.shade600,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
 
   Widget _buildErrorState(BuildContext context, String errorMessage) {
     return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(Icons.error_outline, size: 64, color: AppStyles.errorColor),
-          const SizedBox(height: 16),
-          Text(
-            errorMessage,
-            style: AppStyles.errorText,
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 16),
-          ElevatedButton(
-            onPressed: onRetry,
-            style: AppStyles.retryButtonStyle,
-            child: const Text('Thử lại', style: AppStyles.retryButtonText),
-          ),
-        ],
+      child: Container(
+        padding: const EdgeInsets.all(24),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.blue.shade100.withOpacity(0.2),
+              blurRadius: 8,
+              spreadRadius: 1,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            AnimatedScale(
+              scale: 1.0,
+              duration: const Duration(milliseconds: 200),
+              child: Icon(Icons.error_outline,
+                  size: 64, color: AppStyles.errorColor),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              errorMessage,
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w500,
+                color: Colors.grey.shade600,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 16),
+            InkWell(
+              onTap: onRetry,
+              borderRadius: BorderRadius.circular(12),
+              child: Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [Colors.blue.shade700, Colors.blue.shade900],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(12),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.blue.shade300.withOpacity(0.4),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: const Text(
+                  'Thử lại',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

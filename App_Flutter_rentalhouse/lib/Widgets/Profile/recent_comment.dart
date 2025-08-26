@@ -62,12 +62,17 @@ class _RecentCommentsViewState extends State<RecentCommentsView> {
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-              content: Text('Không tìm thấy bài đăng hoặc lỗi tải dữ liệu.')),
+            content: Text('Không tìm thấy bài đăng hoặc lỗi tải dữ liệu.'),
+            backgroundColor: Colors.red,
+          ),
         );
       }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Lỗi khi tải chi tiết bài đăng: $e')),
+        SnackBar(
+          content: Text('Lỗi khi tải chi tiết bài đăng: $e'),
+          backgroundColor: Colors.red,
+        ),
       );
     } finally {
       setState(() => _loadingCommentId = null);
@@ -79,14 +84,33 @@ class _RecentCommentsViewState extends State<RecentCommentsView> {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text('Xác nhận xóa'),
-        content: Text('Bạn có chắc muốn xóa bình luận này?'),
+        title: const Text('Xác nhận xóa'),
+        content: const Text('Bạn có chắc muốn xóa bình luận này?'),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+        ),
+        backgroundColor: Colors.white,
         actions: [
           TextButton(
-              onPressed: () => Navigator.pop(ctx, false), child: Text('Hủy')),
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text(
+              'Hủy',
+              style: TextStyle(
+                color: Colors.grey,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
           TextButton(
-              onPressed: () => Navigator.pop(ctx, true),
-              child: Text('Xóa', style: TextStyle(color: Colors.red))),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text(
+              'Xóa',
+              style: TextStyle(
+                color: Colors.red,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
         ],
       ),
     );
@@ -95,20 +119,28 @@ class _RecentCommentsViewState extends State<RecentCommentsView> {
     await CommentService().deleteCommentOrReply(
       authViewModel: authViewModel,
       id: comment.id,
-      type: comment.type ?? 'Comment', // 'Reply' hoặc 'Comment'
+      type: comment.type ?? 'Comment',
       onCommentDeleted: (total, totalPages) async {
         await authViewModel.fetchRecentComments(page: 1);
         setState(() {
           _loadingCommentId = null;
           if (_selectedCommentId == comment.id) _selectedCommentId = null;
         });
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('Đã xóa bình luận !')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Đã xóa bình luận!'),
+            backgroundColor: Colors.green,
+          ),
+        );
       },
       onError: (err) {
         setState(() => _loadingCommentId = null);
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('Xóa thất bại: $err')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Xóa thất bại: $err'),
+            backgroundColor: Colors.red,
+          ),
+        );
       },
       setLoading: (loading) {},
     );
@@ -119,11 +151,27 @@ class _RecentCommentsViewState extends State<RecentCommentsView> {
     return Consumer<AuthViewModel>(
       builder: (context, authViewModel, child) {
         return Scaffold(
-          backgroundColor: Colors.white,
+          backgroundColor: const Color(0xFFF8F9FA),
           appBar: AppBar(
-            backgroundColor: Colors.white,
-            title: Text('Bình luận gần đây',
-                style: TextStyle(color: Colors.black)),
+            backgroundColor: Colors.blueAccent,
+            elevation: 0,
+            title: const Text(
+              'Bình luận gần đây của bạn',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
+                color: Colors.white,
+              ),
+            ),
+            leading: IconButton(
+              icon: const Icon(Icons.arrow_back, color: Colors.white),
+              onPressed: () => Navigator.pop(context),
+            ),
+            shape: const RoundedRectangleBorder(
+              borderRadius: BorderRadius.vertical(
+                bottom: Radius.circular(20),
+              ),
+            ),
           ),
           body: Column(
             children: [
@@ -133,19 +181,38 @@ class _RecentCommentsViewState extends State<RecentCommentsView> {
                     ? Center(
                         child: Lottie.asset(
                           AssetsConfig.loadingLottie,
-                          width: 100,
-                          height: 100,
-                          fit: BoxFit.fill,
+                          width: 150,
+                          height: 150,
+                          fit: BoxFit.contain,
                         ),
                       )
                     : Padding(
-                        padding: const EdgeInsets.all(16.0),
+                        padding: const EdgeInsets.all(20.0),
                         child: authViewModel.recentComments.isEmpty
                             ? Center(
-                                child: Text(
-                                'Chưa có bình luận hoặc phản hồi nào !',
-                                style: TextStyle(color: Colors.red),
-                              ))
+                                child: Container(
+                                  padding: const EdgeInsets.all(20),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white,
+                                    borderRadius: BorderRadius.circular(16),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Colors.grey.withOpacity(0.1),
+                                        blurRadius: 20,
+                                        offset: const Offset(0, 8),
+                                      ),
+                                    ],
+                                  ),
+                                  child: const Text(
+                                    'Chưa có bình luận hoặc phản hồi nào!',
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w500,
+                                      color: Colors.red,
+                                    ),
+                                  ),
+                                ),
+                              )
                             : ListView.builder(
                                 itemCount: authViewModel.recentComments.length,
                                 itemBuilder: (context, index) {
@@ -166,43 +233,81 @@ class _RecentCommentsViewState extends State<RecentCommentsView> {
                                             ),
                                     child: Stack(
                                       children: [
-                                        Card(
-                                          margin:
-                                              EdgeInsets.symmetric(vertical: 8),
-                                          shape: RoundedRectangleBorder(
-                                            side: isSelected
-                                                ? BorderSide(
-                                                    color: Colors.blue,
-                                                    width: 2)
-                                                : BorderSide.none,
+                                        Container(
+                                          margin: const EdgeInsets.symmetric(
+                                              vertical: 10),
+                                          decoration: BoxDecoration(
+                                            gradient: LinearGradient(
+                                              colors: [
+                                                Colors.white,
+                                                Colors.blue[50]!
+                                                    .withOpacity(0.5),
+                                              ],
+                                              begin: Alignment.topLeft,
+                                              end: Alignment.bottomRight,
+                                            ),
                                             borderRadius:
-                                                BorderRadius.circular(8),
+                                                BorderRadius.circular(16),
+                                            border: Border.all(
+                                              color: isSelected
+                                                  ? Colors.blueAccent
+                                                  : Colors.grey
+                                                      .withOpacity(0.2),
+                                              width: isSelected ? 2 : 1,
+                                            ),
+                                            boxShadow: [
+                                              BoxShadow(
+                                                color: Colors.grey
+                                                    .withOpacity(0.1),
+                                                blurRadius: 10,
+                                                offset: const Offset(0, 4),
+                                              ),
+                                            ],
                                           ),
-                                          color: isSelected
-                                              ? Colors.blue[50]
-                                              : Colors.white,
                                           child: Padding(
-                                            padding: const EdgeInsets.all(12.0),
+                                            padding: const EdgeInsets.all(16.0),
                                             child: Column(
                                               crossAxisAlignment:
                                                   CrossAxisAlignment.start,
                                               children: [
                                                 Row(
                                                   children: [
-                                                    CircleAvatar(
-                                                      radius: 16,
-                                                      backgroundImage: comment
-                                                                  .userId
-                                                                  .avatarBytes !=
-                                                              null
-                                                          ? MemoryImage(comment
-                                                              .userId
-                                                              .avatarBytes!)
-                                                          : const AssetImage(
-                                                                  'assets/img/imageuser.png')
-                                                              as ImageProvider,
+                                                    Container(
+                                                      decoration: BoxDecoration(
+                                                        shape: BoxShape.circle,
+                                                        border: Border.all(
+                                                          color: Colors
+                                                              .blueAccent
+                                                              .withOpacity(0.3),
+                                                          width: 2,
+                                                        ),
+                                                        boxShadow: [
+                                                          BoxShadow(
+                                                            color: Colors.grey
+                                                                .withOpacity(
+                                                                    0.2),
+                                                            blurRadius: 8,
+                                                            offset:
+                                                                const Offset(
+                                                                    0, 2),
+                                                          ),
+                                                        ],
+                                                      ),
+                                                      child: CircleAvatar(
+                                                        radius: 20,
+                                                        backgroundImage: comment
+                                                                    .userId
+                                                                    .avatarBytes !=
+                                                                null
+                                                            ? MemoryImage(comment
+                                                                .userId
+                                                                .avatarBytes!)
+                                                            : const AssetImage(
+                                                                    'assets/img/imageuser.png')
+                                                                as ImageProvider,
+                                                      ),
                                                     ),
-                                                    SizedBox(width: 8),
+                                                    const SizedBox(width: 12),
                                                     Expanded(
                                                       child: Column(
                                                         crossAxisAlignment:
@@ -212,46 +317,62 @@ class _RecentCommentsViewState extends State<RecentCommentsView> {
                                                           Text(
                                                             comment.userId
                                                                 .username,
-                                                            style: TextStyle(
-                                                                fontWeight:
-                                                                    FontWeight
-                                                                        .bold),
+                                                            style:
+                                                                const TextStyle(
+                                                              fontSize: 16,
+                                                              fontWeight:
+                                                                  FontWeight
+                                                                      .w600,
+                                                              color: Color(
+                                                                  0xFF424242),
+                                                            ),
                                                           ),
+                                                          const SizedBox(
+                                                              height: 4),
                                                           Text(
                                                             isReply
                                                                 ? 'Phản hồi trên ${comment.rentalTitle}'
                                                                 : comment
                                                                         .rentalTitle ??
                                                                     'Unknown Rental',
-                                                            style: TextStyle(
-                                                                color:
-                                                                    Colors.grey,
-                                                                fontSize: 12),
+                                                            style:
+                                                                const TextStyle(
+                                                              fontSize: 12,
+                                                              color: Color(
+                                                                  0xFF757575),
+                                                            ),
                                                           ),
                                                         ],
                                                       ),
                                                     ),
-                                                    // Icon delete
                                                     IconButton(
-                                                      icon: Icon(Icons.delete,
-                                                          color: Colors.red),
+                                                      icon: const Icon(
+                                                        Icons.delete,
+                                                        color: Colors.red,
+                                                        size: 24,
+                                                      ),
                                                       tooltip: 'Xóa bình luận',
                                                       onPressed: isLoading
                                                           ? null
-                                                          : () => _deleteComment(
-                                                              context,
-                                                              comment,
-                                                              authViewModel),
+                                                          : () =>
+                                                              _deleteComment(
+                                                                context,
+                                                                comment,
+                                                                authViewModel,
+                                                              ),
                                                     ),
                                                   ],
                                                 ),
-                                                SizedBox(height: 8),
+                                                const SizedBox(height: 12),
                                                 Text(
                                                   comment.content,
-                                                  style:
-                                                      TextStyle(fontSize: 14),
+                                                  style: const TextStyle(
+                                                    fontSize: 14,
+                                                    fontWeight: FontWeight.w500,
+                                                    color: Color(0xFF424242),
+                                                  ),
                                                 ),
-                                                SizedBox(height: 8),
+                                                const SizedBox(height: 12),
                                                 if (!isReply &&
                                                     comment.rating > 0)
                                                   Row(
@@ -263,16 +384,17 @@ class _RecentCommentsViewState extends State<RecentCommentsView> {
                                                             : Icons.star_border,
                                                         color:
                                                             Colors.yellow[700],
-                                                        size: 16,
+                                                        size: 18,
                                                       ),
                                                     ),
                                                   ),
-                                                SizedBox(height: 8),
+                                                const SizedBox(height: 8),
                                                 Text(
                                                   '${comment.createdAt.toLocal().toString().substring(0, 16)}',
-                                                  style: TextStyle(
-                                                      color: Colors.grey,
-                                                      fontSize: 12),
+                                                  style: const TextStyle(
+                                                    fontSize: 12,
+                                                    color: Color(0xFF757575),
+                                                  ),
                                                 ),
                                               ],
                                             ),
@@ -281,15 +403,20 @@ class _RecentCommentsViewState extends State<RecentCommentsView> {
                                         if (isLoading)
                                           Positioned.fill(
                                             child: Container(
-                                              color:
-                                                  Colors.white.withOpacity(0.7),
+                                              decoration: BoxDecoration(
+                                                color: Colors.white
+                                                    .withOpacity(0.7),
+                                                borderRadius:
+                                                    BorderRadius.circular(16),
+                                              ),
                                               child: Center(
-                                                  child: SizedBox(
-                                                      width: 24,
-                                                      height: 24,
-                                                      child:
-                                                          CircularProgressIndicator(
-                                                              strokeWidth: 2))),
+                                                child: Lottie.asset(
+                                                  AssetsConfig.loadingLottie,
+                                                  width: 50,
+                                                  height: 50,
+                                                  fit: BoxFit.contain,
+                                                ),
+                                              ),
                                             ),
                                           ),
                                       ],
@@ -301,18 +428,53 @@ class _RecentCommentsViewState extends State<RecentCommentsView> {
               ),
               if (authViewModel.commentsPage < authViewModel.commentsTotalPages)
                 Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 16.0),
-                  child: ElevatedButton(
-                    onPressed: authViewModel.isLoading
-                        ? null
-                        : () => authViewModel.fetchRecentComments(
-                            page: authViewModel.commentsPage + 1),
-                    child: authViewModel.isLoading
-                        ? CircularProgressIndicator(color: Colors.white)
-                        : Text('Tải thêm'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.blue,
-                      foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 20.0),
+                  child: Container(
+                    width: double.infinity,
+                    height: 60,
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [
+                          Colors.blueAccent,
+                          Colors.blueAccent.withOpacity(0.8),
+                        ],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      borderRadius: BorderRadius.circular(12),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.blueAccent.withOpacity(0.3),
+                          blurRadius: 8,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: ElevatedButton(
+                      onPressed: authViewModel.isLoading
+                          ? null
+                          : () => authViewModel.fetchRecentComments(
+                              page: authViewModel.commentsPage + 1),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.transparent,
+                        foregroundColor: Colors.white,
+                        shadowColor: Colors.transparent,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      child: authViewModel.isLoading
+                          ? const CircularProgressIndicator(
+                              color: Colors.white,
+                              strokeWidth: 2,
+                            )
+                          : const Text(
+                              'Tải thêm',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
                     ),
                   ),
                 ),

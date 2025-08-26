@@ -236,7 +236,7 @@ class BookingService {
   }
 
   // Lấy chi tiết booking
-  Future<Booking> getBookingDetail({
+  Future<Booking?> getBookingDetail({
     required String bookingId,
     required Function(String) onError,
   }) async {
@@ -264,6 +264,45 @@ class BookingService {
       }
     } catch (e) {
       onError('Lỗi khi lấy chi tiết đặt chỗ: $e');
+      rethrow;
+    }
+  }
+
+  // Kiểm tra xem người dùng đã đặt chỗ cho một bài viết cụ thể hay chưa
+  Future<Booking?> checkUserHasBooked({
+    required String rentalId,
+    required Function(String) onError,
+  }) async {
+    try {
+      final token = await _getIdToken();
+      if (token == null) {
+        throw Exception('Không tìm thấy token. Vui lòng đăng nhập lại.');
+      }
+
+      final response = await http.get(
+        Uri.parse(
+            '${ApiRoutes.baseUrl}/bookings/my-bookings?rentalId=$rentalId&status=pending,confirmed'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        final bookings = data['bookings'] as List;
+
+        // Nếu có booking nào với status pending hoặc confirmed, trả về booking đầu tiên
+        if (bookings.isNotEmpty) {
+          return Booking.fromJson(bookings.first);
+        }
+        return null;
+      } else {
+        final errorData = jsonDecode(response.body);
+        throw Exception(errorData['message'] ?? 'Kiểm tra đặt chỗ thất bại');
+      }
+    } catch (e) {
+      onError('Lỗi khi kiểm tra đặt chỗ: $e');
       rethrow;
     }
   }

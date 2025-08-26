@@ -35,7 +35,7 @@ class _ConversationInfoPageState extends State<ConversationInfoPage> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: const Text('Cuộc trò chuyện đã được xóa'),
-          backgroundColor: Colors.green[700],
+          backgroundColor: Colors.green.shade700,
           behavior: SnackBarBehavior.floating,
           shape:
               RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -48,7 +48,7 @@ class _ConversationInfoPageState extends State<ConversationInfoPage> {
         SnackBar(
           content:
               Text(chatViewModel.errorMessage ?? 'Lỗi khi xóa cuộc trò chuyện'),
-          backgroundColor: Colors.red[700],
+          backgroundColor: Colors.red.shade700,
           behavior: SnackBarBehavior.floating,
           shape:
               RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -66,54 +66,88 @@ class _ConversationInfoPageState extends State<ConversationInfoPage> {
         .toList();
     final imageUrls = messages.expand((message) => message.images).toList();
 
-    const Color messagingThemeColor = Color(0xFF007AFF);
+    const Color messagingThemeColor = Colors.lightBlue;
     const Color onMessagingThemeColor = Colors.white;
 
-    final ThemeData currentTheme = Theme.of(context);
-
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: Colors.transparent,
       appBar: AppBar(
-        title: Text(
-          'Thông tin hội thoại',
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            color: onMessagingThemeColor,
+        backgroundColor: Colors.blue.shade50,
+        elevation: 0,
+        flexibleSpace: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [Colors.blue.shade700, Colors.blue.shade900],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            borderRadius:
+                const BorderRadius.vertical(bottom: Radius.circular(24)),
           ),
         ),
-        backgroundColor: messagingThemeColor,
-        elevation: 1.0,
-        iconTheme: const IconThemeData(color: onMessagingThemeColor),
-        surfaceTintColor: Colors.transparent,
+        title: const Text(
+          'Thông tin cuộc trò chuyện',
+          style: TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.w700,
+            fontSize: 20,
+            letterSpacing: 0.2,
+          ),
+        ),
+        leading: IconButton(
+          icon: AnimatedScale(
+            scale: 1.0,
+            duration: const Duration(milliseconds: 200),
+            child: const Icon(Icons.arrow_back, color: Colors.white, size: 26),
+          ),
+          onPressed: () => Navigator.pop(context),
+        ),
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            SectionTitle(
-              title: 'Ảnh đã chia sẻ',
-              icon: Icons.image_outlined,
-              color: messagingThemeColor,
-            ),
-            const SizedBox(height: 12),
-            SharedImages(
-              imageUrls: imageUrls,
-              themeColor: messagingThemeColor,
-            ),
-            const SizedBox(height: 24),
-            SectionTitle(
-              title: 'Quản lý',
-              icon: Icons.settings_outlined,
-              color: messagingThemeColor,
-            ),
-            const SizedBox(height: 12),
-            ActionsCard(
-              appTheme: currentTheme,
-              isDeleting: _isDeleting,
-              onDelete: _deleteConversation,
-            ),
-          ],
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [Colors.blue.shade50, Colors.white],
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+          ),
+        ),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            return SingleChildScrollView(
+              padding: const EdgeInsets.all(20.0),
+              child: ConstrainedBox(
+                constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    SectionTitle(
+                      title: 'Ảnh đã chia sẻ',
+                      icon: Icons.image_outlined,
+                      color: messagingThemeColor,
+                    ),
+                    const SizedBox(height: 12),
+                    SharedImages(
+                      imageUrls: imageUrls,
+                      themeColor: messagingThemeColor,
+                    ),
+                    const SizedBox(height: 24),
+                    SectionTitle(
+                      title: 'Quản lý',
+                      icon: Icons.settings_outlined,
+                      color: messagingThemeColor,
+                    ),
+                    const SizedBox(height: 12),
+                    ActionsCard(
+                      appTheme: Theme.of(context),
+                      isDeleting: _isDeleting,
+                      onDelete: _deleteConversation,
+                    ),
+                    const SizedBox(height: 20), // Ensure bottom padding
+                  ],
+                ),
+              ),
+            );
+          },
         ),
       ),
     );

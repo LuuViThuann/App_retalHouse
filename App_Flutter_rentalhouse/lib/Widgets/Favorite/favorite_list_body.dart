@@ -7,7 +7,6 @@ import 'package:flutter_rentalhouse/viewmodels/vm_auth.dart';
 import 'package:flutter_rentalhouse/viewmodels/vm_favorite.dart';
 import 'package:flutter_rentalhouse/views/rental_detail_view.dart';
 
-
 class FavoriteListBody extends StatelessWidget {
   final FavoriteViewModel favoriteViewModel;
   final AuthViewModel authViewModel;
@@ -50,27 +49,27 @@ class FavoriteListBody extends StatelessWidget {
         favoriteViewModel.favorites.isEmpty) {
       return Center(
           child: Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Text('Lỗi: ${favoriteViewModel.errorMessage}',
-                textAlign: TextAlign.center,
-                style: const TextStyle(color: Colors.red, fontSize: 16)),
-          ));
+        padding: const EdgeInsets.all(16.0),
+        child: Text('Lỗi: ${favoriteViewModel.errorMessage}',
+            textAlign: TextAlign.center,
+            style: const TextStyle(color: Colors.red, fontSize: 16)),
+      ));
     }
 
     if (favoriteViewModel.favorites.isEmpty) {
       return const Center(
           child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(Icons.favorite_border_outlined, size: 80, color: Colors.grey),
-              SizedBox(height: 16),
-              Text('Danh sách yêu thích trống',
-                  style: TextStyle(fontSize: 17, color: Colors.grey)),
-              Text('Hãy khám phá và thêm nhà/phòng bạn thích nhé.',
-                  style: TextStyle(fontSize: 15, color: Colors.grey),
-                  textAlign: TextAlign.center),
-            ],
-          ));
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.favorite_border_outlined, size: 80, color: Colors.grey),
+          SizedBox(height: 16),
+          Text('Danh sách yêu thích trống',
+              style: TextStyle(fontSize: 17, color: Colors.grey)),
+          Text('Hãy khám phá và thêm nhà/phòng bạn thích nhé.',
+              style: TextStyle(fontSize: 15, color: Colors.grey),
+              textAlign: TextAlign.center),
+        ],
+      ));
     }
 
     return ListView.builder(
@@ -94,12 +93,12 @@ class FavoriteListBody extends StatelessWidget {
                   snapshot.data == null) {
                 return Container(
                   margin:
-                  const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
+                      const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
                       color: Colors.white,
                       border:
-                      Border(bottom: BorderSide(color: Colors.grey[200]!))),
+                          Border(bottom: BorderSide(color: Colors.grey[200]!))),
                   child: Row(
                     children: [
                       Icon(Icons.error_outline,

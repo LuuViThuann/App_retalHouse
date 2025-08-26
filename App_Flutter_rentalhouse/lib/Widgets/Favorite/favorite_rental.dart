@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_rentalhouse/config/api_routes.dart';
+import 'package:flutter_rentalhouse/config/loading.dart';
 import 'package:flutter_rentalhouse/models/rental.dart';
 import 'package:flutter_rentalhouse/viewmodels/vm_auth.dart';
 import 'package:flutter_rentalhouse/viewmodels/vm_favorite.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
+import 'package:lottie/lottie.dart';
 
 class RentalFavoriteWidget extends StatefulWidget {
   final Rental rental;
@@ -26,8 +28,10 @@ class RentalFavoriteWidget extends StatefulWidget {
 
 class _RentalFavoriteWidgetState extends State<RentalFavoriteWidget> {
   Future<void> _handleToggleFavorite(String token) async {
-    final favoriteViewModel = Provider.of<FavoriteViewModel>(context, listen: false);
-    final success = await favoriteViewModel.removeFavorite(widget.rental.id!, token);
+    final favoriteViewModel =
+        Provider.of<FavoriteViewModel>(context, listen: false);
+    final success =
+        await favoriteViewModel.removeFavorite(widget.rental.id!, token);
 
     if (mounted) {
       if (success) {
@@ -38,7 +42,8 @@ class _RentalFavoriteWidgetState extends State<RentalFavoriteWidget> {
         ));
       } else {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text(favoriteViewModel.errorMessage ?? 'Không thể xóa khỏi yêu thích'),
+          content: Text(
+              favoriteViewModel.errorMessage ?? 'Không thể xóa khỏi yêu thích'),
           backgroundColor: Colors.redAccent,
           duration: Duration(seconds: 2),
         ));
@@ -49,12 +54,19 @@ class _RentalFavoriteWidgetState extends State<RentalFavoriteWidget> {
   @override
   Widget build(BuildContext context) {
     final authViewModel = Provider.of<AuthViewModel>(context, listen: false);
-    final favoriteViewModel = Provider.of<FavoriteViewModel>(context, listen: false);
+    final favoriteViewModel =
+        Provider.of<FavoriteViewModel>(context, listen: false);
 
-    final priceVND = NumberFormat.currency(locale: 'vi_VN', symbol: 'VNĐ').format(widget.rental.price);
-    final location = widget.rental.location['short']?.isNotEmpty == true ? widget.rental.location['short'] : 'Không rõ vị trí';
-    final statusText = widget.rental.status == 'available' ? 'Đang cho thuê' : 'Đã cho thuê';
-    final propertyType = widget.rental.propertyType?.isNotEmpty == true ? widget.rental.propertyType : 'Chưa rõ loại';
+    final priceVND = NumberFormat.currency(locale: 'vi_VN', symbol: 'VNĐ')
+        .format(widget.rental.price);
+    final location = widget.rental.location['short']?.isNotEmpty == true
+        ? widget.rental.location['short']
+        : 'Không rõ vị trí';
+    final statusText =
+        widget.rental.status == 'available' ? 'Đang cho thuê' : 'Đã cho thuê';
+    final propertyType = widget.rental.propertyType?.isNotEmpty == true
+        ? widget.rental.propertyType
+        : 'Chưa rõ loại';
 
     bool isLoadingThisItem = favoriteViewModel.isLoading(widget.rental.id!);
 
@@ -63,7 +75,8 @@ class _RentalFavoriteWidgetState extends State<RentalFavoriteWidget> {
       padding: const EdgeInsets.all(12.0),
       decoration: BoxDecoration(
         color: Colors.white,
-        border: Border(bottom: BorderSide(color: Colors.grey[200]!, width: 1.0)),
+        border:
+            Border(bottom: BorderSide(color: Colors.grey[200]!, width: 1.0)),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -80,10 +93,12 @@ class _RentalFavoriteWidgetState extends State<RentalFavoriteWidget> {
                   width: 120,
                   height: 130,
                   color: Colors.grey[200],
-                  child: Icon(Icons.broken_image_outlined, color: Colors.grey[400], size: 30),
+                  child: Icon(Icons.broken_image_outlined,
+                      color: Colors.grey[400], size: 30),
                 );
               },
-              loadingBuilder: (BuildContext context, Widget child, ImageChunkEvent? loadingProgress) {
+              loadingBuilder: (BuildContext context, Widget child,
+                  ImageChunkEvent? loadingProgress) {
                 if (loadingProgress == null) return child;
                 return SizedBox(
                   width: 120,
@@ -92,7 +107,8 @@ class _RentalFavoriteWidgetState extends State<RentalFavoriteWidget> {
                     child: CircularProgressIndicator(
                       strokeWidth: 2.0,
                       value: loadingProgress.expectedTotalBytes != null
-                          ? loadingProgress.cumulativeBytesLoaded / loadingProgress.expectedTotalBytes!
+                          ? loadingProgress.cumulativeBytesLoaded /
+                              loadingProgress.expectedTotalBytes!
                           : null,
                     ),
                   ),
@@ -110,9 +126,14 @@ class _RentalFavoriteWidgetState extends State<RentalFavoriteWidget> {
                   runSpacing: 4.0,
                   children: [
                     Chip(
-                      label: Text(propertyType!, style: TextStyle(fontSize: 10, color: Colors.blueGrey[700], fontWeight: FontWeight.w500)),
+                      label: Text(propertyType!,
+                          style: TextStyle(
+                              fontSize: 10,
+                              color: Colors.blueGrey[700],
+                              fontWeight: FontWeight.w500)),
                       backgroundColor: Colors.blueGrey[50],
-                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 0),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 5, vertical: 0),
                       materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                       labelPadding: const EdgeInsets.symmetric(horizontal: 2.0),
                       visualDensity: VisualDensity.compact,
@@ -123,11 +144,16 @@ class _RentalFavoriteWidgetState extends State<RentalFavoriteWidget> {
                         style: TextStyle(
                           fontSize: 10,
                           fontWeight: FontWeight.w500,
-                          color: widget.rental.status == 'available' ? Colors.green[700] : Colors.orange[800],
+                          color: widget.rental.status == 'available'
+                              ? Colors.green[700]
+                              : Colors.orange[800],
                         ),
                       ),
-                      backgroundColor: widget.rental.status == 'available' ? Colors.green[50] : Colors.orange[50],
-                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 0),
+                      backgroundColor: widget.rental.status == 'available'
+                          ? Colors.green[50]
+                          : Colors.orange[50],
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 5, vertical: 0),
                       materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                       labelPadding: const EdgeInsets.symmetric(horizontal: 2.0),
                       visualDensity: VisualDensity.compact,
@@ -148,7 +174,8 @@ class _RentalFavoriteWidgetState extends State<RentalFavoriteWidget> {
                 const SizedBox(height: 3),
                 Row(
                   children: [
-                    Icon(Icons.location_on_outlined, size: 13, color: Colors.grey[600]),
+                    Icon(Icons.location_on_outlined,
+                        size: 13, color: Colors.grey[600]),
                     const SizedBox(width: 3),
                     Expanded(
                       child: Text(
@@ -202,45 +229,96 @@ class _RentalFavoriteWidgetState extends State<RentalFavoriteWidget> {
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
               isLoadingThisItem
-                  ? const SizedBox(
-                  width: 24,
-                  height: 24,
-                  child: Padding(
-                    padding: EdgeInsets.all(4.0),
-                    child: CircularProgressIndicator(strokeWidth: 2.0, color: Colors.grey),
-                  ))
-                  : InkWell(
-                onTap: () {
-                  if (authViewModel.currentUser != null &&
-                      authViewModel.currentUser!.token != null &&
-                      authViewModel.currentUser!.token!.isNotEmpty &&
-                      !isLoadingThisItem) {
-                    _handleToggleFavorite(authViewModel.currentUser!.token!);
-                  } else if (!isLoadingThisItem) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Vui lòng đăng nhập để bỏ yêu thích')));
-                  }
-                },
-                borderRadius: BorderRadius.circular(20),
-                child: Padding(
-                  padding: const EdgeInsets.all(6.0),
-                  child: Icon(
-                    Icons.favorite,
-                    color: Colors.red[400],
-                    size: 22,
-                  ),
-                ),
-              ),
+                  ? Container(
+                      width: 32,
+                      height: 32,
+                      padding: const EdgeInsets.all(4.0),
+                      child: Lottie.asset(
+                        AssetsConfig.loadingLottie,
+                        width: 24,
+                        height: 24,
+                        fit: BoxFit.contain,
+                      ),
+                    )
+                  : Container(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [
+                            Colors.red[400]!.withOpacity(0.9),
+                            Colors.red[600]!.withOpacity(0.9),
+                          ],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                        shape: BoxShape.circle,
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.red.withOpacity(0.3),
+                            blurRadius: 8,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: InkWell(
+                        onTap: () {
+                          if (authViewModel.currentUser != null &&
+                              authViewModel.currentUser!.token != null &&
+                              authViewModel.currentUser!.token!.isNotEmpty &&
+                              !isLoadingThisItem) {
+                            _handleToggleFavorite(
+                                authViewModel.currentUser!.token!);
+                          } else if (!isLoadingThisItem) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content:
+                                    Text('Vui lòng đăng nhập để bỏ yêu thích'),
+                                backgroundColor: Colors.red,
+                              ),
+                            );
+                          }
+                        },
+                        borderRadius: BorderRadius.circular(20),
+                        child: Padding(
+                          padding: const EdgeInsets.all(8.0),
+                          child: Icon(
+                            Icons.favorite,
+                            color: Colors.white,
+                            size: 24,
+                          ),
+                        ),
+                      ),
+                    ),
+              const SizedBox(height: 12),
               if (widget.showCheckbox)
-                SizedBox(
-                  height: 30,
-                  width: 30,
+                Container(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        Colors.blueAccent,
+                        Colors.blueAccent.withOpacity(0.8),
+                      ],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: BorderRadius.circular(8),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.blueAccent.withOpacity(0.3),
+                        blurRadius: 8,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
                   child: Checkbox(
                     value: widget.isSelected,
                     onChanged: (value) {
                       widget.onSelectChanged(value ?? false);
                     },
-                    activeColor: Theme.of(context).primaryColor,
+                    activeColor: Colors.transparent,
+                    checkColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(6),
+                    ),
                     visualDensity: VisualDensity.compact,
                     materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                   ),

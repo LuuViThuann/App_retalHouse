@@ -19,6 +19,10 @@ class BookingViewModel extends ChangeNotifier {
   int _myBookingsTotal = 0;
   int _rentalBookingsTotal = 0;
 
+  // Biến để lưu trạng thái đặt chỗ của user cho một bài viết cụ thể
+  Booking? _userHasBooked;
+  bool _isCheckingBooking = false;
+
   // Getters
   List<Booking> get myBookings => _myBookings;
   List<Booking> get rentalBookings => _rentalBookings;
@@ -31,6 +35,8 @@ class BookingViewModel extends ChangeNotifier {
   int get rentalBookingsTotalPages => _rentalBookingsTotalPages;
   int get myBookingsTotal => _myBookingsTotal;
   int get rentalBookingsTotal => _rentalBookingsTotal;
+  Booking? get userHasBooked => _userHasBooked;
+  bool get isCheckingBooking => _isCheckingBooking;
 
   // Tạo booking mới
   Future<bool> createBooking({
@@ -293,28 +299,6 @@ class BookingViewModel extends ChangeNotifier {
     }
   }
 
-  // Clear error message
-  void clearError() {
-    _errorMessage = null;
-    notifyListeners();
-  }
-
-  // Reset state
-  void reset() {
-    _myBookings.clear();
-    _rentalBookings.clear();
-    _isLoading = false;
-    _isCreating = false;
-    _errorMessage = null;
-    _myBookingsPage = 1;
-    _rentalBookingsPage = 1;
-    _myBookingsTotalPages = 1;
-    _rentalBookingsTotalPages = 1;
-    _myBookingsTotal = 0;
-    _rentalBookingsTotal = 0;
-    notifyListeners();
-  }
-
   // Helper methods
   String getStatusText(String status) {
     switch (status) {
@@ -344,5 +328,56 @@ class BookingViewModel extends ChangeNotifier {
       default:
         return Colors.grey;
     }
+  }
+
+  // Kiểm tra xem người dùng đã đặt chỗ cho một bài viết cụ thể hay chưa
+  Future<void> checkUserHasBooked({
+    required String rentalId,
+  }) async {
+    _isCheckingBooking = true;
+    _errorMessage = null;
+    notifyListeners();
+
+    try {
+      final booking = await _bookingService.checkUserHasBooked(
+        rentalId: rentalId,
+        onError: (error) {
+          _errorMessage = error;
+          notifyListeners();
+        },
+      );
+
+      _userHasBooked = booking;
+    } catch (e) {
+      _errorMessage = e.toString();
+      _userHasBooked = null;
+    } finally {
+      _isCheckingBooking = false;
+      notifyListeners();
+    }
+  }
+
+  // Clear error message
+  void clearError() {
+    _errorMessage = null;
+    notifyListeners();
+  }
+
+  // Reset state
+  void reset() {
+    _myBookings.clear();
+    _rentalBookings.clear();
+    _isLoading = false;
+    _isCreating = false;
+    _errorMessage = null;
+    _myBookingsPage = 1;
+    _rentalBookingsPage = 1;
+    _myBookingsTotalPages = 1;
+    _rentalBookingsTotalPages = 1;
+    _myBookingsTotal = 0;
+    _rentalBookingsTotal = 0;
+    _userHasBooked = null;
+    _isCheckingBooking = false;
+    notifyListeners();
   }
 }

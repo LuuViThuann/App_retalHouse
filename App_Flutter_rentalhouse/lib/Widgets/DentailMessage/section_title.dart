@@ -14,18 +14,23 @@ class SectionTitle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final ThemeData currentTheme = Theme.of(context);
     return Row(
       children: [
         if (icon != null) ...[
-          Icon(icon, color: color, size: 22),
-          const SizedBox(width: 8),
+          AnimatedScale(
+            scale: 1.0,
+            duration: const Duration(milliseconds: 200),
+            child: Icon(icon, color: color, size: 24),
+          ),
+          const SizedBox(width: 12),
         ],
         Text(
           title,
-          style: currentTheme.textTheme.titleLarge?.copyWith(
-            fontWeight: FontWeight.w600,
-            color: currentTheme.colorScheme.onSurface,
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w700,
+            color: Colors.blue.shade800,
+            letterSpacing: 0.2,
           ),
         ),
       ],

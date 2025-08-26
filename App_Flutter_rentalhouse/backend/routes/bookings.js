@@ -117,12 +117,21 @@ router.post('/bookings', authMiddleware, async (req, res) => {
 // Get user's bookings
 router.get('/bookings/my-bookings', authMiddleware, async (req, res) => {
   try {
-    const { page = 1, limit = 10, status } = req.query;
+    const { page = 1, limit = 10, status, rentalId } = req.query;
     const skip = (Number(page) - 1) * Number(limit);
 
     let query = { userId: req.userId };
     if (status) {
-      query.status = status;
+      // Nếu status có dạng "pending,confirmed" thì split và sử dụng $in
+      if (status.includes(',')) {
+        const statusArray = status.split(',');
+        query.status = { $in: statusArray };
+      } else {
+        query.status = status;
+      }
+    }
+    if (rentalId) {
+      query.rentalId = rentalId;
     }
 
     const bookings = await Booking.find(query)

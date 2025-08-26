@@ -27,13 +27,30 @@ class _AllLatestPostsScreenState extends State<AllLatestPostsScreen> {
 
     return Scaffold(
       backgroundColor: Colors.white,
+      // --------------------------------------
       appBar: AppBar(
-        backgroundColor: Colors.white,
-        title: const Text(
+        backgroundColor: Colors.blueAccent,
+        elevation: 0,
+        title: Text(
           'Bài đăng mới nhất',
-          style: TextStyle(color: Colors.black),
+          style: TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.w600,
+            fontSize: 18,
+          ),
+        ),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          onPressed: () => Navigator.pop(context),
+        ),
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(
+            bottom: Radius.circular(20),
+          ),
         ),
       ),
+      // --------------------------------------
+
       body: rentalViewModel.isLoading
           ? const Center(child: CircularProgressIndicator(color: Colors.blue))
           : rentalViewModel.errorMessage != null

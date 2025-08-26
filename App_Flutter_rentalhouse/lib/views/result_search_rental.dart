@@ -71,30 +71,40 @@ class _SearchResultsPageState extends State<SearchResultsPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
+      //--------------------------------
+      //--------------------------------
       appBar: AppBar(
-        title: const Text(
-          'Kết quả tìm kiếm',
-          style: TextStyle(
-            fontSize: 20,
-            fontWeight: FontWeight.w600,
-            color: Colors.white,
-            fontFamily: 'Roboto',
-          ),
-        ),
+        backgroundColor: Colors.transparent,
+        elevation: 0,
         flexibleSpace: Container(
           decoration: BoxDecoration(
             gradient: LinearGradient(
-              colors: [Colors.blue[600]!, Colors.blue[800]!],
+              colors: [Colors.blue.shade700, Colors.blue.shade900],
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
             ),
+            borderRadius: const BorderRadius.vertical(
+              bottom: Radius.circular(24),
+            ),
           ),
         ),
-        iconTheme: const IconThemeData(
-          color: Colors.white,
+        title: const Text(
+          'Kết quả tìm kiếm bài viết',
+          style: TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.w700,
+            fontSize: 20,
+            letterSpacing: 0.2,
+          ),
         ),
-        elevation: 0,
-        shadowColor: Colors.black.withOpacity(0.2),
+        leading: IconButton(
+          icon: AnimatedScale(
+            scale: 1.0,
+            duration: const Duration(milliseconds: 200),
+            child: const Icon(Icons.arrow_back, color: Colors.white, size: 26),
+          ),
+          onPressed: () => Navigator.pop(context),
+        ),
       ),
       body: Consumer<RentalViewModel>(
         builder: (context, rentalViewModel, child) {

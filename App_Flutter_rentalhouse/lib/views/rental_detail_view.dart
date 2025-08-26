@@ -1,5 +1,7 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_rentalhouse/config/loading.dart';
+import 'package:lottie/lottie.dart';
 import 'package:provider/provider.dart';
 
 import 'package:flutter_rentalhouse/Widgets/Comment/comment_user.dart';
@@ -9,6 +11,7 @@ import 'package:flutter_rentalhouse/models/rental.dart';
 import 'package:flutter_rentalhouse/services/rental_service.dart';
 import 'package:flutter_rentalhouse/views/booking_view.dart';
 import 'package:flutter_rentalhouse/viewmodels/vm_auth.dart';
+import 'package:flutter_rentalhouse/viewmodels/vm_booking.dart';
 
 import 'package:intl/intl.dart';
 import 'package:photo_view/photo_view.dart';
@@ -47,21 +50,34 @@ class _RentalDetailScreenState extends State<RentalDetailScreen>
   }
 
   Future<void> _initializeData() async {
-    await _rentalService.fetchRentalDetails(
-      rental: widget.rental,
-      onSuccess: (averageRating, reviewCount) {
-        setState(() {
-          _averageRating = averageRating;
-          _reviewCount = reviewCount;
-        });
-      },
-      onError: (error) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(error)),
-        );
-      },
-      context: context,
-    );
+    // Kiểm tra xem rental có đủ dữ liệu không
+    if (widget.rental.id.isNotEmpty && widget.rental.title.isNotEmpty) {
+      // Nếu có dữ liệu đầy đủ, không cần fetch từ API
+      setState(() {
+        _averageRating = 0.0; // Có thể set giá trị mặc định
+        _reviewCount = 0;
+      });
+    } else {
+      // Chỉ fetch khi cần thiết
+      await _rentalService.fetchRentalDetails(
+        rental: widget.rental,
+        onSuccess: (averageRating, reviewCount) {
+          setState(() {
+            _averageRating = averageRating;
+            _reviewCount = reviewCount;
+          });
+        },
+        onError: (error) {
+          // Không hiển thị lỗi 404, chỉ log để debug
+          print('Error fetching rental details: $error');
+          setState(() {
+            _averageRating = 0.0;
+            _reviewCount = 0;
+          });
+        },
+        context: context,
+      );
+    }
 
     await _rentalService.checkFavoriteStatus(
       rental: widget.rental,
@@ -82,6 +98,14 @@ class _RentalDetailScreenState extends State<RentalDetailScreen>
       },
       context: context,
     );
+
+    // Kiểm tra xem người dùng đã đặt chỗ cho bài viết này hay chưa
+    final authViewModel = Provider.of<AuthViewModel>(context, listen: false);
+    if (authViewModel.currentUser != null) {
+      final bookingViewModel =
+          Provider.of<BookingViewModel>(context, listen: false);
+      await bookingViewModel.checkUserHasBooked(rentalId: widget.rental.id);
+    }
   }
 
   Future<void> _toggleFavorite() async {
@@ -156,6 +180,16 @@ class _RentalDetailScreenState extends State<RentalDetailScreen>
     });
   }
 
+  // Refresh trạng thái đặt chỗ khi quay lại từ BookingView
+  Future<void> _refreshBookingStatus() async {
+    final authViewModel = Provider.of<AuthViewModel>(context, listen: false);
+    if (authViewModel.currentUser != null) {
+      final bookingViewModel =
+          Provider.of<BookingViewModel>(context, listen: false);
+      await bookingViewModel.checkUserHasBooked(rentalId: widget.rental.id);
+    }
+  }
+
   @override
   void dispose() {
     _tabController.dispose();
@@ -207,28 +241,98 @@ class _RentalDetailScreenState extends State<RentalDetailScreen>
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        widget.rental.title,
-                        style: const TextStyle(
-                          fontSize: 24,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.black87,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Row(
-                        children: [
-                          const Icon(Icons.location_on,
-                              size: 16, color: Colors.grey),
-                          const SizedBox(width: 4),
-                          Expanded(
-                            child: Text(
-                              widget.rental.location['fullAddress'],
-                              style: const TextStyle(
-                                  fontSize: 16, color: Colors.grey),
-                            ),
+                      // Header với gradient và icon đẹp mắt
+                      Container(
+                        padding: const EdgeInsets.all(20),
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [
+                              Colors.blue.shade50,
+                              Colors.blue.shade100.withOpacity(0.3),
+                            ],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
                           ),
-                        ],
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: Colors.blue.shade200),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.all(10),
+                                  decoration: BoxDecoration(
+                                    color: Colors.blue.shade600,
+                                    borderRadius: BorderRadius.circular(12),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Colors.blue.shade200,
+                                        spreadRadius: 1,
+                                        blurRadius: 8,
+                                        offset: const Offset(0, 2),
+                                      ),
+                                    ],
+                                  ),
+                                  child: const Icon(
+                                    Icons.home,
+                                    color: Colors.white,
+                                    size: 24,
+                                  ),
+                                ),
+                                const SizedBox(width: 16),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        widget.rental.title,
+                                        style: TextStyle(
+                                          fontSize: 22,
+                                          fontWeight: FontWeight.bold,
+                                          color: Colors.blue.shade800,
+                                          height: 1.3,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 8),
+                                      Row(
+                                        children: [
+                                          Container(
+                                            padding: const EdgeInsets.all(6),
+                                            decoration: BoxDecoration(
+                                              color: Colors.blue.shade100,
+                                              borderRadius:
+                                                  BorderRadius.circular(8),
+                                            ),
+                                            child: Icon(
+                                              Icons.location_on,
+                                              size: 16,
+                                              color: Colors.blue.shade700,
+                                            ),
+                                          ),
+                                          const SizedBox(width: 8),
+                                          Expanded(
+                                            child: Text(
+                                              widget.rental
+                                                  .location['fullAddress'],
+                                              style: TextStyle(
+                                                fontSize: 14,
+                                                color: Colors.blue.shade700,
+                                                fontWeight: FontWeight.w500,
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
                       ),
                       const SizedBox(height: 16),
                       SingleChildScrollView(
@@ -264,81 +368,151 @@ class _RentalDetailScreenState extends State<RentalDetailScreen>
                           Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Row(
-                                children: [
-                                  const Text(
-                                    'Giá: ',
-                                    style: TextStyle(
-                                      fontSize: 20,
-                                      fontWeight: FontWeight.w500,
-                                      color: Colors.black87,
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 16, vertical: 12),
+                                decoration: BoxDecoration(
+                                  borderRadius: BorderRadius.circular(16),
+                                ),
+                                child: Row(
+                                  children: [
+                                    Icon(
+                                      Icons.account_balance_wallet,
+                                      color: Colors.green.shade700,
+                                      size: 24,
                                     ),
-                                  ),
-                                  Text(
-                                    formatCurrency(widget.rental.price),
-                                    style: const TextStyle(
-                                      fontSize: 22,
-                                      fontWeight: FontWeight.bold,
-                                      color: Colors.green,
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      'Giá: ',
+                                      style: TextStyle(
+                                        fontSize: 18,
+                                        fontWeight: FontWeight.w500,
+                                        color: Colors.black87,
+                                      ),
                                     ),
-                                  ),
-                                ],
+                                    Text(
+                                      formatCurrency(widget.rental.price),
+                                      style: TextStyle(
+                                        fontSize: 20,
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.green.shade700,
+                                      ),
+                                    ),
+                                  ],
+                                ),
                               ),
-                              const SizedBox(height: 8),
-                              Row(
-                                children: [
-                                  Row(
-                                    children: List.generate(5, (index) {
-                                      final starValue = (index + 1).toDouble();
-                                      return Icon(
-                                        starValue <= _averageRating
-                                            ? Icons.star
-                                            : starValue - 0.5 <= _averageRating
-                                                ? Icons.star_half
-                                                : Icons.star_border,
-                                        color: Colors.amber,
-                                        size: 20,
-                                      );
-                                    }),
+                              const SizedBox(height: 12),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 16, vertical: 12),
+                                decoration: BoxDecoration(
+                                  gradient: LinearGradient(
+                                    colors: [
+                                      Colors.amber.shade50,
+                                      Colors.amber.shade100.withOpacity(0.3),
+                                    ],
+                                    begin: Alignment.topLeft,
+                                    end: Alignment.bottomRight,
                                   ),
-                                  const SizedBox(width: 8),
-                                  Text(
-                                    '($_reviewCount lượt đánh giá)',
-                                    style: const TextStyle(
-                                        fontSize: 16, color: Colors.grey),
-                                  ),
-                                ],
+                                  borderRadius: BorderRadius.circular(16),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.amber.shade200
+                                          .withOpacity(0.3),
+                                      blurRadius: 8,
+                                      offset: const Offset(0, 2),
+                                    ),
+                                  ],
+                                  border:
+                                      Border.all(color: Colors.amber.shade100),
+                                ),
+                                child: Row(
+                                  children: [
+                                    AnimatedScale(
+                                      scale: _averageRating > 0 ? 1.1 : 1.0,
+                                      duration:
+                                          const Duration(milliseconds: 200),
+                                      child: Icon(
+                                        Icons.star,
+                                        color: Colors.amber.shade700,
+                                        size: 24,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      '($_reviewCount lượt đánh giá)',
+                                      style: TextStyle(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.w500,
+                                        color: Colors.grey.shade700,
+                                      ),
+                                    ),
+                                  ],
+                                ),
                               ),
                             ],
                           ),
-                          GestureDetector(
-                            onTap: () {},
-                            child: Container(
-                              padding: const EdgeInsets.all(10),
-                              margin: const EdgeInsets.only(right: 16),
-                              decoration: BoxDecoration(
-                                color: Colors.red.withOpacity(0.1),
-                                shape: BoxShape.circle,
-                              ),
-                              child: _isLoadingFavorite
-                                  ? const SizedBox(
-                                      width: 24,
-                                      height: 24,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2,
-                                        color: Colors.grey,
+                          Column(
+                            mainAxisAlignment: MainAxisAlignment.start,
+                            crossAxisAlignment: CrossAxisAlignment.end,
+                            children: [
+                              _isLoadingFavorite
+                                  ? Container(
+                                      width: 32,
+                                      height: 32,
+                                      padding: const EdgeInsets.all(4.0),
+                                      child: Lottie.asset(
+                                        AssetsConfig.loadingLottie,
+                                        width: 24,
+                                        height: 24,
+                                        fit: BoxFit.contain,
                                       ),
                                     )
-                                  : Icon(
-                                      _isFavorite
-                                          ? Icons.favorite
-                                          : Icons.favorite_border,
-                                      color: _isFavorite
-                                          ? Colors.red
-                                          : Colors.grey,
-                                      size: 24,
+                                  : InkWell(
+                                      onTap: _toggleFavorite,
+                                      borderRadius: BorderRadius.circular(20),
+                                      child: AnimatedContainer(
+                                        duration:
+                                            const Duration(milliseconds: 200),
+                                        padding: const EdgeInsets.all(10),
+                                        margin:
+                                            const EdgeInsets.only(right: 16),
+                                        decoration: BoxDecoration(
+                                          gradient: LinearGradient(
+                                            colors: [
+                                              Colors.red.shade400
+                                                  .withOpacity(0.9),
+                                              Colors.red.shade600
+                                                  .withOpacity(0.9),
+                                            ],
+                                            begin: Alignment.topLeft,
+                                            end: Alignment.bottomRight,
+                                          ),
+                                          shape: BoxShape.circle,
+                                          boxShadow: [
+                                            BoxShadow(
+                                              color:
+                                                  Colors.red.withOpacity(0.3),
+                                              blurRadius: 8,
+                                              offset: const Offset(0, 2),
+                                            ),
+                                          ],
+                                        ),
+                                        child: AnimatedScale(
+                                          scale: _isFavorite ? 1.1 : 1.0,
+                                          duration:
+                                              const Duration(milliseconds: 200),
+                                          child: Icon(
+                                            _isFavorite
+                                                ? Icons.favorite
+                                                : Icons.favorite_border,
+                                            color: Colors.white,
+                                            size: 24,
+                                          ),
+                                        ),
+                                      ),
                                     ),
-                            ),
+                            ],
                           ),
                         ],
                       ),
@@ -395,7 +569,6 @@ class _RentalDetailScreenState extends State<RentalDetailScreen>
                       Center(
                         child: Consumer<AuthViewModel>(
                           builder: (context, authViewModel, child) {
-                            // Kiểm tra nếu là bài viết của chính mình thì ẩn nút đặt chỗ
                             if (authViewModel.currentUser?.id ==
                                 widget.rental.userId) {
                               return Container(
@@ -425,42 +598,223 @@ class _RentalDetailScreenState extends State<RentalDetailScreen>
                               );
                             }
 
-                            return ElevatedButton.icon(
-                              onPressed: () {
-                                if (authViewModel.currentUser == null) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(
-                                      content: Text(
-                                          'Vui lòng đăng nhập để đặt chỗ xem nhà'),
-                                      backgroundColor: Colors.orange,
+                            return Consumer<BookingViewModel>(
+                              builder: (context, bookingViewModel, child) {
+                                if (bookingViewModel.isCheckingBooking) {
+                                  return Container(
+                                    padding: const EdgeInsets.all(16),
+                                    decoration: BoxDecoration(
+                                      color: Colors.grey[50],
+                                      borderRadius: BorderRadius.circular(12),
+                                      border:
+                                          Border.all(color: Colors.grey[200]!),
+                                    ),
+                                    child: Row(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
+                                      children: [
+                                        const SizedBox(
+                                          width: 20,
+                                          height: 20,
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2,
+                                            color: Colors.grey,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 12),
+                                        Text(
+                                          'Đang kiểm tra...',
+                                          style: TextStyle(
+                                            color: Colors.grey[600],
+                                            fontSize: 16,
+                                            fontWeight: FontWeight.w500,
+                                          ),
+                                        ),
+                                      ],
                                     ),
                                   );
-                                  return;
                                 }
 
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (context) =>
-                                        BookingView(rental: widget.rental),
+                                // Nếu đã đặt chỗ
+                                if (bookingViewModel.userHasBooked != null) {
+                                  final booking =
+                                      bookingViewModel.userHasBooked!;
+                                  String statusText = '';
+                                  Color statusColor = Colors.blue;
+
+                                  switch (booking.status) {
+                                    case 'pending':
+                                      statusText = 'Chờ xác nhận';
+                                      statusColor = Colors.orange;
+                                      break;
+                                    case 'confirmed':
+                                      statusText = 'Đã xác nhận';
+                                      statusColor = Colors.green;
+                                      break;
+                                    default:
+                                      statusText = 'Đã đặt chỗ';
+                                      statusColor = Colors.blue;
+                                  }
+
+                                  return Container(
+                                    padding: const EdgeInsets.all(16),
+                                    decoration: BoxDecoration(
+                                      gradient: LinearGradient(
+                                        colors: [
+                                          statusColor.withOpacity(0.1),
+                                          statusColor.withOpacity(0.05),
+                                        ],
+                                        begin: Alignment.topLeft,
+                                        end: Alignment.bottomRight,
+                                      ),
+                                      borderRadius: BorderRadius.circular(12),
+                                      border: Border.all(
+                                          color: statusColor.withOpacity(0.3)),
+                                    ),
+                                    child: Column(
+                                      children: [
+                                        Row(
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.center,
+                                          children: [
+                                            Container(
+                                              padding: const EdgeInsets.all(8),
+                                              decoration: BoxDecoration(
+                                                color: statusColor,
+                                                borderRadius:
+                                                    BorderRadius.circular(8),
+                                              ),
+                                              child: Icon(
+                                                Icons.check_circle,
+                                                color: Colors.white,
+                                                size: 20,
+                                              ),
+                                            ),
+                                            const SizedBox(width: 12),
+                                            Expanded(
+                                              child: Column(
+                                                crossAxisAlignment:
+                                                    CrossAxisAlignment.start,
+                                                children: [
+                                                  Text(
+                                                    'Bạn đã đặt chỗ nhà này',
+                                                    style: TextStyle(
+                                                      color: statusColor,
+                                                      fontSize: 16,
+                                                      fontWeight:
+                                                          FontWeight.bold,
+                                                    ),
+                                                  ),
+                                                  const SizedBox(height: 4),
+                                                  Text(
+                                                    'Trạng thái: $statusText',
+                                                    style: TextStyle(
+                                                      color: statusColor
+                                                          .withOpacity(0.8),
+                                                      fontSize: 14,
+                                                      fontWeight:
+                                                          FontWeight.w500,
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                        const SizedBox(height: 12),
+                                        Text(
+                                          'Chủ nhà sẽ liên hệ với bạn sớm nhất để xác nhận thời gian xem nhà.',
+                                          textAlign: TextAlign.center,
+                                          style: TextStyle(
+                                            color: Colors.grey[700],
+                                            fontSize: 13,
+                                            height: 1.4,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  );
+                                }
+
+                                // Nếu chưa đặt chỗ, hiển thị nút đặt chỗ
+                                return InkWell(
+                                  onTap: () {
+                                    if (authViewModel.currentUser == null) {
+                                      ScaffoldMessenger.of(context)
+                                          .showSnackBar(
+                                        const SnackBar(
+                                          content: Text(
+                                              'Vui lòng đăng nhập để đặt chỗ xem nhà'),
+                                          backgroundColor: Colors.orange,
+                                        ),
+                                      );
+                                      return;
+                                    }
+
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (context) =>
+                                            BookingView(rental: widget.rental),
+                                      ),
+                                    ).then((_) => _refreshBookingStatus());
+                                  },
+                                  borderRadius: BorderRadius.circular(24),
+                                  child: AnimatedContainer(
+                                    duration: const Duration(milliseconds: 200),
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 32, vertical: 16),
+                                    decoration: BoxDecoration(
+                                      gradient: LinearGradient(
+                                        colors: [
+                                          Colors.blue.shade700,
+                                          Colors.blue.shade900,
+                                        ],
+                                        begin: Alignment.topLeft,
+                                        end: Alignment.bottomRight,
+                                      ),
+                                      borderRadius: BorderRadius.circular(24),
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: Colors.blue.shade300
+                                              .withOpacity(0.4),
+                                          spreadRadius: 2,
+                                          blurRadius: 8,
+                                          offset: const Offset(0, 4),
+                                        ),
+                                      ],
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        AnimatedScale(
+                                          scale:
+                                              authViewModel.currentUser == null
+                                                  ? 1.0
+                                                  : 1.1,
+                                          duration:
+                                              const Duration(milliseconds: 200),
+                                          child: Icon(
+                                            Icons.event_available,
+                                            color: Colors.white,
+                                            size: 26,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 12),
+                                        Text(
+                                          'Đặt chỗ ngay',
+                                          style: TextStyle(
+                                            fontSize: 18,
+                                            fontWeight: FontWeight.w600,
+                                            color: Colors.white,
+                                            letterSpacing: 0.5,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
                                   ),
                                 );
                               },
-                              icon: const Icon(Icons.event_available,
-                                  size: 24, color: Colors.white),
-                              label: const Text(
-                                'Đặt chỗ ngay',
-                                style: TextStyle(
-                                    fontSize: 18, color: Colors.white),
-                              ),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.blue[700],
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 32, vertical: 16),
-                                shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(20)),
-                                elevation: 3,
-                              ),
                             );
                           },
                         ),
@@ -494,14 +848,41 @@ class _RentalDetailScreenState extends State<RentalDetailScreen>
               child: IndexedStack(
                 index: _tabController.index,
                 children: [
+                  // ---------- Thông tin chi tiết bài viết
                   DetailsTab(
                     rental: widget.rental,
                     formatCurrency: formatCurrency,
                   ),
-                  CommentSection(
-                    rentalId: widget.rental.id,
-                    onCommentCountChanged: _updateReviewCount,
-                  ),
+                  //-------------------------------------------------
+                  // Chỉ hiển thị CommentSection khi có rental ID hợp lệ
+                  if (widget.rental.id.isNotEmpty)
+                    CommentSection(
+                      rentalId: widget.rental.id,
+                      onCommentCountChanged: _updateReviewCount,
+                    )
+                  else
+                    Container(
+                      padding: const EdgeInsets.all(20),
+                      child: const Center(
+                        child: Column(
+                          children: [
+                            Icon(
+                              Icons.comment_outlined,
+                              size: 48,
+                              color: const Color(0xFF9E9E9E),
+                            ),
+                            SizedBox(height: 16),
+                            Text(
+                              'Không có bình luận cho bài viết này',
+                              style: TextStyle(
+                                fontSize: 16,
+                                color: const Color(0xFF9E9E9E),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
                 ],
               ),
             ),

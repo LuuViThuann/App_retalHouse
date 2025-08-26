@@ -16,51 +16,92 @@ class ActionsCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final Color errorColor = appTheme.colorScheme.error;
 
-    return Card(
-      elevation: 4,
-      shadowColor: errorColor.withOpacity(0.2),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      color: Colors.white,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(16),
-        onTap: isDeleting
-            ? null
-            : () {
-                showDialog(
-                  context: context,
-                  builder: (dialogContext) => AlertDialog(
-                    backgroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(15)),
-                    title: const Text('Xác nhận xóa'),
-                    content: const Text(
-                        'Bạn có chắc muốn xóa vĩnh viễn cuộc trò chuyện này? Hành động này không thể hoàn tác.'),
-                    actionsAlignment: MainAxisAlignment.spaceEvenly,
-                    actionsPadding:
-                        const EdgeInsets.only(bottom: 10, left: 10, right: 10),
-                    actions: [
-                      TextButton(
-                        style: TextButton.styleFrom(
-                            foregroundColor: appTheme.textTheme.bodyLarge?.color
-                                ?.withOpacity(0.8)),
-                        onPressed: () => Navigator.pop(dialogContext),
-                        child: const Text('Hủy'),
-                      ),
-                      TextButton(
-                        style: TextButton.styleFrom(
-                          foregroundColor: errorColor,
-                        ),
-                        onPressed: () {
-                          Navigator.pop(dialogContext);
-                          onDelete();
-                        },
-                        child: const Text('Xóa',
-                            style: TextStyle(fontWeight: FontWeight.bold)),
-                      ),
-                    ],
+    return InkWell(
+      borderRadius: BorderRadius.circular(16),
+      onTap: isDeleting
+          ? null
+          : () {
+              showDialog(
+                context: context,
+                builder: (dialogContext) => AlertDialog(
+                  backgroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
                   ),
-                );
-              },
+                  title: Text(
+                    'Xác nhận xóa',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.blue.shade800,
+                    ),
+                  ),
+                  content: Text(
+                    'Bạn có chắc muốn xóa vĩnh viễn cuộc trò chuyện này? Hành động này không thể hoàn tác.',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w500,
+                      color: Colors.grey.shade700,
+                    ),
+                  ),
+                  actionsAlignment: MainAxisAlignment.spaceEvenly,
+                  actionsPadding:
+                      const EdgeInsets.only(bottom: 16, left: 16, right: 16),
+                  actions: [
+                    TextButton(
+                      style: TextButton.styleFrom(
+                        foregroundColor: Colors.grey.shade600,
+                      ),
+                      onPressed: () => Navigator.pop(dialogContext),
+                      child: Text(
+                        'Hủy',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.grey.shade600,
+                        ),
+                      ),
+                    ),
+                    TextButton(
+                      style: TextButton.styleFrom(
+                        foregroundColor: errorColor,
+                      ),
+                      onPressed: () {
+                        Navigator.pop(dialogContext);
+                        onDelete();
+                      },
+                      child: Text(
+                        'Xóa',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                          color: errorColor,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            },
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [Colors.white, Colors.blue.shade50],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.blue.shade100.withOpacity(0.2),
+              blurRadius: 8,
+              spreadRadius: 1,
+              offset: const Offset(0, 2),
+            ),
+          ],
+          border: Border.all(color: Colors.blue.shade100.withOpacity(0.5)),
+        ),
         child: Padding(
           padding: const EdgeInsets.all(16),
           child: Row(
@@ -71,8 +112,12 @@ class ActionsCard extends StatelessWidget {
                   color: errorColor.withOpacity(0.1),
                   shape: BoxShape.circle,
                 ),
-                child: Icon(Icons.delete_forever_rounded,
-                    color: errorColor, size: 28),
+                child: AnimatedScale(
+                  scale: isDeleting ? 1.1 : 1.0,
+                  duration: const Duration(milliseconds: 200),
+                  child: Icon(Icons.delete_forever_rounded,
+                      color: errorColor, size: 28),
+                ),
               ),
               const SizedBox(width: 16),
               Expanded(
@@ -82,6 +127,7 @@ class ActionsCard extends StatelessWidget {
                     color: errorColor,
                     fontSize: 16,
                     fontWeight: FontWeight.w600,
+                    letterSpacing: 0.2,
                   ),
                 ),
               ),
@@ -95,8 +141,15 @@ class ActionsCard extends StatelessWidget {
                   ),
                 )
               else
-                Icon(Icons.arrow_forward_ios,
-                    size: 16, color: errorColor.withOpacity(0.7)),
+                AnimatedScale(
+                  scale: 1.0,
+                  duration: const Duration(milliseconds: 200),
+                  child: Icon(
+                    Icons.arrow_forward_ios,
+                    size: 16,
+                    color: errorColor.withOpacity(0.7),
+                  ),
+                ),
             ],
           ),
         ),

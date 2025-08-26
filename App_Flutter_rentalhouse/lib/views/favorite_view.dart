@@ -40,34 +40,25 @@ class _FavoriteViewState extends State<FavoriteView> {
     return Scaffold(
       backgroundColor: Colors.grey[100],
       appBar: AppBar(
-        title: Row(
-          children: [
-            Icon(
-              Icons.favorite,
-              color: Colors.white,
-            ),
-            SizedBox(width: 8),
-            Text(
-              'Danh Sách Yêu Thích',
-              style: TextStyle(
-                fontWeight: FontWeight.bold,
-                fontSize: 22,
-                color: Colors.white,
-              ),
-            ),
-          ],
-        ),
-        flexibleSpace: Container(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [Colors.blue, Colors.blueAccent.shade700],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
+        backgroundColor: Colors.blueAccent,
+        elevation: 0,
+        title: const Text(
+          'Danh sách bài viết yêu thích',
+          style: TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.w600,
+            fontSize: 18,
           ),
         ),
-        elevation: 4,
-        shadowColor: Colors.black26,
+        leading: IconButton(
+          icon: const Icon(Icons.favorite, color: Colors.white),
+          onPressed: () => Navigator.pop(context),
+        ),
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(
+            bottom: Radius.circular(20),
+          ),
+        ),
       ),
       body: FavoriteListBody(
         favoriteViewModel: favoriteViewModel,

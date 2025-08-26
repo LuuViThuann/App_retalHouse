@@ -48,9 +48,16 @@ class ConversationTile extends StatelessWidget {
       onDismissed: (direction) => _deleteConversation(context),
       background: Container(
         alignment: Alignment.centerRight,
-        padding: EdgeInsets.only(right: 20),
-        color: AppStyles.errorColor,
-        child: Icon(Icons.delete, color: AppStyles.whiteColor),
+        padding: const EdgeInsets.only(right: 20),
+        decoration: BoxDecoration(
+          color: AppStyles.errorColor,
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: AnimatedScale(
+          scale: 1.0,
+          duration: const Duration(milliseconds: 200),
+          child: Icon(Icons.delete, color: AppStyles.whiteColor, size: 28),
+        ),
       ),
       child: InkWell(
         onTap: () {
@@ -65,59 +72,70 @@ class ConversationTile extends StatelessWidget {
             ),
           );
         },
-        borderRadius: BorderRadius.circular(12),
-        child: Container(
+        borderRadius: BorderRadius.circular(16),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           decoration: BoxDecoration(
             gradient: hasUnread
                 ? LinearGradient(
                     colors: [
-                      AppStyles.unreadGradientStart,
-                      AppStyles.unreadGradientEnd
+                      Colors.blue.shade100,
+                      Colors.blue.shade50,
                     ],
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                   )
-                : null,
-            color: hasUnread ? null : AppStyles.whiteColor,
-            borderRadius: BorderRadius.circular(12),
+                : LinearGradient(
+                    colors: [Colors.white, Colors.blue.shade50],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+            borderRadius: BorderRadius.circular(16),
             boxShadow: [
               BoxShadow(
-                color: AppStyles.shadowColor,
-                blurRadius: hasUnread ? 6 : 1,
-                offset: Offset(0, hasUnread ? 4 : 2),
+                color: Colors.blue.shade100.withOpacity(hasUnread ? 0.3 : 0.2),
+                blurRadius: hasUnread ? 8 : 6,
+                spreadRadius: 1,
+                offset: const Offset(0, 2),
               ),
             ],
+            border: Border.all(color: Colors.blue.shade100.withOpacity(0.5)),
           ),
           child: ListTile(
-            contentPadding: EdgeInsets.symmetric(
-                horizontal: 16, vertical: hasUnread ? 16 : 12),
+            contentPadding: EdgeInsets.zero,
             leading: Stack(
               clipBehavior: Clip.none,
               children: [
-                CircleAvatar(
-                  radius: 28,
-                  backgroundImage: conversation
-                              .landlord['avatarBase64']?.isNotEmpty ==
-                          true
-                      ? MemoryImage(
-                          base64Decode(conversation.landlord['avatarBase64']))
-                      : null,
-                  backgroundColor: AppStyles.avatarBackground,
-                  child: conversation.landlord['avatarBase64']?.isEmpty == true
-                      ? Icon(Icons.person,
-                          size: 28, color: AppStyles.avatarIconColor)
-                      : null,
+                AnimatedScale(
+                  scale: hasUnread ? 1.1 : 1.0,
+                  duration: const Duration(milliseconds: 200),
+                  child: CircleAvatar(
+                    radius: 30,
+                    backgroundImage: conversation
+                                .landlord['avatarBase64']?.isNotEmpty ==
+                            true
+                        ? MemoryImage(
+                            base64Decode(conversation.landlord['avatarBase64']))
+                        : null,
+                    backgroundColor: Colors.blue.shade100,
+                    child:
+                        conversation.landlord['avatarBase64']?.isEmpty == true
+                            ? Icon(Icons.person,
+                                size: 32, color: Colors.blue.shade700)
+                            : null,
+                  ),
                 ),
                 if (hasUnread)
                   Positioned(
-                    right: 0,
-                    top: -10,
+                    right: -2,
+                    top: -8,
                     child: AnimatedScale(
-                      scale: hasUnread ? 1.1 : 1.0,
-                      duration: Duration(milliseconds: 1000),
+                      scale: hasUnread ? 1.2 : 1.0,
+                      duration: const Duration(milliseconds: 1000),
                       curve: Curves.easeInOut,
                       child: Container(
-                        padding: EdgeInsets.all(5),
+                        padding: const EdgeInsets.all(6),
                         decoration: BoxDecoration(
                           color: AppStyles.errorColor,
                           shape: BoxShape.circle,
@@ -131,14 +149,18 @@ class ConversationTile extends StatelessWidget {
                             ),
                           ],
                         ),
-                        constraints: BoxConstraints(
-                          minWidth: 24,
-                          minHeight: 24,
+                        constraints: const BoxConstraints(
+                          minWidth: 26,
+                          minHeight: 26,
                         ),
                         child: Center(
                           child: Text(
                             '${conversation.unreadCount}',
-                            style: AppStyles.unreadBadgeText,
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.white,
+                            ),
                           ),
                         ),
                       ),
@@ -148,25 +170,31 @@ class ConversationTile extends StatelessWidget {
             ),
             title: Text(
               conversation.landlord['username'] ?? 'Chủ nhà',
-              style:
-                  hasUnread ? AppStyles.unreadTitleText : AppStyles.titleText,
+              style: TextStyle(
+                fontWeight: FontWeight.w600,
+                fontSize: 16,
+                color: hasUnread ? Colors.blue.shade800 : Colors.black87,
+                letterSpacing: 0.2,
+              ),
             ),
             subtitle: Text(
               subtitleText,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: hasUnread
-                  ? AppStyles.unreadSubtitleText
-                  : AppStyles.subtitleText,
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w400,
+                color: hasUnread ? Colors.blue.shade600 : Colors.grey.shade600,
+              ),
             ),
             trailing: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
                 if (hasUnread)
                   Container(
-                    width: 8,
-                    height: 8,
-                    margin: EdgeInsets.only(right: 8),
+                    width: 10,
+                    height: 10,
+                    margin: const EdgeInsets.only(right: 10),
                     decoration: BoxDecoration(
                       color: AppStyles.errorColor,
                       shape: BoxShape.circle,
@@ -178,9 +206,12 @@ class ConversationTile extends StatelessWidget {
                           .format(conversation.lastMessage!.createdAt)
                       : DateFormat('HH:mm, dd/MM')
                           .format(conversation.createdAt),
-                  style: hasUnread
-                      ? AppStyles.unreadTimestampText
-                      : AppStyles.timestampText,
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                    color:
+                        hasUnread ? Colors.blue.shade700 : Colors.grey.shade500,
+                  ),
                 ),
               ],
             ),

@@ -59,26 +59,30 @@ class _ProfileViewState extends State<ProfileView> {
 
         return Scaffold(
           backgroundColor: Colors.white,
+          // --------------
           appBar: AppBar(
-            backgroundColor: Colors.white,
-            title: Row(
-              children: [
-                Icon(
-                  Icons.person,
-                  color: Colors.black,
-                ),
-                SizedBox(width: 8),
-                Text(
-                  'Hồ sơ người dùng',
-                  style: TextStyle(
-                    color: Colors.black,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 22,
-                  ),
-                ),
-              ],
+            backgroundColor: Colors.blueAccent,
+            elevation: 0,
+            title: const Text(
+              'Hồ sơ người dùng',
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w600,
+                fontSize: 18,
+              ),
+            ),
+            leading: IconButton(
+              icon: const Icon(Icons.person, color: Colors.white),
+              onPressed: () => Navigator.pop(context),
+            ),
+            shape: const RoundedRectangleBorder(
+              borderRadius: BorderRadius.vertical(
+                bottom: Radius.circular(20),
+              ),
             ),
           ),
+          //---------------
+
           body: SingleChildScrollView(
             child: Padding(
               padding: const EdgeInsets.all(16.0),

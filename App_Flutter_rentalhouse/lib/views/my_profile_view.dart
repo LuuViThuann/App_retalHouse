@@ -194,24 +194,32 @@ class _MyProfileViewState extends State<MyProfileView> {
       context: context,
       position: const RelativeRect.fromLTRB(100, 400, 100, 100),
       items: [
-        const PopupMenuItem(
+        PopupMenuItem(
           value: 'map',
-          child: Row(
-            children: [
-              Icon(Icons.map, color: Colors.blueAccent),
-              SizedBox(width: 8),
-              Text('Chọn từ bản đồ'),
-            ],
+          child: Container(
+            padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+            child: Row(
+              children: const [
+                Icon(Icons.map, color: Colors.blueAccent),
+                SizedBox(width: 8),
+                Text('Chọn từ bản đồ',
+                    style: TextStyle(color: Colors.blueAccent)),
+              ],
+            ),
           ),
         ),
-        const PopupMenuItem(
+        PopupMenuItem(
           value: 'manual',
-          child: Row(
-            children: [
-              Icon(Icons.edit, color: Colors.blueAccent),
-              SizedBox(width: 8),
-              Text('Nhập địa chỉ'),
-            ],
+          child: Container(
+            padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+            child: Row(
+              children: const [
+                Icon(Icons.edit, color: Colors.blueAccent),
+                SizedBox(width: 8),
+                Text('Nhập địa chỉ',
+                    style: TextStyle(color: Colors.blueAccent)),
+              ],
+            ),
           ),
         ),
       ],
@@ -231,269 +239,264 @@ class _MyProfileViewState extends State<MyProfileView> {
         final AppUser? user = authViewModel.currentUser;
 
         return Scaffold(
-          backgroundColor: Colors.white,
+          backgroundColor: const Color(0xFFF8F9FA),
           appBar: AppBar(
-            backgroundColor: Colors.white,
+            backgroundColor: Colors.blueAccent,
             elevation: 0,
-            title: const Center(
-              child: Text(
-                'Thông tin cá nhân',
-                style: TextStyle(color: Colors.black),
+            title: const Text(
+              'Thông tin cá nhân',
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w600,
+                fontSize: 18,
               ),
             ),
             leading: IconButton(
-              icon: const Icon(Icons.arrow_back, color: Colors.black),
+              icon: const Icon(Icons.arrow_back, color: Colors.white),
               onPressed: () => Navigator.pop(context),
             ),
             actions: [
               IconButton(
-                icon: const Icon(Icons.link, color: Colors.black),
+                icon: const Icon(Icons.link, color: Colors.white),
                 onPressed: () {
                   // TODO: Implement link sharing functionality
                 },
               ),
             ],
+            shape: const RoundedRectangleBorder(
+              borderRadius: BorderRadius.vertical(
+                bottom: Radius.circular(20),
+              ),
+            ),
           ),
           body: authViewModel.isLoading
               ? Center(
-                  child: Lottie.asset(
-                    AssetsConfig.loadingLottie,
-                    width: 100,
-                    height: 100,
-                    fit: BoxFit.fill,
+                  child: Container(
+                    padding: const EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.grey.withOpacity(0.1),
+                          blurRadius: 20,
+                          offset: const Offset(0, 8),
+                        ),
+                      ],
+                    ),
+                    child: Lottie.asset(
+                      AssetsConfig.loadingLottie,
+                      width: 100,
+                      height: 100,
+                      fit: BoxFit.fill,
+                    ),
                   ),
                 )
               : user == null
-                  ? const Center(child: Text('Không có dữ liệu người dùng'))
+                  ? Center(
+                      child: Container(
+                        padding: const EdgeInsets.all(20),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(16),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.grey.withOpacity(0.1),
+                              blurRadius: 20,
+                              offset: const Offset(0, 8),
+                            ),
+                          ],
+                        ),
+                        child: const Text(
+                          'Không có dữ liệu người dùng',
+                          style: TextStyle(
+                            fontSize: 16,
+                            color: Color(0xFF424242),
+                          ),
+                        ),
+                      ),
+                    )
                   : SingleChildScrollView(
-                      padding: const EdgeInsets.all(16.0),
+                      padding: const EdgeInsets.all(20),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const SizedBox(height: 20),
                           Center(
-                            child: Stack(
-                              children: [
-                                CircleAvatar(
-                                  backgroundColor: Colors.white,
-                                  radius: 50,
-                                  backgroundImage:
-                                      getImageProvider(user.avatarUrl),
+                            child: Container(
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                gradient: LinearGradient(
+                                  colors: [
+                                    Colors.blueAccent.withOpacity(0.2),
+                                    Colors.blueAccent.withOpacity(0.1),
+                                  ],
                                 ),
-                                Positioned(
-                                  bottom: 0,
-                                  right: 0,
-                                  child: GestureDetector(
-                                    onTap: _pickAndUploadImage,
-                                    child: Container(
-                                      padding: const EdgeInsets.all(8),
-                                      decoration: const BoxDecoration(
-                                        color: Colors.blueAccent,
-                                        shape: BoxShape.circle,
-                                      ),
-                                      child: const Icon(
-                                        Icons.camera_alt,
-                                        color: Colors.white,
-                                        size: 20,
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.blueAccent.withOpacity(0.2),
+                                    blurRadius: 15,
+                                    offset: const Offset(0, 5),
+                                  ),
+                                ],
+                              ),
+                              child: Stack(
+                                children: [
+                                  CircleAvatar(
+                                    backgroundColor: Colors.white,
+                                    radius: 60,
+                                    backgroundImage:
+                                        getImageProvider(user.avatarUrl),
+                                  ),
+                                  Positioned(
+                                    bottom: 0,
+                                    right: 0,
+                                    child: GestureDetector(
+                                      onTap: _pickAndUploadImage,
+                                      child: Container(
+                                        padding: const EdgeInsets.all(10),
+                                        decoration: BoxDecoration(
+                                          color: Colors.blueAccent,
+                                          shape: BoxShape.circle,
+                                          boxShadow: [
+                                            BoxShadow(
+                                              color: Colors.blueAccent
+                                                  .withOpacity(0.3),
+                                              blurRadius: 8,
+                                              offset: const Offset(0, 2),
+                                            ),
+                                          ],
+                                        ),
+                                        child: const Icon(
+                                          Icons.camera_alt,
+                                          color: Colors.white,
+                                          size: 24,
+                                        ),
                                       ),
                                     ),
                                   ),
-                                ),
-                              ],
+                                ],
+                              ),
                             ),
                           ),
-                          const SizedBox(height: 32),
-                          Row(
-                            children: [
-                              const Icon(Icons.person_outline,
-                                  color: Colors.grey),
-                              const SizedBox(width: 16),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    const Text('Tên người dùng',
-                                        style: TextStyle(
-                                            color: Colors.grey, fontSize: 12)),
-                                    _isEditing
-                                        ? TextField(
-                                            controller: _userNameController,
-                                            decoration: const InputDecoration(
-                                              border: OutlineInputBorder(),
-                                              hintText:
-                                                  'Nhập tên người dùng...',
-                                            ),
-                                          )
-                                        : Text(
-                                            user.username.isEmpty
-                                                ? 'Chưa cập nhật'
-                                                : user.username,
-                                            style:
-                                                const TextStyle(fontSize: 16),
-                                            overflow: TextOverflow.ellipsis,
-                                          ),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ),
                           const SizedBox(height: 24),
-                          Row(
+                          _buildInfoSection(
+                            title: 'Thông tin cá nhân',
+                            icon: Icons.person_outline,
+                            iconColor: Colors.blueAccent,
                             children: [
-                              const Icon(Icons.email_outlined,
-                                  color: Colors.grey),
-                              const SizedBox(width: 16),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    const Text('Email',
-                                        style: TextStyle(
-                                            color: Colors.grey, fontSize: 12)),
-                                    Text(
-                                      _email ?? 'Chưa cập nhật',
-                                      style: const TextStyle(fontSize: 16),
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                  ],
-                                ),
+                              _buildInfoRow(
+                                label: 'Tên người dùng',
+                                value: user.username.isEmpty
+                                    ? 'Chưa cập nhật'
+                                    : user.username,
+                                icon: Icons.person,
+                                iconColor: Colors.blueAccent,
+                                isEditing: _isEditing,
+                                controller: _userNameController,
+                                hintText: 'Nhập tên người dùng...',
                               ),
-                            ],
-                          ),
-                          const SizedBox(height: 24),
-                          Row(
-                            children: [
-                              const Icon(Icons.phone_outlined,
-                                  color: Colors.grey),
-                              const SizedBox(width: 16),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    const Text('Số điện thoại',
-                                        style: TextStyle(
-                                            color: Colors.grey, fontSize: 12)),
-                                    _isEditing
-                                        ? TextField(
-                                            controller: _phoneController,
-                                            keyboardType: TextInputType.phone,
-                                            decoration: const InputDecoration(
-                                              border: OutlineInputBorder(),
-                                              hintText: 'Nhập số điện thoại',
-                                            ),
-                                          )
-                                        : Text(
-                                            user.phoneNumber?.isNotEmpty ??
-                                                    false
-                                                ? user.phoneNumber!
-                                                : 'Chưa cập nhật',
-                                            style:
-                                                const TextStyle(fontSize: 16),
-                                            overflow: TextOverflow.ellipsis,
-                                          ),
-                                  ],
-                                ),
+                              _buildInfoRow(
+                                label: 'Email',
+                                value: _email ?? 'Chưa cập nhật',
+                                icon: Icons.email_outlined,
+                                iconColor: Colors.blueAccent,
+                                isEditing: false,
                               ),
-                            ],
-                          ),
-                          const SizedBox(height: 24),
-                          Row(
-                            children: [
-                              const Icon(Icons.location_on_outlined,
-                                  color: Colors.grey),
-                              const SizedBox(width: 16),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    const Text(
-                                      'Địa chỉ',
-                                      style: TextStyle(
-                                        color: Colors.grey,
-                                        fontSize: 12,
-                                      ),
-                                    ),
-                                    _isEditing
-                                        ? Row(
-                                            children: [
-                                              Expanded(
-                                                child: TextField(
-                                                  controller:
-                                                      _addressController,
-                                                  decoration:
-                                                      const InputDecoration(
-                                                    border:
-                                                        OutlineInputBorder(),
-                                                    hintText: 'Chọn địa chỉ...',
-                                                  ),
-                                                  readOnly: true,
-                                                  onTap: _showAddressPickerMenu,
-                                                ),
-                                              ),
-                                              const SizedBox(width: 8),
-                                              PopupMenuButton<String>(
-                                                color: Colors.white,
-                                                icon: const Icon(
-                                                  Icons.place,
-                                                  color: Colors.blueAccent,
-                                                ),
-                                                onSelected: (value) {
-                                                  if (value == 'map') {
-                                                    _pickAddressFromMap();
-                                                  } else if (value ==
-                                                      'manual') {
-                                                    _pickAddressManually();
-                                                  }
-                                                },
-                                                itemBuilder: (context) => [
-                                                  const PopupMenuItem(
-                                                    value: 'map',
-                                                    child: Row(
-                                                      children: [
-                                                        Icon(Icons.map,
-                                                            color: Colors
-                                                                .blueAccent),
-                                                        SizedBox(width: 8),
-                                                        Text('Chọn từ bản đồ'),
-                                                      ],
-                                                    ),
-                                                  ),
-                                                  const PopupMenuItem(
-                                                    value: 'manual',
-                                                    child: Row(
-                                                      children: [
-                                                        Icon(Icons.edit,
-                                                            color: Colors
-                                                                .blueAccent),
-                                                        SizedBox(width: 8),
-                                                        Text('Nhập địa chỉ'),
-                                                      ],
-                                                    ),
-                                                  ),
+                              _buildInfoRow(
+                                label: 'Số điện thoại',
+                                value: user.phoneNumber?.isNotEmpty ?? false
+                                    ? user.phoneNumber!
+                                    : 'Chưa cập nhật',
+                                icon: Icons.phone_outlined,
+                                iconColor: Colors.blueAccent,
+                                isEditing: _isEditing,
+                                controller: _phoneController,
+                                hintText: 'Nhập số điện thoại',
+                                keyboardType: TextInputType.phone,
+                              ),
+                              _buildInfoRow(
+                                label: 'Địa chỉ',
+                                value: user.address?.isNotEmpty ?? false
+                                    ? user.address!
+                                    : 'Chưa cập nhật',
+                                icon: Icons.location_on_outlined,
+                                iconColor: Colors.blueAccent,
+                                isEditing: _isEditing,
+                                controller: _addressController,
+                                hintText: 'Chọn địa chỉ...',
+                                readOnly: true,
+                                onTap:
+                                    _isEditing ? _showAddressPickerMenu : null,
+                                trailing: _isEditing
+                                    ? PopupMenuButton<String>(
+                                        icon: const Icon(
+                                          Icons.place,
+                                          color: Colors.blueAccent,
+                                        ),
+                                        color: Colors.white,
+                                        onSelected: (value) {
+                                          if (value == 'map') {
+                                            _pickAddressFromMap();
+                                          } else if (value == 'manual') {
+                                            _pickAddressManually();
+                                          }
+                                        },
+                                        itemBuilder: (context) => [
+                                          PopupMenuItem(
+                                            value: 'map',
+                                            child: Container(
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                      vertical: 8,
+                                                      horizontal: 12),
+                                              child: Row(
+                                                children: const [
+                                                  Icon(Icons.map,
+                                                      color: Colors.blueAccent),
+                                                  SizedBox(width: 8),
+                                                  Text('Chọn từ bản đồ',
+                                                      style: TextStyle(
+                                                          color: Colors
+                                                              .blueAccent)),
                                                 ],
                                               ),
-                                            ],
-                                          )
-                                        : Text(
-                                            user.address?.isNotEmpty ?? false
-                                                ? user.address!
-                                                : 'Chưa cập nhật',
-                                            style:
-                                                const TextStyle(fontSize: 16),
+                                            ),
                                           ),
-                                  ],
-                                ),
+                                          PopupMenuItem(
+                                            value: 'manual',
+                                            child: Container(
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                      vertical: 8,
+                                                      horizontal: 12),
+                                              child: Row(
+                                                children: const [
+                                                  Icon(Icons.edit,
+                                                      color: Colors.blueAccent),
+                                                  SizedBox(width: 8),
+                                                  Text('Nhập địa chỉ',
+                                                      style: TextStyle(
+                                                          color: Colors
+                                                              .blueAccent)),
+                                                ],
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      )
+                                    : null,
                               ),
                             ],
                           ),
                           const SizedBox(height: 24),
                           Center(
                             child: Container(
+                              width: double.infinity,
+                              height: 50,
                               decoration: BoxDecoration(
                                 gradient: LinearGradient(
-                                  colors: const [
+                                  colors: [
                                     Colors.blueAccent,
-                                    Colors.lightBlueAccent
+                                    Colors.blueAccent.withOpacity(0.8),
                                   ],
                                   begin: Alignment.topLeft,
                                   end: Alignment.bottomRight,
@@ -502,8 +505,8 @@ class _MyProfileViewState extends State<MyProfileView> {
                                 boxShadow: [
                                   BoxShadow(
                                     color: Colors.blueAccent.withOpacity(0.3),
-                                    blurRadius: 10,
-                                    offset: const Offset(0, 5),
+                                    blurRadius: 8,
+                                    offset: const Offset(0, 2),
                                   ),
                                 ],
                               ),
@@ -519,9 +522,8 @@ class _MyProfileViewState extends State<MyProfileView> {
                                 },
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: Colors.transparent,
+                                  foregroundColor: Colors.white,
                                   shadowColor: Colors.transparent,
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 40, vertical: 15),
                                   shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(12),
                                   ),
@@ -532,8 +534,7 @@ class _MyProfileViewState extends State<MyProfileView> {
                                       : 'Chỉnh sửa thông tin',
                                   style: const TextStyle(
                                     fontSize: 16,
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.white,
+                                    fontWeight: FontWeight.w600,
                                   ),
                                 ),
                               ),
@@ -545,6 +546,161 @@ class _MyProfileViewState extends State<MyProfileView> {
                     ),
         );
       },
+    );
+  }
+
+  Widget _buildInfoSection({
+    required String title,
+    required IconData icon,
+    required Color iconColor,
+    required List<Widget> children,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [
+                iconColor.withOpacity(0.1),
+                iconColor.withOpacity(0.05),
+              ],
+            ),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: iconColor.withOpacity(0.2),
+            ),
+          ),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: iconColor.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(icon, color: iconColor, size: 24),
+              ),
+              const SizedBox(width: 12),
+              Text(
+                title,
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600,
+                  color: iconColor,
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+        Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: Colors.grey.withOpacity(0.1),
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.grey.withOpacity(0.05),
+                blurRadius: 20,
+                offset: const Offset(0, 8),
+              ),
+            ],
+          ),
+          child: Column(
+            children: children,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildInfoRow({
+    required String label,
+    required String value,
+    required IconData icon,
+    required Color iconColor,
+    bool isEditing = false,
+    TextEditingController? controller,
+    String? hintText,
+    TextInputType? keyboardType,
+    bool readOnly = false,
+    VoidCallback? onTap,
+    Widget? trailing,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: iconColor.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(
+              icon,
+              size: 18,
+              color: iconColor,
+            ),
+          ),
+          const SizedBox(width: 12),
+          SizedBox(
+            width: 120,
+            child: Text(
+              '$label:',
+              style: const TextStyle(
+                fontWeight: FontWeight.w600,
+                color: Color(0xFF616161),
+                fontSize: 14,
+              ),
+            ),
+          ),
+          Expanded(
+            child: isEditing && controller != null
+                ? TextField(
+                    controller: controller,
+                    keyboardType: keyboardType,
+                    readOnly: readOnly,
+                    onTap: onTap,
+                    decoration: InputDecoration(
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: BorderSide(
+                          color: Colors.blueAccent.withOpacity(0.3),
+                        ),
+                      ),
+                      hintText: hintText,
+                      contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 8),
+                    ),
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w500,
+                      fontSize: 14,
+                      color: Color(0xFF424242),
+                    ),
+                  )
+                : Text(
+                    value,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w500,
+                      fontSize: 14,
+                      color: Color(0xFF424242),
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+          ),
+          if (trailing != null) ...[
+            const SizedBox(width: 8),
+            trailing,
+          ],
+        ],
+      ),
     );
   }
 }

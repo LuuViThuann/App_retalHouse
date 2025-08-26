@@ -41,6 +41,11 @@ class CommentService {
       final response = await http.get(
         Uri.parse('${ApiRoutes.comments}/$rentalId?page=$page&limit=5'),
       );
+      if (response.statusCode == 404) {
+        // Nếu rental không tồn tại, trả về danh sách rỗng
+        onCommentsLoaded([], 0, 1, 1);
+        return;
+      }
       if (response.statusCode != 200) {
         throw Exception(
             'Failed to load comments: ${response.statusCode} - ${response.body}');

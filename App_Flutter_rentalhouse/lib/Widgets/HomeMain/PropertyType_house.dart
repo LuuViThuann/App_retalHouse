@@ -29,30 +29,30 @@ class _PropertyTypeScreenState extends State<PropertyTypeScreen> {
 
     return Scaffold(
       backgroundColor: Colors.white,
+      // -----------
       appBar: AppBar(
+        backgroundColor: Colors.blueAccent,
+        elevation: 0,
         title: Text(
           widget.propertyType,
           style: TextStyle(
             color: Colors.white,
-            fontWeight: FontWeight.bold,
-            fontSize: 22,
+            fontWeight: FontWeight.w600,
+            fontSize: 18,
           ),
         ),
-        iconTheme: const IconThemeData(
-          color: Colors.white,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          onPressed: () => Navigator.pop(context),
         ),
-        flexibleSpace: Container(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [Colors.blue, Colors.blueAccent.shade700],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(
+            bottom: Radius.circular(20),
           ),
         ),
-        elevation: 4,
-        shadowColor: Colors.black26,
       ),
+      //-----------
+
       body: rentalViewModel.isLoading
           ? const Center(child: CircularProgressIndicator(color: Colors.blue))
           : rentalViewModel.errorMessage != null
