@@ -234,7 +234,7 @@ router.patch('/bookings/:bookingId/status', authMiddleware, async (req, res) => 
     const { status, ownerNotes } = req.body;
 
     if (!mongoose.Types.ObjectId.isValid(bookingId)) {
-      return res.status(400).json({ message: 'Invalid booking ID' });
+      return res.status(400).json({ message: 'Invalid booking ID' }); 
     }
 
     // Check if booking exists

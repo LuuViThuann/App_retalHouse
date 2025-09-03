@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../models/booking.dart';
 import '../models/rental.dart';
 import '../viewmodels/vm_booking.dart';
@@ -288,6 +289,34 @@ class _BookingDetailViewState extends State<BookingDetailView> {
       }
       _showRentalInfoDialog();
       print('Error navigating to real rental: $e');
+    }
+  }
+
+  Future<void> _makePhoneCall(String phoneNumber) async {
+    final Uri phoneUri = Uri(scheme: 'tel', path: phoneNumber);
+    try {
+      if (await canLaunchUrl(phoneUri)) {
+        await launchUrl(phoneUri);
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Không thể thực hiện cuộc gọi đến $phoneNumber'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Lỗi khi thực hiện cuộc gọi: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+      print('Error making phone call: $e');
     }
   }
 
@@ -821,11 +850,13 @@ class _BookingDetailViewState extends State<BookingDetailView> {
                         child: ElevatedButton.icon(
                           onPressed: () {
                             if (booking.ownerPhone?.isNotEmpty == true) {
+                              _makePhoneCall(booking.ownerPhone!);
+                            } else {
                               ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content:
-                                      Text('Liên hệ: ${booking.ownerPhone}'),
-                                  backgroundColor: const Color(0xFF2196F3),
+                                const SnackBar(
+                                  content: Text(
+                                      'Không có số điện thoại để thực hiện cuộc gọi'),
+                                  backgroundColor: Colors.red,
                                 ),
                               );
                             }

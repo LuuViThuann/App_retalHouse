@@ -71,6 +71,7 @@ class ChatInputArea extends StatelessWidget {
     }
   }
 
+//Code xử lý gửi tin nhắn --------------------------
   Future<void> _sendMessage(BuildContext context, ChatViewModel chatViewModel,
       AuthViewModel authViewModel, String content) async {
     final success = await chatViewModel.sendMessage(

@@ -1,5 +1,7 @@
 - điều chỉnh có thể xóa lịch sử tìm kiếm và không bị trùng 
--Lỗi chưa thể chọn loại nhà và khoảng giá tìm kiếm 
+- Lỗi chưa thể chọn loại nhà và khoảng giá tìm kiếm 
 - Lỗi không hiển thị ảnh lúc chọn gửi tin nhắn 
 - Tích hợp thử hiển thị vị trí bài viết khi mở googleMap và đường đi + thời gian phương tiện 
-- Tích hợp mở call khi gọi qua SDT 
+- Điều chỉnh các thông báo thao tác cho hoàn chỉnh còn log , thông báo nghiệp vụ 
+- Chưa hiển thị các hợp đồng của bạn ở Home
+- Khi chọn địa chỉ trong bài viết hiển thị trên ggMap và gợi ý các bài trong khu vực đó

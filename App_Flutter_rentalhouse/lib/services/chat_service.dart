@@ -31,6 +31,7 @@ class ChatService {
     _initializeSocket();
   }
 
+// Hàm kiểm tra token có hợp lệ hay không --------------------
   Future<String> _ensureValidToken({bool forceInteractive = false}) async {
     if (_token != null && _token!.isNotEmpty) {
       print(
@@ -77,6 +78,7 @@ class ChatService {
     }
   }
 
+// hàm khởi tạo sự kiện io
   void _initializeSocket() {
     if (_token == null || _token!.isEmpty) {
       print('ChatService: Cannot initialize socket: No token provided');
@@ -130,6 +132,7 @@ class ChatService {
 
   Function(Message)? onMessageReceived;
 
+  // khởi tạo tham gia phòng chat ----------------------
   void joinConversation(String conversationId) {
     if (_token == null || _token!.isEmpty) {
       print('ChatService: Cannot join conversation: No token provided');

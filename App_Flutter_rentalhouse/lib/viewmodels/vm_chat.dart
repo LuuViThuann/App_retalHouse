@@ -64,6 +64,7 @@ class ChatViewModel extends ChangeNotifier {
     }
   }
 
+// khởi chạy socket -----------------
   void _initializeSocket() {
     if (_socket != null) {
       _socket?.disconnect();
