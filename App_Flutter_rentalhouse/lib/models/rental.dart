@@ -86,6 +86,8 @@ class Rental {
         'location': {
           'short': location['short'],
           'fullAddress': location['fullAddress'],
+          'latitude': location['latitude'],
+          'longitude': location['longitude'],
         },
         'propertyType': propertyType,
         'furniture': furniture,
@@ -124,6 +126,14 @@ class Rental {
       location: {
         'short': json['location']['short'] as String? ?? '',
         'fullAddress': json['location']['fullAddress'] as String? ?? '',
+        'latitude':
+            (json['location']['coordinates']?['coordinates']?[1] as num?)
+                    ?.toDouble() ??
+                0.0,
+        'longitude':
+            (json['location']['coordinates']?['coordinates']?[0] as num?)
+                    ?.toDouble() ??
+                0.0,
       },
       propertyType: json['propertyType'] as String? ?? 'Khác',
       furniture: List<String>.from(json['furniture'] as List? ?? []),

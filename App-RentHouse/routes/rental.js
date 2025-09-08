@@ -1,264 +1,369 @@
 require('dotenv').config();
-
-const express = require('express'); 
+const express = require('express');
 const router = express.Router();
 const mongoose = require('mongoose');
-const Rental = require('../models/Rental'); 
+const Rental = require('../models/Rental');
 const Favorite = require('../models/favorite');
 const { Comment, Reply, LikeComment } = require('../models/comments');
-const admin = require('firebase-admin');// liên kết với firebase
-const multer = require('multer'); // lưu ảnh vào thư mục uploads
-const path = require('path'); // lưu ảnh vào thư mục uploads
-const redis = require('redis'); // Giúp lưu trữ dữ liệu trong bộ nhớ
-const sharp = require('sharp'); // Giúp xử lý ảnh nhỏ hơn
-const { Client } = require('@elastic/elasticsearch'); // lưu ảnh vào thư mục uploads
-const fs = require('fs').promises; // Giúp xử lý file 
+const admin = require('firebase-admin');
+const multer = require('multer');
+const path = require('path');
+const redis = require('redis');
+const sharp = require('sharp');
+const { Client } = require('@elastic/elasticsearch');
+const fs = require('fs').promises;
 
-// ----------------------------------------------------------------------------------
-// kết nối đến redis ---------------
 const redisClient = redis.createClient({
-  url: process.env.REDIS_URL || 'redis://localhost:6379', // kết nối đến redis
+  url: process.env.REDIS_URL || 'redis://localhost:6379',
 });
-redisClient.on('error', (err) => console.log('Redis Client Error', err)); // báo lỗi khi lỗi kết nối
+redisClient.on('error', (err) => console.log('Redis Client Error', err));
 redisClient.connect();
 
-// Elasticsearch client
-// kết nối đến elasticsearch ---------------
 const elasticClient = new Client({
   node: process.env.ELASTICSEARCH_URL || 'http://localhost:9200',
-  maxRetries: 3, // số lần thử lại khi lỗi
-  requestTimeout: 30000, // thời gian chờ kết nối
-  sniffOnStart: false, // không sniff khi khởi động
-  sniffOnConnectionFault: false, // không sniff khi lỗi kết nối
+  maxRetries: 3,
+  requestTimeout: 30000,
+  sniffOnStart: false,
+  sniffOnConnectionFault: false,
 });
-// ----------------------------------------------------------------------------------
-// Multer storage configuration
-// lưu ảnh vào thư mục uploads ---------------
+
 const storage = multer.diskStorage({
   destination: './uploads/',
   filename: (req, file, cb) => {
     cb(null, `${Date.now()}-${file.originalname}`);
   },
 });
-const upload = multer({ 
+const upload = multer({
   storage,
-  limits: { fileSize: 100 * 1024 * 1024 } //  lưu ảnh tối đa 100MB > báo lỗi 
+  limits: { fileSize: 100 * 1024 * 1024 },
 });
 router.use('/uploads', express.static(path.join(__dirname, '..', 'uploads')));
 
-// ----------------------------------------------------------------------------------
-
-// Authentication middleware
-// kiểm tra token ---------------
-const authMiddleware = async (req, res, next) => { // 
-  const token = req.header('Authorization')?.replace('Bearer ', ''); // lấy token từ header
-  if (!token) return res.status(401).json({ message: 'No token provided' }); // nếu không có token thì báo lỗi
+const authMiddleware = async (req, res, next) => {
+  const token = req.header('Authorization')?.replace('Bearer ', '');
+  if (!token) return res.status(401).json({ message: 'No token provided' });
   try {
-    const decodedToken = await admin.auth().verifyIdToken(token); // giải mã token
-    req.userId = decodedToken.uid; // lấy id từ token
-    next(); // tiếp tục
+    const decodedToken = await admin.auth().verifyIdToken(token);
+    req.userId = decodedToken.uid;
+    next();
   } catch (err) {
-    res.status(401).json({ message: 'Invalid token' }); // nếu lỗi thì báo lỗi
+    res.status(401).json({ message: 'Invalid token', error: err.message });
   }
 };
-// ----------------------------------------------------------------------------------
-// Helper function to adjust timestamps for +7 timezone
-// hàm điều chỉnh thời gian theo múi giờ +7
+
 const adjustTimestamps = (obj) => {
-  const adjusted = { ...obj.toObject() }; // tạo một đối tượng mới từ đối tượng cũ
-  adjusted.createdAt = new Date(adjusted.createdAt.getTime() + 7 * 60 * 60 * 1000); // điều chỉnh thời gian theo múi giờ +7
-  return adjusted; // trả về đối tượng đã điều chỉnh
+  const adjusted = { ...obj.toObject() };
+  adjusted.createdAt = new Date(adjusted.createdAt.getTime() + 7 * 60 * 60 * 1000);
+  return adjusted;
 };
-// ----------------------------------------------------------------------------------
-// Sync rental to Elasticsearch (non-blocking)
-// hàm đồng bộ dữ liệu từ MongoDB sang Elasticsearch
+
 const syncRentalToElasticsearch = async (rental) => {
   try {
     const headers = {
-      Accept: 'application/json', // chấp nhận dữ liệu dạng json
-      'Content-Type': 'application/json', // định dạng dữ liệu là json
+      Accept: 'application/json',
+      'Content-Type': 'application/json',
     };
-    console.log('Elasticsearch sync headers:', headers); // log headers
-    const response = await elasticClient.index({
-      index: 'rentals', // tên index
-      id: rental._id.toString(), // id của rental
+    await elasticClient.index({
+      index: 'rentals',
+      id: rental._id.toString(),
       body: {
-        title: rental.title, // tên của rental
-        price: parseFloat(rental.price) || 0, // giá của rental
-        location: rental.location.short, // vị trí của rental
-        propertyType: rental.propertyType, // loại bất động sản
-        status: rental.status, // trạng thái của rental
-        area: parseFloat(rental.area.total) || 0, // diện tích của rental
-        createdAt: rental.createdAt, // thời gian tạo của rental
-        images: rental.images || [], // ảnh của rental
+        title: rental.title,
+        price: parseFloat(rental.price) || 0,
+        location: rental.location.short,
+        coordinates: {
+          lat: rental.location.coordinates?.coordinates?.[1] || 0,
+          lon: rental.location.coordinates?.coordinates?.[0] || 0,
+        },
+        propertyType: rental.propertyType,
+        status: rental.status,
+        area: parseFloat(rental.area.total) || 0,
+        createdAt: rental.createdAt,
+        images: rental.images || [],
+        geocodingStatus: rental.geocodingStatus || 'pending',
       },
-      headers, // headers
+      headers,
     });
-    console.log(`Synced rental ${rental._id} to Elasticsearch`, response); // log response
+    console.log(`Synced rental ${rental._id} to Elasticsearch`);
   } catch (err) {
-    console.error('Error syncing to Elasticsearch:', err); // log lỗi
+    console.error('Error syncing to Elasticsearch:', err);
   }
 };
-// ----------------------------------------------------------------------------------
-// Build MongoDB query
-// hàm tạo query cho MongoDB
+
 const buildMongoQuery = ({ search, minPrice, maxPrice, propertyTypes, status }) => {
-  const query = {}; // tạo một đối tượng mới
+  const query = {};
   if (search) {
     query.$or = [
-      { title: { $regex: search, $options: 'i' } }, // tìm kiếm theo tên
-      { 'location.short': { $regex: search, $options: 'i' } }, // tìm kiếm theo vị trí
+      { title: { $regex: search, $options: 'i' } },
+      { 'location.short': { $regex: search, $options: 'i' } },
     ];
   }
   if (minPrice || maxPrice) {
-    query.price = {}; // tạo một đối tượng mới  
-    if (minPrice) query.price.$gte = Number(minPrice); // giá tối thiểu
-    if (maxPrice) query.price.$lte = Number(maxPrice); // giá tối đa
+    query.price = {};
+    if (minPrice) query.price.$gte = Number(minPrice);
+    if (maxPrice) query.price.$lte = Number(maxPrice);
   }
   if (propertyTypes && propertyTypes.length > 0) {
-    query.propertyType = { $in: propertyTypes }; // tìm kiếm theo loại bất động sản
+    query.propertyType = { $in: propertyTypes };
   }
-  if (status) query.status = status; // tìm kiếm theo trạng thái
-  return query; // trả về query
+  if (status) query.status = status;
+  return query;
 };
-// ----------------------------------------------------------------------------------
-// Sanitize headers middleware
-// hàm xử lý headers
+
 const sanitizeHeadersMiddleware = (req, res, next) => {
-  if (req.headers.accept && req.headers.accept.includes('application/vnd.elasticsearch+json')) { // nếu header accept là application/vnd.elasticsearch+json thì thay thế bằng application/json
-    req.headers.accept = 'application/json'; // thay thế header accept bằng application/json
+  if (req.headers.accept && req.headers.accept.includes('application/vnd.elasticsearch+json')) {
+    req.headers.accept = 'application/json';
   }
-  next(); // tiếp tục
+  next();
 };
-// ----------------------------------------------------------------------------------
-// Search rentals
-// hàm tìm kiếm bất động sản
+
+// Chuẩn hóa địa chỉ theo định dạng Việt Nam và tạo nhiều phiên bản địa chỉ
+const normalizeVietnameseAddress = (address) => {
+  if (!address || typeof address !== 'string') return { full: '', simplified: '', minimal: '' };
+  
+  let normalized = address.trim().replace(/\s+/g, ' ');
+  normalized = normalized.replace(/[<>[\]{}|]/g, '');
+  normalized = normalized.replace(/\bP\.?\b/gi, 'Phường');
+  normalized = normalized.replace(/\bQ\.?\b/gi, 'Quận');
+  normalized = normalized.replace(/\bTP\.?\b/gi, 'Thành phố');
+  
+  const parts = normalized.split(',').map(part => part.trim()).filter(part => part);
+  
+  // Địa chỉ đầy đủ
+  let fullAddress = normalized;
+  if (parts.length >= 3) {
+    fullAddress = `${parts[0]}, ${parts[1]}, ${parts[2]}${parts[3] ? `, ${parts[3]}` : ''}${parts[4] ? `, ${parts[4]}` : ''}, Việt Nam`;
+  } else {
+    fullAddress = `${normalized}, Việt Nam`;
+  }
+  
+  // Địa chỉ rút gọn: đường + thành phố
+  let simplifiedAddress = '';
+  if (parts.length >= 3) {
+    const road = parts[0].includes('Hẻm') ? parts[0] + ' ' + parts[1] : parts[1];
+    const city = parts[3] || parts[4] || 'Cần Thơ';
+    simplifiedAddress = `${road}, ${city}, Việt Nam`;
+  } else {
+    simplifiedAddress = `${normalized}, Việt Nam`;
+  }
+  
+  // Địa chỉ tối thiểu: chỉ thành phố
+  const minimalAddress = `Cần Thơ, Việt Nam`;
+
+  return { full: fullAddress, simplified: simplifiedAddress, minimal: minimalAddress };
+};
+
+// Hàm retry với số lần thử lại và delay
+const retryOperation = async (operation, maxRetries = 3, delay = 2000) => {
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      return await operation();
+    } catch (error) {
+      if (attempt === maxRetries) throw error;
+      console.log(`Retry attempt ${attempt}/${maxRetries} failed: ${error.message}`);
+      await new Promise(resolve => setTimeout(resolve, delay));
+    }
+  }
+};
+
+const geocodeAddressFree = async (address) => {
+  try {
+    const { full: fullAddress, simplified: simplifiedAddress, minimal: minimalAddress } = normalizeVietnameseAddress(address);
+    if (!fullAddress) {
+      throw new Error('Invalid or missing address');
+    }
+
+    const operation = async () => {
+      // Thử với địa chỉ đầy đủ trước
+      console.log(`Attempting geocoding with full address: ${fullAddress}`);
+      let response = await fetch(
+        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(fullAddress)}&limit=1&addressdetails=1&countrycodes=vn&accept-language=vi`,
+        {
+          headers: {
+            'User-Agent': 'RentalHouseApp/1.0',
+          },
+        }
+      );
+      let data = await response.json();
+
+      if (data.length > 0) {
+        return {
+          latitude: parseFloat(data[0].lat),
+          longitude: parseFloat(data[0].lon),
+          formattedAddress: data[0].display_name,
+        };
+      }
+
+      // Thử với địa chỉ rút gọn
+      console.log(`Full address failed, trying simplified address: ${simplifiedAddress}`);
+      response = await fetch(
+        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(simplifiedAddress)}&limit=1&addressdetails=1&countrycodes=vn&accept-language=vi`,
+        {
+          headers: {
+            'User-Agent': 'RentalHouseApp/1.0',
+          },
+        }
+      );
+      data = await response.json();
+
+      if (data.length > 0) {
+        return {
+          latitude: parseFloat(data[0].lat),
+          longitude: parseFloat(data[0].lon),
+          formattedAddress: data[0].display_name,
+        };
+      }
+
+      // Thử với địa chỉ tối thiểu
+      console.log(`Simplified address failed, trying minimal address: ${minimalAddress}`);
+      response = await fetch(
+        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(minimalAddress)}&limit=1&addressdetails=1&countrycodes=vn&accept-language=vi`,
+        {
+          headers: {
+            'User-Agent': 'RentalHouseApp/1.0',
+          },
+        }
+      );
+      data = await response.json();
+
+      if (data.length > 0) {
+        return {
+          latitude: parseFloat(data[0].lat),
+          longitude: parseFloat(data[0].lon),
+          formattedAddress: data[0].display_name,
+        };
+      }
+
+      throw new Error(`No results found for addresses: ${fullAddress}, ${simplifiedAddress}, or ${minimalAddress}`);
+    };
+
+    return await retryOperation(operation, 3, 2000);
+  } catch (error) {
+    console.error('Nominatim geocoding error:', error.message);
+    throw error;
+  }
+};
+
 router.get('/rentals/search', [sanitizeHeadersMiddleware], async (req, res) => {
   try {
-    const { search, minPrice, maxPrice, propertyType, status, page = 1, limit = 10 } = req.query; // lấy các tham số từ query
-    const propertyTypes = propertyType ? (Array.isArray(propertyType) ? propertyType : [propertyType]) : []; // lấy các tham số từ query
-    const skip = (Number(page) - 1) * Number(limit); // tính toán số lượng bất động sản cần bỏ qua
+    const { search, minPrice, maxPrice, propertyType, status, page = 1, limit = 10 } = req.query;
+    const propertyTypes = propertyType ? (Array.isArray(propertyType) ? propertyType : [propertyType]) : [];
+    const skip = (Number(page) - 1) * Number(limit);
 
     const cacheKey = `search:${search || ''}:${minPrice || ''}:${maxPrice || ''}:${propertyTypes.join(',')}:${status || ''}:${page}:${limit}`;
-    const cachedResult = await redisClient.get(cacheKey); // lấy kết quả từ cache
+    const cachedResult = await redisClient.get(cacheKey);
     if (cachedResult) {
-      console.log('Serving from cache:', cacheKey); // log kết quả từ cache
-      return res.json(JSON.parse(cachedResult)); // trả về kết quả từ cache
+      console.log('Serving from cache:', cacheKey);
+      return res.json(JSON.parse(cachedResult));
     }
 
-    console.log('Search query:', { search, minPrice, maxPrice, propertyTypes, status, page, limit }); // log query
+    console.log('Search query:', { search, minPrice, maxPrice, propertyTypes, status, page, limit });
 
     if (search && req.header('Authorization')) {
-      const token = req.header('Authorization').replace('Bearer ', ''); // lấy token từ header
+      const token = req.header('Authorization').replace('Bearer ', '');
       try {
-        const decodedToken = await admin.auth().verifyIdToken(token); // giải mã token
-        const userId = decodedToken.uid; // lấy id từ token
-        const searchKey = `search:${userId}`; // tạo key từ id
-        await redisClient.lPush(searchKey, search); // lưu search vào cache
-        await redisClient.lTrim(searchKey, 0, 9); // giới hạn số lượng search trong cache
-        console.log(`Saved search "${search}" for user ${userId}`); // log kết quả
+        const decodedToken = await admin.auth().verifyIdToken(token);
+        const userId = decodedToken.uid;
+        const searchKey = `search:${userId}`;
+        await redisClient.lPush(searchKey, search);
+        await redisClient.lTrim(searchKey, 0, 9);
+        console.log(`Saved search "${search}" for user ${userId}`);
       } catch (err) {
-        console.error('Error saving search history:', err); // log lỗi
+        console.error('Error saving search history:', err);
       }
     }
 
-    let rentals = []; // tạo một mảng mới
-    let total = 0; // tạo một biến mới
+    let rentals = [];
+    let total = 0;
 
     try {
-      const query = { // tạo một đối tượng mới
-        bool: { // tạo một đối tượng mới
-          must: [], // tạo một mảng mới
-          filter: [], // tạo một mảng mới
+      const query = {
+        bool: {
+          must: [],
+          filter: [],
         },
-      }; // tạo một đối tượng mới
+      };
 
-      if (search) { // nếu có search
-        query.bool.must.push({ // thêm search vào query
-          multi_match: { // tạo một đối tượng mới
-            query: search, // tên của search
-            fields: ['title^2', 'location'], // tên của search
-            fuzziness: 'AUTO', // tên của search
+      if (search) {
+        query.bool.must.push({
+          multi_match: {
+            query: search,
+            fields: ['title^2', 'location'],
+            fuzziness: 'AUTO',
           },
-        }); // thêm search vào query
-      }
-
-      if (minPrice || maxPrice) { // nếu có minPrice hoặc maxPrice
-        const priceFilter = {}; // tạo một đối tượng mới
-        if (minPrice) priceFilter.gte = Number(minPrice); // giá tối thiểu
-        if (maxPrice) priceFilter.lte = Number(maxPrice); // giá tối đa
-        query.bool.filter.push({ range: { price: priceFilter } }); // thêm giá vào query
-      }
-
-      if (propertyTypes.length > 0) { // nếu có propertyTypes
-        query.bool.filter.push({ // thêm propertyTypes vào query
-          terms: { propertyType: propertyTypes }, // thêm propertyTypes vào query
         });
       }
 
-      if (status) { // nếu có status
-        query.bool.filter.push({ term: { status } }); // thêm status vào query
+      if (minPrice || maxPrice) {
+        const priceFilter = {};
+        if (minPrice) priceFilter.gte = Number(minPrice);
+        if (maxPrice) priceFilter.lte = Number(maxPrice);
+        query.bool.filter.push({ range: { price: priceFilter } });
       }
 
-      console.log('Elasticsearch query:', JSON.stringify(query, null, 2)); // log query
+      if (propertyTypes.length > 0) {
+        query.bool.filter.push({ terms: { propertyType: propertyTypes } });
+      }
+
+      if (status) {
+        query.bool.filter.push({ term: { status } });
+      }
+
+      console.log('Elasticsearch query:', JSON.stringify(query, null, 2));
       const response = await elasticClient.search({
-        index: 'rentals', // tên index
-        from: skip, // số lượng bất động sản cần bỏ qua
-        size: Number(limit), // số lượng bất động sản cần lấy
-        body: { query }, // body của query
+        index: 'rentals',
+        from: skip,
+        size: Number(limit),
+        body: { query },
         headers: {
-          Accept: 'application/json', // chấp nhận dữ liệu dạng json
-          'Content-Type': 'application/json', // định dạng dữ liệu là json
+          Accept: 'application/json',
+          'Content-Type': 'application/json',
         },
       });
 
-      const rentalIds = response.hits.hits.map(hit => hit._id); // lấy id của bất động sản
-      total = response.hits.total.value; // lấy số lượng bất động sản
-      rentals = await Rental.find({ _id: { $in: rentalIds } }).lean(); // lấy bất động sản từ MongoDB
+      const rentalIds = response.hits.hits.map(hit => hit._id);
+      total = response.hits.total.value;
+      rentals = await Rental.find({ _id: { $in: rentalIds } }).lean();
     } catch (esErr) {
-      console.error('Elasticsearch search failed:', esErr); // log lỗi
-      const mongoQuery = buildMongoQuery({ search, minPrice, maxPrice, propertyTypes, status }); // tạo query cho MongoDB
-      rentals = await Rental.find(mongoQuery).skip(skip).limit(Number(limit)).lean(); // lấy bất động sản từ MongoDB
-      total = await Rental.countDocuments(mongoQuery); // lấy số lượng bất động sản
+      console.error('Elasticsearch search failed:', esErr);
+      const mongoQuery = buildMongoQuery({ search, minPrice, maxPrice, propertyTypes, status });
+      rentals = await Rental.find(mongoQuery).skip(skip).limit(Number(limit)).lean();
+      total = await Rental.countDocuments(mongoQuery);
     }
 
-    const result = { // tạo một đối tượng mới
-      rentals, // bất động sản
-      total, // số lượng bất động sản
-      page: Number(page), // trang hiện tại
-      pages: Math.ceil(total / Number(limit)), // số trang
+    const result = {
+      rentals,
+      total,
+      page: Number(page),
+      pages: Math.ceil(total / Number(limit)),
     };
 
-    await redisClient.setEx(cacheKey, 300, JSON.stringify(result)); // lưu kết quả vào cache
-    res.json(result); // trả về kết quả
+    await redisClient.setEx(cacheKey, 300, JSON.stringify(result));
+    res.json(result);
   } catch (err) {
-    console.error('Error fetching rentals:', err); // log lỗi
-    res.status(500).json({ message: 'Failed to fetch rentals', error: err.message }); // trả về lỗi
+    console.error('Error fetching rentals:', err);
+    res.status(500).json({ message: 'Failed to fetch rentals', error: err.message });
   }
 });
-// ----------------------------------------------------------------------------------
-// Get all rentals
-// hàm lấy tất cả bất động sản
+
 router.get('/rentals', async (req, res) => {
   try {
-    const { search, minPrice, maxPrice, propertyType, status } = req.query; // lấy các tham số từ query
-    let query = {}; // tạo một đối tượng mới
-    if (search) query.$or = [{ title: { $regex: search, $options: 'i' } }, { 'location.short': { $regex: search, $options: 'i' } }]; // tìm kiếm theo tên hoặc vị trí
-    if (minPrice || maxPrice) { // nếu có minPrice hoặc maxPrice
+    const { search, minPrice, maxPrice, propertyType, status } = req.query;
+    let query = {};
+    if (search) query.$or = [{ title: { $regex: search, $options: 'i' } }, { 'location.short': { $regex: search, $options: 'i' } }];
+    if (minPrice || maxPrice) {
       query.price = {};
-      if (minPrice) query.price.$gte = Number(minPrice); // giá tối thiểu
-      if (maxPrice) query.price.$lte = Number(maxPrice); // giá tối đa
+      if (minPrice) query.price.$gte = Number(minPrice);
+      if (maxPrice) query.price.$lte = Number(maxPrice);
     }
-    if (propertyType) query.propertyType = propertyType; // tìm kiếm theo loại bất động sản
-    if (status) query.status = status; // tìm kiếm theo trạng thái
-    const rentals = await Rental.find(query); // lấy bất động sản từ MongoDB
-    res.json(rentals); // trả về kết quả
+    if (propertyType) query.propertyType = propertyType;
+    if (status) query.status = status;
+    const rentals = await Rental.find(query);
+    res.json(rentals);
   } catch (err) {
-    res.status(500).json({ message: err.message }); // trả về lỗi
+    res.status(500).json({ message: 'Failed to fetch rentals', error: err.message });
   }
 });
-// ----------------------------------------------------------------------------------
-// Get search history
+
 router.get('/search-history', [sanitizeHeadersMiddleware, authMiddleware], async (req, res) => {
   try {
     const searchKey = `search:${req.userId}`;
@@ -269,193 +374,289 @@ router.get('/search-history', [sanitizeHeadersMiddleware, authMiddleware], async
     res.status(500).json({ message: 'Failed to fetch search history', error: err.message });
   }
 });
-// ----------------------------------------------------------------------------------
-// Get rental by ID
-// hàm lấy bất động sản theo id
-// populate là phương thức để lấy dữ liệu từ một bảng khác
+
 router.get('/rentals/:id', async (req, res) => {
   try {
-    const rental = await Rental.findById(req.params.id); // lấy bất động sản theo id
-    if (!rental) return res.status(404).json({ message: 'Rental not found' }); // nếu không tìm thấy bất động sản thì báo lỗi
+    const rental = await Rental.findById(req.params.id);
+    if (!rental) return res.status(404).json({ message: 'Rental not found' });
 
-    const comments = await Comment.find({ rentalId: req.params.id }) // lấy bình luận theo id
-      .populate('userId', 'avatarBase64 username'); // lấy thông tin người dùng gồm avatar và username
+    const comments = await Comment.find({ rentalId: req.params.id })
+      .populate('userId', 'avatarBase64 username');
 
-    const commentIds = comments.map(c => c._id); // lấy id của bình luận
-    const replies = await Reply.find({ commentId: { $in: commentIds } }) // lấy phản hồi theo id
-      .populate('userId', 'username') // lấy thông tin người dùng gồm username
-      .lean(); // lấy dữ liệu dạng lean là dữ liệu không có thông tin của bảng khác
+    const commentIds = comments.map(c => c._id);
+    const replies = await Reply.find({ commentId: { $in: commentIds } })
+      .populate('userId', 'username')
+      .lean();
 
-    const likes = await LikeComment.find({ // lấy thích theo id
+    const likes = await LikeComment.find({
       $or: [
-        { targetId: { $in: commentIds }, targetType: 'Comment' }, // lấy thích theo id
-        { targetId: { $in: replies.map(r => r._id) }, targetType: 'Reply' }, // lấy thích theo id
-      ]
-    }).populate('userId', 'username').lean(); // lấy thông tin người dùng gồm username
+        { targetId: { $in: commentIds }, targetType: 'Comment' },
+        { targetId: { $in: replies.map(r => r._id) }, targetType: 'Reply' },
+      ],
+    }).populate('userId', 'username').lean();
 
-    const replyMap = new Map(); // tạo một đối tượng mới
-    replies.forEach(reply => { // lặp qua tất cả các phản hồi
-      reply.createdAt = new Date(reply.createdAt.getTime() + 7 * 60 * 60 * 1000); // điều chỉnh thời gian theo múi giờ +7
-      reply.likes = likes.filter(like => like.targetId.toString() === reply._id.toString() && like.targetType === 'Reply') // lấy thích theo id
+    const replyMap = new Map();
+    replies.forEach(reply => {
+      reply.createdAt = new Date(reply.createdAt.getTime() + 7 * 60 * 60 * 1000);
+      reply.likes = likes
+        .filter(like => like.targetId.toString() === reply._id.toString() && like.targetType === 'Reply')
         .map(like => ({ ...like, createdAt: new Date(like.createdAt.getTime() + 7 * 60 * 60 * 1000) }));
-      const commentIdStr = reply.commentId.toString(); // lấy id của bình luận
-      if (!replyMap.has(commentIdStr)) { // nếu không có id của bình luận trong replyMap thì thêm id của bình luận vào replyMap
-        replyMap.set(commentIdStr, []); // thêm id của bình luận vào replyMap
+      const commentIdStr = reply.commentId.toString();
+      if (!replyMap.has(commentIdStr)) {
+        replyMap.set(commentIdStr, []);
       }
-      replyMap.get(commentIdStr).push(reply); // thêm phản hồi vào replyMap
+      replyMap.get(commentIdStr).push(reply);
     });
 
-    const buildReplyTree = (replyList, parentId = null) => { // hàm tạo cây phản hồi
-      return replyList // lấy tất cả các phản hồi
-        .filter(reply => (parentId ? reply.parentReplyId?.toString() === parentId : !reply.parentReplyId)) // lấy phản hồi theo id
-        .map(reply => ({ // lấy phản hồi theo id
+    const buildReplyTree = (replyList, parentId = null) => {
+      return replyList
+        .filter(reply => (parentId ? reply.parentReplyId?.toString() === parentId : !reply.parentReplyId))
+        .map(reply => ({
           ...reply,
-          replies: buildReplyTree(replyList, reply._id.toString()) // lấy phản hồi theo id
+          replies: buildReplyTree(replyList, reply._id.toString()),
         }));
     };
 
-    const adjustedComments = comments.map(comment => { // lấy tất cả các bình luận
-      const commentObj = adjustTimestamps(comment); // điều chỉnh thời gian theo múi giờ +7
-      commentObj.replies = buildReplyTree(replyMap.get(comment._id.toString()) || []); // lấy phản hồi theo id
-      commentObj.likes = likes.filter(like => like.targetId.toString() === comment._id.toString() && like.targetType === 'Comment') // lấy thích theo id
+    const adjustedComments = comments.map(comment => {
+      const commentObj = adjustTimestamps(comment);
+      commentObj.replies = buildReplyTree(replyMap.get(comment._id.toString()) || []);
+      commentObj.likes = likes
+        .filter(like => like.targetId.toString() === comment._id.toString() && like.targetType === 'Comment')
         .map(like => ({ ...like, createdAt: new Date(like.createdAt.getTime() + 7 * 60 * 60 * 1000) }));
       return commentObj;
     });
 
-    const totalRatings = adjustedComments.reduce((sum, comment) => sum + (comment.rating || 0), 0); // lấy tổng đánh giá
-    const averageRating = adjustedComments.length > 0 ? totalRatings / adjustedComments.length : 0; // lấy đánh giá trung bình
+    const totalRatings = adjustedComments.reduce((sum, comment) => sum + (comment.rating || 0), 0);
+    const averageRating = adjustedComments.length > 0 ? totalRatings / adjustedComments.length : 0;
 
     res.json({
       ...rental.toObject(),
-      comments: adjustedComments, // bình luận
-      averageRating, // đánh giá trung bình
-      reviewCount: adjustedComments.length // số lượng đánh giá
+      comments: adjustedComments,
+      averageRating,
+      reviewCount: adjustedComments.length,
     });
   } catch (err) {
-    res.status(500).json({ message: err.message });
+    res.status(500).json({ message: 'Failed to fetch rental details', error: err.message });
   }
 });
-// ----------------------------------------------------------------------------------
-// Create rental
-// Code tạo bất động sản
+
 router.post('/rentals', authMiddleware, upload.array('images'), async (req, res) => {
   try {
-    const imageUrls = req.files.map(file => `/uploads/${file.filename}`); // lấy url của ảnh
-    const contactInfoName = req.body.contactInfoName || req.user.displayName || 'Chủ nhà'; // lấy tên của chủ nhà
-    const contactInfoPhone = req.body.contactInfoPhone || req.user.phoneNumber || 'Không có số điện thoại'; // lấy số điện thoại của chủ nhà
-    const rental = new Rental({ // tạo một đối tượng mới
-      title: req.body.title, // tên của bất động sản
-      price: req.body.price, // giá của bất động sản
-      area: { total: req.body.areaTotal, livingRoom: req.body.areaLivingRoom, bedrooms: req.body.areaBedrooms, bathrooms: req.body.areaBathrooms }, // diện tích của bất động sản
-      location: { short: req.body.locationShort, fullAddress: req.body.locationFullAddress }, // vị trí của bất động sản
-      propertyType: req.body.propertyType, // loại bất động sản
-      furniture: req.body.furniture ? req.body.furniture.split(',').map(item => item.trim()) : [], // nội thất của bất động sản
-      amenities: req.body.amenities ? req.body.amenities.split(',').map(item => item.trim()) : [], // tiện ích của bất động sản
-      surroundings: req.body.surroundings ? req.body.surroundings.split(',').map(item => item.trim()) : [], // môi trường xung quanh của bất động sản
-      rentalTerms: { minimumLease: req.body.rentalTermsMinimumLease, deposit: req.body.rentalTermsDeposit, paymentMethod: req.body.rentalTermsPaymentMethod, renewalTerms: req.body.rentalTermsRenewalTerms }, // điều kiện thuê của bất động sản
-      contactInfo: { name: contactInfoName, phone: contactInfoPhone, availableHours: req.body.contactInfoAvailableHours }, // thông tin liên hệ của chủ nhà
-      userId: req.userId, // id của người dùng
+    const imageUrls = req.files.map(file => `/uploads/${file.filename}`);
+    const contactInfoName = req.body.contactInfoName || req.user.displayName || 'Chủ nhà';
+    const contactInfoPhone = req.body.contactInfoPhone || req.user.phoneNumber || 'Không có số điện thoại';
+
+    let coordinates = [
+      parseFloat(req.body.longitude) || 0,
+      parseFloat(req.body.latitude) || 0,
+    ];
+    let formattedAddress = req.body.locationFullAddress;
+    let geocodingStatus = 'pending';
+
+    const { full: fullAddress } = normalizeVietnameseAddress(req.body.locationFullAddress);
+    if (!fullAddress) {
+      return res.status(400).json({ message: 'Invalid or missing full address' });
+    }
+
+    if (
+      coordinates[0] === 0 && coordinates[1] === 0 || 
+      isNaN(coordinates[0]) || isNaN(coordinates[1])
+    ) {
+      try {
+        console.log(`Geocoding address for new rental: ${fullAddress}`);
+        const geocodeResult = await geocodeAddressFree(fullAddress);
+        coordinates = [geocodeResult.longitude, geocodeResult.latitude];
+        formattedAddress = geocodeResult.formattedAddress;
+        geocodingStatus = 'success';
+        console.log('Used Nominatim geocoding service');
+      } catch (geocodeError) {
+        console.error('Geocoding failed:', geocodeError.message);
+        coordinates = [0, 0];
+        formattedAddress = fullAddress;
+        geocodingStatus = 'failed';
+        console.warn(`Geocoding failed for address: ${fullAddress}. Saving with default coordinates [0, 0].`);
+      }
+    } else {
+      geocodingStatus = 'manual';
+    }
+
+    if (Math.abs(coordinates[0]) > 180 || Math.abs(coordinates[1]) > 90) {
+      return res.status(400).json({ message: 'Invalid coordinate values provided' });
+    }
+
+    const rental = new Rental({
+      title: req.body.title,
+      price: req.body.price,
+      area: {
+        total: req.body.areaTotal,
+        livingRoom: req.body.areaLivingRoom,
+        bedrooms: req.body.areaBedrooms,
+        bathrooms: req.body.areaBathrooms,
+      },
+      location: {
+        short: req.body.locationShort,
+        fullAddress: fullAddress,
+        formattedAddress: formattedAddress,
+        coordinates: {
+          type: 'Point',
+          coordinates: coordinates,
+        },
+      },
+      propertyType: req.body.propertyType,
+      furniture: req.body.furniture ? req.body.furniture.split(',').map(item => item.trim()) : [],
+      amenities: req.body.amenities ? req.body.amenities.split(',').map(item => item.trim()) : [],
+      surroundings: req.body.surroundings ? req.body.surroundings.split(',').map(item => item.trim()) : [],
+      rentalTerms: {
+        minimumLease: req.body.rentalTermsMinimumLease,
+        deposit: req.body.rentalTermsDeposit,
+        paymentMethod: req.body.rentalTermsPaymentMethod,
+        renewalTerms: req.body.rentalTermsRenewalTerms,
+      },
+      contactInfo: {
+        name: contactInfoName,
+        phone: contactInfoPhone,
+        availableHours: req.body.contactInfoAvailableHours,
+      },
+      userId: req.userId,
       images: imageUrls,
-      status: req.body.status || 'available', // trạng thái của bất động sản
+      status: req.body.status || 'available',
+      geocodingStatus: geocodingStatus,
     });
-    const newRental = await rental.save(); // lưu bất động sản vào MongoDB
-    syncRentalToElasticsearch(newRental); // đồng bộ dữ liệu từ MongoDB sang Elasticsearch
-    res.status(201).json(newRental); // trả về kết quả
+
+    const newRental = await rental.save();
+    await syncRentalToElasticsearch(newRental);
+    res.status(201).json({
+      message: coordinates[0] === 0 && coordinates[1] === 0 
+        ? 'Rental created successfully, but geocoding failed. Coordinates set to [0, 0]. Please update coordinates using /rentals/fix-coordinates/:id.'
+        : 'Rental created successfully',
+      rental: newRental,
+    });
   } catch (err) {
-    console.error('Error creating rental:', err); // log lỗi
-    if (err instanceof multer.MulterError) { // nếu lỗi là multer
+    console.error('Error creating rental:', err);
+    if (err instanceof multer.MulterError) {
       return res.status(400).json({ message: `File upload error: ${err.message}` });
     }
     res.status(400).json({ message: 'Failed to create rental', error: err.message });
   }
 });
-// ----------------------------------------------------------------------------------
 
-// Update rental
-router.patch('/rentals/:id', authMiddleware, upload.array('images'), async (req, res) => { // hàm cập nhật bất động sản
+router.patch('/rentals/:id', authMiddleware, upload.array('images'), async (req, res) => {
   try {
-    // Kiểm tra ID hợp lệ
-    if (!mongoose.Types.ObjectId.isValid(req.params.id)) { // nếu id không hợp lệ
-      return res.status(400).json({ message: 'Invalid rental ID' }); // trả về lỗi
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(400).json({ message: 'Invalid rental ID' });
     }
 
-    // Tìm rental
-    const rental = await Rental.findById(req.params.id); // lấy bất động sản theo id
-    if (!rental) { // nếu không tìm thấy bất động sản
-      return res.status(404).json({ message: 'Rental not found' }); // trả về lỗi
+    const rental = await Rental.findById(req.params.id);
+    if (!rental) {
+      return res.status(404).json({ message: 'Rental not found' });
     }
-    if (rental.userId !== req.userId) { // nếu id của người dùng không trùng với id của bất động sản
-      return res.status(403).json({ message: 'Unauthorized: You do not own this rental' }); // trả về lỗi
+    if (rental.userId !== req.userId) {
+      return res.status(403).json({ message: 'Unauthorized: You do not own this rental' });
     }
 
-    // Chuẩn bị dữ liệu cập nhật
-    const updatedData = {}; // tạo một đối tượng mới
-    if (req.body.title) updatedData.title = req.body.title; // tên của bất động sản
-    if (req.body.price) updatedData.price = parseFloat(req.body.price) || rental.price; // giá của bất động sản
+    const updatedData = {};
+    if (req.body.title) updatedData.title = req.body.title;
+    if (req.body.price) updatedData.price = parseFloat(req.body.price) || rental.price;
     if (req.body.areaTotal || req.body.areaLivingRoom || req.body.areaBedrooms || req.body.areaBathrooms) {
-      updatedData.area = { // diện tích của bất động sản
-        total: parseFloat(req.body.areaTotal) || rental.area.total, // diện tích của bất động sản
-        livingRoom: parseFloat(req.body.areaLivingRoom) || rental.area.livingRoom, // diện tích của bất động sản
-        bedrooms: parseFloat(req.body.areaBedrooms) || rental.area.bedrooms, // diện tích của bất động sản
-        bathrooms: parseFloat(req.body.areaBathrooms) || rental.area.bathrooms // diện tích của bất động sản
+      updatedData.area = {
+        total: parseFloat(req.body.areaTotal) || rental.area.total,
+        livingRoom: parseFloat(req.body.areaLivingRoom) || rental.area.livingRoom,
+        bedrooms: parseFloat(req.body.areaBedrooms) || rental.area.bedrooms,
+        bathrooms: parseFloat(req.body.areaBathrooms) || rental.area.bathrooms,
       };
     }
-    if (req.body.locationShort || req.body.locationFullAddress) {
-      updatedData.location = { // vị trí của bất động sản
-        short: req.body.locationShort || rental.location.short, // vị trí của bất động sản
-        fullAddress: req.body.locationFullAddress || rental.location.fullAddress // vị trí của bất động sản
+    if (req.body.locationShort || req.body.locationFullAddress || req.body.latitude || req.body.longitude) {
+      let coordinates = [
+        parseFloat(req.body.longitude) || rental.location.coordinates.coordinates[0],
+        parseFloat(req.body.latitude) || rental.location.coordinates.coordinates[1],
+      ];
+      let formattedAddress = rental.location.formattedAddress;
+      let geocodingStatus = rental.geocodingStatus || 'pending';
+
+      const { full: fullAddress } = normalizeVietnameseAddress(req.body.locationFullAddress || rental.location.fullAddress);
+      if (!fullAddress) {
+        return res.status(400).json({ message: 'Invalid or missing full address' });
+      }
+
+      if (
+        fullAddress &&
+        (coordinates[0] === 0 && coordinates[1] === 0 || isNaN(coordinates[0]) || isNaN(coordinates[1]))
+      ) {
+        try {
+          const geocodeResult = await geocodeAddressFree(fullAddress);
+          coordinates = [geocodeResult.longitude, geocodeResult.latitude];
+          formattedAddress = geocodeResult.formattedAddress;
+          geocodingStatus = 'success';
+          console.log('Used Nominatim geocoding service');
+        } catch (geocodeError) {
+          console.error('Geocoding failed:', geocodeError.message);
+          coordinates = [0, 0];
+          formattedAddress = fullAddress;
+          geocodingStatus = 'failed';
+          console.warn(`Geocoding failed for address: ${fullAddress}. Saving with default coordinates [0, 0].`);
+        }
+      } else if (req.body.latitude || req.body.longitude) {
+        geocodingStatus = 'manual';
+      }
+
+      updatedData.location = {
+        short: req.body.locationShort || rental.location.short,
+        fullAddress: fullAddress,
+        formattedAddress: formattedAddress,
+        coordinates: {
+          type: 'Point',
+          coordinates: coordinates,
+        },
       };
+      updatedData.geocodingStatus = geocodingStatus;
     }
-    if (req.body.propertyType) updatedData.propertyType = req.body.propertyType;  // loại bất động sản
-    if (req.body.furniture) updatedData.furniture = req.body.furniture.split(',').map(item => item.trim()); // nội thất của bất động sản
-    if (req.body.amenities) updatedData.amenities = req.body.amenities.split(',').map(item => item.trim()); // tiện ích của bất động sản
-    if (req.body.surroundings) updatedData.surroundings = req.body.surroundings.split(',').map(item => item.trim()); // môi trường xung quanh của bất động sản
+    if (req.body.propertyType) updatedData.propertyType = req.body.propertyType;
+    if (req.body.furniture) updatedData.furniture = req.body.furniture.split(',').map(item => item.trim());
+    if (req.body.amenities) updatedData.amenities = req.body.amenities.split(',').map(item => item.trim());
+    if (req.body.surroundings) updatedData.surroundings = req.body.surroundings.split(',').map(item => item.trim());
     if (req.body.rentalTermsMinimumLease || req.body.rentalTermsDeposit || req.body.rentalTermsPaymentMethod || req.body.rentalTermsRenewalTerms) {
-      updatedData.rentalTerms = { // điều kiện thuê của bất động sản
-        minimumLease: req.body.rentalTermsMinimumLease || rental.rentalTerms.minimumLease, // điều kiện thuê của bất động sản
-        deposit: req.body.rentalTermsDeposit || rental.rentalTerms.deposit, // điều kiện thuê của bất động sản
-        paymentMethod: req.body.rentalTermsPaymentMethod || rental.rentalTerms.paymentMethod, // điều kiện thuê của bất động sản
-        renewalTerms: req.body.rentalTermsRenewalTerms || rental.rentalTerms.renewalTerms // điều kiện thuê của bất động sản
+      updatedData.rentalTerms = {
+        minimumLease: req.body.rentalTermsMinimumLease || rental.rentalTerms.minimumLease,
+        deposit: req.body.rentalTermsDeposit || rental.rentalTerms.deposit,
+        paymentMethod: req.body.rentalTermsPaymentMethod || rental.rentalTerms.paymentMethod,
+        renewalTerms: req.body.rentalTermsRenewalTerms || rental.rentalTerms.renewalTerms,
       };
     }
     if (req.body.contactInfoName || req.body.contactInfoPhone || req.body.contactInfoAvailableHours) {
-      updatedData.contactInfo = { // thông tin liên hệ của chủ nhà
-        name: req.body.contactInfoName || rental.contactInfo.name, // tên của chủ nhà
-        phone: req.body.contactInfoPhone || rental.contactInfo.phone, // số điện thoại của chủ nhà
-        availableHours: req.body.contactInfoAvailableHours || rental.contactInfo.availableHours
+      updatedData.contactInfo = {
+        name: req.body.contactInfoName || rental.contactInfo.name,
+        phone: req.body.contactInfoPhone || rental.contactInfo.phone,
+        availableHours: req.body.contactInfoAvailableHours || rental.contactInfo.availableHours,
       };
     }
-    if (req.body.status) updatedData.status = req.body.status; // code cập nhật trạng thái
+    if (req.body.status) updatedData.status = req.body.status;
 
-    // Xử lý ảnh
-    let updatedImages = [...rental.images]; // lấy ảnh của bất động sản
-    let removedImages = []; // tạo một mảng mới
-    if (req.body.removedImages) { // nếu có removedImages
+    let updatedImages = [...rental.images];
+    let removedImages = [];
+    if (req.body.removedImages) {
       try {
-        // Nếu là string, thử parse JSON, nếu lỗi thì tách theo dấu phẩy
         if (typeof req.body.removedImages === 'string') {
           try {
-            removedImages = JSON.parse(req.body.removedImages); // lấy ảnh của bất động sản
+            removedImages = JSON.parse(req.body.removedImages);
           } catch (e) {
-            removedImages = req.body.removedImages.split(',').map(s => s.trim()).filter(Boolean); // lấy ảnh của bất động sản
+            removedImages = req.body.removedImages.split(',').map(s => s.trim()).filter(Boolean);
           }
         } else if (Array.isArray(req.body.removedImages)) {
-          removedImages = req.body.removedImages; // lấy ảnh của bất động sản
+          removedImages = req.body.removedImages;
         }
       } catch (e) {
-        removedImages = [req.body.removedImages].filter(Boolean); // lấy ảnh của bất động sản
+        removedImages = [req.body.removedImages].filter(Boolean);
       }
-      if (!Array.isArray(removedImages)) removedImages = [removedImages]; // lấy ảnh của bất động sản
+      if (!Array.isArray(removedImages)) removedImages = [removedImages];
 
-      for (const image of removedImages) { // lấy ảnh của bất động sản
-        if (typeof image !== 'string' || !image.startsWith('/uploads/')) continue; // lấy ảnh của bất động sản
+      for (const image of removedImages) {
+        if (typeof image !== 'string' || !image.startsWith('/uploads/')) continue;
         if (updatedImages.includes(image)) {
           updatedImages = updatedImages.filter(img => img !== image);
           const filePath = path.join(__dirname, '..', 'uploads', image.replace(/^\/uploads\//, ''));
           try {
             await fs.unlink(filePath);
           } catch (err) {
-            // Nếu file không tồn tại thì bỏ qua, lỗi khác thì báo lỗi
             if (err.code !== 'ENOENT') {
               return res.status(500).json({ message: `Failed to delete image: ${image}`, error: err.message });
             }
@@ -464,108 +665,500 @@ router.patch('/rentals/:id', authMiddleware, upload.array('images'), async (req,
       }
     }
 
-    // Thêm ảnh mới
-    if (req.files && req.files.length > 0) { // nếu có req.files và req.files.length > 0
-      const newImages = req.files.map(file => `/uploads/${file.filename}`); // lấy ảnh của bất động sản
-      updatedImages = [...new Set([...updatedImages, ...newImages])]; // lấy ảnh của bất động sản của bài 
+    if (req.files && req.files.length > 0) {
+      const newImages = req.files.map(file => `/uploads/${file.filename}`);
+      updatedImages = [...new Set([...updatedImages, ...newImages])];
     }
 
-    // Luôn cập nhật lại trường images
-    updatedData.images = updatedImages; // cập nhật ảnh của bất động sản
+    updatedData.images = updatedImages;
 
-    // Cập nhật rental
-    const updatedRental = await Rental.findByIdAndUpdate( // cập nhật bất động sản
-      req.params.id, // id của bất động sản theo từng bài viết 
-      { $set: updatedData }, // dữ liệu cập nhật
-      { new: true, runValidators: true } // cập nhật bất động sản
+    const updatedRental = await Rental.findByIdAndUpdate(
+      req.params.id,
+      { $set: updatedData },
+      { new: true, runValidators: true },
     );
 
     if (!updatedRental) {
       return res.status(404).json({ message: 'Rental not found after update' });
     }
 
-    // Đồng bộ Elasticsearch
-    syncRentalToElasticsearch(updatedRental);
-
-    res.json(updatedRental);
+    await syncRentalToElasticsearch(updatedRental);
+    res.json({
+      message: updatedData.location?.coordinates?.coordinates[0] === 0 && updatedData.location?.coordinates?.coordinates[1] === 0 
+        ? 'Rental updated successfully, but geocoding failed. Coordinates set to [0, 0]. Please update coordinates using /rentals/fix-coordinates/:id.'
+        : 'Rental updated successfully',
+      rental: updatedRental,
+    });
   } catch (err) {
+    console.error('Error updating rental:', err);
     if (err instanceof multer.MulterError) {
       return res.status(400).json({ message: `File upload error: ${err.message}` });
     }
     res.status(500).json({ message: 'Failed to update rental', error: err.message });
   }
 });
-// ----------------------------------------------------------------------------------
-// Delete rental
-router.delete('/rentals/:id', authMiddleware, async (req, res) => { // hàm xóa bất động sản
+
+router.delete('/rentals/:id', authMiddleware, async (req, res) => {
   try {
-    if (!mongoose.Types.ObjectId.isValid(req.params.id)) { // nếu id không hợp lệ
-      return res.status(400).json({ message: 'Invalid rental ID' }); // trả về lỗi
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(400).json({ message: 'Invalid rental ID' });
     }
 
-    const rental = await Rental.findById(req.params.id); // lấy bất động sản theo id
-    if (!rental) { // nếu không tìm thấy bất động sản
-      return res.status(404).json({ message: 'Rental not found' }); // trả về lỗi
+    const rental = await Rental.findById(req.params.id);
+    if (!rental) {
+      return res.status(404).json({ message: 'Rental not found' });
     }
-    if (rental.userId !== req.userId) { // nếu id của người dùng không trùng với id của bất động sản
-      return res.status(403).json({ message: 'Unauthorized: You do not own this rental' }); // trả về lỗi
+    if (rental.userId !== req.userId) {
+      return res.status(403).json({ message: 'Unauthorized: You do not own this rental' });
     }
 
-    for (const image of rental.images) { // lấy ảnh của bất động sản
-      if (!image.startsWith('/uploads/')) { // nếu ảnh không bắt đầu bằng /uploads/
-        console.warn(`Invalid image path format during deletion: ${image}`); // log lỗi
-        continue; // bỏ qua
+    for (const image of rental.images) {
+      if (!image.startsWith('/uploads/')) {
+        console.warn(`Invalid image path format during deletion: ${image}`);
+        continue;
       }
-      const filePath = path.join(__dirname, '..', 'Uploads', image.replace(/^\/uploads\//, '')); // lấy đường dẫn của ảnh
+      const filePath = path.join(__dirname, '..', 'Uploads', image.replace(/^\/uploads\//, ''));
       try {
-        await fs.access(filePath); // kiểm tra xem file có tồn tại không
-        await fs.unlink(filePath); // xóa file
-        console.log(`Deleted image: ${filePath}`); // log lỗi
+        await fs.access(filePath);
+        await fs.unlink(filePath);
+        console.log(`Deleted image: ${filePath}`);
       } catch (err) {
-        console.error(`Error deleting image ${filePath}: ${err.message}`); // log lỗi
-        if (err.code !== 'ENOENT') { // nếu lỗi không phải là ENOENT
-          console.warn(`Non-ENOENT error during deletion: ${err.message}`); // log lỗi
+        console.error(`Error deleting image ${filePath}: ${err.message}`);
+        if (err.code !== 'ENOENT') {
+          console.warn(`Non-ENOENT error during deletion: ${err.message}`);
         }
       }
     }
 
-    await Comment.deleteMany({ rentalId: req.params.id }); // xóa bình luận theo id
-    await Reply.deleteMany({ commentId: { $in: await Comment.find({ rentalId: req.params.id }).distinct('_id') } }); // xóa phản hồi theo id
-    await LikeComment.deleteMany({ targetId: req.params.id, targetType: 'Comment' }); // xóa thích theo id
-    await Favorite.deleteMany({ rentalId: req.params.id }); // xóa yêu thích theo id
+    await Comment.deleteMany({ rentalId: req.params.id });
+    await Reply.deleteMany({ commentId: { $in: await Comment.find({ rentalId: req.params.id }).distinct('_id') } });
+    await LikeComment.deleteMany({ targetId: req.params.id, targetType: 'Comment' });
+    await Favorite.deleteMany({ rentalId: req.params.id });
 
-    await Rental.findByIdAndDelete(req.params.id); // xóa bất động sản theo id
+    await Rental.findByIdAndDelete(req.params.id);
 
     try {
-      await elasticClient.delete({ // xóa bất động sản theo id
-        index: 'rentals', // index của bất động sản
-        id: req.params.id, // id của bất động sản
-        headers: { // headers của bất động sản
-          Accept: 'application/json', // accept của bất động sản
-          'Content-Type': 'application/json', // content type của bất động sản
+      await elasticClient.delete({
+        index: 'rentals',
+        id: req.params.id,
+        headers: {
+          Accept: 'application/json',
+          'Content-Type': 'application/json',
         },
       });
-      console.log(`Deleted rental ${req.params.id} from Elasticsearch`); // log lỗi
+      console.log(`Deleted rental ${req.params.id} from Elasticsearch`);
     } catch (esErr) {
-      console.error('Error deleting from Elasticsearch:', esErr); // log lỗi
+      console.error('Error deleting from Elasticsearch:', esErr);
     }
 
-    res.json({ message: 'Rental deleted successfully' }); // trả về kết quả
+    res.json({ message: 'Rental deleted successfully' });
   } catch (err) {
-    console.error('Error deleting rental:', err); // log lỗi
-    res.status(500).json({ message: 'Failed to delete rental', error: err.message }); // trả về lỗi
+    console.error('Error deleting rental:', err);
+    res.status(500).json({ message: 'Failed to delete rental', error: err.message });
   }
 });
 
-// Handle unsupported methods
-router.all('/rentals/:id', (req, res) => {
-  console.warn(`Received unsupported method ${req.method} for /rentals/:id`, {
-    headers: req.headers,
-    body: req.body,
-  });
-  res.status(405).json({
-    message: `Method ${req.method} not allowed. Use PATCH to update rentals.`,
-  });
+router.post('/rentals/geocode/:id', authMiddleware, async (req, res) => {
+  try {
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(400).json({ message: 'Invalid rental ID format' });
+    }
+
+    const rental = await Rental.findById(req.params.id);
+    if (!rental) {
+      return res.status(404).json({ message: 'Rental not found' });
+    }
+
+    if (rental.userId !== req.userId) {
+      return res.status(403).json({ message: 'Unauthorized: You do not own this rental' });
+    }
+
+    const { full: fullAddress } = normalizeVietnameseAddress(req.body.address || rental.location?.fullAddress);
+    if (!fullAddress) {
+      return res.status(400).json({ 
+        message: 'No address provided. Include address in request body or ensure rental has fullAddress' 
+      });
+    }
+
+    console.log(`Geocoding address: ${fullAddress}`);
+
+    let geocodeResult;
+    try {
+      geocodeResult = await geocodeAddressFree(fullAddress);
+      console.log('Used Nominatim geocoding service');
+    } catch (geocodeError) {
+      console.error('Geocoding failed:', geocodeError.message);
+      return res.status(400).json({ 
+        message: 'Failed to geocode address', 
+        error: geocodeError.message,
+        addressTried: fullAddress,
+      });
+    }
+
+    const updatedRental = await Rental.findByIdAndUpdate(
+      req.params.id,
+      {
+        $set: {
+          'location.coordinates': {
+            type: 'Point',
+            coordinates: [geocodeResult.longitude, geocodeResult.latitude],
+          },
+          'location.formattedAddress': geocodeResult.formattedAddress,
+          geocodingStatus: 'success',
+        },
+      },
+      { new: true, runValidators: true },
+    );
+
+    await syncRentalToElasticsearch(updatedRental);
+
+    res.json({
+      message: 'Address geocoded successfully',
+      address: fullAddress,
+      geocodedAddress: geocodeResult.formattedAddress,
+      coordinates: [geocodeResult.longitude, geocodeResult.latitude],
+      rental: {
+        id: updatedRental._id,
+        title: updatedRental.title,
+        location: updatedRental.location,
+        geocodingStatus: updatedRental.geocodingStatus,
+      },
+    });
+  } catch (err) {
+    console.error('Error geocoding address:', err);
+    res.status(500).json({ message: 'Failed to geocode address', error: err.message });
+  }
+});
+
+router.post('/rentals/geocode-all', authMiddleware, async (req, res) => {
+  try {
+    const rentalsToGeocode = await Rental.find({
+      userId: req.userId,
+      $or: [
+        { 'location.coordinates.coordinates': [0, 0] },
+        { 'location.coordinates.coordinates': { $exists: false } },
+        { 'location.coordinates': { $exists: false } },
+      ],
+      'location.fullAddress': { $exists: true, $ne: '' },
+    });
+
+    console.log(`Found ${rentalsToGeocode.length} rentals to geocode for user ${req.userId}`);
+
+    const results = {
+      success: [],
+      failed: [],
+      total: rentalsToGeocode.length,
+    };
+
+    for (const rental of rentalsToGeocode) {
+      try {
+        console.log(`Geocoding rental ${rental._id}: ${rental.location.fullAddress}`);
+        const geocodeResult = await geocodeAddressFree(rental.location.fullAddress);
+        
+        await Rental.findByIdAndUpdate(
+          rental._id,
+          {
+            $set: {
+              'location.coordinates': {
+                type: 'Point',
+                coordinates: [geocodeResult.longitude, geocodeResult.latitude],
+              },
+              'location.formattedAddress': geocodeResult.formattedAddress,
+              geocodingStatus: 'success',
+            },
+          },
+          { new: true, runValidators: true },
+        );
+
+        results.success.push({
+          id: rental._id,
+          title: rental.title,
+          address: rental.location.fullAddress,
+          geocodedAddress: geocodeResult.formattedAddress,
+          coordinates: [geocodeResult.longitude, geocodeResult.latitude],
+        });
+
+        await new Promise(resolve => setTimeout(resolve, 100));
+      } catch (error) {
+        console.error(`Failed to geocode rental ${rental._id}:`, error.message);
+        results.failed.push({
+          id: rental._id,
+          title: rental.title,
+          address: rental.location.fullAddress,
+          error: error.message,
+        });
+      }
+    }
+
+    res.json({
+      message: `Geocoded ${results.success.length}/${results.total} rentals`,
+      results,
+    });
+  } catch (err) {
+    console.error('Error in batch geocoding:', err);
+    res.status(500).json({ message: 'Failed to batch geocode', error: err.message });
+  }
+});
+
+router.patch('/rentals/fix-coordinates/:id', authMiddleware, async (req, res) => {
+  try {
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(400).json({ message: 'Invalid rental ID format' });
+    }
+
+    const rental = await Rental.findById(req.params.id);
+    if (!rental) {
+      return res.status(404).json({ message: 'Rental not found' });
+    }
+
+    if (rental.userId !== req.userId) {
+      return res.status(403).json({ message: 'Unauthorized: You do not own this rental' });
+    }
+
+    let newLatitude = parseFloat(req.body.latitude);
+    let newLongitude = parseFloat(req.body.longitude);
+
+    if (isNaN(newLatitude) || isNaN(newLongitude)) {
+      return res.status(400).json({ 
+        message: 'Please provide valid latitude and longitude in request body',
+        example: { latitude: 10.762622, longitude: 106.660172 },
+      });
+    }
+
+    if (Math.abs(newLongitude) > 180 || Math.abs(newLatitude) > 90) {
+      return res.status(400).json({ message: 'Invalid coordinate values provided' });
+    }
+
+    const updatedRental = await Rental.findByIdAndUpdate(
+      req.params.id,
+      {
+        $set: {
+          'location.coordinates': {
+            type: 'Point',
+            coordinates: [newLongitude, newLatitude],
+          },
+          geocodingStatus: 'manual',
+        },
+      },
+      { new: true, runValidators: true },
+    );
+
+    await syncRentalToElasticsearch(updatedRental);
+
+    res.json({
+      message: 'Coordinates updated successfully',
+      oldCoordinates: rental.location?.coordinates?.coordinates,
+      newCoordinates: [newLongitude, newLatitude],
+      rental: {
+        id: updatedRental._id,
+        title: updatedRental.title,
+        coordinates: updatedRental.location.coordinates.coordinates,
+        geocodingStatus: updatedRental.geocodingStatus,
+      },
+    });
+  } catch (err) {
+    console.error('Error fixing coordinates:', err);
+    res.status(500).json({ message: 'Failed to fix coordinates', error: err.message });
+  }
+});
+
+router.get('/rentals/nearby/:id', async (req, res) => {
+  try {
+    const { radius = 5, page = 1, limit = 10 } = req.query;
+    const skip = (Number(page) - 1) * Number(limit);
+
+    console.log(`Fetching nearby rentals for ID: ${req.params.id} with radius: ${radius}km, page: ${page}, limit: ${limit}`);
+
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(400).json({ message: 'Invalid rental ID format' });
+    }
+
+    const rental = await Rental.findById(req.params.id);
+    if (!rental) {
+      console.log(`Rental with ID ${req.params.id} not found`);
+      return res.status(404).json({ message: 'Rental not found' });
+    }
+
+    console.log('Found rental:', {
+      id: rental._id,
+      title: rental.title,
+      coordinates: rental.location?.coordinates?.coordinates,
+      geocodingStatus: rental.geocodingStatus,
+    });
+
+    const coordinates = rental.location?.coordinates?.coordinates;
+    if (!coordinates || !Array.isArray(coordinates) || coordinates.length !== 2) {
+      console.log('Invalid coordinates structure:', coordinates);
+      return res.status(400).json({ message: 'Rental has invalid coordinate structure' });
+    }
+
+    const [longitude, latitude] = coordinates;
+
+    if (typeof longitude !== 'number' || typeof latitude !== 'number' || 
+        isNaN(longitude) || isNaN(latitude) ||
+        Math.abs(longitude) > 180 || Math.abs(latitude) > 90) {
+      console.log('Invalid coordinate values:', { longitude, latitude });
+      return res.status(400).json({ message: 'Rental has invalid coordinate values' });
+    }
+
+    if (longitude === 0 && latitude === 0) {
+      console.log('Coordinates are both zero - likely invalid');
+      return res.status(400).json({ 
+        message: 'Rental coordinates not set properly. Please update using /rentals/fix-coordinates/:id.' 
+      });
+    }
+
+    console.log('Using coordinates:', { longitude, latitude });
+
+    const radiusInMeters = parseFloat(radius) * 1000;
+    const radiusInRadians = radiusInMeters / 6378100;
+
+    const total = await Rental.countDocuments({
+      'location.coordinates': {
+        $geoWithin: {
+          $centerSphere: [[longitude, latitude], radiusInRadians],
+        },
+      },
+      _id: { $ne: new mongoose.Types.ObjectId(req.params.id) },
+      status: 'available',
+    });
+
+    const nearbyRentals = await Rental.aggregate([
+      {
+        $geoNear: {
+          near: { type: 'Point', coordinates: [longitude, latitude] },
+          distanceField: 'distance',
+          maxDistance: radiusInMeters,
+          spherical: true,
+          query: { 
+            _id: { $ne: new mongoose.Types.ObjectId(req.params.id) }, 
+            status: 'available',
+          },
+        },
+      },
+      { $skip: skip },
+      { $limit: Number(limit) },
+      {
+        $project: {
+          title: 1,
+          price: 1,
+          location: 1,
+          images: 1,
+          propertyType: 1,
+          createdAt: 1,
+          geocodingStatus: 1,
+        },
+      },
+    ]);
+
+    console.log(`Found ${nearbyRentals.length} nearby rentals`);
+
+    const transformedRentals = nearbyRentals.map(rental => ({
+      ...rental,
+      location: {
+        ...rental.location,
+        latitude: rental.location?.coordinates?.coordinates?.[1] || 0,
+        longitude: rental.location?.coordinates?.coordinates?.[0] || 0,
+      },
+    }));
+
+    const result = {
+      rentals: transformedRentals,
+      total,
+      page: Number(page),
+      pages: Math.ceil(total / Number(limit)),
+    };
+
+    res.json(result);
+  } catch (err) {
+    console.error('Error fetching nearby rentals:', err);
+    if (err.name === 'CastError') {
+      return res.status(400).json({ message: 'Invalid rental ID format', error: err.message });
+    }
+    res.status(500).json({ message: 'Failed to fetch nearby rentals', error: err.message });
+  }
+});
+
+router.get('/rentals/nearby-fallback/:id', async (req, res) => {
+  try {
+    const { radius = 5 } = req.query;
+    
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(400).json({ message: 'Invalid rental ID format' });
+    }
+
+    const rental = await Rental.findById(req.params.id);
+    if (!rental) {
+      return res.status(404).json({ message: 'Rental not found' });
+    }
+
+    const coordinates = rental.location?.coordinates?.coordinates;
+    if (!coordinates || coordinates.length !== 2) {
+      return res.status(400).json({ message: 'Rental has invalid coordinates' });
+    }
+
+    const [targetLon, targetLat] = coordinates;
+    
+    const nearbyRentals = await Rental.aggregate([
+      {
+        $match: {
+          _id: { $ne: new mongoose.Types.ObjectId(req.params.id) },
+          status: 'available',
+          'location.coordinates.coordinates': { $exists: true, $ne: [0, 0] },
+        },
+      },
+      {
+        $addFields: {
+          distance: {
+            $sqrt: {
+              $add: [
+                {
+                  $pow: [
+                    { $multiply: [{ $subtract: [{ $arrayElemAt: ['$location.coordinates.coordinates', 0] }, targetLon] }, 111.32] },
+                    2,
+                  ],
+                },
+                {
+                  $pow: [
+                    { $multiply: [{ $subtract: [{ $arrayElemAt: ['$location.coordinates.coordinates', 1] }, targetLat] }, 110.54] },
+                    2,
+                  ],
+                },
+              ],
+            },
+          },
+        },
+      },
+      {
+        $match: {
+          distance: { $lte: parseFloat(radius) },
+        },
+      },
+      {
+        $sort: { distance: 1 },
+      },
+      {
+        $limit: 20,
+      },
+      {
+        $project: {
+          title: 1,
+          price: 1,
+          location: 1,
+          images: 1,
+          propertyType: 1,
+          createdAt: 1,
+          geocodingStatus: 1,
+          distance: 1,
+        },
+      },
+    ]);
+
+    res.json(nearbyRentals);
+  } catch (err) {
+    console.error('Error in fallback nearby rentals:', err);
+    res.status(500).json({ message: 'Failed to fetch nearby rentals', error: err.message });
+  }
 });
 
 module.exports = router;

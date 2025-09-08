@@ -1,12 +1,10 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_rentalhouse/Widgets/Detail/rentalMap.dart';
 import 'package:flutter_rentalhouse/config/loading.dart';
+import 'package:flutter_rentalhouse/viewmodels/vm_rental.dart';
 import 'package:lottie/lottie.dart' hide Marker;
-import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:provider/provider.dart';
-import 'package:geocoding/geocoding.dart';
-import 'package:custom_map_markers/custom_map_markers.dart';
-import 'package:location/location.dart' as loc;
 import 'package:flutter_rentalhouse/Widgets/Comment/comment_user.dart';
 import 'package:flutter_rentalhouse/Widgets/Detail/detail_tab.dart';
 import 'package:flutter_rentalhouse/Widgets/Detail/info_chip.dart';
@@ -114,19 +112,112 @@ class _RentalDetailScreenState extends State<RentalDetailScreen>
           _isFavorite = newFavoriteStatus;
           _isLoadingFavorite = false;
         });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              newFavoriteStatus
-                  ? 'Đã thêm vào yêu thích'
-                  : 'Đã xóa khỏi yêu thích',
+
+        final snackBar = SnackBar(
+          behavior: SnackBarBehavior.floating,
+          margin: const EdgeInsets.all(16),
+          elevation: 0,
+          backgroundColor: Colors.transparent, // để lộ gradient
+          duration: const Duration(seconds: 2),
+          content: TweenAnimationBuilder<double>(
+            tween: Tween(begin: 0.0, end: 1.0),
+            duration: const Duration(milliseconds: 500),
+            curve: Curves.easeOutCubic,
+            builder: (context, value, child) {
+              return Opacity(
+                opacity: value,
+                child: Transform.translate(
+                  offset: Offset(0, (1 - value) * 20), // hiệu ứng trượt lên
+                  child: child,
+                ),
+              );
+            },
+            child: Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    const Color.fromARGB(255, 1, 180, 64),
+                    const Color.fromARGB(255, 85, 221, 112),
+                  ],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black26,
+                    blurRadius: 8,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: Row(
+                children: [
+                  AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 400),
+                    transitionBuilder: (child, anim) =>
+                        ScaleTransition(scale: anim, child: child),
+                    child: Icon(
+                      newFavoriteStatus
+                          ? Icons.favorite
+                          : Icons.favorite_border,
+                      key: ValueKey(newFavoriteStatus),
+                      color: Colors.white,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      newFavoriteStatus
+                          ? 'Đã thêm vào yêu thích '
+                          : 'Đã xóa khỏi yêu thích ',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         );
+
+        ScaffoldMessenger.of(context).showSnackBar(snackBar);
       },
       onError: (error) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(error)),
+          SnackBar(
+            behavior: SnackBarBehavior.floating,
+            margin: const EdgeInsets.all(16),
+            backgroundColor: Colors.transparent,
+            elevation: 0,
+            content: Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [Colors.orange.shade300, Colors.deepOrange.shade400],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.error_outline, color: Colors.white),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      error,
+                      style: const TextStyle(color: Colors.white, fontSize: 16),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
         );
         setState(() => _isLoadingFavorite = false);
       },
@@ -189,10 +280,7 @@ class _RentalDetailScreenState extends State<RentalDetailScreen>
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => RentalMapView(
-          address: widget.rental.location['fullAddress'],
-          title: widget.rental.title,
-        ),
+        builder: (context) => RentalMapView(rental: widget.rental),
       ),
     );
   }
@@ -244,7 +332,7 @@ class _RentalDetailScreenState extends State<RentalDetailScreen>
               child: Container(
                 color: Colors.white,
                 child: Padding(
-                  padding: const EdgeInsets.all(16.0),
+                  padding: const EdgeInsets.all(13.0),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -267,27 +355,6 @@ class _RentalDetailScreenState extends State<RentalDetailScreen>
                           children: [
                             Row(
                               children: [
-                                Container(
-                                  padding: const EdgeInsets.all(10),
-                                  decoration: BoxDecoration(
-                                    color: Colors.blue.shade600,
-                                    borderRadius: BorderRadius.circular(12),
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: Colors.blue.shade200,
-                                        spreadRadius: 1,
-                                        blurRadius: 8,
-                                        offset: const Offset(0, 2),
-                                      ),
-                                    ],
-                                  ),
-                                  child: const Icon(
-                                    Icons.home,
-                                    color: Colors.white,
-                                    size: 24,
-                                  ),
-                                ),
-                                const SizedBox(width: 16),
                                 Expanded(
                                   child: Column(
                                     crossAxisAlignment:
@@ -335,38 +402,41 @@ class _RentalDetailScreenState extends State<RentalDetailScreen>
                                           ],
                                         ),
                                       ),
-                                      const SizedBox(height: 8),
-                                      GestureDetector(
-                                        onTap: _navigateToMap,
-                                        child: Container(
-                                          padding: const EdgeInsets.symmetric(
-                                              horizontal: 12, vertical: 8),
-                                          decoration: BoxDecoration(
-                                            color: Colors.blue.shade600,
-                                            borderRadius:
-                                                BorderRadius.circular(8),
-                                          ),
-                                          child: Row(
-                                            mainAxisSize: MainAxisSize.min,
-                                            children: [
-                                              Icon(
-                                                Icons.map,
-                                                color: Colors.white,
-                                                size: 16,
-                                              ),
-                                              const SizedBox(width: 8),
-                                              Text(
-                                                'Xem trên bản đồ',
-                                                style: TextStyle(
+                                      const SizedBox(height: 16),
+                                      Align(
+                                        alignment: Alignment.center,
+                                        child: GestureDetector(
+                                          onTap: _navigateToMap,
+                                          child: Container(
+                                            padding: const EdgeInsets.symmetric(
+                                                horizontal: 12, vertical: 8),
+                                            decoration: BoxDecoration(
+                                              color: Colors.blue.shade600,
+                                              borderRadius:
+                                                  BorderRadius.circular(8),
+                                            ),
+                                            child: Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                Icon(
+                                                  Icons.map,
                                                   color: Colors.white,
-                                                  fontSize: 14,
-                                                  fontWeight: FontWeight.w500,
+                                                  size: 16,
                                                 ),
-                                              ),
-                                            ],
+                                                const SizedBox(width: 8),
+                                                Text(
+                                                  'Xem trên bản đồ',
+                                                  style: TextStyle(
+                                                    color: Colors.white,
+                                                    fontSize: 14,
+                                                    fontWeight: FontWeight.w500,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
                                           ),
                                         ),
-                                      ),
+                                      )
                                     ],
                                   ),
                                 ),
@@ -952,311 +1022,5 @@ class _SliverAppBarDelegate extends SliverPersistentHeaderDelegate {
   @override
   bool shouldRebuild(_SliverAppBarDelegate oldDelegate) {
     return false;
-  }
-}
-
-// New Map View for Rental
-class RentalMapView extends StatefulWidget {
-  final String address;
-  final String title;
-
-  const RentalMapView({super.key, required this.address, required this.title});
-
-  @override
-  State<RentalMapView> createState() => _RentalMapViewState();
-}
-
-class _RentalMapViewState extends State<RentalMapView> {
-  GoogleMapController? _controller;
-  LatLng? _rentalLatLng;
-  LatLng? _currentLatLng;
-  List<MarkerData> _customMarkers = [];
-  String? _errorMessage;
-  bool _isMapLoading = true;
-
-  @override
-  void initState() {
-    super.initState();
-    _getLocationFromAddress();
-    _getCurrentLocation();
-  }
-
-  @override
-  void dispose() {
-    _controller?.dispose();
-    super.dispose();
-  }
-
-  Widget _customRentalMarkerWidget(String title) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Image.asset(
-          'assets/img/location.png',
-          width: 35,
-          fit: BoxFit.contain,
-          errorBuilder: (context, error, stackTrace) => const Icon(
-            Icons.location_pin,
-            color: Colors.red,
-            size: 35,
-          ),
-        ),
-        const SizedBox(height: 4),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(4),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.2),
-                blurRadius: 4,
-                offset: const Offset(0, 2),
-              ),
-            ],
-          ),
-          child: Text(
-            title,
-            style: const TextStyle(
-              fontSize: 10,
-              fontWeight: FontWeight.bold,
-              color: Colors.black,
-            ),
-            textAlign: TextAlign.center,
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _customCurrentLocationMarkerWidget() {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        const Icon(
-          Icons.my_location,
-          color: Colors.blue,
-          size: 35,
-        ),
-        const SizedBox(height: 4),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(4),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.2),
-                blurRadius: 4,
-                offset: const Offset(0, 2),
-              ),
-            ],
-          ),
-          child: const Text(
-            "Vị trí hiện tại",
-            style: TextStyle(
-              fontSize: 10,
-              fontWeight: FontWeight.bold,
-              color: Colors.black,
-            ),
-            textAlign: TextAlign.center,
-          ),
-        ),
-      ],
-    );
-  }
-
-  Future<void> _getLocationFromAddress() async {
-    try {
-      final locations = await locationFromAddress(widget.address);
-      if (locations.isNotEmpty) {
-        final location = locations.first;
-        final latLng = LatLng(location.latitude, location.longitude);
-        setState(() {
-          _rentalLatLng = latLng;
-          _customMarkers = [
-            MarkerData(
-              marker: Marker(
-                markerId: const MarkerId('rental-location'),
-                position: latLng,
-                infoWindow: InfoWindow(title: widget.title),
-              ),
-              child: _customRentalMarkerWidget(widget.title),
-            ),
-            if (_currentLatLng != null)
-              MarkerData(
-                marker: Marker(
-                  markerId: const MarkerId('current-location'),
-                  position: _currentLatLng!,
-                  infoWindow: const InfoWindow(title: 'Vị trí hiện tại'),
-                ),
-                child: _customCurrentLocationMarkerWidget(),
-              ),
-          ];
-          _isMapLoading = false;
-        });
-        if (_controller != null) {
-          _controller?.animateCamera(CameraUpdate.newLatLngZoom(latLng, 16));
-        }
-      } else {
-        setState(() {
-          _errorMessage = 'Không tìm thấy tọa độ cho địa chỉ này.';
-          _isMapLoading = false;
-        });
-      }
-    } catch (e) {
-      setState(() {
-        _errorMessage = 'Lỗi khi lấy tọa độ: $e';
-        _isMapLoading = false;
-      });
-    }
-  }
-
-  Future<void> _getCurrentLocation() async {
-    try {
-      final location = loc.Location();
-
-      bool serviceEnabled = await location.serviceEnabled();
-      if (!serviceEnabled) {
-        serviceEnabled = await location.requestService();
-        if (!serviceEnabled) {
-          setState(() => _errorMessage = 'Dịch vụ vị trí chưa được bật.');
-          return;
-        }
-      }
-
-      var permissionGranted = await location.hasPermission();
-      if (permissionGranted == loc.PermissionStatus.denied) {
-        permissionGranted = await location.requestPermission();
-        if (permissionGranted != loc.PermissionStatus.granted) {
-          setState(() => _errorMessage = 'Quyền truy cập vị trí bị từ chối.');
-          return;
-        }
-      }
-
-      final currentLocation = await location.getLocation();
-
-      if (currentLocation.latitude != null &&
-          currentLocation.longitude != null) {
-        final latLng = LatLng(
-          currentLocation.latitude!,
-          currentLocation.longitude!,
-        );
-
-        setState(() {
-          _currentLatLng = latLng;
-          if (_rentalLatLng != null) {
-            _customMarkers = [
-              MarkerData(
-                marker: Marker(
-                  markerId: const MarkerId('rental-location'),
-                  position: _rentalLatLng!,
-                  infoWindow: InfoWindow(title: widget.title),
-                ),
-                child: _customRentalMarkerWidget(widget.title),
-              ),
-              MarkerData(
-                marker: Marker(
-                  markerId: const MarkerId('current-location'),
-                  position: latLng,
-                  infoWindow: const InfoWindow(title: 'Vị trí hiện tại'),
-                ),
-                child: _customCurrentLocationMarkerWidget(),
-              ),
-            ];
-          }
-        });
-
-        if (_controller != null && _rentalLatLng == null) {
-          _controller?.animateCamera(CameraUpdate.newLatLngZoom(latLng, 16));
-        }
-      } else {
-        setState(() => _errorMessage = 'Không lấy được tọa độ hiện tại.');
-      }
-    } catch (e) {
-      setState(() {
-        _errorMessage = 'Lỗi khi lấy vị trí hiện tại: $e';
-      });
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.white,
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        leading: IconButton(
-          onPressed: () => Navigator.pop(context),
-          icon: const Icon(Icons.arrow_back, color: Colors.black),
-        ),
-        title: Text(
-          widget.title,
-          style: const TextStyle(
-            color: Colors.black,
-            fontSize: 17,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-      ),
-      body: Column(
-        children: [
-          if (_errorMessage != null)
-            Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Text(
-                _errorMessage!,
-                style: const TextStyle(color: Colors.red, fontSize: 14),
-              ),
-            ),
-          Expanded(
-            child: _isMapLoading
-                ? const Center(child: CircularProgressIndicator())
-                : CustomGoogleMapMarkerBuilder(
-                    customMarkers: _customMarkers,
-                    builder: (BuildContext context, Set<Marker>? markers) {
-                      return GoogleMap(
-                        mapType: MapType.normal,
-                        initialCameraPosition: CameraPosition(
-                          target: _rentalLatLng ??
-                              _currentLatLng ??
-                              const LatLng(10.0, 105.0),
-                          zoom: 16.0,
-                        ),
-                        onMapCreated: (GoogleMapController controller) {
-                          _controller = controller;
-                          if (_rentalLatLng != null) {
-                            controller.animateCamera(
-                              CameraUpdate.newLatLngZoom(_rentalLatLng!, 16),
-                            );
-                          } else if (_currentLatLng != null) {
-                            controller.animateCamera(
-                              CameraUpdate.newLatLngZoom(_currentLatLng!, 16),
-                            );
-                          }
-                        },
-                        markers: markers ?? {},
-                        myLocationEnabled: true,
-                        myLocationButtonEnabled: true,
-                        zoomControlsEnabled: true,
-                        scrollGesturesEnabled: true,
-                        rotateGesturesEnabled: true,
-                        tiltGesturesEnabled: true,
-                      );
-                    },
-                  ),
-          ),
-          Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Text(
-              widget.address,
-              style: const TextStyle(fontSize: 14, color: Colors.black87),
-              textAlign: TextAlign.center,
-            ),
-          ),
-        ],
-      ),
-    );
   }
 }

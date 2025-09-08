@@ -83,18 +83,6 @@ class ConversationList extends StatelessWidget {
     return Center(
       child: Container(
         padding: const EdgeInsets.all(24),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.blue.shade100.withOpacity(0.2),
-              blurRadius: 8,
-              spreadRadius: 1,
-              offset: const Offset(0, 2),
-            ),
-          ],
-        ),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           mainAxisSize: MainAxisSize.min,
@@ -102,7 +90,7 @@ class ConversationList extends StatelessWidget {
             AnimatedScale(
               scale: 1.0,
               duration: const Duration(milliseconds: 200),
-              child: Icon(icon, size: 64, color: Colors.grey.shade400),
+              child: Icon(icon, size: 64, color: Colors.black54),
             ),
             const SizedBox(height: 16),
             Text(
@@ -110,7 +98,7 @@ class ConversationList extends StatelessWidget {
               style: TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.w500,
-                color: Colors.grey.shade600,
+                color: Colors.black54,
                 letterSpacing: 0.2,
               ),
               textAlign: TextAlign.center,

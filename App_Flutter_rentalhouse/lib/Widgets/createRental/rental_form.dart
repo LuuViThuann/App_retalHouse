@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_rentalhouse/models/rental.dart';
 import 'package:flutter_rentalhouse/viewmodels/vm_auth.dart';
-
-import '../../models/rental.dart';
 
 class FormStateManager {
   final AuthViewModel authViewModel;
@@ -65,6 +64,8 @@ class FormStateManager {
     required String propertyType,
     required String status,
     required String userId,
+    double? latitude, // Add latitude parameter
+    double? longitude, // Add longitude parameter
   }) {
     final rawPrice = priceController!.text.replaceAll(RegExp(r'[^\d]'), '');
     final rawDeposit =
@@ -89,6 +90,8 @@ class FormStateManager {
       location: {
         'short': locationShortController!.text.trim(),
         'fullAddress': locationFullAddressController!.text.trim(),
+        if (latitude != null) 'latitude': latitude,
+        if (longitude != null) 'longitude': longitude,
       },
       propertyType: propertyType,
       furniture: furnitureController!.text

@@ -16,7 +16,6 @@ class _NewAddressPageState extends State<NewAddressPage> {
   final _formKey = GlobalKey<FormState>();
   final _streetController = TextEditingController();
   bool isDefault = false;
-  String addressType = 'Văn Phòng';
 
   List<dynamic> provinces = [];
   List<Map<String, dynamic>> districts = [];
@@ -107,7 +106,7 @@ class _NewAddressPageState extends State<NewAddressPage> {
       selectedWard,
       selectedDistrict,
       selectedProvince,
-      if (addressType.isNotEmpty) '($addressType)',
+      'Việt Nam',
       if (isDefault) '(Mặc định)',
     ];
     return parts.where((part) => part != null && part.isNotEmpty).join(', ');
@@ -136,17 +135,16 @@ class _NewAddressPageState extends State<NewAddressPage> {
             const SizedBox(height: 12),
             _buildWardSelector(),
             const SizedBox(height: 12),
-            _buildTextField('Tên đường, Tòa nhà, Số nhà'),
+            _buildTextField('Tên đường, Tòa nhà, Số nhà *'),
             const SizedBox(height: 24),
             _buildDefaultSwitch(),
             const SizedBox(height: 12),
-            _buildAddressType(),
-            const SizedBox(height: 32),
             ElevatedButton(
               onPressed: () async {
                 if (_formKey.currentState!.validate()) {
                   if (selectedProvince == null ||
                       selectedDistrict == null ||
+                      selectedWard == null ||
                       _streetController.text.isEmpty) {
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(
@@ -281,7 +279,7 @@ class _NewAddressPageState extends State<NewAddressPage> {
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text(selectedProvince ?? 'Tỉnh/Thành phố'),
+            Text(selectedProvince ?? 'Tỉnh/Thành phố *'),
             const Icon(Icons.chevron_right),
           ],
         ),
@@ -351,7 +349,7 @@ class _NewAddressPageState extends State<NewAddressPage> {
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text(selectedDistrict ?? 'Chọn Quận/Huyện'),
+            Text(selectedDistrict ?? 'Chọn Quận/Huyện *'),
             const Icon(Icons.chevron_right),
           ],
         ),
@@ -418,7 +416,7 @@ class _NewAddressPageState extends State<NewAddressPage> {
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text(selectedWard ?? 'Chọn Xã/Phường'),
+            Text(selectedWard ?? 'Chọn Xã/Phường *'),
             const Icon(Icons.chevron_right),
           ],
         ),
@@ -440,27 +438,6 @@ class _NewAddressPageState extends State<NewAddressPage> {
           inactiveTrackColor: Colors.grey[300],
         ),
       ],
-    );
-  }
-
-  Widget _buildAddressType() {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-      children: [
-        _addressTypeChip("Văn Phòng"),
-        _addressTypeChip("Nhà Riêng"),
-      ],
-    );
-  }
-
-  Widget _addressTypeChip(String type) {
-    final isSelected = addressType == type;
-    return ChoiceChip(
-      label: Text(type),
-      selected: isSelected,
-      onSelected: (_) => setState(() => addressType = type),
-      selectedColor: Colors.blueAccent,
-      labelStyle: TextStyle(color: isSelected ? Colors.white : Colors.black),
     );
   }
 }

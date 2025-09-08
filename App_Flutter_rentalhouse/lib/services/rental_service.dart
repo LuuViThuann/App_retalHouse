@@ -1,6 +1,6 @@
+import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
 import 'package:provider/provider.dart';
 import '../config/api_routes.dart';
 import '../models/rental.dart';
@@ -8,25 +8,58 @@ import '../services/auth_service.dart';
 import '../viewmodels/vm_auth.dart';
 
 class RentalService {
-  Future<List<Rental>> fetchRentals() async {
+  Future<List<Rental>> fetchRentals({
+    int page = 1,
+    int limit = 10,
+    String? token,
+  }) async {
     try {
-      final response = await http.get(
-        Uri.parse('${ApiRoutes.baseUrl}/rentals'),
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      );
+      final uri =
+          Uri.parse('${ApiRoutes.baseUrl}/rentals?page=$page&limit=$limit');
+      final headers = {
+        'Content-Type': 'application/json',
+        if (token != null) 'Authorization': 'Bearer $token',
+      };
+
+      final response = await http.get(uri, headers: headers);
 
       if (response.statusCode == 200) {
-        final List<dynamic> data = jsonDecode(response.body);
-        return data.map((json) => Rental.fromJson(json)).toList();
+        final data = jsonDecode(response.body);
+        final List<dynamic> rentalsData = data['rentals'] ?? [];
+        return rentalsData.map((json) => Rental.fromJson(json)).toList();
       } else {
         throw Exception(
-            'Failed to fetch rentals: ${response.statusCode}, Body: ${response.body}');
+            'Failed to fetch rentals: Status ${response.statusCode}, Body: ${response.body}');
       }
     } catch (e) {
-      print('Exception fetching rentals: $e');
-      throw Exception('Error fetching rentals: $e');
+      debugPrint('Error fetching rentals: $e');
+      throw Exception('Lỗi khi tải danh sách nhà trọ: $e');
+    }
+  }
+
+  Future<Rental?> fetchRentalById({
+    required String rentalId,
+    String? token,
+  }) async {
+    try {
+      final uri = Uri.parse('${ApiRoutes.baseUrl}/rentals/$rentalId');
+      final headers = {
+        'Content-Type': 'application/json',
+        if (token != null) 'Authorization': 'Bearer $token',
+      };
+
+      final response = await http.get(uri, headers: headers);
+
+      if (response.statusCode == 200) {
+        return Rental.fromJson(jsonDecode(response.body));
+      } else {
+        debugPrint(
+            'Error fetching rental $rentalId: Status ${response.statusCode}, Body: ${response.body}');
+        return null;
+      }
+    } catch (e) {
+      debugPrint('Exception fetching rental $rentalId: $e');
+      return null;
     }
   }
 
@@ -35,10 +68,19 @@ class RentalService {
     required Function(double, int) onSuccess,
     required Function(String) onError,
     required BuildContext context,
+    String? token,
   }) async {
     try {
-      final response =
-          await http.get(Uri.parse('${ApiRoutes.rentals}/${rental.id}'));
+      final headers = {
+        'Content-Type': 'application/json',
+        if (token != null) 'Authorization': 'Bearer $token',
+      };
+
+      final response = await http.get(
+        Uri.parse('${ApiRoutes.baseUrl}/rentals/${rental.id}'),
+        headers: headers,
+      );
+
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         final averageRating =
@@ -46,10 +88,11 @@ class RentalService {
         final reviewCount = (data['comments'] as List<dynamic>?)?.length ?? 0;
         onSuccess(averageRating, reviewCount);
       } else {
-        onError('Không thể tải thông tin: ${response.statusCode}');
+        onError('Không thể tải thông tin chi tiết: ${response.statusCode}');
       }
     } catch (e) {
-      onError('Lỗi khi tải thông tin: $e');
+      debugPrint('Error fetching rental details: $e');
+      onError('Lỗi khi tải thông tin chi tiết: $e');
     }
   }
 
@@ -86,10 +129,12 @@ class RentalService {
             .any((favorite) => favorite['rentalId']['_id'] == rental.id);
         onSuccess(isFavorited);
       } else {
-        onError('Không thể tải trạng thái yêu thích: ${response.statusCode}');
+        onError(
+            'Không thể kiểm tra trạng thái yêu thích: ${response.statusCode}');
         onSuccess(false);
       }
     } catch (e) {
+      debugPrint('Error checking favorite status: $e');
       onError('Lỗi khi kiểm tra trạng thái yêu thích: $e');
       onSuccess(false);
     }
@@ -110,7 +155,9 @@ class RentalService {
 
     try {
       final token = await AuthService().getIdToken();
-      if (token == null) throw Exception('No valid token found');
+      if (token == null) {
+        throw Exception('Không tìm thấy token xác thực');
+      }
 
       final url = isFavorite
           ? '${ApiRoutes.baseUrl}/favorites/${rental.id}'
@@ -135,39 +182,109 @@ class RentalService {
       if (response.statusCode == 200 || response.statusCode == 201) {
         onSuccess(!isFavorite);
       } else {
-        throw Exception('Failed to toggle favorite: ${response.body}');
+        throw Exception(
+            'Không thể cập nhật yêu thích: ${response.statusCode}, ${response.body}');
       }
     } catch (e) {
+      debugPrint('Error toggling favorite: $e');
       onError('Lỗi khi cập nhật yêu thích: $e');
     }
   }
 
-  Future<Rental?> fetchRentalById({
-    required String rentalId,
-    required String? token,
+  Future<void> createRental({
+    required Rental rental,
+    required List<String> imagePaths,
+    required String token,
+    required Function(Rental) onSuccess,
+    required Function(String) onError,
   }) async {
-    if (token == null || token.isEmpty) {
-      print('Fetch rental $rentalId failed: No token provided.');
-      return null;
-    }
     try {
-      final response = await http.get(
-        Uri.parse('${ApiRoutes.baseUrl}/rentals/$rentalId'),
+      final response = await http.post(
+        Uri.parse('${ApiRoutes.baseUrl}/rentals'),
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $token',
         },
+        body: jsonEncode({
+          ...rental.toJson(),
+          'images': imagePaths,
+          'latitude': rental.location['latitude'],
+          'longitude': rental.location['longitude'],
+        }),
       );
-      if (response.statusCode == 200) {
-        return Rental.fromJson(jsonDecode(response.body));
+
+      if (response.statusCode == 201) {
+        final createdRental = Rental.fromJson(jsonDecode(response.body));
+        onSuccess(createdRental);
       } else {
-        print(
-            'Error fetching rental $rentalId: Status ${response.statusCode}, Body: ${response.body}');
-        return null;
+        throw Exception(
+            'Không thể tạo nhà trọ: ${response.statusCode}, ${response.body}');
       }
     } catch (e) {
-      print('Exception fetching rental $rentalId: $e');
-      return null;
+      debugPrint('Error creating rental: $e');
+      onError('Lỗi khi tạo nhà trọ: $e');
+    }
+  }
+
+  Future<void> updateRental({
+    required Rental rental,
+    required String token,
+    required Function(Rental) onSuccess,
+    required Function(String) onError,
+  }) async {
+    try {
+      final response = await http.patch(
+        Uri.parse('${ApiRoutes.baseUrl}/rentals/${rental.id}'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode({
+          ...rental.toJson(),
+          'latitude': rental.location['latitude'],
+          'longitude': rental.location['longitude'],
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        final updatedRental = Rental.fromJson(jsonDecode(response.body));
+        onSuccess(updatedRental);
+      } else {
+        throw Exception(
+            'Không thể cập nhật nhà trọ: ${response.statusCode}, ${response.body}');
+      }
+    } catch (e) {
+      debugPrint('Error updating rental: $e');
+      onError('Lỗi khi cập nhật nhà trọ: $e');
+    }
+  }
+
+  Future<List<Rental>> fetchNearbyRentals({
+    required String rentalId,
+    double radius = 5.0,
+    String? token,
+  }) async {
+    try {
+      final uri = Uri.parse(
+          '${ApiRoutes.baseUrl}/rentals/nearby/$rentalId?radius=$radius');
+      final headers = {
+        'Content-Type': 'application/json',
+        if (token != null) 'Authorization': 'Bearer $token',
+      };
+
+      final response = await http.get(uri, headers: headers);
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        final List<dynamic> rentalsData = data['rentals'] ?? [];
+        return rentalsData.map((json) => Rental.fromJson(json)).toList();
+      } else {
+        throw Exception(
+            'Failed to fetch nearby rentals: ${response.statusCode}, ${response.body}');
+      }
+    } catch (e) {
+      debugPrint('Error fetching nearby rentals: $e');
+      throw Exception('Lỗi khi tải nhà trọ gần đây: $e');
     }
   }
 }

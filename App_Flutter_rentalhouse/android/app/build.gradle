@@ -8,7 +8,7 @@ plugins {
 android {
     namespace 'io.flutter.plugins.googleapiheaders'
     namespace = "com.example.flutter_rentalhouse"
-    compileSdk = 35
+    compileSdk = 36
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
@@ -21,12 +21,12 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.example.flutter_rentalhouse"
-        minSdk = 23
-        targetSdk = flutter.targetSdkVersion
-        versionCode = flutter.versionCode
-        versionName = flutter.versionName
-        multiDexEnabled = true
+        applicationId "com.example.flutter_rentalhouse"
+        minSdkVersion flutter.minSdkVersion
+        targetSdkVersion flutter.targetSdkVersion
+        versionCode flutter.versionCode
+        versionName flutter.versionName
+        multiDexEnabled true
     }
 
     buildTypes {

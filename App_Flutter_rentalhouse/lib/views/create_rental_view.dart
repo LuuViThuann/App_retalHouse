@@ -35,6 +35,9 @@ class _CreateRentalScreenState extends State<CreateRentalScreen> {
       ValueNotifier<String?>(null);
   final ValueNotifier<String> _statusNotifier =
       ValueNotifier<String>('Đang hoạt động');
+  final ValueNotifier<double?> _latitudeNotifier = ValueNotifier<double?>(null);
+  final ValueNotifier<double?> _longitudeNotifier =
+      ValueNotifier<double?>(null);
 
   @override
   void initState() {
@@ -42,7 +45,6 @@ class _CreateRentalScreenState extends State<CreateRentalScreen> {
     _formStateManager = FormStateManager(
       authViewModel: Provider.of<AuthViewModel>(context, listen: false),
     );
-    _formStateManager.initializeControllers();
   }
 
   @override
@@ -51,6 +53,8 @@ class _CreateRentalScreenState extends State<CreateRentalScreen> {
     _imagesNotifier.dispose();
     _propertyTypeNotifier.dispose();
     _statusNotifier.dispose();
+    _latitudeNotifier.dispose();
+    _longitudeNotifier.dispose();
     super.dispose();
   }
 
@@ -106,6 +110,8 @@ class _CreateRentalScreenState extends State<CreateRentalScreen> {
         status:
             _statusNotifier.value == 'Đang hoạt động' ? 'available' : 'rented',
         userId: authViewModel.currentUser!.id,
+        latitude: _latitudeNotifier.value,
+        longitude: _longitudeNotifier.value,
       );
 
       try {
@@ -125,10 +131,16 @@ class _CreateRentalScreenState extends State<CreateRentalScreen> {
             );
             Navigator.pop(context, true);
           } else {
+            String errorMessage = rentalViewModel.errorMessage!;
+            if (errorMessage.contains('Failed to geocode address')) {
+              errorMessage =
+                  'Địa chỉ không hợp lệ. Vui lòng kiểm tra lại hoặc chọn từ bản đồ.';
+            }
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
-                content: Text('Lỗi: ${rentalViewModel.errorMessage!}'),
+                content: Text('Lỗi: $errorMessage'),
                 backgroundColor: Colors.redAccent,
+                duration: const Duration(seconds: 5),
               ),
             );
           }
@@ -189,6 +201,9 @@ class _CreateRentalScreenState extends State<CreateRentalScreen> {
                 shortController: _formStateManager.locationShortController!,
                 fullAddressController:
                     _formStateManager.locationFullAddressController!,
+                latitudeNotifier: _latitudeNotifier,
+                longitudeNotifier: _longitudeNotifier,
+                
               ),
               PropertyDetailsForm(
                 propertyTypeNotifier: _propertyTypeNotifier,

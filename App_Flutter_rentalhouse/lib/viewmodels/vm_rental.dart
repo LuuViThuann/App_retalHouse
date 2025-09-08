@@ -1,11 +1,14 @@
 import 'package:flutter/foundation.dart';
+import 'package:flutter_rentalhouse/services/rental_service.dart';
 import '../services/api_service.dart';
 import '../models/rental.dart';
 
 class RentalViewModel extends ChangeNotifier {
   final ApiService _apiService = ApiService();
+  final RentalService _rentalService = RentalService();
   List<Rental> _rentals = [];
   List<Rental> _searchResults = [];
+  List<Rental> _nearbyRentals = [];
   bool _isLoading = false;
   String? _errorMessage;
   int _total = 0;
@@ -14,6 +17,7 @@ class RentalViewModel extends ChangeNotifier {
 
   List<Rental> get rentals => _rentals;
   List<Rental> get searchResults => _searchResults;
+  List<Rental> get nearbyRentals => _nearbyRentals;
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
   int get total => _total;
@@ -97,6 +101,21 @@ class RentalViewModel extends ChangeNotifier {
     }
   }
 
+  Future<void> fetchNearbyRentals(String rentalId,
+      {double radius = 5.0}) async {
+    _isLoading = true;
+    _errorMessage = null;
+    notifyListeners();
+
+    try {
+      _nearbyRentals = await _rentalService.fetchNearbyRentals(
+          rentalId: rentalId, radius: radius); // Updated to use RentalService
+    } catch (e) {
+      _errorMessage = e.toString();
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
   // new -------
-  
 }
