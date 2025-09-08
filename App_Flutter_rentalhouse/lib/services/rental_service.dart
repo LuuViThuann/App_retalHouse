@@ -261,7 +261,7 @@ class RentalService {
 
   Future<List<Rental>> fetchNearbyRentals({
     required String rentalId,
-    double radius = 5.0,
+    double radius = 2.0, // Giảm bán kính mặc định xuống 2km
     String? token,
   }) async {
     try {
@@ -277,6 +277,9 @@ class RentalService {
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         final List<dynamic> rentalsData = data['rentals'] ?? [];
+        if (data['warning'] != null) {
+          debugPrint('Warning from server: ${data['warning']}');
+        }
         return rentalsData.map((json) => Rental.fromJson(json)).toList();
       } else {
         throw Exception(

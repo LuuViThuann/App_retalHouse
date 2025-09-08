@@ -11,6 +11,7 @@ class RentalViewModel extends ChangeNotifier {
   List<Rental> _nearbyRentals = [];
   bool _isLoading = false;
   String? _errorMessage;
+  String? _warningMessage;
   int _total = 0;
   int _page = 1;
   int _pages = 1;
@@ -20,6 +21,7 @@ class RentalViewModel extends ChangeNotifier {
   List<Rental> get nearbyRentals => _nearbyRentals;
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
+  String? get warningMessage => _warningMessage;
   int get total => _total;
   int get page => _page;
   int get pages => _pages;
@@ -102,14 +104,15 @@ class RentalViewModel extends ChangeNotifier {
   }
 
   Future<void> fetchNearbyRentals(String rentalId,
-      {double radius = 5.0}) async {
+      {double radius = 2.0}) async {
     _isLoading = true;
     _errorMessage = null;
+    _warningMessage = null; // Reset warning
     notifyListeners();
 
     try {
       _nearbyRentals = await _rentalService.fetchNearbyRentals(
-          rentalId: rentalId, radius: radius); // Updated to use RentalService
+          rentalId: rentalId, radius: radius);
     } catch (e) {
       _errorMessage = e.toString();
     } finally {

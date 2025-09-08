@@ -964,7 +964,7 @@ router.patch('/rentals/fix-coordinates/:id', authMiddleware, async (req, res) =>
 
 router.get('/rentals/nearby/:id', async (req, res) => {
   try {
-    const { radius = 5, page = 1, limit = 10 } = req.query;
+    const { radius = 10, page = 1, limit = 10 } = req.query; // Giảm bán kính mặc định xuống 2km
     const skip = (Number(page) - 1) * Number(limit);
 
     console.log(`Fetching nearby rentals for ID: ${req.params.id} with radius: ${radius}km, page: ${page}, limit: ${limit}`);
@@ -987,7 +987,7 @@ router.get('/rentals/nearby/:id', async (req, res) => {
     });
 
     const coordinates = rental.location?.coordinates?.coordinates;
-    if (!coordinates || !Array.isArray(coordinates) || coordinates.length !== 2) {
+    if (!coordinates || !Array.isArray(coordinates) || coordinates.length !== 2) { 
       console.log('Invalid coordinates structure:', coordinates);
       return res.status(400).json({ message: 'Rental has invalid coordinate structure' });
     }
@@ -1003,8 +1003,22 @@ router.get('/rentals/nearby/:id', async (req, res) => {
 
     if (longitude === 0 && latitude === 0) {
       console.log('Coordinates are both zero - likely invalid');
-      return res.status(400).json({ 
-        message: 'Rental coordinates not set properly. Please update using /rentals/fix-coordinates/:id.' 
+      // Trả về danh sách các nhà trọ khác trong cùng phường để gợi ý
+      const nearbyRentals = await Rental.find({
+        _id: { $ne: new mongoose.Types.ObjectId(req.params.id) },
+        status: 'available',
+        'location.fullAddress': { $regex: 'Phường Bình Thủy', $options: 'i' },
+      })
+        .skip(skip)
+        .limit(Number(limit))
+        .lean();
+
+      return res.json({
+        rentals: nearbyRentals,
+        total: nearbyRentals.length,
+        page: Number(page),
+        pages: Math.ceil(nearbyRentals.length / Number(limit)),
+        warning: 'Rental coordinates are invalid ([0, 0]). Showing rentals in the same ward instead.'
       });
     }
 
@@ -1047,6 +1061,7 @@ router.get('/rentals/nearby/:id', async (req, res) => {
           propertyType: 1,
           createdAt: 1,
           geocodingStatus: 1,
+          distance: 1, // Thêm khoảng cách vào kết quả
         },
       },
     ]);
@@ -1060,16 +1075,15 @@ router.get('/rentals/nearby/:id', async (req, res) => {
         latitude: rental.location?.coordinates?.coordinates?.[1] || 0,
         longitude: rental.location?.coordinates?.coordinates?.[0] || 0,
       },
+      distance: (rental.distance / 1000).toFixed(2), // Chuyển đổi khoảng cách sang km
     }));
 
-    const result = {
+    res.json({
       rentals: transformedRentals,
       total,
       page: Number(page),
       pages: Math.ceil(total / Number(limit)),
-    };
-
-    res.json(result);
+    });
   } catch (err) {
     console.error('Error fetching nearby rentals:', err);
     if (err.name === 'CastError') {

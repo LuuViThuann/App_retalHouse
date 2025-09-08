@@ -137,7 +137,8 @@ class _RentalMapViewState extends State<RentalMapView> {
     try {
       final rentalViewModel =
           Provider.of<RentalViewModel>(context, listen: false);
-      await rentalViewModel.fetchNearbyRentals(widget.rental.id, radius: 5.0);
+      await rentalViewModel.fetchNearbyRentals(widget.rental.id,
+          radius: 10.0); // Giảm bán kính xuống 2km
       _updateMarkers();
     } catch (e) {
       setState(() {
@@ -222,27 +223,26 @@ class _RentalMapViewState extends State<RentalMapView> {
     final rentalViewModel =
         Provider.of<RentalViewModel>(context, listen: false);
     for (var rental in rentalViewModel.nearbyRentals) {
-      if (rental.location['latitude'] != null &&
-          rental.location['longitude'] != null &&
-          rental.id != widget.rental.id) {
-        markers.add(
-          Marker(
-            markerId: MarkerId(rental.id),
-            position: LatLng(
-              rental.location['latitude'] as double,
-              rental.location['longitude'] as double,
-            ),
-            infoWindow: InfoWindow(
-              title: rental.title,
-              snippet:
-                  '${formatCurrency(rental.price)} • ${rental.location['fullAddress']}',
-            ),
-            icon: BitmapDescriptor.defaultMarkerWithHue(
-                BitmapDescriptor.hueGreen),
-            onTap: () => _showRentalInfo(rental),
+      // Hiển thị marker ngay cả khi tọa độ là [0, 0] để người dùng nhận biết
+      final latitude = rental.location['latitude'] as double? ?? 0.0;
+      final longitude = rental.location['longitude'] as double? ?? 0.0;
+      markers.add(
+        Marker(
+          markerId: MarkerId(rental.id),
+          position: LatLng(latitude, longitude),
+          infoWindow: InfoWindow(
+            title: rental.title,
+            snippet:
+                '${formatCurrency(rental.price)} • ${rental.location['fullAddress']}${latitude == 0 && longitude == 0 ? ' (Cần cập nhật tọa độ)' : ''}',
           ),
-        );
-      }
+          icon: latitude == 0 && longitude == 0
+              ? BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor
+                  .hueYellow) // Màu vàng cho tọa độ không hợp lệ
+              : BitmapDescriptor.defaultMarkerWithHue(
+                  BitmapDescriptor.hueGreen),
+          onTap: () => _showRentalInfo(rental),
+        ),
+      );
     }
 
     setState(() {
@@ -372,6 +372,16 @@ class _RentalMapViewState extends State<RentalMapView> {
                               maxLines: 2,
                               overflow: TextOverflow.ellipsis,
                             ),
+                            if (rental.location['latitude'] == 0 &&
+                                rental.location['longitude'] == 0)
+                              Text(
+                                'Cần cập nhật tọa độ',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.red[600],
+                                  fontStyle: FontStyle.italic,
+                                ),
+                              ),
                           ],
                         ),
                       ),
@@ -493,6 +503,26 @@ class _RentalMapViewState extends State<RentalMapView> {
                     ],
                   ),
                 ),
+              if (rentalViewModel.warningMessage != null)
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(16.0),
+                  color: Colors.yellow[50],
+                  child: Row(
+                    children: [
+                      Icon(Icons.warning_amber,
+                          color: Colors.yellow[700], size: 20),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          rentalViewModel.warningMessage!,
+                          style: TextStyle(
+                              color: Colors.yellow[800], fontSize: 14),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               Expanded(
                 child: _isMapLoading
                     ? const Center(child: CircularProgressIndicator())
@@ -594,7 +624,15 @@ class _RentalMapViewState extends State<RentalMapView> {
                     ],
                   ),
                 )
-              else if (rentalViewModel.nearbyRentals.isNotEmpty)
+              else if (rentalViewModel.nearbyRentals.isEmpty)
+                Container(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Text(
+                    'Không tìm thấy nhà trọ gần đây trong bán kính gần đây !',
+                    style: TextStyle(color: Colors.grey[600]),
+                  ),
+                )
+              else
                 Container(
                   height: 160,
                   padding: const EdgeInsets.symmetric(vertical: 8.0),
@@ -709,6 +747,17 @@ class _RentalMapViewState extends State<RentalMapView> {
                                               color: Colors.green.shade700,
                                             ),
                                           ),
+                                          if (rental.location['latitude'] ==
+                                                  0 &&
+                                              rental.location['longitude'] == 0)
+                                            Text(
+                                              'Cần cập nhật tọa độ',
+                                              style: TextStyle(
+                                                fontSize: 12,
+                                                color: Colors.red[600],
+                                                fontStyle: FontStyle.italic,
+                                              ),
+                                            ),
                                         ],
                                       ),
                                     ),
