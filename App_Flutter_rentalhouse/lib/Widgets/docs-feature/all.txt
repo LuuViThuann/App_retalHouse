@@ -14,4 +14,4 @@
 
 - Khi chọn địa chỉ trong bài viết hiển thị trên ggMap và gợi ý các bài trong khu vực đó
 
-- Lỗi xóa cuộc trò chuyện : "I/flutter (11874): ChatViewModel: Delete conversation status: 403, body: {"message":"Unauthorized or conversation not found"}"
+- Chưa điều chỉnh cập nhật tọa độ khi thay đổi địa chỉ trong profile và chỉnh sửa bài đăng 

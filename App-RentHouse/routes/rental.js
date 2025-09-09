@@ -146,8 +146,10 @@ const normalizeVietnameseAddress = (address) => {
     simplifiedAddress = `${normalized}, Việt Nam`;
   }
   
-  // Địa chỉ tối thiểu: chỉ thành phố
-  const minimalAddress = `Cần Thơ, Việt Nam`;
+  // Địa chỉ tối thiểu: chỉ thành phố ---------------------------------------
+  const city = parts[parts.length - 1] || 'Việt Nam';
+  const minimalAddress = `${city}, Việt Nam`;
+  // ----------------------------------------
 
   return { full: fullAddress, simplified: simplifiedAddress, minimal: minimalAddress };
 };
@@ -964,7 +966,7 @@ router.patch('/rentals/fix-coordinates/:id', authMiddleware, async (req, res) =>
 
 router.get('/rentals/nearby/:id', async (req, res) => {
   try {
-    const { radius = 10, page = 1, limit = 10 } = req.query; // Giảm bán kính mặc định xuống 2km
+    const { radius = 10, page = 1, limit = 10 } = req.query; // Xác định bán kính cần tìm ---------------
     const skip = (Number(page) - 1) * Number(limit);
 
     console.log(`Fetching nearby rentals for ID: ${req.params.id} with radius: ${radius}km, page: ${page}, limit: ${limit}`);
@@ -985,7 +987,7 @@ router.get('/rentals/nearby/:id', async (req, res) => {
       coordinates: rental.location?.coordinates?.coordinates,
       geocodingStatus: rental.geocodingStatus,
     });
-
+    
     const coordinates = rental.location?.coordinates?.coordinates;
     if (!coordinates || !Array.isArray(coordinates) || coordinates.length !== 2) { 
       console.log('Invalid coordinates structure:', coordinates);

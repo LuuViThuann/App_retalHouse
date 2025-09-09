@@ -138,7 +138,7 @@ class _RentalMapViewState extends State<RentalMapView> {
       final rentalViewModel =
           Provider.of<RentalViewModel>(context, listen: false);
       await rentalViewModel.fetchNearbyRentals(widget.rental.id,
-          radius: 10.0); // Giảm bán kính xuống 2km
+          radius: 10.0); // Chỉnh sửa bán kính tìm kiếm
       _updateMarkers();
     } catch (e) {
       setState(() {
