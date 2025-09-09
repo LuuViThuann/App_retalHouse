@@ -256,6 +256,299 @@ class _RentalMapViewState extends State<RentalMapView> {
     return formatter.format(amount);
   }
 
+// Thêm widget hiển thị gợi ý nhà trọ gần đây vào RentalMapView
+  Widget _buildNearbyRentalsSuggestions() {
+    final rentalViewModel = Provider.of<RentalViewModel>(context);
+
+    if (rentalViewModel.isLoading) {
+      return Container(
+        padding: const EdgeInsets.all(16.0),
+        child: const Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            SizedBox(
+              width: 20,
+              height: 20,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            ),
+            SizedBox(width: 12),
+            Text('Đang tải gợi ý nhà trọ gần đây...'),
+          ],
+        ),
+      );
+    }
+
+    if (rentalViewModel.nearbyRentals.isEmpty) {
+      return Container(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          children: [
+            Icon(Icons.location_searching, size: 48, color: Colors.grey[400]),
+            const SizedBox(height: 8),
+            Text(
+              'Không tìm thấy nhà trọ gần đây',
+              style: TextStyle(
+                color: Colors.grey[600],
+                fontSize: 16,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Hãy thử tăng bán kính tìm kiếm hoặc kiểm tra lại vị trí',
+              style: TextStyle(
+                color: Colors.grey[500],
+                fontSize: 14,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      );
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 8.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16.0),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    color: Colors.green.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Icon(Icons.location_on,
+                      color: Colors.green[600], size: 20),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Gợi ý nhà trọ gần đây',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.black87,
+                        ),
+                      ),
+                      if (rentalViewModel.warningMessage != null)
+                        Text(
+                          rentalViewModel.warningMessage!,
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.orange[700],
+                            fontStyle: FontStyle.italic,
+                          ),
+                        ),
+                      Text(
+                        'Tìm thấy ${rentalViewModel.nearbyRentals.length} nhà trọ',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey[600],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                TextButton.icon(
+                  onPressed: () {
+                    // Refresh nearby rentals với bán kính lớn hơn
+                    _fetchNearbyRentals();
+                  },
+                  icon: Icon(Icons.refresh, size: 16, color: Colors.blue[600]),
+                  label: Text(
+                    'Làm mới',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.blue[600],
+                    ),
+                  ),
+                  style: TextButton.styleFrom(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    minimumSize: Size.zero,
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            height: 160,
+            child: ListView.builder(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              itemCount: rentalViewModel.nearbyRentals.length,
+              itemBuilder: (context, index) {
+                final rental = rentalViewModel.nearbyRentals[index];
+
+                // Skip nếu là chính rental hiện tại
+                if (rental.id == widget.rental.id) {
+                  return const SizedBox.shrink();
+                }
+
+                final imageUrl = rental.images.isNotEmpty
+                    ? '${ApiRoutes.baseUrl.replaceAll('/api', '')}${rental.images[0]}'
+                    : '';
+
+                final bool hasValidCoords =
+                    rental.location['latitude'] != 0.0 ||
+                        rental.location['longitude'] != 0.0;
+
+                return GestureDetector(
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) =>
+                            RentalDetailScreen(rental: rental),
+                      ),
+                    );
+                  },
+                  child: Container(
+                    width: 220,
+                    margin: const EdgeInsets.only(right: 12),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.grey[300]!),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.grey.withOpacity(0.1),
+                          spreadRadius: 1,
+                          blurRadius: 6,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                      color: Colors.white,
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Stack(
+                          children: [
+                            ClipRRect(
+                              borderRadius: const BorderRadius.vertical(
+                                  top: Radius.circular(12)),
+                              child: CachedNetworkImage(
+                                imageUrl: imageUrl,
+                                height: 90,
+                                width: double.infinity,
+                                fit: BoxFit.cover,
+                                placeholder: (context, url) => Container(
+                                  height: 90,
+                                  color: Colors.grey[200],
+                                  child: Center(
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      valueColor: AlwaysStoppedAnimation<Color>(
+                                          Colors.grey[400]!),
+                                    ),
+                                  ),
+                                ),
+                                errorWidget: (context, url, error) => Container(
+                                  height: 90,
+                                  color: Colors.grey[200],
+                                  child: Icon(Icons.home,
+                                      color: Colors.grey[400], size: 32),
+                                ),
+                              ),
+                            ),
+                            if (!hasValidCoords)
+                              Positioned(
+                                top: 8,
+                                right: 8,
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 6, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: Colors.orange[600],
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                  child: const Text(
+                                    'Cần cập nhật vị trí',
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
+                        Expanded(
+                          child: Padding(
+                            padding: const EdgeInsets.all(12.0),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  rental.title,
+                                  style: const TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.black87,
+                                  ),
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                const SizedBox(height: 6),
+                                Text(
+                                  formatCurrency(rental.price),
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.green.shade700,
+                                  ),
+                                ),
+                                const Spacer(),
+                                Row(
+                                  children: [
+                                    Icon(Icons.location_on,
+                                        size: 14,
+                                        color: hasValidCoords
+                                            ? Colors.green[600]
+                                            : Colors.orange[600]),
+                                    const SizedBox(width: 4),
+                                    Expanded(
+                                      child: Text(
+                                        rental.location['short'] ??
+                                            rental.location['fullAddress'] ??
+                                            'Chưa có địa chỉ',
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          color: Colors.grey[600],
+                                        ),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildCustomInfoWindow() {
     if (!_showCustomInfo || _selectedRental == null)
       return const SizedBox.shrink();

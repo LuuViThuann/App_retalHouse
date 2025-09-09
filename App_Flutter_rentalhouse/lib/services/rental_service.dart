@@ -259,14 +259,15 @@ class RentalService {
     }
   }
 
-  Future<List<Rental>> fetchNearbyRentals({
+  // Cập nhật method fetchNearbyRentals trong RentalService
+  Future<Map<String, dynamic>> fetchNearbyRentals({
     required String rentalId,
-    double radius = 2.0, // Giảm bán kính mặc định xuống 2km
+    double radius = 10.0,
     String? token,
   }) async {
     try {
       final uri = Uri.parse(
-          '${ApiRoutes.baseUrl}/rentals/nearby/$rentalId?radius=$radius');
+          '${ApiRoutes.baseUrl}/rentals/nearby/$rentalId?radius=$radius&limit=10');
       final headers = {
         'Content-Type': 'application/json',
         if (token != null) 'Authorization': 'Bearer $token',
@@ -276,11 +277,51 @@ class RentalService {
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
+
+        // Log response để debug
+        debugPrint('Nearby rentals API response: ${response.body}');
+
         final List<dynamic> rentalsData = data['rentals'] ?? [];
-        if (data['warning'] != null) {
-          debugPrint('Warning from server: ${data['warning']}');
+        final String? warning = data['warning'];
+        final String? searchMethod = data['searchMethod'];
+
+        if (warning != null) {
+          debugPrint('Warning from server: $warning');
         }
-        return rentalsData.map((json) => Rental.fromJson(json)).toList();
+
+        // Xử lý dữ liệu rentals an toàn hơn
+        final List<Rental> rentals = rentalsData
+            .map((json) {
+              try {
+                // Đảm bảo coordinates được xử lý đúng
+                if (json['coordinates'] != null &&
+                    json['coordinates'] is List) {
+                  final coords = json['coordinates'] as List;
+                  if (coords.length >= 2) {
+                    // Cập nhật location với coordinates
+                    json['location'] = json['location'] ?? {};
+                    json['location']['longitude'] = coords[0];
+                    json['location']['latitude'] = coords[1];
+                  }
+                }
+
+                return Rental.fromJson(json);
+              } catch (e) {
+                debugPrint('Error parsing rental: $e, JSON: $json');
+                return null;
+              }
+            })
+            .where((rental) => rental != null)
+            .cast<Rental>()
+            .toList();
+
+        return {
+          'rentals': rentals,
+          'warning': warning,
+          'searchMethod': searchMethod,
+          'total': data['total'] ?? rentals.length,
+          'radiusKm': data['radiusKm'] ?? radius,
+        };
       } else {
         throw Exception(
             'Failed to fetch nearby rentals: ${response.statusCode}, ${response.body}');

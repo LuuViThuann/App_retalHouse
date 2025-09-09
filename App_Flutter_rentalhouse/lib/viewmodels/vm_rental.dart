@@ -103,18 +103,30 @@ class RentalViewModel extends ChangeNotifier {
     }
   }
 
+  // Cập nhật method fetchNearbyRentals trong RentalViewModel
   Future<void> fetchNearbyRentals(String rentalId,
-      {double radius = 2.0}) async {
+      {double radius = 10.0}) async {
     _isLoading = true;
     _errorMessage = null;
-    _warningMessage = null; // Reset warning
+    _warningMessage = null;
     notifyListeners();
 
     try {
-      _nearbyRentals = await _rentalService.fetchNearbyRentals(
+      final result = await _rentalService.fetchNearbyRentals(
           rentalId: rentalId, radius: radius);
+
+      _nearbyRentals = result['rentals'] ?? [];
+      _warningMessage = result['warning'];
+
+      // Log thông tin để debug
+      debugPrint('Fetched ${_nearbyRentals.length} nearby rentals');
+      debugPrint('Search method: ${result['searchMethod']}');
+      if (_warningMessage != null) {
+        debugPrint('Warning: $_warningMessage');
+      }
     } catch (e) {
       _errorMessage = e.toString();
+      debugPrint('Error in fetchNearbyRentals: $e');
     } finally {
       _isLoading = false;
       notifyListeners();
