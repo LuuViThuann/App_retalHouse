@@ -967,10 +967,10 @@ router.patch('/rentals/fix-coordinates/:id', authMiddleware, async (req, res) =>
 // Cập nhật route /rentals/nearby/:id trong file routes
 router.get('/rentals/nearby/:id', async (req, res) => {
   try {
-    const { radius = 10, page = 1, limit = 10 } = req.query;
+    const { radius = 10, page = 1, limit = 10, minPrice, maxPrice } = req.query;
     const skip = (Number(page) - 1) * Number(limit);
     
-    console.log(`Fetching nearby rentals for ID: ${req.params.id} with radius: ${radius}km, page: ${page}, limit: ${limit}`);
+    console.log(`Fetching nearby rentals for ID: ${req.params.id} with radius: ${radius}km, page: ${page}, limit: ${limit}, minPrice: ${minPrice}, maxPrice: ${maxPrice}`);
     
     if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
       return res.status(400).json({ message: 'Invalid rental ID format' });
@@ -1022,6 +1022,13 @@ router.get('/rentals/nearby/:id', async (req, res) => {
       console.log('Invalid coordinate values:', { longitude, latitude });
       return res.status(400).json({ message: 'Rental has invalid coordinate values' });
     }
+
+    // Xử lý price filter
+    let priceFilter = {};
+    if (minPrice || maxPrice) {
+      if (minPrice) priceFilter.$gte = Number(minPrice);
+      if (maxPrice) priceFilter.$lte = Number(maxPrice);
+    }
     
     if (longitude === 0 && latitude === 0) {
       console.log('Coordinates are both zero - likely invalid');
@@ -1029,11 +1036,16 @@ router.get('/rentals/nearby/:id', async (req, res) => {
       const locationParts = rental.location?.fullAddress?.split(',') || [];
       const wardInfo = locationParts.length > 1 ? locationParts[1].trim() : '';
       
-      const nearbyRentals = await Rental.find({
+      const query = {
         _id: { $ne: new mongoose.Types.ObjectId(req.params.id) },
         status: 'available',
         ...(wardInfo && { 'location.fullAddress': { $regex: wardInfo, $options: 'i' } }),
-      })
+      };
+      if (Object.keys(priceFilter).length > 0) {
+        query.price = priceFilter;
+      }
+
+      const nearbyRentals = await Rental.find(query)
         .skip(skip)
         .limit(Number(limit))
         .lean();
@@ -1058,7 +1070,7 @@ router.get('/rentals/nearby/:id', async (req, res) => {
     const radiusInRadians = radiusInMeters / 6378100;
     
     // Đếm tổng số nhà trọ gần đây
-    const total = await Rental.countDocuments({
+    const geoQuery = {
       'location.coordinates': {
         $geoWithin: {
           $centerSphere: [[longitude, latitude], radiusInRadians],
@@ -1066,7 +1078,11 @@ router.get('/rentals/nearby/:id', async (req, res) => {
       },
       _id: { $ne: new mongoose.Types.ObjectId(req.params.id) },
       status: 'available',
-    });
+    };
+    if (Object.keys(priceFilter).length > 0) {
+      geoQuery.price = priceFilter;
+    }
+    const total = await Rental.countDocuments(geoQuery);
     
     // Tìm nhà trọ gần đây bằng $geoNear
     const nearbyRentals = await Rental.aggregate([
@@ -1079,6 +1095,7 @@ router.get('/rentals/nearby/:id', async (req, res) => {
           query: {
             _id: { $ne: new mongoose.Types.ObjectId(req.params.id) },
             status: 'available',
+            ...(Object.keys(priceFilter).length > 0 ? { price: priceFilter } : {}),
           },
         },
       },

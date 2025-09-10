@@ -16,6 +16,11 @@ class RentalViewModel extends ChangeNotifier {
   int _page = 1;
   int _pages = 1;
 
+  // Thêm các thuộc tính cho bộ lọc nearby rentals
+  double _currentRadius = 10.0;
+  double? _currentMinPrice;
+  double? _currentMaxPrice;
+
   List<Rental> get rentals => _rentals;
   List<Rental> get searchResults => _searchResults;
   List<Rental> get nearbyRentals => _nearbyRentals;
@@ -25,6 +30,10 @@ class RentalViewModel extends ChangeNotifier {
   int get total => _total;
   int get page => _page;
   int get pages => _pages;
+
+  double get currentRadius => _currentRadius;
+  double? get currentMinPrice => _currentMinPrice;
+  double? get currentMaxPrice => _currentMaxPrice;
 
   Future<void> fetchRentals() async {
     _isLoading = true;
@@ -105,15 +114,24 @@ class RentalViewModel extends ChangeNotifier {
 
   // Cập nhật method fetchNearbyRentals trong RentalViewModel
   Future<void> fetchNearbyRentals(String rentalId,
-      {double radius = 10.0}) async {
+      {double? radius, double? minPrice, double? maxPrice}) async {
     _isLoading = true;
     _errorMessage = null;
     _warningMessage = null;
     notifyListeners();
 
+    // Cập nhật bộ lọc nếu được cung cấp
+    if (radius != null) _currentRadius = radius;
+    if (minPrice != null) _currentMinPrice = minPrice;
+    if (maxPrice != null) _currentMaxPrice = maxPrice;
+
     try {
       final result = await _rentalService.fetchNearbyRentals(
-          rentalId: rentalId, radius: radius);
+        rentalId: rentalId,
+        radius: _currentRadius,
+        minPrice: _currentMinPrice,
+        maxPrice: _currentMaxPrice,
+      );
 
       _nearbyRentals = result['rentals'] ?? [];
       _warningMessage = result['warning'];
@@ -131,6 +149,14 @@ class RentalViewModel extends ChangeNotifier {
       _isLoading = false;
       notifyListeners();
     }
+  }
+
+  // Method để reset bộ lọc
+  void resetNearbyFilters() {
+    _currentRadius = 10.0;
+    _currentMinPrice = null;
+    _currentMaxPrice = null;
+    notifyListeners();
   }
   // new -------
 }

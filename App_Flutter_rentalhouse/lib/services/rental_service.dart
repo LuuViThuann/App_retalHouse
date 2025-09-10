@@ -263,11 +263,20 @@ class RentalService {
   Future<Map<String, dynamic>> fetchNearbyRentals({
     required String rentalId,
     double radius = 10.0,
+    double? minPrice,
+    double? maxPrice,
     String? token,
   }) async {
     try {
-      final uri = Uri.parse(
-          '${ApiRoutes.baseUrl}/rentals/nearby/$rentalId?radius=$radius&limit=10');
+      final queryParams = {
+        'radius': radius.toString(),
+        'limit': '10',
+      };
+      if (minPrice != null) queryParams['minPrice'] = minPrice.toString();
+      if (maxPrice != null) queryParams['maxPrice'] = maxPrice.toString();
+
+      final uri = Uri.parse('${ApiRoutes.baseUrl}/rentals/nearby/$rentalId')
+          .replace(queryParameters: queryParams);
       final headers = {
         'Content-Type': 'application/json',
         if (token != null) 'Authorization': 'Bearer $token',
