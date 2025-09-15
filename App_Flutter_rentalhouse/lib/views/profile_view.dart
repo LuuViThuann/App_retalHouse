@@ -1,10 +1,10 @@
 import 'dart:convert';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_rentalhouse/Widgets/Profile/my_post.dart';
 import 'package:flutter_rentalhouse/Widgets/Profile/notification_view.dart';
 import 'package:flutter_rentalhouse/Widgets/Profile/recent_comment.dart';
 import 'package:flutter_rentalhouse/Widgets/item_menu_profile.dart';
+import 'package:flutter_rentalhouse/config/navigator.dart';
 import 'package:flutter_rentalhouse/models/user.dart';
 import 'package:flutter_rentalhouse/viewmodels/vm_auth.dart';
 import 'package:flutter_rentalhouse/views/change_password_view.dart';
@@ -107,68 +107,28 @@ class _ProfileViewState extends State<ProfileView> {
                   ProfileMenuItem(
                     icon: Icons.person_outline,
                     text: 'Thông tin cá nhân',
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                            builder: (context) => MyProfileView()),
-                      );
-                    },
+                    onTap: () => AppNavigator.goToProfile(context),
                   ),
                   ProfileMenuItem(
-                    icon: Icons.shopping_bag_outlined,
-                    text: 'Hợp đồng của tôi',
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                            builder: (context) => MyBookingsView()),
-                      );
-                    },
-                  ),
+                      icon: Icons.shopping_bag_outlined,
+                      text: 'Hợp đồng của tôi',
+                      onTap: () => AppNavigator.goToBookings(context)),
                   ProfileMenuItem(
-                    icon: Icons.book,
-                    text: 'Danh sách bài đăng của bạn',
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (context) => MyPostsView()),
-                      );
-                    },
-                  ),
+                      icon: Icons.book,
+                      text: 'Danh sách bài đăng của bạn',
+                      onTap: () => AppNavigator.goToPosts(context)),
                   ProfileMenuItem(
-                    icon: Icons.comment,
-                    text: 'Bình luận gần đây',
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                            builder: (context) => RecentCommentsView()),
-                      );
-                    },
-                  ),
+                      icon: Icons.comment,
+                      text: 'Bình luận gần đây',
+                      onTap: () => AppNavigator.goToComments(context)),
                   ProfileMenuItem(
-                    icon: Icons.notifications,
-                    text: 'Thông báo',
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                            builder: (context) => NotificationsView()),
-                      );
-                    },
-                  ),
+                      icon: Icons.notifications,
+                      text: 'Thông báo',
+                      onTap: () => AppNavigator.goToNotifications(context)),
                   ProfileMenuItem(
-                    icon: Icons.password,
-                    text: 'Thay đổi mật khẩu',
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                            builder: (context) => ForgotPasswordScreen()),
-                      );
-                    },
-                  ),
+                      icon: Icons.password,
+                      text: 'Thay đổi mật khẩu',
+                      onTap: () => AppNavigator.goToChangePassword(context)),
                   ProfileMenuItem(
                     icon: Icons.logout,
                     text: 'Đăng xuất',
