@@ -1,5 +1,6 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_rentalhouse/Widgets/Detail/customMarker.dart';
 import 'package:flutter_rentalhouse/config/api_routes.dart';
 import 'package:flutter_rentalhouse/views/rental_detail_view.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
@@ -162,21 +163,28 @@ class _RentalMapViewState extends State<RentalMapView> {
     }
   }
 
-  void _updateMarkers() {
+  void _updateMarkers() async {
     print('=== UPDATING MARKERS ===');
     final Set<Marker> markers = {};
 
     // Main rental marker (RED)
     if (_rentalLatLng != null) {
+      final customIcon = await CustomMarkerHelper.createCustomMarker(
+        price: widget.rental.price,
+        propertyType: 'Rental',
+        isMainRental: true,
+        hasValidCoords: widget.rental.location['latitude'] != 0.0 &&
+            widget.rental.location['longitude'] != 0.0,
+      );
       markers.add(
         Marker(
           markerId: MarkerId('main-${widget.rental.id}'),
           position: _rentalLatLng!,
           infoWindow: InfoWindow(
             title: 'Nhà này: ${widget.rental.title}',
-            snippet: formatCurrency(widget.rental.price),
+            snippet: _formatPriceCompact(widget.rental.price),
           ),
-          icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
+          icon: customIcon,
           onTap: () => _showRentalInfo(widget.rental),
         ),
       );
@@ -199,7 +207,7 @@ class _RentalMapViewState extends State<RentalMapView> {
       print('Added current location marker at ${_currentLatLng}');
     }
 
-    // Nearby rental markers (GREEN)
+    // Nearby rental markers (GREEN/BLUE)
     final rentalViewModel =
         Provider.of<RentalViewModel>(context, listen: false);
     print(
@@ -224,6 +232,12 @@ class _RentalMapViewState extends State<RentalMapView> {
       }
 
       final position = LatLng(lat, lng);
+      final customIcon = await CustomMarkerHelper.createCustomMarker(
+        price: rental.price,
+        propertyType: 'Rental',
+        isMainRental: false,
+        hasValidCoords: lat != 0.0 && lng != 0.0,
+      );
       markers.add(
         Marker(
           markerId: MarkerId('nearby-${rental.id}'),
@@ -231,10 +245,9 @@ class _RentalMapViewState extends State<RentalMapView> {
           infoWindow: InfoWindow(
             title: 'Gần đây: ${rental.title}',
             snippet:
-                '${formatCurrency(rental.price)} - ${rental.location['short'] ?? ''}',
+                '${_formatPriceCompact(rental.price)} - ${rental.location['short'] ?? ''}',
           ),
-          icon:
-              BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen),
+          icon: customIcon,
           onTap: () => _showRentalInfo(rental),
         ),
       );
@@ -252,6 +265,20 @@ class _RentalMapViewState extends State<RentalMapView> {
     }
   }
 
+// ĐỊNH DẠNG HIỂN THỊ GIÁ TRỊ TIỀN TRÊN GOOGLE-MAP ==========================
+  String _formatPriceCompact(double price) {
+    if (price >= 1000000000) {
+      return '${(price / 1000000000).toStringAsFixed(1)} ty VND';
+    } else if (price >= 1000000) {
+      return '${(price / 1000000).toStringAsFixed(0)} tr VND';
+    } else if (price >= 1000) {
+      return '${(price / 1000).toStringAsFixed(0)} nghìn VND';
+    } else {
+      return '${price.toStringAsFixed(0)} VND';
+    }
+  }
+
+// ----------==============================================================
   void _animateToPosition(LatLng position, double zoom) {
     if (_controller != null) {
       _controller!.animateCamera(CameraUpdate.newLatLngZoom(position, zoom));

@@ -16,7 +16,7 @@ class CustomMarkerHelper {
     final canvas = Canvas(recorder);
 
     // Kích thước marker
-    const double width = 200;
+    const double width = 200; // Adjusted for smaller size to match image
     const double height = 80;
 
     // Màu sắc theo loại
@@ -28,7 +28,8 @@ class CustomMarkerHelper {
     } else if (isMainRental) {
       backgroundColor = Colors.red.shade600;
     } else {
-      backgroundColor = Colors.blue.shade600;
+      backgroundColor = const ui.Color.fromARGB(
+          255, 14, 167, 62); // Default for nearby rentals
     }
 
     // Vẽ background rounded rectangle
@@ -41,7 +42,7 @@ class CustomMarkerHelper {
       ..style = PaintingStyle.stroke
       ..strokeWidth = 2;
 
-    const radius = Radius.circular(20);
+    const radius = Radius.circular(10); // Smaller radius for compactness
     final rect = RRect.fromRectAndRadius(
       Rect.fromLTWH(0, 0, width, height),
       radius,
@@ -62,8 +63,8 @@ class CustomMarkerHelper {
     canvas.drawRRect(rect, paint);
     canvas.drawRRect(rect, borderPaint);
 
-    // Format giá
-    String priceText = _formatPrice(price);
+    // Format giá theo kiểu ảnh (ty, tr, tỷ)
+    String priceText = _formatPriceCompact(price);
 
     // Vẽ text
     final textPainter = TextPainter(
@@ -71,7 +72,7 @@ class CustomMarkerHelper {
         text: priceText,
         style: TextStyle(
           color: textColor,
-          fontSize: 30,
+          fontSize: 30, // Adjusted for readability
           fontWeight: FontWeight.bold,
         ),
       ),
@@ -91,7 +92,7 @@ class CustomMarkerHelper {
     // Vẽ tam giác nhỏ ở dưới (pointer)
     final trianglePath = Path();
     trianglePath.moveTo(width / 2 - 5, height);
-    trianglePath.lineTo(width / 2, height + 8);
+    trianglePath.lineTo(width / 2, height + 17);
     trianglePath.lineTo(width / 2 + 5, height);
     trianglePath.close();
 
@@ -105,15 +106,15 @@ class CustomMarkerHelper {
     return BitmapDescriptor.fromBytes(bytes!.buffer.asUint8List());
   }
 
-  static String _formatPrice(double price) {
+  static String _formatPriceCompact(double price) {
     if (price >= 1000000000) {
-      return '${(price / 1000000000).toStringAsFixed(1)}B VNĐ';
+      return '${(price / 1000000000).toStringAsFixed(1)} ty VND';
     } else if (price >= 1000000) {
-      return '${(price / 1000000).toStringAsFixed(1)}M VNĐ';
+      return '${(price / 1000000).toStringAsFixed(0)} tr VND';
     } else if (price >= 1000) {
-      return '${(price / 1000).toStringAsFixed(0)}K VNĐ';
+      return '${(price / 1000).toStringAsFixed(0)} nghìn VND';
     } else {
-      return '${price.toStringAsFixed(0)} VNĐ';
+      return '${price.toStringAsFixed(0)} VND';
     }
   }
 }
