@@ -8,22 +8,51 @@ import 'package:flutter_rentalhouse/viewmodels/vm_rental.dart';
 import 'package:flutter_rentalhouse/views/login_view.dart';
 import 'package:flutter_rentalhouse/views/my_profile_view.dart';
 import 'package:flutter_rentalhouse/views/search_rental.dart';
+import 'package:flutter_rentalhouse/views/booking_detail_view.dart';
+import 'package:flutter_rentalhouse/views/my_bookings_view.dart';
 import 'package:provider/provider.dart';
 import 'package:shimmer/shimmer.dart';
 import '../models/user.dart';
+import '../models/booking.dart';
 import '../viewmodels/vm_auth.dart';
-import '../viewmodels/vm_favorite.dart';
+import '../viewmodels/vm_booking.dart';
 import 'main_list_cart_home.dart';
 import 'package:intl/intl.dart';
+import '../config/api_routes.dart';
 
-class HomeContent extends StatelessWidget {
+class HomeContent extends StatefulWidget {
   const HomeContent({super.key});
+
+  @override
+  _HomeContentState createState() => _HomeContentState();
+}
+
+class _HomeContentState extends State<HomeContent> {
+  final TextEditingController _searchController = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final bookingViewModel =
+          Provider.of<BookingViewModel>(context, listen: false);
+      final authViewModel = Provider.of<AuthViewModel>(context, listen: false);
+      if (authViewModel.currentUser != null) {
+        bookingViewModel.fetchMyBookings(page: 1);
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     final rentalViewModel = Provider.of<RentalViewModel>(context);
     final authViewModel = Provider.of<AuthViewModel>(context);
-    final TextEditingController _searchController = TextEditingController();
 
     final AppUser? user = authViewModel.currentUser;
 
@@ -53,16 +82,265 @@ class HomeContent extends StatelessWidget {
 
     String formatCurrency(double amount) {
       final formatter =
-      NumberFormat.currency(locale: 'vi_VN', symbol: '₫', decimalDigits: 0);
+          NumberFormat.currency(locale: 'vi_VN', symbol: '₫', decimalDigits: 0);
       return formatter.format(amount);
+    }
+
+    Widget _buildBookingCard(Booking booking) {
+      String getStatusText(String status) {
+        switch (status) {
+          case 'pending':
+            return 'Chờ xác nhận';
+          case 'confirmed':
+            return 'Đã xác nhận';
+          case 'completed':
+            return 'Hoàn thành';
+          case 'rejected':
+            return 'Đã từ chối';
+          case 'cancelled':
+            return 'Đã hủy';
+          default:
+            return 'Không xác định';
+        }
+      }
+
+      Color getStatusColor(String status) {
+        switch (status) {
+          case 'pending':
+            return Colors.orange;
+          case 'confirmed':
+            return Colors.green;
+          case 'completed':
+            return Colors.blue;
+          case 'rejected':
+            return Colors.red;
+          case 'cancelled':
+            return Colors.grey;
+          default:
+            return Colors.grey;
+        }
+      }
+
+      return InkWell(
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => BookingDetailView(booking: booking),
+            ),
+          );
+        },
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: Colors.grey.shade200),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.grey.withOpacity(0.1),
+                blurRadius: 4,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Row(
+            children: [
+              // Image
+              if (booking.rentalImage != null)
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: CachedNetworkImage(
+                    imageUrl:
+                        '${ApiRoutes.serverBaseUrl}${booking.rentalImage}',
+                    width: 80,
+                    height: 80,
+                    fit: BoxFit.cover,
+                    errorWidget: (context, url, error) => Container(
+                      width: 80,
+                      height: 80,
+                      color: Colors.grey[300],
+                      child: const Icon(Icons.image_not_supported),
+                    ),
+                  ),
+                )
+              else
+                Container(
+                  width: 80,
+                  height: 80,
+                  decoration: BoxDecoration(
+                    color: Colors.grey[300],
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Icon(Icons.home, color: Colors.grey),
+                ),
+              const SizedBox(width: 12),
+              // Content
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      booking.rentalTitle ?? 'Không có tiêu đề',
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.black87,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 4),
+                    if (booking.rentalAddress != null)
+                      Row(
+                        children: [
+                          Icon(Icons.location_on,
+                              size: 14, color: Colors.grey[600]),
+                          const SizedBox(width: 4),
+                          Expanded(
+                            child: Text(
+                              booking.rentalAddress!,
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.grey[600],
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
+                    const SizedBox(height: 4),
+                    if (booking.rentalPrice != null)
+                      Text(
+                        formatCurrency(booking.rentalPrice!),
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.blue[700],
+                        ),
+                      ),
+                    const SizedBox(height: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: getStatusColor(booking.status).withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color:
+                              getStatusColor(booking.status).withOpacity(0.3),
+                        ),
+                      ),
+                      child: Text(
+                        getStatusText(booking.status),
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: getStatusColor(booking.status),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              Icon(
+                Icons.chevron_right,
+                color: Colors.grey[400],
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    Widget _buildMyBookingsSection() {
+      return Consumer<BookingViewModel>(
+        builder: (context, bookingViewModel, child) {
+          if (bookingViewModel.isLoading &&
+              bookingViewModel.myBookings.isEmpty) {
+            return const SizedBox.shrink();
+          }
+
+          final activeBookings = bookingViewModel.myBookings
+              .where((booking) => booking.status != 'cancelled')
+              .take(3)
+              .toList();
+
+          if (activeBookings.isEmpty) {
+            return const SizedBox.shrink();
+          }
+
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    'Hợp đồng của tôi',
+                    style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black87),
+                  ),
+                  TextButton(
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const MyBookingsView(),
+                        ),
+                      );
+                    },
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          'Xem tất cả',
+                          style:
+                              TextStyle(fontSize: 14, color: Colors.blue[700]),
+                        ),
+                        const SizedBox(width: 4),
+                        Icon(
+                          Icons.arrow_forward,
+                          size: 14,
+                          color: Colors.blue[700],
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              ListView.separated(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: activeBookings.length,
+                separatorBuilder: (context, index) =>
+                    const SizedBox(height: 12),
+                itemBuilder: (context, index) {
+                  final booking = activeBookings[index];
+                  return _buildBookingCard(booking);
+                },
+              ),
+              const SizedBox(height: 20),
+            ],
+          );
+        },
+      );
     }
 
     Widget _buildLatestPostsSection() {
       final today = DateTime.now();
       final latestRentals = rentalViewModel.rentals
           .where((rental) =>
-      rental.createdAt.year == today.year &&
-          rental.createdAt.month == today.month)
+              rental.createdAt.year == today.year &&
+              rental.createdAt.month == today.month)
           .take(5)
           .toList();
 
@@ -109,24 +387,24 @@ class HomeContent extends StatelessWidget {
           const SizedBox(height: 10),
           latestRentals.isEmpty
               ? const Center(
-            child: Padding(
-              padding: EdgeInsets.all(20.0),
-              child: Text(
-                'Không có bài đăng mới trong tháng này!',
-                style: TextStyle(fontSize: 16, color: Colors.grey),
-              ),
-            ),
-          )
+                  child: Padding(
+                    padding: EdgeInsets.all(20.0),
+                    child: Text(
+                      'Không có bài đăng mới trong tháng này!',
+                      style: TextStyle(fontSize: 16, color: Colors.grey),
+                    ),
+                  ),
+                )
               : ListView.separated(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            itemCount: latestRentals.length,
-            separatorBuilder: (context, index) =>
-            const SizedBox(height: 12),
-            itemBuilder: (context, index) {
-              return RentalItemWidget(rental: latestRentals[index]);
-            },
-          ),
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  itemCount: latestRentals.length,
+                  separatorBuilder: (context, index) =>
+                      const SizedBox(height: 12),
+                  itemBuilder: (context, index) {
+                    return RentalItemWidget(rental: latestRentals[index]);
+                  },
+                ),
           const SizedBox(height: 20),
         ],
       );
@@ -183,7 +461,7 @@ class HomeContent extends StatelessWidget {
         child: SingleChildScrollView(
           child: Padding(
             padding:
-            const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+                const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -329,14 +607,16 @@ class HomeContent extends StatelessWidget {
                         // Shimmer effect (only shown during loading)
                         FutureBuilder(
                           future: precacheImage(
-                              const AssetImage('assets/img/banner.jpg'), context),
+                              const AssetImage('assets/img/banner.jpg'),
+                              context),
                           builder: (context, snapshot) {
                             if (snapshot.connectionState ==
                                 ConnectionState.waiting) {
                               return Shimmer.fromColors(
-                                baseColor: Colors.blue.shade300.withOpacity(0.5),
+                                baseColor:
+                                    Colors.blue.shade300.withOpacity(0.5),
                                 highlightColor:
-                                Colors.teal.shade100.withOpacity(0.2),
+                                    Colors.teal.shade100.withOpacity(0.2),
                                 period: const Duration(milliseconds: 1500),
                                 child: Container(
                                   decoration: BoxDecoration(
@@ -363,7 +643,8 @@ class HomeContent extends StatelessWidget {
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
                               Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
                                 children: [],
                               ),
                             ],
@@ -400,6 +681,9 @@ class HomeContent extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 20),
+                // My Bookings Section
+                if (authViewModel.currentUser != null)
+                  _buildMyBookingsSection(),
                 // Latest Posts
                 if (authViewModel.currentUser == null)
                   Padding(
@@ -441,16 +725,16 @@ class HomeContent extends StatelessWidget {
                 else if (rentalViewModel.isLoading)
                   _buildShimmerLoading()
                 else if (rentalViewModel.errorMessage != null)
-                    Center(
-                      child: Padding(
-                        padding: const EdgeInsets.all(16.0),
-                        child: Text('Lỗi: ${rentalViewModel.errorMessage}',
-                            style:
-                            const TextStyle(color: Colors.red, fontSize: 16)),
-                      ),
-                    )
-                  else
-                    _buildLatestPostsSection(),
+                  Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(16.0),
+                      child: Text('Lỗi: ${rentalViewModel.errorMessage}',
+                          style:
+                              const TextStyle(color: Colors.red, fontSize: 16)),
+                    ),
+                  )
+                else
+                  _buildLatestPostsSection(),
               ],
             ),
           ),
@@ -467,7 +751,7 @@ class HomeContent extends StatelessWidget {
                 isScrollControlled: true,
                 shape: const RoundedRectangleBorder(
                   borderRadius:
-                  BorderRadius.vertical(top: Radius.circular(25.0)),
+                      BorderRadius.vertical(top: Radius.circular(25.0)),
                 ),
                 builder: (context) => ChatAIBottomSheet(
                   apiKey: 'AIzaSyAQ2qxzF90d2Yj03y_vt1Sb9AdIlbiBauE',
@@ -519,12 +803,12 @@ class HomeContent extends StatelessWidget {
           border: isSelected ? null : Border.all(color: Colors.grey.shade300),
           boxShadow: isSelected
               ? [
-            BoxShadow(
-              color: Colors.teal.withOpacity(0.3),
-              blurRadius: 5,
-              offset: const Offset(0, 2),
-            )
-          ]
+                  BoxShadow(
+                    color: Colors.teal.withOpacity(0.3),
+                    blurRadius: 5,
+                    offset: const Offset(0, 2),
+                  )
+                ]
               : [],
         ),
         child: Row(

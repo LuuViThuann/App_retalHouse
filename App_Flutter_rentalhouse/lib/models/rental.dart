@@ -115,17 +115,21 @@ class Rental {
 
   factory Rental.fromJson(Map<String, dynamic> json) {
     try {
-      // Parse area với null check
+      // Parse area with robust null and type checking
       Map<String, dynamic> areaData = {};
       if (json['area'] != null && json['area'] is Map) {
         areaData = {
-          'total': (json['area']['total'] as num?)?.toDouble() ?? 0.0,
-          'livingRoom': (json['area']['livingRoom'] as num?)?.toDouble() ?? 0.0,
-          'bedrooms': (json['area']['bedrooms'] as num?)?.toDouble() ?? 0.0,
-          'bathrooms': (json['area']['bathrooms'] as num?)?.toDouble() ?? 0.0,
+          'total': _parseDouble(json['area']['total'], 'area.total') ?? 0.0,
+          'livingRoom':
+              _parseDouble(json['area']['livingRoom'], 'area.livingRoom') ??
+                  0.0,
+          'bedrooms':
+              _parseDouble(json['area']['bedrooms'], 'area.bedrooms') ?? 0.0,
+          'bathrooms':
+              _parseDouble(json['area']['bathrooms'], 'area.bathrooms') ?? 0.0,
         };
       } else {
-        // Fallback cho nearby API (không có area)
+        debugPrint('Warning: area is null or not a Map in JSON');
         areaData = {
           'total': 0.0,
           'livingRoom': 0.0,
@@ -134,42 +138,75 @@ class Rental {
         };
       }
 
-      // Parse location với nhiều format
+      // Parse location with robust null and type checking
       Map<String, dynamic> locationData = {};
       if (json['location'] != null && json['location'] is Map) {
         locationData['short'] = json['location']['short'] as String? ?? '';
         locationData['fullAddress'] =
             json['location']['fullAddress'] as String? ?? '';
 
-        // Xử lý coordinates - format GeoJSON
+        // Handle GeoJSON coordinates
         if (json['location']['coordinates'] != null &&
             json['location']['coordinates']['coordinates'] != null) {
           var coords = json['location']['coordinates']['coordinates'];
           if (coords is List && coords.length >= 2) {
-            locationData['longitude'] = (coords[0] as num?)?.toDouble() ?? 0.0;
-            locationData['latitude'] = (coords[1] as num?)?.toDouble() ?? 0.0;
+            final lat = _parseDouble(coords[1], 'location.coordinates[1]');
+            final lng = _parseDouble(coords[0], 'location.coordinates[0]');
+            if (lat == null || lng == null) {
+              debugPrint(
+                  'Warning: Invalid coordinates in JSON, defaulting to [0,0]');
+              locationData['longitude'] = 0.0;
+              locationData['latitude'] = 0.0;
+            } else {
+              locationData['longitude'] = lng;
+              locationData['latitude'] = lat;
+            }
+          } else {
+            debugPrint(
+                'Warning: coordinates array is invalid, defaulting to [0,0]');
+            locationData['longitude'] = 0.0;
+            locationData['latitude'] = 0.0;
           }
         }
-        // Fallback: coordinates trực tiếp trong location (từ nearby API)
+        // Handle direct latitude/longitude
         else if (json['location']['longitude'] != null &&
             json['location']['latitude'] != null) {
-          locationData['longitude'] =
-              (json['location']['longitude'] as num?)?.toDouble() ?? 0.0;
-          locationData['latitude'] =
-              (json['location']['latitude'] as num?)?.toDouble() ?? 0.0;
+          final lat =
+              _parseDouble(json['location']['latitude'], 'location.latitude');
+          final lng =
+              _parseDouble(json['location']['longitude'], 'location.longitude');
+          if (lat == null || lng == null) {
+            debugPrint(
+                'Warning: Invalid latitude/longitude in JSON, defaulting to [0,0]');
+            locationData['longitude'] = 0.0;
+            locationData['latitude'] = 0.0;
+          } else {
+            locationData['longitude'] = lng;
+            locationData['latitude'] = lat;
+          }
         }
-        // Fallback: coordinates array ở root level (từ nearby API)
+        // Handle root-level coordinates array
         else if (json['coordinates'] is List &&
             json['coordinates'].length >= 2) {
-          locationData['longitude'] =
-              (json['coordinates'][0] as num?)?.toDouble() ?? 0.0;
-          locationData['latitude'] =
-              (json['coordinates'][1] as num?)?.toDouble() ?? 0.0;
+          final lat = _parseDouble(json['coordinates'][1], 'coordinates[1]');
+          final lng = _parseDouble(json['coordinates'][0], 'coordinates[0]');
+          if (lat == null || lng == null) {
+            debugPrint(
+                'Warning: Invalid root coordinates in JSON, defaulting to [0,0]');
+            locationData['longitude'] = 0.0;
+            locationData['latitude'] = 0.0;
+          } else {
+            locationData['longitude'] = lng;
+            locationData['latitude'] = lat;
+          }
         } else {
+          debugPrint(
+              'Warning: No valid coordinates found in JSON, defaulting to [0,0]');
           locationData['longitude'] = 0.0;
           locationData['latitude'] = 0.0;
         }
       } else {
+        debugPrint('Warning: location is null or not a Map in JSON');
         locationData = {
           'short': '',
           'fullAddress': '',
@@ -178,7 +215,7 @@ class Rental {
         };
       }
 
-      // Parse rentalTerms với null check
+      // Parse rentalTerms with robust null and type checking
       Map<String, dynamic> rentalTermsData = {};
       if (json['rentalTerms'] != null && json['rentalTerms'] is Map) {
         rentalTermsData = {
@@ -189,6 +226,7 @@ class Rental {
           'renewalTerms': json['rentalTerms']['renewalTerms'] as String? ?? '',
         };
       } else {
+        debugPrint('Warning: rentalTerms is null or not a Map in JSON');
         rentalTermsData = {
           'minimumLease': '',
           'deposit': '',
@@ -197,7 +235,7 @@ class Rental {
         };
       }
 
-      // Parse contactInfo với null check
+      // Parse contactInfo with robust null and type checking
       Map<String, dynamic> contactInfoData = {};
       if (json['contactInfo'] != null && json['contactInfo'] is Map) {
         contactInfoData = {
@@ -207,6 +245,7 @@ class Rental {
               json['contactInfo']['availableHours'] as String? ?? '',
         };
       } else {
+        debugPrint('Warning: contactInfo is null or not a Map in JSON');
         contactInfoData = {
           'name': '',
           'phone': '',
@@ -214,11 +253,17 @@ class Rental {
         };
       }
 
+      // Parse price
+      final price = _parseDouble(json['price'], 'price');
+      if (price == null) {
+        debugPrint('Warning: Invalid price in JSON, defaulting to 0.0');
+      }
+
       return Rental(
         id: json['_id'] as String? ??
             (throw Exception('Rental ID is missing in JSON response')),
         title: json['title'] as String? ?? '',
-        price: (json['price'] as num?)?.toDouble() ?? 0.0,
+        price: price ?? 0.0,
         area: areaData,
         location: locationData,
         propertyType: json['propertyType'] as String? ?? 'Khác',
@@ -240,5 +285,28 @@ class Rental {
       debugPrint('JSON data: $json');
       rethrow;
     }
+  }
+
+  // Helper method to safely parse a value to double
+  static double? _parseDouble(dynamic value, String fieldName) {
+    if (value == null) {
+      debugPrint('Warning: $fieldName is null');
+      return null;
+    }
+    if (value is num) return value.toDouble();
+    if (value is String) {
+      final trimmed = value.trim().replaceAll(',', '.');
+      if (trimmed.isEmpty) {
+        debugPrint('Warning: $fieldName is empty string');
+        return null;
+      }
+      final result = double.tryParse(trimmed);
+      if (result == null) {
+        debugPrint('Error: Failed to parse $fieldName with value "$value"');
+      }
+      return result;
+    }
+    debugPrint('Error: $fieldName is of invalid type: ${value.runtimeType}');
+    return null;
   }
 }

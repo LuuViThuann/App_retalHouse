@@ -42,8 +42,17 @@ class _SearchScreenState extends State<SearchScreen> {
         Provider.of<RentalViewModel>(context, listen: false);
     try {
       final history = await rentalViewModel.getSearchHistory();
+      // Loại bỏ các mục trùng lặp, giữ lại thứ tự ban đầu
+      final uniqueHistory = <String>[];
+      final seen = <String>{};
+      for (final item in history) {
+        if (!seen.contains(item.toLowerCase().trim())) {
+          seen.add(item.toLowerCase().trim());
+          uniqueHistory.add(item);
+        }
+      }
       setState(() {
-        _searchHistory = history;
+        _searchHistory = uniqueHistory;
       });
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -52,6 +61,81 @@ class _SearchScreenState extends State<SearchScreen> {
           backgroundColor: Colors.red,
         ),
       );
+    }
+  }
+
+  Future<void> _deleteSearchHistoryItem(String query) async {
+    final rentalViewModel =
+        Provider.of<RentalViewModel>(context, listen: false);
+    try {
+      await rentalViewModel.deleteSearchHistoryItem(query);
+      await _fetchSearchHistory();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Đã xóa mục lịch sử'),
+            backgroundColor: Colors.green,
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Lỗi: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _clearSearchHistory() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Xác nhận'),
+        content:
+            const Text('Bạn có chắc chắn muốn xóa toàn bộ lịch sử tìm kiếm?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Hủy'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Xóa', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      final rentalViewModel =
+          Provider.of<RentalViewModel>(context, listen: false);
+      try {
+        await rentalViewModel.clearSearchHistory();
+        await _fetchSearchHistory();
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Đã xóa toàn bộ lịch sử tìm kiếm'),
+              backgroundColor: Colors.green,
+              duration: Duration(seconds: 2),
+            ),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Lỗi: $e'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
     }
   }
 
@@ -208,14 +292,46 @@ class _SearchScreenState extends State<SearchScreen> {
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
-                            'Lịch sử tìm kiếm',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w700,
-                              color: Colors.blue.shade800,
-                              letterSpacing: 0.2,
-                            ),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                'Lịch sử tìm kiếm',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w700,
+                                  color: Colors.blue.shade800,
+                                  letterSpacing: 0.2,
+                                ),
+                              ),
+                              InkWell(
+                                onTap: _clearSearchHistory,
+                                borderRadius: BorderRadius.circular(8),
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 8, vertical: 4),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(
+                                        Icons.delete_outline,
+                                        size: 18,
+                                        color: Colors.red.shade600,
+                                      ),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        'Xóa tất cả',
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w500,
+                                          color: Colors.red.shade600,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
                           const SizedBox(height: 12),
                           Wrap(
@@ -231,7 +347,7 @@ class _SearchScreenState extends State<SearchScreen> {
                                 child: AnimatedContainer(
                                   duration: const Duration(milliseconds: 200),
                                   padding: const EdgeInsets.symmetric(
-                                    horizontal: 16,
+                                    horizontal: 12,
                                     vertical: 8,
                                   ),
                                   decoration: BoxDecoration(
@@ -258,13 +374,36 @@ class _SearchScreenState extends State<SearchScreen> {
                                           Colors.blue.shade100.withOpacity(0.5),
                                     ),
                                   ),
-                                  child: Text(
-                                    query,
-                                    style: TextStyle(
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.w500,
-                                      color: Colors.blue.shade700,
-                                    ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Flexible(
+                                        child: Text(
+                                          query,
+                                          style: TextStyle(
+                                            fontSize: 14,
+                                            fontWeight: FontWeight.w500,
+                                            color: Colors.blue.shade700,
+                                          ),
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 6),
+                                      InkWell(
+                                        onTap: () {
+                                          _deleteSearchHistoryItem(query);
+                                        },
+                                        borderRadius: BorderRadius.circular(12),
+                                        child: Padding(
+                                          padding: const EdgeInsets.all(2),
+                                          child: Icon(
+                                            Icons.close,
+                                            size: 16,
+                                            color: Colors.grey.shade600,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                 ),
                               );

@@ -122,10 +122,6 @@ class _ProfileViewState extends State<ProfileView> {
                       text: 'Bình luận gần đây',
                       onTap: () => AppNavigator.goToComments(context)),
                   ProfileMenuItem(
-                      icon: Icons.notifications,
-                      text: 'Thông báo',
-                      onTap: () => AppNavigator.goToNotifications(context)),
-                  ProfileMenuItem(
                       icon: Icons.password,
                       text: 'Thay đổi mật khẩu',
                       onTap: () => AppNavigator.goToChangePassword(context)),

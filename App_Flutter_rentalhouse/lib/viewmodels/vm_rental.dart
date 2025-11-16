@@ -112,6 +112,26 @@ class RentalViewModel extends ChangeNotifier {
     }
   }
 
+  Future<void> deleteSearchHistoryItem(String query) async {
+    try {
+      await _apiService.deleteSearchHistoryItem(query);
+    } catch (e) {
+      _errorMessage = e.toString();
+      notifyListeners();
+      throw Exception('Không thể xóa mục lịch sử tìm kiếm: $e');
+    }
+  }
+
+  Future<void> clearSearchHistory() async {
+    try {
+      await _apiService.clearSearchHistory();
+    } catch (e) {
+      _errorMessage = e.toString();
+      notifyListeners();
+      throw Exception('Không thể xóa toàn bộ lịch sử tìm kiếm: $e');
+    }
+  }
+
   // Cập nhật method fetchNearbyRentals trong RentalViewModel
   Future<void> fetchNearbyRentals(String rentalId,
       {double? radius, double? minPrice, double? maxPrice}) async {

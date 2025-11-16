@@ -1,6 +1,6 @@
-- điều chỉnh có thể xóa lịch sử tìm kiếm và không bị trùng 
+- điều chỉnh có thể xóa lịch sử tìm kiếm và không bị trùng : DONE 
 
--Khi xóa bài viết thuộc tài khoản chưa cập nhật ở Home 
+- Khi xóa bài viết thuộc tài khoản chưa cập nhật ở Home 
 
 - Lỗi chưa thể chọn loại nhà và khoảng giá tìm kiếm 
 
@@ -10,8 +10,8 @@
 
 - Điều chỉnh các thông báo thao tác cho hoàn chỉnh còn log , thông báo nghiệp vụ 
 
-- Chưa hiển thị các hợp đồng của bạn ở Home
+- Chưa hiển thị các hợp đồng của bạn ở Home : DONE 
 
-- Khi chọn địa chỉ trong bài viết hiển thị trên ggMap và gợi ý các bài trong khu vực đó
+- Khi chọn địa chỉ trong bài viết hiển thị trên ggMap và gợi ý các bài trong khu vực đó : DONE 
 
 - Chưa điều chỉnh cập nhật tọa độ khi thay đổi địa chỉ trong profile và chỉnh sửa bài đăng 

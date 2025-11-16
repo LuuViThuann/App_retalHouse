@@ -120,6 +120,55 @@ class ApiService {
     }
   }
 
+  Future<void> deleteSearchHistoryItem(String query) async {
+    final token = await _getIdToken();
+    if (token == null) {
+      throw Exception('Không tìm thấy token. Vui lòng đăng nhập lại.');
+    }
+
+    final headers = {
+      'Authorization': 'Bearer $token',
+      'Accept': 'application/json',
+      'Content-Type': 'application/json',
+    };
+    print('Delete search history item headers: $headers');
+    final response = await http.delete(
+      Uri.parse('${ApiRoutes.baseUrl}/search-history'),
+      headers: headers,
+      body: jsonEncode({'query': query}),
+    );
+    print(
+        'Delete search history item response: status=${response.statusCode}, body=${response.body}');
+
+    if (response.statusCode != 200 && response.statusCode != 204) {
+      throw Exception('Không thể xóa mục lịch sử tìm kiếm: ${response.body}');
+    }
+  }
+
+  Future<void> clearSearchHistory() async {
+    final token = await _getIdToken();
+    if (token == null) {
+      throw Exception('Không tìm thấy token. Vui lòng đăng nhập lại.');
+    }
+
+    final headers = {
+      'Authorization': 'Bearer $token',
+      'Accept': 'application/json',
+    };
+    print('Clear search history headers: $headers');
+    final response = await http.delete(
+      Uri.parse('${ApiRoutes.baseUrl}/search-history/all'),
+      headers: headers,
+    );
+    print(
+        'Clear search history response: status=${response.statusCode}, body=${response.body}');
+
+    if (response.statusCode != 200 && response.statusCode != 204) {
+      throw Exception(
+          'Không thể xóa toàn bộ lịch sử tìm kiếm: ${response.body}');
+    }
+  }
+
   Future<void> createRental(Rental rental, List<String> imagePaths) async {
     final token = await _getIdToken();
     if (token == null) {

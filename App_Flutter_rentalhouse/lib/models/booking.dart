@@ -53,6 +53,11 @@ class Booking {
     this.ownerEmail,
   });
 
+  // ====================
+  // Nhận dữ liệu JSON từ API và chuyển sang Object booking
+  // Nếu có dữ liệu chuyển sang String còn không có thì trống ''
+  // bookingDate : Nếu API không có hiển thị lấy ngày hiện tại giúp tránh lỗi Parse Date
+  //========================
   factory Booking.fromJson(Map<String, dynamic> json) {
     return Booking(
       id: json['_id']?.toString() ?? '',
@@ -110,6 +115,10 @@ class Booking {
     );
   }
 
+  // =============
+  // Dùng để chuyển object Booking → dạng Map JSON để gửi lên API, lưu local, dùng socket, lưu Firestore, hoặc encode.
+  // Nếu Không có hàm này → object Dart không thể giao tiếp với backend.
+  //=============
   Map<String, dynamic> toJson() {
     return {
       '_id': id,
@@ -138,6 +147,7 @@ class Booking {
     };
   }
 
+// Tạo đối tượng mới dựa trên đối tượng hiện tại chỉ để thay đổi vài thuộc tính để quản lý state
   Booking copyWith({
     String? id,
     String? userId,

@@ -1,0 +1,459 @@
+================================================================================
+                    GIẢI THÍCH CÁC FILE TRONG THƯ MỤC SERVICES
+================================================================================
+
+Tổng quan: Thư mục services chứa các service layer xử lý logic nghiệp vụ,
+giao tiếp với backend API, và quản lý các chức năng chính của ứng dụng.
+
+================================================================================
+1. API_SERVICE.DART - Service API Cơ Bản
+================================================================================
+
+📁 File: lib/services/api_service.dart
+📝 Chức năng: Xử lý các API liên quan đến bài đăng thuê nhà
+
+🔧 Tính năng chính:
+   • getRentals()
+     - Lấy danh sách tất cả bài đăng thuê nhà
+     - Trả về List<Rental>
+   
+   • searchRentals()
+     - Tìm kiếm bài đăng với nhiều bộ lọc:
+       * search: Từ khóa tìm kiếm
+       * minPrice, maxPrice: Lọc theo giá
+       * propertyTypes: Lọc theo loại bất động sản
+       * status: Lọc theo trạng thái
+       * page, limit: Phân trang
+     - Trả về Map với rentals, total, page, pages
+   
+   • getSearchHistory()
+     - Lấy lịch sử tìm kiếm của người dùng
+     - Trả về List<String>
+   
+   • createRental()
+     - Tạo bài đăng thuê nhà mới
+     - Hỗ trợ upload nhiều ảnh (MultipartRequest)
+     - Xử lý tất cả thông tin: title, price, area, location, propertyType,
+       furniture, amenities, surroundings, rentalTerms, contactInfo
+
+🔐 Xác thực:
+   - Sử dụng Firebase Auth token
+   - Tự động lấy token qua _getIdToken()
+   - Gửi token trong header Authorization: Bearer {token}
+
+================================================================================
+2. AUTH_SERVICE.DART - Service Xác Thực Người Dùng
+================================================================================
+
+📁 File: lib/services/auth_service.dart
+📝 Chức năng: Quản lý toàn bộ chức năng xác thực và thông tin người dùng
+
+🔧 Tính năng chính:
+
+   A. Đăng ký & Đăng nhập:
+   • register()
+     - Đăng ký tài khoản mới
+     - Tham số: email, password, phoneNumber, address, username, avatarBase64
+     - Validation: Email, số điện thoại (10 chữ số), mật khẩu (≥6 ký tự),
+       username (≥3 ký tự), avatar base64 hợp lệ
+   
+   • login()
+     - Đăng nhập bằng email/password
+     - Tích hợp Firebase Auth
+     - Trả về AppUser với đầy đủ thông tin
+   
+   • signInWithGoogle()
+     - Đăng nhập bằng tài khoản Google
+     - Sử dụng GoogleSignIn package
+     - Tự động lấy thông tin profile từ Google
+   
+   • signInWithFacebook()
+     - Đăng nhập bằng tài khoản Facebook
+     - Sử dụng FacebookAuth package
+     - Tự động lấy thông tin profile từ Facebook
+
+   B. Quản lý Mật khẩu:
+   • sendPasswordResetEmail()
+     - Gửi email đặt lại mật khẩu
+   
+   • resetPassword()
+     - Đặt lại mật khẩu với oobCode từ email
+   
+   • changePassword()
+     - Thay đổi mật khẩu cho tài khoản hiện tại
+
+   C. Quản lý Hồ sơ:
+   • updateProfile()
+     - Cập nhật thông tin: phoneNumber, address, username
+   
+   • uploadProfileImage()
+     - Upload ảnh đại diện mới (base64)
+   
+   • fetchAvatarBase64()
+     - Lấy ảnh đại diện từ server
+
+   D. Quản lý Bài đăng:
+   • fetchMyPosts()
+     - Lấy danh sách bài đăng của người dùng (phân trang)
+   
+   • fetchRental()
+     - Lấy chi tiết một bài đăng
+   
+   • deleteRental()
+     - Xóa bài đăng
+   
+   • updateRental()
+     - Cập nhật bài đăng (hỗ trợ thêm/xóa ảnh)
+
+   E. Khác:
+   • fetchRecentComments()
+     - Lấy bình luận gần đây của người dùng
+   
+   • fetchNotifications()
+     - Lấy thông báo
+   
+   • deleteNotification()
+     - Xóa thông báo
+   
+   • getIdToken()
+     - Lấy Firebase ID token
+   
+   • logout()
+     - Đăng xuất (Google, Facebook, Firebase)
+
+🔐 Validation:
+   - Email: Regex pattern validation
+   - Phone: 10 chữ số
+   - Password: Tối thiểu 6 ký tự
+   - Username: Tối thiểu 3 ký tự
+   - Avatar: Base64 format validation
+
+================================================================================
+3. BOOKING_SERVICE.DART - Service Đặt Chỗ
+================================================================================
+
+📁 File: lib/services/booking_service.dart
+📝 Chức năng: Quản lý toàn bộ chức năng đặt chỗ xem nhà
+
+🔧 Tính năng chính:
+   • createBooking()
+     - Tạo đặt chỗ mới
+     - Tham số: rentalId, customerInfo, preferredViewingTime
+     - Trả về Booking object
+   
+   • getMyBookings()
+     - Lấy danh sách đặt chỗ của người dùng
+     - Hỗ trợ phân trang (page, limit)
+     - Lọc theo status (pending, confirmed, rejected, cancelled)
+     - Trả về Map: bookings, total, page, pages
+   
+   • getRentalBookings()
+     - Lấy danh sách đặt chỗ cho một bài đăng cụ thể
+     - Dành cho chủ nhà xem các đặt chỗ của bài đăng của mình
+     - Hỗ trợ phân trang và lọc theo status
+   
+   • updateBookingStatus()
+     - Cập nhật trạng thái đặt chỗ (chủ nhà)
+     - Status: pending → confirmed/rejected
+     - Có thể thêm ownerNotes
+   
+   • cancelBooking()
+     - Hủy đặt chỗ (khách hàng)
+     - Status: pending/confirmed → cancelled
+   
+   • getBookingDetail()
+     - Lấy chi tiết một đặt chỗ cụ thể
+   
+   • checkUserHasBooked()
+     - Kiểm tra người dùng đã đặt chỗ cho một bài đăng chưa
+     - Trả về Booking nếu có, null nếu chưa
+   
+   • deleteBooking()
+     - Xóa đặt chỗ (chỉ cho booking đã hủy)
+
+📊 Trạng thái Booking:
+   - pending: Đang chờ xử lý
+   - confirmed: Đã xác nhận
+   - rejected: Bị từ chối
+   - cancelled: Đã hủy
+
+================================================================================
+4. CHAT_SERVICE.DART - Service Chat Real-time
+================================================================================
+
+📁 File: lib/services/chat_service.dart
+📝 Chức năng: Quản lý chat real-time sử dụng Socket.IO
+
+🔧 Tính năng chính:
+   • setToken()
+     - Thiết lập token và khởi tạo kết nối socket
+     - Tự động gọi _initializeSocket()
+   
+   • _initializeSocket()
+     - Khởi tạo kết nối Socket.IO với server
+     - Cấu hình: websocket transport, auto-reconnect, headers với token
+     - Lắng nghe các events: receiveMessage, error, connect, disconnect
+   
+   • joinConversation()
+     - Tham gia vào một phòng chat cụ thể
+     - Emit event 'joinConversation' với conversationId
+   
+   • sendMessage()
+     - Gửi tin nhắn real-time qua socket
+     - Emit event 'sendMessage' với conversationId, senderId, content
+   
+   • getOrCreateConversation()
+     - Tạo hoặc lấy cuộc trò chuyện giữa người dùng và chủ nhà
+     - Tham số: rentalId, landlordId
+     - Trả về Conversation object
+   
+   • fetchMessages()
+     - Lấy danh sách tin nhắn của một cuộc trò chuyện
+     - Hỗ trợ cursor pagination (load more messages)
+     - Trả về Map: messages, nextCursor
+   
+   • fetchConversations()
+     - Lấy danh sách tất cả cuộc trò chuyện của người dùng
+     - Có retry logic (3 lần thử)
+     - Trả về List<Conversation>
+   
+   • fetchPendingConversations()
+     - Lấy danh sách cuộc trò chuyện chờ xử lý
+   
+   • refreshGoogleToken()
+     - Làm mới Google token khi hết hạn
+     - Hỗ trợ silent sign-in và interactive sign-in
+   
+   • disconnect()
+     - Ngắt kết nối socket
+
+🔌 Socket Events:
+   - receiveMessage: Nhận tin nhắn mới
+   - error: Lỗi kết nối
+   - connect: Kết nối thành công
+   - disconnect: Ngắt kết nối
+   - connectError: Lỗi khi kết nối
+
+🔄 Token Management:
+   - Tự động refresh token khi hết hạn (401 error)
+   - Hỗ trợ Google Sign-In token refresh
+   - Callback onTokenExpired để xử lý khi token hết hạn
+
+================================================================================
+5. CHAT_AI_SERVICE.DART - Service AI Chat (UI Component)
+================================================================================
+
+📁 File: lib/services/chat_ai_service.dart
+📝 Chức năng: Widget BottomSheet cho chat AI tìm kiếm nhà
+
+⚠️ Lưu ý: Đây là UI Component (StatefulWidget), không phải service thuần
+
+🔧 Tính năng chính:
+   • Tìm kiếm thông minh theo nhiều tiêu chí:
+     1. Loại bất động sản (propertyType)
+        - Tìm theo: chung cư, nhà trọ, phòng trọ, etc.
+     
+     2. Từ khóa (tiêu đề, vị trí, tiện nghi)
+        - Tìm trong: title, location['short'], amenities
+     
+     3. Giá rẻ nhất/cao nhất
+        - "giá rẻ nhất": Sắp xếp theo giá tăng dần
+        - "giá cao nhất" hoặc "đắt nhất": Sắp xếp theo giá giảm dần
+     
+     4. Diện tích
+        - Tìm theo từ khóa "diện tích" + số
+        - Tìm nhà có diện tích gần với giá trị tìm kiếm (±10m²)
+     
+     5. Vị trí/khu vực
+        - Tìm theo từ khóa "vị trí" hoặc "khu vực"
+        - So khớp với location['short']
+   
+   • Tích hợp Google Gemini API:
+     - Khi không tìm thấy kết quả local
+     - Gọi API: generativelanguage.googleapis.com
+     - Model: gemini-2.0-flash
+     - Trả về phản hồi AI thông minh
+   
+   • Hiển thị kết quả:
+     - Nếu có kết quả: Hiển thị danh sách bài đăng (RentalItemWidget)
+     - Nếu không có: Hiển thị phản hồi từ AI
+
+💡 Cách sử dụng:
+   - Khởi tạo với apiKey (Google Gemini API key)
+   - Load danh sách rentals khi init
+   - Xử lý input người dùng và tìm kiếm thông minh
+   - Fallback sang AI nếu không có kết quả
+
+================================================================================
+6. CHAT_USER_SERVICE.DART - Service Quản Lý Người Dùng Chat
+================================================================================
+
+📁 File: lib/services/chat_user_service.dart
+📝 Trạng thái: File trống (chưa được implement)
+
+💡 Gợi ý: Có thể dùng để:
+   - Quản lý thông tin người dùng trong chat
+   - Lấy danh sách người dùng đã chat
+   - Block/unblock người dùng
+   - Cập nhật trạng thái online/offline
+
+================================================================================
+7. COMMENT_SERVICE.DART - Service Bình Luận
+================================================================================
+
+📁 File: lib/services/comment_service.dart
+📝 Chức năng: Quản lý toàn bộ chức năng bình luận và phản hồi
+
+🔧 Tính năng chính:
+
+   A. Bình luận (Comment):
+   • fetchComments()
+     - Lấy danh sách bình luận của một bài đăng
+     - Phân trang: page, limit (mặc định 5)
+     - Trả về: comments, totalComments, currentPage, totalPages
+   
+   • postComment()
+     - Đăng bình luận mới
+     - Hỗ trợ: content, rating (1-5 sao), images (nhiều ảnh)
+     - Upload dạng MultipartRequest
+   
+   • editComment()
+     - Chỉnh sửa bình luận
+     - Có thể thêm/xóa ảnh
+     - imagesToRemove: Danh sách URL ảnh cần xóa
+   
+   • deleteComment()
+     - Xóa bình luận
+
+   B. Phản hồi (Reply):
+   • postReply()
+     - Đăng phản hồi cho bình luận
+     - Hỗ trợ nested replies (phản hồi phản hồi)
+     - parentReplyId: ID của reply cha (nếu có)
+     - Hỗ trợ upload ảnh
+   
+   • editReply()
+     - Chỉnh sửa phản hồi
+     - Tối ưu: Chỉ trả về Reply được cập nhật, không phải toàn bộ Comment
+   
+   • deleteReply()
+     - Xóa phản hồi
+     - Tối ưu: Chỉ trả về replyId, không phải toàn bộ Comment
+
+   C. Like/Unlike:
+   • toggleLike()
+     - Like/unlike bình luận
+     - Tự động kiểm tra trạng thái like hiện tại
+   
+   • toggleReplyLike()
+     - Like/unlike phản hồi
+     - Hỗ trợ nested replies
+
+   D. Tiện ích:
+   • pickImages()
+     - Chọn ảnh từ gallery
+     - Hỗ trợ: comment, reply, edit
+   
+   • loadCurrentUserInfo()
+     - Load thông tin người dùng hiện tại (username, avatar)
+
+   E. Helper Classes:
+   • CommentStateManager
+     - Quản lý state bình luận hiệu quả
+     - Methods:
+       * updateCommentInList()
+       * removeCommentFromList()
+       * addCommentToList()
+       * updateReplyInCommentList()
+       * removeReplyFromCommentList()
+       * findCommentById()
+       * findReplyInComments()
+   
+   • CommentService Static Methods:
+     - updateReplyInComment()
+     - removeReplyFromComment()
+     - _updateReplyInList() (recursive)
+     - _removeReplyFromList() (recursive)
+     - findReplyById() (recursive)
+
+📊 Cấu trúc dữ liệu:
+   Comment
+   ├── id
+   ├── rentalId
+   ├── userId
+   ├── content
+   ├── rating (1-5)
+   ├── images []
+   ├── likes []
+   ├── replies []
+   │   ├── id
+   │   ├── commentId
+   │   ├── parentReplyId (nested support)
+   │   ├── userId
+   │   ├── content
+   │   ├── images []
+   │   ├── likes []
+   │   └── replies [] (nested)
+   └── createdAt
+
+================================================================================
+8. RENTAL_SERVICE.DART - Service Quản Lý Nhà Trọ
+================================================================================
+
+📁 File: lib/services/rental_service.dart
+📝 Chức năng: Quản lý bài đăng nhà trọ và các tính năng liên quan
+
+🔧 Tính năng chính:
+   • fetchRentals()
+     - Lấy danh sách nhà trọ
+     - Phân trang: page, limit (mặc định 10)
+     - Token optional (có thể xem không cần đăng nhập)
+   
+   • fetchRentalById()
+     - Lấy chi tiết một nhà trọ cụ thể
+     - Trả về Rental hoặc null
+   
+   • fetchRentalDetails()
+     - Lấy thông tin chi tiết: averageRating, reviewCount
+     - Callback: onSuccess(averageRating, reviewCount)
+   
+   • checkFavoriteStatus()
+     - Kiểm tra nhà trọ đã được thêm vào yêu thích chưa
+     - Callback: onSuccess(isFavorite)
+   
+   • toggleFavorite()
+     - Thêm/xóa yêu thích
+     - POST để thêm, DELETE để xóa
+     - Callback: onSuccess(newStatus)
+   
+   • createRental()
+     - Tạo bài đăng nhà trọ mới
+     - Hỗ trợ: rental data, imagePaths, token
+     - Callback: onSuccess(Rental), onError(String)
+   
+   • updateRental()
+     - Cập nhật bài đăng nhà trọ
+     - Hỗ trợ tất cả thông tin rental
+   
+   • fetchNearbyRentals()
+     - Tìm nhà trọ gần đây
+     - Tham số:
+       * rentalId: ID nhà trọ làm điểm tham chiếu
+       * radius: Bán kính tìm kiếm (km, mặc định 10km)
+       * minPrice, maxPrice: Lọc theo giá
+     - Trả về Map:
+       * rentals: List<Rental>
+       * warning: Cảnh báo (nếu có)
+       * searchMethod: Phương pháp tìm kiếm
+       * total: Tổng số kết quả
+       * radiusKm: Bán kính thực tế
+     - Xử lý coordinates từ server
+     - Parse an toàn với error handling
+
+🗺️ Tìm kiếm gần đây:
+   - Sử dụng tọa độ địa lý (latitude, longitude)
+   - Tính khoảng cách giữa các điểm
+   - Hỗ trợ lọc theo giá
+   - Có thể fallback sang phương pháp khác nếu không có coordinates
+
+

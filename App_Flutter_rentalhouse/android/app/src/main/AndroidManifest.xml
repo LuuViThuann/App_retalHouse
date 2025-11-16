@@ -19,7 +19,7 @@
         <!-- Thêm Google Maps API key -->
         <meta-data
             android:name="com.google.android.geo.API_KEY"
-            android:value="AIzaSyBodQpjnPwT1_2ARa34QvgEvW2O7qTDRCk" />
+            android:value="AIzaSyDmb_p1IDQvMzCbvVXo2vpNkCtXA-DpcLY"/>
 
         <!-- Thêm Facebook App ID và Client Token -->
         <meta-data

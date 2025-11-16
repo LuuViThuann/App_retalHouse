@@ -156,23 +156,9 @@ router.delete("/bookings/:bookingId", authMiddleware, async (req, res) => {
 
 ### Booking Model (Updated)
 
-```dart
-class Booking {
-  // ... existing fields ...
 
-  // Thông tin bài viết chi tiết
-  final String? propertyType;
-  final Map<String, dynamic>? area;
-  final List<String>? amenities;
-  final List<String>? furniture;
-  final List<String>? surroundings;
-  final Map<String, dynamic>? rentalTerms;
 
-  // ... existing fields ...
-}
-```
-
-## Tính năng đặc biệt
+- Tính năng đặc biệt
 
 1. **Hiển thị thông minh:** Chỉ hiển thị các trường có dữ liệu
 2. **Giới hạn hiển thị:** Tiện ích, nội thất, xung quanh chỉ hiển thị 3 đầu tiên

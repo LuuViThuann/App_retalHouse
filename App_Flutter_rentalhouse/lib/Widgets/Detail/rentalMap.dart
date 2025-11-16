@@ -57,7 +57,8 @@ class _RentalMapViewState extends State<RentalMapView> {
 
   Future<void> _getLocationFromAddress() async {
     try {
-      if (widget.rental.location['latitude'] != 0.0 &&
+      if (_validateRental(widget.rental) &&
+          widget.rental.location['latitude'] != 0.0 &&
           widget.rental.location['longitude'] != 0.0) {
         setState(() {
           _rentalLatLng = LatLng(
@@ -152,6 +153,7 @@ class _RentalMapViewState extends State<RentalMapView> {
         print('Rental: ${rental.title}');
         print(
             '  - Coordinates: lat=${rental.location['latitude']}, lng=${rental.location['longitude']}');
+        print('  - Price: ${rental.price}');
       }
 
       _updateMarkers();
@@ -168,7 +170,7 @@ class _RentalMapViewState extends State<RentalMapView> {
     final Set<Marker> markers = {};
 
     // Main rental marker (RED)
-    if (_rentalLatLng != null) {
+    if (_rentalLatLng != null && _validateRental(widget.rental)) {
       final customIcon = await CustomMarkerHelper.createCustomMarker(
         price: widget.rental.price,
         propertyType: 'Rental',
@@ -222,8 +224,19 @@ class _RentalMapViewState extends State<RentalMapView> {
         continue;
       }
 
-      final lat = rental.location['latitude'] as double? ?? 0.0;
-      final lng = rental.location['longitude'] as double? ?? 0.0;
+      // Validate rental before processing
+      if (!_validateRental(rental)) {
+        print(
+            'Warning: Invalid rental data for ${rental.title}, skipping marker');
+        continue;
+      }
+
+      final lat = _safeParseDouble(
+              rental.location['latitude'], 'rental.location.latitude') ??
+          0.0;
+      final lng = _safeParseDouble(
+              rental.location['longitude'], 'rental.location.longitude') ??
+          0.0;
 
       if (lat == 0.0 && lng == 0.0) {
         print(
@@ -265,20 +278,69 @@ class _RentalMapViewState extends State<RentalMapView> {
     }
   }
 
-// ĐỊNH DẠNG HIỂN THỊ GIÁ TRỊ TIỀN TRÊN GOOGLE-MAP ==========================
-  String _formatPriceCompact(double price) {
-    if (price >= 1000000000) {
-      return '${(price / 1000000000).toStringAsFixed(1)} ty VND';
-    } else if (price >= 1000000) {
-      return '${(price / 1000000).toStringAsFixed(0)} tr VND';
-    } else if (price >= 1000) {
-      return '${(price / 1000).toStringAsFixed(0)} nghìn VND';
-    } else {
-      return '${price.toStringAsFixed(0)} VND';
+  // Hàm kiểm tra tính hợp lệ của Rental
+  bool _validateRental(Rental rental) {
+    try {
+      if (rental.id.isEmpty || rental.title.isEmpty) {
+        debugPrint('Invalid rental: Missing id or title');
+        return false;
+      }
+      final price = _safeParseDouble(rental.price, 'rental.price');
+      final lat = _safeParseDouble(
+          rental.location['latitude'], 'rental.location.latitude');
+      final lng = _safeParseDouble(
+          rental.location['longitude'], 'rental.location.longitude');
+      if (price == null || lat == null || lng == null) {
+        debugPrint('Invalid rental: Invalid price or coordinates');
+        return false;
+      }
+      return true;
+    } catch (e) {
+      debugPrint('Error validating rental: $e');
+      return false;
     }
   }
 
-// ----------==============================================================
+  // Helper method to safely parse a value to double
+  double? _safeParseDouble(dynamic value, String fieldName) {
+    if (value == null) {
+      debugPrint('Warning: $fieldName is null');
+      return null;
+    }
+    if (value is num) return value.toDouble();
+    if (value is String) {
+      final trimmed = value.trim().replaceAll(',', '.');
+      if (trimmed.isEmpty) {
+        debugPrint('Warning: $fieldName is empty string');
+        return null;
+      }
+      final result = double.tryParse(trimmed);
+      if (result == null) {
+        debugPrint('Error: Failed to parse $fieldName with value "$value"');
+      }
+      return result;
+    }
+    debugPrint('Error: $fieldName is of invalid type: ${value.runtimeType}');
+    return null;
+  }
+
+  String _formatPriceCompact(double price) {
+    try {
+      if (price >= 1000000000) {
+        return '${(price / 1000000000).toStringAsFixed(1)} tỷ VNĐ';
+      } else if (price >= 1000000) {
+        return '${(price / 1000000).toStringAsFixed(0)} triệu VNĐ';
+      } else if (price >= 1000) {
+        return '${(price / 1000).toStringAsFixed(0)} nghìn VNĐ';
+      } else {
+        return '${price.toStringAsFixed(0)} VNĐ';
+      }
+    } catch (e) {
+      debugPrint('Error formatting price: $e');
+      return '0 VNĐ';
+    }
+  }
+
   void _animateToPosition(LatLng position, double zoom) {
     if (_controller != null) {
       _controller!.animateCamera(CameraUpdate.newLatLngZoom(position, zoom));
@@ -286,6 +348,12 @@ class _RentalMapViewState extends State<RentalMapView> {
   }
 
   void _showRentalInfo(Rental rental) {
+    if (!_validateRental(rental)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Dữ liệu bài viết không hợp lệ')),
+      );
+      return;
+    }
     setState(() {
       _selectedRental = rental;
       _showCustomInfo = true;
@@ -334,8 +402,8 @@ class _RentalMapViewState extends State<RentalMapView> {
       );
       return formatter.format(price);
     } catch (e) {
-      print('Error formatting currency: $e');
-      return '0 VNĐ'; // Fallback value
+      debugPrint('Error formatting currency: $e');
+      return '0 VNĐ';
     }
   }
 
@@ -350,8 +418,14 @@ class _RentalMapViewState extends State<RentalMapView> {
         : '';
 
     final bool isCurrentRental = rental.id == widget.rental.id;
-    final bool hasValidCoords = rental.location['latitude'] != 0.0 ||
-        rental.location['longitude'] != 0.0;
+    final bool hasValidCoords = _safeParseDouble(
+                rental.location['latitude'], 'rental.location.latitude') !=
+            null &&
+        _safeParseDouble(
+                rental.location['longitude'], 'rental.location.longitude') !=
+            null &&
+        (rental.location['latitude'] != 0.0 ||
+            rental.location['longitude'] != 0.0);
 
     return Positioned(
       top: 100,
@@ -523,13 +597,21 @@ class _RentalMapViewState extends State<RentalMapView> {
                       Expanded(
                         child: ElevatedButton.icon(
                           onPressed: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) =>
-                                    RentalDetailScreen(rental: rental),
-                              ),
-                            );
+                            if (_validateRental(rental)) {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) =>
+                                      RentalDetailScreen(rental: rental),
+                                ),
+                              );
+                            } else {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                    content:
+                                        Text('Dữ liệu bài viết không hợp lệ')),
+                              );
+                            }
                           },
                           icon: const Icon(Icons.info_outline, size: 18),
                           label: const Text('Chi tiết'),
@@ -549,8 +631,14 @@ class _RentalMapViewState extends State<RentalMapView> {
                           onPressed: hasValidCoords
                               ? () {
                                   final position = LatLng(
-                                    rental.location['latitude'] as double,
-                                    rental.location['longitude'] as double,
+                                    _safeParseDouble(
+                                            rental.location['latitude'],
+                                            'rental.location.latitude') ??
+                                        0.0,
+                                    _safeParseDouble(
+                                            rental.location['longitude'],
+                                            'rental.location.longitude') ??
+                                        0.0,
                                   );
                                   _openInGoogleMaps(position, rental.title);
                                 }
