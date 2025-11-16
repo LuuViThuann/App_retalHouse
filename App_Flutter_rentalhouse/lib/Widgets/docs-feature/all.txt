@@ -4,7 +4,7 @@
 
 - Lỗi chưa thể chọn loại nhà và khoảng giá tìm kiếm 
 
-- Lỗi không hiển thị ảnh lúc chọn gửi tin nhắn 
+- Lỗi không hiển thị ảnh lúc chọn gửi tin nhắn : DONE 
 
 - Tích hợp thử hiển thị vị trí bài viết khi mở googleMap và đường đi + thời gian phương tiện 
 

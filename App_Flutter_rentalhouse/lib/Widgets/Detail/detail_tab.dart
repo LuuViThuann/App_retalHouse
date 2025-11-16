@@ -11,6 +11,27 @@ class DetailsTab extends StatelessWidget {
   const DetailsTab(
       {super.key, required this.rental, required this.formatCurrency});
 
+  // Helper method to safely parse and format deposit
+  String _formatDeposit(dynamic deposit) {
+    if (deposit == null) {
+      return formatCurrency(0.0);
+    }
+
+    double? depositValue;
+    if (deposit is num) {
+      depositValue = deposit.toDouble();
+    } else if (deposit is String) {
+      final trimmed = deposit.trim().replaceAll(',', '.');
+      depositValue = double.tryParse(trimmed);
+    }
+
+    if (depositValue == null || depositValue < 0) {
+      return formatCurrency(0.0);
+    }
+
+    return formatCurrency(depositValue);
+  }
+
   @override
   Widget build(BuildContext context) {
     return Column(
@@ -65,10 +86,10 @@ class DetailsTab extends StatelessWidget {
                 title: 'Điều khoản thuê',
                 icon: Icons.description,
                 items: [
-                  'Thời hạn thuê tối thiểu: ${rental.rentalTerms['minimumLease']}',
-                  'Cọc: ${formatCurrency(double.parse(rental.rentalTerms['deposit']))}',
-                  'Thanh toán: ${rental.rentalTerms['paymentMethod']}',
-                  'Gia hạn hợp đồng: ${rental.rentalTerms['renewalTerms']}',
+                  'Thời hạn thuê tối thiểu: ${rental.rentalTerms['minimumLease'] ?? 'Không xác định'}',
+                  'Cọc: ${_formatDeposit(rental.rentalTerms['deposit'])}',
+                  'Thanh toán: ${rental.rentalTerms['paymentMethod'] ?? 'Không xác định'}',
+                  'Gia hạn hợp đồng: ${rental.rentalTerms['renewalTerms'] ?? 'Không xác định'}',
                 ],
               ),
             ],
