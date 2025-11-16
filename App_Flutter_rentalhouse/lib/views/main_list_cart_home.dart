@@ -105,18 +105,77 @@ class RentalItemWidget extends StatelessWidget {
                     ClipRRect(
                       borderRadius: BorderRadius.circular(8),
                       child: rental.images.isNotEmpty
-                          ? CachedNetworkImage(
-                              imageUrl:
-                                  '${ApiRoutes.serverBaseUrl}${rental.images[0]}',
-                              height: 200,
-                              width: double.infinity,
-                              fit: BoxFit.cover,
-                              placeholder: (context, url) => const Center(
-                                  child: CircularProgressIndicator()),
-                              errorWidget: (context, url, error) {
-                                print('Image load error: $error for URL: $url');
-                                return const Icon(Icons.error, size: 50);
-                              },
+                          ? Row(
+                              children: [
+                                // First image
+                                Expanded(
+                                  child: ClipRRect(
+                                    borderRadius: const BorderRadius.only(
+                                      topLeft: Radius.circular(8),
+                                      bottomLeft: Radius.circular(8),
+                                    ),
+                                    child: CachedNetworkImage(
+                                      imageUrl:
+                                          '${ApiRoutes.serverBaseUrl}${rental.images[0]}',
+                                      height: 200,
+                                      fit: BoxFit.cover,
+                                      placeholder: (context, url) =>
+                                          const Center(
+                                              child:
+                                                  CircularProgressIndicator()),
+                                      errorWidget: (context, url, error) {
+                                        print(
+                                            'Image load error: $error for URL: $url');
+                                        return const Icon(Icons.error,
+                                            size: 50);
+                                      },
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 4),
+                                // Second image
+                                Expanded(
+                                  child: ClipRRect(
+                                    borderRadius: const BorderRadius.only(
+                                      topRight: Radius.circular(8),
+                                      bottomRight: Radius.circular(8),
+                                    ),
+                                    child: rental.images.length > 1
+                                        ? CachedNetworkImage(
+                                            imageUrl:
+                                                '${ApiRoutes.serverBaseUrl}${rental.images[1]}',
+                                            height: 200,
+                                            fit: BoxFit.cover,
+                                            placeholder: (context, url) =>
+                                                const Center(
+                                                    child:
+                                                        CircularProgressIndicator()),
+                                            errorWidget: (context, url, error) {
+                                              print(
+                                                  'Image load error: $error for URL: $url');
+                                              return const Icon(Icons.error,
+                                                  size: 50);
+                                            },
+                                          )
+                                        : CachedNetworkImage(
+                                            imageUrl:
+                                                '${ApiRoutes.serverBaseUrl}${rental.images[0]}',
+                                            height: 200,
+                                            fit: BoxFit.cover,
+                                            placeholder: (context, url) =>
+                                                const Center(
+                                                    child:
+                                                        CircularProgressIndicator()),
+                                            errorWidget: (context, url, error) {
+                                              print(
+                                                  'Image load error: $error for URL: $url');
+                                              return const Icon(Icons.error,
+                                                  size: 50);
+                                            },
+                                          ),
+                                  ),
+                                ),
+                              ],
                             )
                           : Container(
                               height: 200,
