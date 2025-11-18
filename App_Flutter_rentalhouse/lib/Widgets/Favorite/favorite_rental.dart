@@ -13,10 +13,12 @@ class RentalFavoriteWidget extends StatefulWidget {
   final bool showCheckbox;
   final bool isSelected;
   final Function(bool) onSelectChanged;
+  final bool showFavoriteButton;
 
   const RentalFavoriteWidget({
     super.key,
     required this.rental,
+    required this.showFavoriteButton,
     required this.showCheckbox,
     required this.isSelected,
     required this.onSelectChanged,
@@ -228,66 +230,55 @@ class _RentalFavoriteWidgetState extends State<RentalFavoriteWidget> {
             mainAxisAlignment: MainAxisAlignment.start,
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              isLoadingThisItem
-                  ? Container(
-                      width: 32,
-                      height: 32,
-                      padding: const EdgeInsets.all(4.0),
-                      child: Lottie.asset(
-                        AssetsConfig.loadingLottie,
-                        width: 24,
-                        height: 24,
-                        fit: BoxFit.contain,
-                      ),
-                    )
-                  : Container(
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: [
-                            Colors.red[400]!.withOpacity(0.9),
-                            Colors.red[600]!.withOpacity(0.9),
+              if (widget.showFavoriteButton)
+                isLoadingThisItem
+                    ? Container(
+                        width: 32,
+                        height: 32,
+                        padding: const EdgeInsets.all(4.0),
+                        child: Lottie.asset(
+                          AssetsConfig.loadingLottie,
+                          width: 24,
+                          height: 24,
+                          fit: BoxFit.contain,
+                        ),
+                      )
+                    : Container(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [
+                              Colors.red[400]!.withOpacity(0.9),
+                              Colors.red[600]!.withOpacity(0.9),
+                            ],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                          shape: BoxShape.circle,
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.red.withOpacity(0.3),
+                              blurRadius: 8,
+                              offset: const Offset(0, 2),
+                            ),
                           ],
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
                         ),
-                        shape: BoxShape.circle,
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.red.withOpacity(0.3),
-                            blurRadius: 8,
-                            offset: const Offset(0, 2),
-                          ),
-                        ],
-                      ),
-                      child: InkWell(
-                        onTap: () {
-                          if (authViewModel.currentUser != null &&
-                              authViewModel.currentUser!.token != null &&
-                              authViewModel.currentUser!.token!.isNotEmpty &&
-                              !isLoadingThisItem) {
-                            _handleToggleFavorite(
-                                authViewModel.currentUser!.token!);
-                          } else if (!isLoadingThisItem) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content:
-                                    Text('Vui lòng đăng nhập để bỏ yêu thích'),
-                                backgroundColor: Colors.red,
-                              ),
-                            );
-                          }
-                        },
-                        borderRadius: BorderRadius.circular(20),
-                        child: Padding(
-                          padding: const EdgeInsets.all(8.0),
-                          child: Icon(
-                            Icons.favorite,
-                            color: Colors.white,
-                            size: 24,
+                        child: InkWell(
+                          onTap: () {
+                            if (authViewModel.currentUser != null &&
+                                authViewModel.currentUser!.token != null &&
+                                !isLoadingThisItem) {
+                              _handleToggleFavorite(
+                                  authViewModel.currentUser!.token!);
+                            }
+                          },
+                          borderRadius: BorderRadius.circular(20),
+                          child: const Padding(
+                            padding: EdgeInsets.all(8.0),
+                            child: Icon(Icons.favorite,
+                                color: Colors.white, size: 24),
                           ),
                         ),
                       ),
-                    ),
               const SizedBox(height: 12),
               if (widget.showCheckbox)
                 Container(

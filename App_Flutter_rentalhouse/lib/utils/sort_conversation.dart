@@ -1,7 +1,8 @@
 import 'package:flutter_rentalhouse/models/conversation.dart';
 
 class ConversationSorter {
-  static List<Conversation> sortConversations(List<Conversation> conversations) {
+  static List<Conversation> sortConversations(
+      List<Conversation> conversations) {
     final sorted = List<Conversation>.from(conversations);
     sorted.sort((a, b) {
       // Prioritize conversations with unread messages
@@ -37,3 +38,5 @@ class ConversationSorter {
     return sorted;
   }
 }
+
+// SẮP XẾP CÁC TIN NHẮN THEO THỨ TỰ DƯỚI LÊN

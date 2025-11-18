@@ -10,7 +10,6 @@ import 'package:flutter_rentalhouse/viewmodels/vm_auth.dart';
 import 'package:flutter_rentalhouse/views/change_password_view.dart';
 import 'package:flutter_rentalhouse/views/forgot_password.dart';
 import 'package:flutter_rentalhouse/views/login_view.dart';
-import 'package:flutter_rentalhouse/views/my_bookings_view.dart';
 import 'package:flutter_rentalhouse/views/my_profile_view.dart';
 import 'package:provider/provider.dart';
 
@@ -110,8 +109,8 @@ class _ProfileViewState extends State<ProfileView> {
                     onTap: () => AppNavigator.goToProfile(context),
                   ),
                   ProfileMenuItem(
-                      icon: Icons.shopping_bag_outlined,
-                      text: 'Hợp đồng của tôi',
+                      icon: Icons.notifications_paused,
+                      text: 'Thông báo gần đây',
                       onTap: () => AppNavigator.goToBookings(context)),
                   ProfileMenuItem(
                       icon: Icons.book,

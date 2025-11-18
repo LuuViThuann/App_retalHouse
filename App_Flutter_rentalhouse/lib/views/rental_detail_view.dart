@@ -10,9 +10,7 @@ import 'package:flutter_rentalhouse/Widgets/Detail/detail_tab.dart';
 import 'package:flutter_rentalhouse/Widgets/Detail/info_chip.dart';
 import 'package:flutter_rentalhouse/models/rental.dart';
 import 'package:flutter_rentalhouse/services/rental_service.dart';
-import 'package:flutter_rentalhouse/views/booking_view.dart';
 import 'package:flutter_rentalhouse/viewmodels/vm_auth.dart';
-import 'package:flutter_rentalhouse/viewmodels/vm_booking.dart';
 import 'package:intl/intl.dart';
 import 'package:photo_view/photo_view.dart';
 import '../config/api_routes.dart';
@@ -96,9 +94,7 @@ class _RentalDetailScreenState extends State<RentalDetailScreen>
 
     final authViewModel = Provider.of<AuthViewModel>(context, listen: false);
     if (authViewModel.currentUser != null) {
-      final bookingViewModel =
-          Provider.of<BookingViewModel>(context, listen: false);
-      await bookingViewModel.checkUserHasBooked(rentalId: widget.rental.id);
+     
     }
   }
 
@@ -270,9 +266,8 @@ class _RentalDetailScreenState extends State<RentalDetailScreen>
   Future<void> _refreshBookingStatus() async {
     final authViewModel = Provider.of<AuthViewModel>(context, listen: false);
     if (authViewModel.currentUser != null) {
-      final bookingViewModel =
-          Provider.of<BookingViewModel>(context, listen: false);
-      await bookingViewModel.checkUserHasBooked(rentalId: widget.rental.id);
+    //
+     
     }
   }
 
@@ -709,226 +704,11 @@ class _RentalDetailScreenState extends State<RentalDetailScreen>
                               );
                             }
 
-                            return Consumer<BookingViewModel>(
-                              builder: (context, bookingViewModel, child) {
-                                if (bookingViewModel.isCheckingBooking) {
-                                  return Container(
-                                    padding: const EdgeInsets.all(16),
-                                    decoration: BoxDecoration(
-                                      color: Colors.grey[50],
-                                      borderRadius: BorderRadius.circular(12),
-                                      border:
-                                          Border.all(color: Colors.grey[200]!),
-                                    ),
-                                    child: Row(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.center,
-                                      children: [
-                                        const SizedBox(
-                                          width: 20,
-                                          height: 20,
-                                          child: CircularProgressIndicator(
-                                            strokeWidth: 2,
-                                            color: Colors.grey,
-                                          ),
-                                        ),
-                                        const SizedBox(width: 12),
-                                        Text(
-                                          'Đang kiểm tra...',
-                                          style: TextStyle(
-                                            color: Colors.grey[600],
-                                            fontSize: 16,
-                                            fontWeight: FontWeight.w500,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  );
-                                }
-
-                                if (bookingViewModel.userHasBooked != null) {
-                                  final booking =
-                                      bookingViewModel.userHasBooked!;
-                                  String statusText = '';
-                                  Color statusColor = Colors.blue;
-
-                                  switch (booking.status) {
-                                    case 'pending':
-                                      statusText = 'Chờ xác nhận';
-                                      statusColor = Colors.orange;
-                                      break;
-                                    case 'confirmed':
-                                      statusText = 'Đã xác nhận';
-                                      statusColor = Colors.green;
-                                      break;
-                                    default:
-                                      statusText = 'Đã đặt chỗ';
-                                      statusColor = Colors.blue;
-                                  }
-
-                                  return Container(
-                                    padding: const EdgeInsets.all(16),
-                                    decoration: BoxDecoration(
-                                      gradient: LinearGradient(
-                                        colors: [
-                                          statusColor.withOpacity(0.1),
-                                          statusColor.withOpacity(0.05),
-                                        ],
-                                        begin: Alignment.topLeft,
-                                        end: Alignment.bottomRight,
-                                      ),
-                                      borderRadius: BorderRadius.circular(12),
-                                      border: Border.all(
-                                          color: statusColor.withOpacity(0.3)),
-                                    ),
-                                    child: Column(
-                                      children: [
-                                        Row(
-                                          mainAxisAlignment:
-                                              MainAxisAlignment.center,
-                                          children: [
-                                            Container(
-                                              padding: const EdgeInsets.all(8),
-                                              decoration: BoxDecoration(
-                                                color: statusColor,
-                                                borderRadius:
-                                                    BorderRadius.circular(8),
-                                              ),
-                                              child: Icon(
-                                                Icons.check_circle,
-                                                color: Colors.white,
-                                                size: 20,
-                                              ),
-                                            ),
-                                            const SizedBox(width: 12),
-                                            Expanded(
-                                              child: Column(
-                                                crossAxisAlignment:
-                                                    CrossAxisAlignment.start,
-                                                children: [
-                                                  Text(
-                                                    'Bạn đã đặt chỗ nhà này',
-                                                    style: TextStyle(
-                                                      color: statusColor,
-                                                      fontSize: 16,
-                                                      fontWeight:
-                                                          FontWeight.bold,
-                                                    ),
-                                                  ),
-                                                  const SizedBox(height: 4),
-                                                  Text(
-                                                    'Trạng thái: $statusText',
-                                                    style: TextStyle(
-                                                      color: statusColor
-                                                          .withOpacity(0.8),
-                                                      fontSize: 14,
-                                                      fontWeight:
-                                                          FontWeight.w500,
-                                                    ),
-                                                  ),
-                                                ],
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                        const SizedBox(height: 12),
-                                        Text(
-                                          'Chủ nhà sẽ liên hệ với bạn sớm nhất để xác nhận thời gian xem nhà.',
-                                          textAlign: TextAlign.center,
-                                          style: TextStyle(
-                                            color: Colors.grey[700],
-                                            fontSize: 13,
-                                            height: 1.4,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  );
-                                }
-
-                                return InkWell(
-                                  onTap: () {
-                                    if (authViewModel.currentUser == null) {
-                                      ScaffoldMessenger.of(context)
-                                          .showSnackBar(
-                                        const SnackBar(
-                                          content: Text(
-                                              'Vui lòng đăng nhập để đặt chỗ xem nhà'),
-                                          backgroundColor: Colors.orange,
-                                        ),
-                                      );
-                                      return;
-                                    }
-
-                                    Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (context) =>
-                                            BookingView(rental: widget.rental),
-                                      ),
-                                    ).then((_) => _refreshBookingStatus());
-                                  },
-                                  borderRadius: BorderRadius.circular(24),
-                                  child: AnimatedContainer(
-                                    duration: const Duration(milliseconds: 200),
-                                    padding: const EdgeInsets.symmetric(
-                                        horizontal: 32, vertical: 16),
-                                    decoration: BoxDecoration(
-                                      gradient: LinearGradient(
-                                        colors: [
-                                          Colors.blue.shade700,
-                                          Colors.blue.shade900,
-                                        ],
-                                        begin: Alignment.topLeft,
-                                        end: Alignment.bottomRight,
-                                      ),
-                                      borderRadius: BorderRadius.circular(24),
-                                      boxShadow: [
-                                        BoxShadow(
-                                          color: Colors.blue.shade300
-                                              .withOpacity(0.4),
-                                          spreadRadius: 2,
-                                          blurRadius: 8,
-                                          offset: const Offset(0, 4),
-                                        ),
-                                      ],
-                                    ),
-                                    child: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        AnimatedScale(
-                                          scale:
-                                              authViewModel.currentUser == null
-                                                  ? 1.0
-                                                  : 1.1,
-                                          duration:
-                                              const Duration(milliseconds: 200),
-                                          child: Icon(
-                                            Icons.event_available,
-                                            color: Colors.white,
-                                            size: 26,
-                                          ),
-                                        ),
-                                        const SizedBox(width: 12),
-                                        Text(
-                                          'Đặt chỗ ngay',
-                                          style: TextStyle(
-                                            fontSize: 18,
-                                            fontWeight: FontWeight.w600,
-                                            color: Colors.white,
-                                            letterSpacing: 0.5,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                );
-                              },
-                            );
+                            // 👇 Thêm return này để tránh lỗi
+                            return const SizedBox.shrink();
                           },
                         ),
                       ),
-                      const SizedBox(height: 25),
                     ],
                   ),
                 ),

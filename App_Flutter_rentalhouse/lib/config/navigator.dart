@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_rentalhouse/views/login_view.dart';
-import 'package:flutter_rentalhouse/views/my_bookings_view.dart';
 import 'package:flutter_rentalhouse/views/my_profile_view.dart';
 import 'package:flutter_rentalhouse/Widgets/Profile/my_post.dart';
 import 'package:flutter_rentalhouse/Widgets/Profile/recent_comment.dart';
@@ -33,11 +32,11 @@ class AppNavigator {
     );
   }
 
-  // Dẫn thông tin hồ sơ đặt chỗ ----------------------------------------------
+  // Dẫn thông tin thông báo  ----------------------------------------------
   static void goToBookings(BuildContext context) {
     Navigator.push(
       context,
-      MaterialPageRoute(builder: (context) => const MyBookingsView()),
+      MaterialPageRoute(builder: (context) => Container()),
     );
   }
 

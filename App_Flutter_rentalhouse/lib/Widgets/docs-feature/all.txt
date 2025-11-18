@@ -1,17 +1,42 @@
-- điều chỉnh có thể xóa lịch sử tìm kiếm và không bị trùng : DONE 
+- điều chỉnh có thể xóa lịch sử tìm kiếm và không bị trùng : ==> DONE 
+
+- Chưa hiển thị các hợp đồng của bạn ở Home : ==> DONE 
+
+- Khi chọn địa chỉ trong bài viết hiển thị trên ggMap và gợi ý các bài trong khu vực đó : ==> DONE 
+
+- Lỗi không hiển thị ảnh lúc chọn gửi tin nhắn : ==> DONE 
+
+- Chọn địa điểm lọc các bất động sản : ==> DONE  
+
+- Cập nhật địa chỉ sau khi sáp nhập : Chưa có API phiên bản hoàn chỉnh 
 
 - Khi xóa bài viết thuộc tài khoản chưa cập nhật ở Home 
 
 - Lỗi chưa thể chọn loại nhà và khoảng giá tìm kiếm 
 
-- Lỗi không hiển thị ảnh lúc chọn gửi tin nhắn : DONE 
-
-- Tích hợp thử hiển thị vị trí bài viết khi mở googleMap và đường đi + thời gian phương tiện 
-
 - Điều chỉnh các thông báo thao tác cho hoàn chỉnh còn log , thông báo nghiệp vụ 
 
-- Chưa hiển thị các hợp đồng của bạn ở Home : DONE 
-
-- Khi chọn địa chỉ trong bài viết hiển thị trên ggMap và gợi ý các bài trong khu vực đó : DONE 
-
 - Chưa điều chỉnh cập nhật tọa độ khi thay đổi địa chỉ trong profile và chỉnh sửa bài đăng 
+
+- Thêm mục thông báo khi có tương tác : VD -> admin từ chối bài đăng + lý do và thông báo 
+
+- Điều chỉnh giao diện chỗ tạo bài đăng 
+
+- Tạo Banner quảng cáo ở trang HOME 
+
+# BỔ SUNG THÊM TÍNH NĂNG ===================================: 
+
+- Tạo thêm ADMIN quản lý kiểm duyệt các banner quảng cáo,  bài đăng , tin tức , tài khoản , sự kiện , chat , ...
+
++ auth_service 
+
++ vm_auth
+
++ login_view 
+
++ Thư mục HomeMain 
+
++ main_list_cart_home
+
+- Thống kê bài đăng hôm nay , tài khoản người dùng mới 
+

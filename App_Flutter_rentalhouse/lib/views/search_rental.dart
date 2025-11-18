@@ -16,7 +16,7 @@ class SearchScreen extends StatefulWidget {
 class _SearchScreenState extends State<SearchScreen> {
   final TextEditingController _searchController = TextEditingController();
   List<String> _selectedPropertyTypes = [];
-  RangeValues _priceRange = const RangeValues(0, 10000000);
+  RangeValues _priceRange = const RangeValues(0, 50000000);
   List<String> _searchHistory = [];
 
   final Map<String, String> _propertyTypeMap = {
@@ -146,16 +146,41 @@ class _SearchScreenState extends State<SearchScreen> {
   }
 
   void _performSearch() {
-    final backendPropertyTypes =
-        _selectedPropertyTypes.map((type) => _propertyTypeMap[type]!).toList();
+    // Chuẩn bị dữ liệu tìm kiếm
+    final backendPropertyTypes = _selectedPropertyTypes.isNotEmpty
+        ? _selectedPropertyTypes.map((type) => _propertyTypeMap[type]!).toList()
+        : null;
+
+    // Kiểm tra nếu giá đã được điều chỉnh từ giá trị mặc định
+    final bool hasPriceFilter =
+        _priceRange.start > 0 || _priceRange.end < 50000000;
+    final double? minPrice = hasPriceFilter ? _priceRange.start : null;
+    final double? maxPrice = hasPriceFilter ? _priceRange.end : null;
+
+    // Hiển thị thông báo nếu không có bộ lọc nào
+    if (_searchController.text.isEmpty &&
+        backendPropertyTypes == null &&
+        !hasPriceFilter) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text(
+              'Vui lòng nhập từ khóa, chọn loại nhà hoặc khoảng giá để tìm kiếm!'),
+          backgroundColor: Colors.orange.shade700,
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 2),
+        ),
+      );
+      return;
+    }
+
     Navigator.push(
       context,
       MaterialPageRoute(
         builder: (context) => SearchResultsPage(
           searchQuery:
               _searchController.text.isNotEmpty ? _searchController.text : null,
-          minPrice: _priceRange.start,
-          maxPrice: _priceRange.end,
+          minPrice: minPrice,
+          maxPrice: maxPrice,
           propertyTypes: backendPropertyTypes,
         ),
       ),
@@ -413,13 +438,68 @@ class _SearchScreenState extends State<SearchScreen> {
                         ],
                       ),
                     // Property Type Selection
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          'Loại nhà',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                            color: Colors.blue.shade800,
+                            letterSpacing: 0.2,
+                          ),
+                        ),
+                        if (_selectedPropertyTypes.isNotEmpty)
+                          InkWell(
+                            onTap: () {
+                              setState(() {
+                                _selectedPropertyTypes.clear();
+                              });
+                            },
+                            borderRadius: BorderRadius.circular(12),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 10, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: Colors.red.shade50,
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                  color: Colors.red.shade300,
+                                  width: 1,
+                                ),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    Icons.close,
+                                    size: 14,
+                                    color: Colors.red.shade700,
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    'Xóa (${_selectedPropertyTypes.length})',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w500,
+                                      color: Colors.red.shade700,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
                     Text(
-                      'Loại nhà',
+                      'Bạn có thể chọn nhiều loại nhà (tùy chọn)',
                       style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w700,
-                        color: Colors.blue.shade800,
-                        letterSpacing: 0.2,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w400,
+                        color: Colors.grey.shade600,
+                        fontStyle: FontStyle.italic,
                       ),
                     ),
                     const SizedBox(height: 12),
@@ -466,13 +546,68 @@ class _SearchScreenState extends State<SearchScreen> {
                     ),
                     const SizedBox(height: 24),
                     // Price Range Slider
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          'Khoảng giá lựa chọn',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                            color: Colors.blue.shade800,
+                            letterSpacing: 0.2,
+                          ),
+                        ),
+                        if (_priceRange.start > 0 || _priceRange.end < 50000000)
+                          InkWell(
+                            onTap: () {
+                              setState(() {
+                                _priceRange = const RangeValues(0, 50000000);
+                              });
+                            },
+                            borderRadius: BorderRadius.circular(12),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 10, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: Colors.red.shade50,
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                  color: Colors.red.shade300,
+                                  width: 1,
+                                ),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    Icons.close,
+                                    size: 14,
+                                    color: Colors.red.shade700,
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    'Đặt lại',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w500,
+                                      color: Colors.red.shade700,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
                     Text(
-                      'Khoảng giá lựa chọn',
+                      'Có thể kết hợp với loại nhà để tìm kiếm chính xác hơn (tùy chọn)',
                       style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w700,
-                        color: Colors.blue.shade800,
-                        letterSpacing: 0.2,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w400,
+                        color: Colors.grey.shade600,
+                        fontStyle: FontStyle.italic,
                       ),
                     ),
                     const SizedBox(height: 12),
@@ -510,12 +645,69 @@ class _SearchScreenState extends State<SearchScreen> {
                       ),
                     ),
                     const SizedBox(height: 12),
-                    Text(
-                      'Giá: ${formatCurrency(_priceRange.start)} - ${formatCurrency(_priceRange.end)}',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w500,
-                        color: Colors.grey.shade700,
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.blue.shade50,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: Colors.blue.shade100,
+                          width: 1,
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Giá tối thiểu',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w500,
+                                  color: Colors.grey.shade600,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                formatCurrency(_priceRange.start),
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w700,
+                                  color: Colors.blue.shade700,
+                                ),
+                              ),
+                            ],
+                          ),
+                          Container(
+                            width: 1,
+                            height: 40,
+                            color: Colors.blue.shade200,
+                          ),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.end,
+                            children: [
+                              Text(
+                                'Giá tối đa',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w500,
+                                  color: Colors.grey.shade600,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                formatCurrency(_priceRange.end),
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w700,
+                                  color: Colors.blue.shade700,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
                       ),
                     ),
                     const SizedBox(height: 24),

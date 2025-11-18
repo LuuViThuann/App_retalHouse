@@ -136,6 +136,7 @@ class FavoriteListBody extends StatelessWidget {
                 child: RentalFavoriteWidget(
                   key: ValueKey(rental.id),
                   rental: rental,
+                  showFavoriteButton: true,
                   showCheckbox: selectedFavorites.isNotEmpty,
                   isSelected: selectedFavorites.contains(rental.id),
                   onSelectChanged: (isSelected) {

@@ -1,0 +1,52 @@
+
+- change_address_profile : Mở bản đồ và chọn vị trí 
+
+- change_password_view : Page thay đổi mật khẩu 
+
+- chat_user : màn hình nhắn tin nhập và danh sách tin nhắn 
+
+- contract_view : BỎ
+
+- create_rental_View : Màn hình nhập thông tin tạo bài đăng 
+
+- favorite_view : Màn hình hiển thị danh sách bài viết đã thêm yêu thích
+
+- forgot_password : Màn hình thay đổi mật khẩu qua Email 
+
+- home_content : trang chính hiển thị khi mở ứng dụng 
+
+- home : Trang code hiển thị BottomNavigation điều hướng bên dưới 
+
+- login_View : Trang màn hình đăng nhập 
+
+- main_list_cart_home : thông tin hiển thị cấu trúc bài đăng 
+
+- message_view : Màn hình hiển thị danh sách cuộc trò chuyện 
+
+- my_booking_view : hiển thị thông tin Compoment khi đã đặt chỗ 
+
+- my_profile_view : Trang hiển thị thông tin tài khoản 
+
+- profile_view : Trang hồ sơ người dùng 
+
+- register_View : Trang giao diện đăng ký thông tin tài khoản 
+
+- rentail_detail_view : Trang giao diện cấu trúc chi tiết bài viết 
+
+- reset_password : Trang giao diện đặt lại mật khẩu 
+
+- result_search_rental : Trang giao diện hiển thị kết quả khi tìm kiếm 
+
+- search_rental : trang giao diện gõ từ khóa và chọn mức tìm kiếm bài viết 
+
+- select_address_register : Compoment Dropdown chọn địa chỉ ở trang đăng ký 
+
+- select_current_location : Code hiển thị thông báo xác nhận chọn vị trí hiện tại
+
+- welcome : Giao hiển thị trang chào khi khởi động ứng dụng 
+
+
+
+
+
+

@@ -42,17 +42,24 @@ class _NewAddressPageState extends State<NewAddressPage> {
 
   Future<void> _fetchProvinces() async {
     setState(() => isLoading = true);
-    final response = await http.get(ApiRoutes.provinces);
-    if (response.statusCode == 200) {
-      setState(() {
-        provinces = json.decode(utf8.decode(response.bodyBytes));
-        isLoading = false;
-      });
-    } else {
+    try {
+      final response = await http.get(ApiRoutes.provinces);
+      if (response.statusCode == 200) {
+        setState(() {
+          provinces = json.decode(
+              utf8.decode(response.bodyBytes)); // API trả mảng trực tiếp
+          isLoading = false;
+        });
+      } else {
+        throw Exception('HTTP ${response.statusCode}');
+      }
+    } catch (e) {
       setState(() => isLoading = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Không thể tải dữ liệu tỉnh')),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Không thể tải dữ liệu tỉnh: $e')),
+        );
+      }
     }
   }
 
@@ -70,39 +77,55 @@ class _NewAddressPageState extends State<NewAddressPage> {
         final Map<String, dynamic> data =
             json.decode(utf8.decode(response.bodyBytes));
         setState(() {
-          districts = List<Map<String, dynamic>>.from(data['districts']);
+          districts = List<Map<String, dynamic>>.from(
+              data['districts'] ?? []); // Lấy từ nested 'districts'
           isLoading = false;
         });
       } else {
-        throw Exception('Failed to load districts');
+        throw Exception('HTTP ${response.statusCode}');
       }
     } catch (e) {
       setState(() => isLoading = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Lỗi khi tải huyện: $e')),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Lỗi khi tải huyện: $e')),
+        );
+      }
     }
   }
 
   Future<void> _fetchWards(String districtCode) async {
-    setState(() => isLoading = true);
-    final response = await http.get(ApiRoutes.getWards(districtCode));
-    if (response.statusCode == 200) {
-      setState(() {
-        wards = json.decode(utf8.decode(response.bodyBytes))['wards'];
-        isLoading = false;
-      });
-    } else {
+    setState(() {
+      isLoading = true;
+      wards.clear();
+      selectedWard = null;
+    });
+    try {
+      final response = await http.get(ApiRoutes.getWards(districtCode));
+      if (response.statusCode == 200) {
+        final Map<String, dynamic> data =
+            json.decode(utf8.decode(response.bodyBytes));
+        setState(() {
+          wards =
+              List<dynamic>.from(data['wards'] ?? []); // Lấy từ nested 'wards'
+          isLoading = false;
+        });
+      } else {
+        throw Exception('HTTP ${response.statusCode}');
+      }
+    } catch (e) {
       setState(() => isLoading = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Không thể tải dữ liệu xã')),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Không thể tải dữ liệu xã: $e')),
+        );
+      }
     }
   }
 
   String _formatAddress() {
     final parts = [
-      _streetController.text,
+      _streetController.text.trim(),
       selectedWard,
       selectedDistrict,
       selectedProvince,
@@ -140,62 +163,82 @@ class _NewAddressPageState extends State<NewAddressPage> {
             _buildDefaultSwitch(),
             const SizedBox(height: 12),
             ElevatedButton(
-              onPressed: () async {
-                if (_formKey.currentState!.validate()) {
-                  if (selectedProvince == null ||
-                      selectedDistrict == null ||
-                      selectedWard == null ||
-                      _streetController.text.isEmpty) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                          content:
-                              Text('Vui lòng điền đầy đủ thông tin địa chỉ')),
-                    );
-                    return;
-                  }
+              onPressed: isLoading
+                  ? null
+                  : () async {
+                      if (_formKey.currentState!.validate()) {
+                        if (selectedProvince == null ||
+                            selectedDistrict == null ||
+                            selectedWard == null ||
+                            _streetController.text.trim().isEmpty) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                                content: Text(
+                                    'Vui lòng điền đầy đủ thông tin địa chỉ')),
+                          );
+                          return;
+                        }
 
-                  final address = _formatAddress();
-                  final authViewModel =
-                      Provider.of<AuthViewModel>(context, listen: false);
+                        final address = _formatAddress();
+                        final authViewModel =
+                            Provider.of<AuthViewModel>(context, listen: false);
 
-                  try {
-                    await authViewModel.updateUserProfile(
-                      phoneNumber: authViewModel.currentUser?.phoneNumber ?? '',
-                      address: address,
-                      username: authViewModel.currentUser?.username ?? '',
-                    );
+                        try {
+                          await authViewModel.updateUserProfile(
+                            phoneNumber:
+                                authViewModel.currentUser?.phoneNumber ?? '',
+                            address: address,
+                            username: authViewModel.currentUser?.username ?? '',
+                          );
 
-                    if (authViewModel.errorMessage == null) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Địa chỉ đã được lưu thành công!'),
-                          backgroundColor: Colors.green,
-                          duration: Duration(seconds: 2),
-                        ),
-                      );
-                      Navigator.pop(context, address);
-                    } else {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                            content:
-                                Text('Lỗi: ${authViewModel.errorMessage}')),
-                      );
-                    }
-                  } catch (e) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('Lỗi khi lưu địa chỉ: $e')),
-                    );
-                  }
-                }
-              },
+                          if (authViewModel.errorMessage == null) {
+                            if (mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content:
+                                      Text('Địa chỉ đã được lưu thành công!'),
+                                  backgroundColor: Colors.green,
+                                  duration: Duration(seconds: 2),
+                                ),
+                              );
+                              Navigator.pop(context, address);
+                            }
+                          } else {
+                            if (mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                    content: Text(
+                                        'Lỗi: ${authViewModel.errorMessage}')),
+                              );
+                            }
+                          }
+                        } catch (e) {
+                          if (mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                  content: Text('Lỗi khi lưu địa chỉ: $e')),
+                            );
+                          }
+                        }
+                      }
+                    },
               style: ElevatedButton.styleFrom(
                 minimumSize: const Size.fromHeight(48),
                 backgroundColor: Colors.blueAccent,
               ),
-              child: const Text(
-                "XÁC NHẬN",
-                style: TextStyle(color: Colors.white),
-              ),
+              child: isLoading
+                  ? const SizedBox(
+                      height: 20,
+                      width: 20,
+                      child: CircularProgressIndicator(
+                        color: Colors.white,
+                        strokeWidth: 2,
+                      ),
+                    )
+                  : const Text(
+                      "XÁC NHẬN",
+                      style: TextStyle(color: Colors.white),
+                    ),
             ),
           ],
         ),
@@ -210,66 +253,68 @@ class _NewAddressPageState extends State<NewAddressPage> {
         labelText: label,
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
       ),
-      validator: (value) =>
-          (value == null || value.isEmpty) ? 'Vui lòng nhập $label' : null,
+      validator: (value) => (value == null || value.trim().isEmpty)
+          ? 'Vui lòng nhập $label'
+          : null,
     );
   }
 
   Widget _buildCitySelector() {
     return GestureDetector(
-      onTap: () async {
-        if (provinces.isEmpty) return;
+      onTap: isLoading || provinces.isEmpty
+          ? null
+          : () async {
+              final selected = await showModalBottomSheet<Map<String, dynamic>>(
+                backgroundColor: Colors.white,
+                isScrollControlled: true,
+                context: context,
+                builder: (context) {
+                  final screenHeight = MediaQuery.of(context).size.height;
+                  return Container(
+                    height: screenHeight * 0.85,
+                    padding: const EdgeInsets.all(12),
+                    child: Column(
+                      children: [
+                        const Text(
+                          'Chọn Tỉnh/Thành phố',
+                          style: TextStyle(
+                              fontWeight: FontWeight.bold, fontSize: 16),
+                        ),
+                        const SizedBox(height: 12),
+                        Expanded(
+                          child: isLoading
+                              ? const Center(child: CircularProgressIndicator())
+                              : ListView.builder(
+                                  itemCount: provinces.length,
+                                  itemBuilder: (context, index) {
+                                    final province = provinces[index];
+                                    return ListTile(
+                                      title: Text(province['name'] ?? ''),
+                                      onTap: () {
+                                        Navigator.pop(context, province);
+                                      },
+                                    );
+                                  },
+                                ),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              );
 
-        final selected = await showModalBottomSheet<Map<String, dynamic>>(
-          backgroundColor: Colors.white,
-          isScrollControlled: true,
-          context: context,
-          builder: (context) {
-            final screenHeight = MediaQuery.of(context).size.height;
-            return Container(
-              height: screenHeight * 0.85,
-              padding: const EdgeInsets.all(12),
-              child: Column(
-                children: [
-                  const Text(
-                    'Chọn Tỉnh/Thành phố',
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                  ),
-                  const SizedBox(height: 12),
-                  Expanded(
-                    child: isLoading
-                        ? const Center(child: CircularProgressIndicator())
-                        : ListView.builder(
-                            itemCount: provinces.length,
-                            itemBuilder: (context, index) {
-                              final province = provinces[index];
-                              return ListTile(
-                                title: Text(province['name']),
-                                onTap: () {
-                                  Navigator.pop(context, province);
-                                },
-                              );
-                            },
-                          ),
-                  ),
-                ],
-              ),
-            );
-          },
-        );
-
-        if (selected != null && mounted) {
-          setState(() {
-            selectedProvince = selected['name'];
-            selectedProvinceCode = selected['code'].toString();
-            districts.clear();
-            wards.clear();
-            selectedDistrict = null;
-            selectedWard = null;
-          });
-          await _fetchDistricts(selectedProvinceCode!);
-        }
-      },
+              if (selected != null && mounted) {
+                setState(() {
+                  selectedProvince = selected['name'];
+                  selectedProvinceCode = selected['code'].toString();
+                  districts.clear();
+                  wards.clear();
+                  selectedDistrict = null;
+                  selectedWard = null;
+                });
+                await _fetchDistricts(selectedProvinceCode!);
+              }
+            },
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 18),
         decoration: BoxDecoration(
@@ -280,7 +325,7 @@ class _NewAddressPageState extends State<NewAddressPage> {
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Text(selectedProvince ?? 'Tỉnh/Thành phố *'),
-            const Icon(Icons.chevron_right),
+            if (!isLoading) const Icon(Icons.chevron_right),
           ],
         ),
       ),
@@ -289,57 +334,59 @@ class _NewAddressPageState extends State<NewAddressPage> {
 
   Widget _buildDistrictSelector() {
     return GestureDetector(
-      onTap: () async {
-        if (districts.isEmpty) return;
+      onTap: isLoading || districts.isEmpty
+          ? null
+          : () async {
+              final selectedDistrictItem =
+                  await showModalBottomSheet<Map<String, dynamic>>(
+                backgroundColor: Colors.white,
+                isScrollControlled: true,
+                context: context,
+                builder: (context) {
+                  final screenHeight = MediaQuery.of(context).size.height;
+                  return Container(
+                    height: screenHeight * 0.7,
+                    padding: const EdgeInsets.all(12),
+                    child: Column(
+                      children: [
+                        const Text(
+                          'Chọn Quận/Huyện',
+                          style: TextStyle(
+                              fontWeight: FontWeight.bold, fontSize: 16),
+                        ),
+                        const SizedBox(height: 12),
+                        Expanded(
+                          child: isLoading
+                              ? const Center(child: CircularProgressIndicator())
+                              : ListView.builder(
+                                  itemCount: districts.length,
+                                  itemBuilder: (context, index) {
+                                    final district = districts[index];
+                                    return ListTile(
+                                      title: Text(district['name'] ?? ''),
+                                      onTap: () {
+                                        Navigator.pop(context, district);
+                                      },
+                                    );
+                                  },
+                                ),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              );
 
-        final selectedDistrict =
-            await showModalBottomSheet<Map<String, dynamic>>(
-          backgroundColor: Colors.white,
-          isScrollControlled: true,
-          context: context,
-          builder: (context) {
-            final screenHeight = MediaQuery.of(context).size.height;
-            return Container(
-              height: screenHeight * 0.7,
-              padding: const EdgeInsets.all(12),
-              child: Column(
-                children: [
-                  const Text(
-                    'Chọn Quận/Huyện',
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                  ),
-                  const SizedBox(height: 12),
-                  Expanded(
-                    child: isLoading
-                        ? const Center(child: CircularProgressIndicator())
-                        : ListView.builder(
-                            itemCount: districts.length,
-                            itemBuilder: (context, index) {
-                              final district = districts[index];
-                              return ListTile(
-                                title: Text(district['name']),
-                                onTap: () {
-                                  Navigator.pop(context, district);
-                                },
-                              );
-                            },
-                          ),
-                  ),
-                ],
-              ),
-            );
-          },
-        );
-
-        if (selectedDistrict != null && mounted) {
-          setState(() {
-            this.selectedDistrict = selectedDistrict['name'];
-            selectedWard = null;
-            wards.clear();
-          });
-          await _fetchWards(selectedDistrict['code'].toString());
-        }
-      },
+              if (selectedDistrictItem != null && mounted) {
+                setState(() {
+                  selectedDistrict =
+                      selectedDistrictItem['name']; // Sửa: Gán đúng vào state
+                  selectedWard = null;
+                  wards.clear();
+                });
+                await _fetchWards(selectedDistrictItem['code'].toString());
+              }
+            },
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 18),
         decoration: BoxDecoration(
@@ -350,7 +397,7 @@ class _NewAddressPageState extends State<NewAddressPage> {
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Text(selectedDistrict ?? 'Chọn Quận/Huyện *'),
-            const Icon(Icons.chevron_right),
+            if (!isLoading) const Icon(Icons.chevron_right),
           ],
         ),
       ),
@@ -359,54 +406,55 @@ class _NewAddressPageState extends State<NewAddressPage> {
 
   Widget _buildWardSelector() {
     return GestureDetector(
-      onTap: () async {
-        if (wards.isEmpty) return;
+      onTap: isLoading || wards.isEmpty
+          ? null
+          : () async {
+              final selectedWardItem =
+                  await showModalBottomSheet<Map<String, dynamic>>(
+                backgroundColor: Colors.white,
+                isScrollControlled: true,
+                context: context,
+                builder: (ctx) {
+                  final screenHeight = MediaQuery.of(ctx).size.height;
+                  return Container(
+                    height: screenHeight * 0.7,
+                    padding: const EdgeInsets.all(12),
+                    child: Column(
+                      children: [
+                        const Text(
+                          'Chọn Xã/Phường',
+                          style: TextStyle(
+                              fontWeight: FontWeight.bold, fontSize: 16),
+                        ),
+                        const SizedBox(height: 12),
+                        Expanded(
+                          child: isLoading
+                              ? const Center(child: CircularProgressIndicator())
+                              : ListView.builder(
+                                  itemCount: wards.length,
+                                  itemBuilder: (context, index) {
+                                    final ward = wards[index];
+                                    return ListTile(
+                                      title: Text(ward['name'] ?? ''),
+                                      onTap: () {
+                                        Navigator.pop(context, ward);
+                                      },
+                                    );
+                                  },
+                                ),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              );
 
-        final selectedWardItem =
-            await showModalBottomSheet<Map<String, dynamic>>(
-          backgroundColor: Colors.white,
-          isScrollControlled: true,
-          context: context,
-          builder: (ctx) {
-            final screenHeight = MediaQuery.of(ctx).size.height;
-            return Container(
-              height: screenHeight * 0.7,
-              padding: const EdgeInsets.all(12),
-              child: Column(
-                children: [
-                  const Text(
-                    'Chọn Xã/Phường',
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                  ),
-                  const SizedBox(height: 12),
-                  Expanded(
-                    child: isLoading
-                        ? const Center(child: CircularProgressIndicator())
-                        : ListView.builder(
-                            itemCount: wards.length,
-                            itemBuilder: (context, index) {
-                              final ward = wards[index];
-                              return ListTile(
-                                title: Text(ward['name']),
-                                onTap: () {
-                                  Navigator.pop(context, ward);
-                                },
-                              );
-                            },
-                          ),
-                  ),
-                ],
-              ),
-            );
-          },
-        );
-
-        if (selectedWardItem != null && mounted) {
-          setState(() {
-            selectedWard = selectedWardItem['name'];
-          });
-        }
-      },
+              if (selectedWardItem != null && mounted) {
+                setState(() {
+                  selectedWard = selectedWardItem['name'];
+                });
+              }
+            },
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 18),
         decoration: BoxDecoration(
@@ -417,7 +465,7 @@ class _NewAddressPageState extends State<NewAddressPage> {
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Text(selectedWard ?? 'Chọn Xã/Phường *'),
-            const Icon(Icons.chevron_right),
+            if (!isLoading) const Icon(Icons.chevron_right),
           ],
         ),
       ),
@@ -431,11 +479,9 @@ class _NewAddressPageState extends State<NewAddressPage> {
         const Text("Đặt làm địa chỉ mặc định"),
         Switch(
           value: isDefault,
-          onChanged: (value) => setState(() => isDefault = value),
-          activeColor: Colors.white,
-          activeTrackColor: Colors.blueAccent,
-          inactiveThumbColor: Colors.grey[400],
-          inactiveTrackColor: Colors.grey[300],
+          onChanged:
+              isLoading ? null : (value) => setState(() => isDefault = value),
+          activeColor: Colors.blueAccent,
         ),
       ],
     );

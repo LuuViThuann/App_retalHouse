@@ -1,0 +1,3 @@
+- all_rental : Trang giao diện hiển thị tất cả bài đăng 
+
+- ProperrtyType_house : Trang hiển thị các bài đăng theo loại nhà 

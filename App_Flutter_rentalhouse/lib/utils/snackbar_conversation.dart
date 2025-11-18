@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_rentalhouse/constants/app_style.dart';
 
+// CÁC LỚP THÔNG BÁO THÀNH CÔNG VÀ LỖI ======================================
 
 class SnackbarUtils {
   static void showSuccess(BuildContext context, String message) {
