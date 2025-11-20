@@ -38,7 +38,7 @@ class ImagePickerForm extends StatelessWidget {
         style: TextStyle(
           fontSize: 18,
           fontWeight: FontWeight.w600,
-          color: Theme.of(context).colorScheme.primary,
+          color: Colors.grey[800],
         ),
       ),
     );
@@ -145,12 +145,11 @@ class ImagePickerForm extends StatelessWidget {
                       style: OutlinedButton.styleFrom(
                         padding: const EdgeInsets.symmetric(vertical: 10),
                         side: BorderSide(
-                            color: Theme.of(context)
-                                .primaryColor
-                                .withOpacity(0.7)),
+                            color: Colors.black87
+                                .withOpacity(0.7)), // border đen mờ
                         shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(8)),
-                        foregroundColor: Theme.of(context).primaryColor,
+                        foregroundColor: Colors.black87, // text và icon màu đen
                       ),
                       onPressed: () => _pickImages(context),
                     ),

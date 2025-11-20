@@ -24,7 +24,7 @@ class PropertyDetailsForm extends StatelessWidget {
         style: TextStyle(
           fontSize: 18,
           fontWeight: FontWeight.w600,
-          color: Theme.of(context).colorScheme.primary,
+          color: Colors.grey[800],
         ),
       ),
     );
@@ -49,8 +49,10 @@ class PropertyDetailsForm extends StatelessWidget {
           labelText: isRequired ? '$labelText *' : labelText,
           hintText: hintText,
           prefixIcon: prefixIcon != null
-              ? Icon(prefixIcon,
-                  color: Theme.of(context).primaryColor.withOpacity(0.8))
+              ? Icon(
+                  prefixIcon,
+                  color: Colors.grey[600],
+                )
               : null,
           border: OutlineInputBorder(borderRadius: BorderRadius.circular(10.0)),
           focusedBorder: OutlineInputBorder(
@@ -86,8 +88,10 @@ class PropertyDetailsForm extends StatelessWidget {
               value: value,
               decoration: InputDecoration(
                 labelText: 'Loại hình bất động sản *',
-                prefixIcon: Icon(Icons.business_outlined,
-                    color: Theme.of(context).primaryColor.withOpacity(0.8)),
+                prefixIcon: Icon(
+                  Icons.business_outlined,
+                  color: Colors.grey[600],
+                ),
                 border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(10.0)),
                 focusedBorder: OutlineInputBorder(

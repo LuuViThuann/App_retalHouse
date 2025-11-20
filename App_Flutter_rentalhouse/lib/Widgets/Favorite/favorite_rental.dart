@@ -216,7 +216,7 @@ class _RentalFavoriteWidgetState extends State<RentalFavoriteWidget> {
                     Row(
                       mainAxisSize: MainAxisSize.min,
                       children: const [
-                        Text('Xem chi tiết', style: TextStyle(fontSize: 12)),
+                        Text('Xem ngay', style: TextStyle(fontSize: 12)),
                         SizedBox(width: 5),
                         Icon(Icons.arrow_forward, size: 18),
                       ],

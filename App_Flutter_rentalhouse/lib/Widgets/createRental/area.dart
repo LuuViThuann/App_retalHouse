@@ -22,9 +22,9 @@ class AreaForm extends StatelessWidget {
       child: Text(
         title,
         style: TextStyle(
-          fontSize: 18,
-          fontWeight: FontWeight.w600,
-          color: Theme.of(context).colorScheme.primary,
+          fontSize: 20, // tăng nhẹ font
+          fontWeight: FontWeight.w500, // vừa phải, hiện đại
+          color: Colors.grey[800], // màu xám tối, trung tính
         ),
       ),
     );
@@ -44,18 +44,21 @@ class AreaForm extends StatelessWidget {
         controller: controller,
         decoration: InputDecoration(
           labelText: isRequired ? '$labelText *' : labelText,
+          labelStyle: TextStyle(color: Colors.grey[700]), // label hiện đại
           prefixIcon: prefixIcon != null
-              ? Icon(prefixIcon,
-                  color: Theme.of(context).primaryColor.withOpacity(0.8))
+              ? Icon(
+                  prefixIcon,
+                  color: Colors.grey[600], // icon màu xám hiện đại
+                  size: 22, // nhỏ vừa phải
+                )
               : null,
-          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10.0)),
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12.0)),
           focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(10.0),
-            borderSide:
-                BorderSide(color: Theme.of(context).primaryColor, width: 1.5),
+            borderRadius: BorderRadius.circular(12.0),
+            borderSide: BorderSide(color: Colors.grey[800]!, width: 1.5),
           ),
           enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(10.0),
+            borderRadius: BorderRadius.circular(12.0),
             borderSide: BorderSide(color: Colors.grey[400]!, width: 1.0),
           ),
           contentPadding:

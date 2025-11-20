@@ -8,7 +8,11 @@
 
 - Chọn địa điểm lọc các bất động sản : ==> DONE  
 
+- Điều chỉnh giao diện chỗ tạo bài đăng : ==> DONE 
+
 - Cập nhật địa chỉ sau khi sáp nhập : Chưa có API phiên bản hoàn chỉnh 
+
+- Lỗi đang lấy tọa độ vị trí sai khi đăng bài : Do sài hàng Free cùi nên chịu 
 
 - Khi xóa bài viết thuộc tài khoản chưa cập nhật ở Home 
 
@@ -20,9 +24,9 @@
 
 - Thêm mục thông báo khi có tương tác : VD -> admin từ chối bài đăng + lý do và thông báo 
 
-- Điều chỉnh giao diện chỗ tạo bài đăng 
-
 - Tạo Banner quảng cáo ở trang HOME 
+
+- Lỗi khi tạo bài đăng nhập địa chỉ sẽ bị cập nhật vào địa chỉ tài khoản -> sai 
 
 # BỔ SUNG THÊM TÍNH NĂNG ===================================: 
 

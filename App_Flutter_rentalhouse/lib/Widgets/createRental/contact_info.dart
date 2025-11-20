@@ -19,9 +19,9 @@ class ContactInfoForm extends StatelessWidget {
       child: Text(
         title,
         style: TextStyle(
-          fontSize: 18,
-          fontWeight: FontWeight.w600,
-          color: Theme.of(context).colorScheme.primary,
+          fontSize: 20,
+          fontWeight: FontWeight.w500,
+          color: Colors.grey[800],
         ),
       ),
     );
@@ -44,10 +44,14 @@ class ContactInfoForm extends StatelessWidget {
         controller: controller,
         decoration: InputDecoration(
           labelText: isRequired ? '$labelText *' : labelText,
+          labelStyle: TextStyle(color: Colors.grey[700]),
           hintText: hintText,
           prefixIcon: prefixIcon != null
-              ? Icon(prefixIcon,
-                  color: Theme.of(context).primaryColor.withOpacity(0.8))
+              ? Icon(
+                  prefixIcon,
+                  color: Colors.grey[600],
+                  size: 22,
+                )
               : null,
           suffixIcon: showClearButton && controller.text.isNotEmpty
               ? IconButton(
@@ -55,14 +59,13 @@ class ContactInfoForm extends StatelessWidget {
                   onPressed: () => controller.clear(),
                 )
               : null,
-          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10.0)),
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12.0)),
           focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(10.0),
-            borderSide:
-                BorderSide(color: Theme.of(context).primaryColor, width: 1.5),
+            borderRadius: BorderRadius.circular(12.0),
+            borderSide: BorderSide(color: Colors.grey[800]!, width: 1.5),
           ),
           enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(10.0),
+            borderRadius: BorderRadius.circular(12.0),
             borderSide: BorderSide(color: Colors.grey[400]!, width: 1.0),
           ),
           contentPadding:

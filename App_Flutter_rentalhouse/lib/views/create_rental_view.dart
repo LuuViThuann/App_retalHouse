@@ -174,10 +174,17 @@ class _CreateRentalScreenState extends State<CreateRentalScreen> {
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
-        title: const Text('Tạo Bài Đăng Mới'),
-        elevation: 1.5,
-        backgroundColor: Colors.white,
-        foregroundColor: Theme.of(context).colorScheme.onPrimaryContainer,
+        backgroundColor: Colors.blue[700],
+        elevation: 0,
+        title: Text(
+          "Tạo bài đăng mới",
+          style: const TextStyle(
+              fontWeight: FontWeight.bold, color: Colors.white, fontSize: 19),
+        ),
+        leading: const BackButton(color: Colors.white),
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(bottom: Radius.circular(20)),
+        ),
       ),
       body: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16.0),
@@ -203,7 +210,6 @@ class _CreateRentalScreenState extends State<CreateRentalScreen> {
                     _formStateManager.locationFullAddressController!,
                 latitudeNotifier: _latitudeNotifier,
                 longitudeNotifier: _longitudeNotifier,
-                
               ),
               PropertyDetailsForm(
                 propertyTypeNotifier: _propertyTypeNotifier,
@@ -257,8 +263,8 @@ class _CreateRentalScreenState extends State<CreateRentalScreen> {
                     padding: const EdgeInsets.symmetric(vertical: 14),
                     textStyle: const TextStyle(
                         fontSize: 17, fontWeight: FontWeight.bold),
-                    backgroundColor: Theme.of(context).primaryColor,
-                    foregroundColor: Theme.of(context).colorScheme.onPrimary,
+                    backgroundColor: Colors.blue[700], // đổi màu nền
+                    foregroundColor: Colors.white, // text và icon màu trắng
                     shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12)),
                   ),

@@ -48,13 +48,13 @@ class _HomeContentState extends State<HomeContent> {
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final authViewModel = Provider.of<AuthViewModel>(context, listen: false);
-     
+
       final favoriteViewModel =
           Provider.of<FavoriteViewModel>(context, listen: false);
 
       if (authViewModel.currentUser != null) {
         final token = authViewModel.currentUser!.token ?? '';
-       
+
         if (token.isNotEmpty) {
           favoriteViewModel.fetchFavorites(token);
         }
@@ -357,7 +357,7 @@ class _HomeContentState extends State<HomeContent> {
 
         const SizedBox(height: 10),
 
-        // Danh sách
+        // Hiển thị danh sách bài đăng ==========================
         filteredRentals.isEmpty
             ? const Center(
                 child: Padding(
@@ -374,6 +374,8 @@ class _HomeContentState extends State<HomeContent> {
                 itemBuilder: (context, index) =>
                     RentalItemWidget(rental: filteredRentals[index]),
               ),
+
+        // ================================================
         const SizedBox(height: 20),
       ],
     );

@@ -24,7 +24,7 @@ class BasicInfoForm extends StatelessWidget {
         style: TextStyle(
           fontSize: 18,
           fontWeight: FontWeight.w600,
-          color: Theme.of(context).colorScheme.primary,
+          color: Colors.grey[800],
         ),
       ),
     );
@@ -52,8 +52,11 @@ class BasicInfoForm extends StatelessWidget {
           labelText: isRequired ? '$labelText *' : labelText,
           hintText: hintText,
           prefixIcon: prefixIcon != null
-              ? Icon(prefixIcon,
-                  color: Theme.of(context).primaryColor.withOpacity(0.8))
+              ? Icon(
+                  prefixIcon,
+                  color: Colors.grey[600],
+                  size: 22,
+                )
               : null,
           suffixText: suffixText,
           border: OutlineInputBorder(borderRadius: BorderRadius.circular(10.0)),
@@ -117,8 +120,10 @@ class BasicInfoForm extends StatelessWidget {
               value: value,
               decoration: InputDecoration(
                 labelText: 'Trạng thái *',
-                prefixIcon: Icon(Icons.info_outline,
-                    color: Theme.of(context).primaryColor.withOpacity(0.8)),
+                prefixIcon: Icon(
+                  Icons.info_outline,
+                  color: Colors.grey[600],
+                ),
                 border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(10.0)),
                 focusedBorder: OutlineInputBorder(

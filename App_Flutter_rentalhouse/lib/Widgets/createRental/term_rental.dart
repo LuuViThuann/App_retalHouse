@@ -23,9 +23,9 @@ class RentalTermsForm extends StatelessWidget {
       child: Text(
         title,
         style: TextStyle(
-          fontSize: 18,
-          fontWeight: FontWeight.w600,
-          color: Theme.of(context).colorScheme.primary,
+          fontSize: 20,
+          fontWeight: FontWeight.w500,
+          color: Colors.grey[800],
         ),
       ),
     );
@@ -51,20 +51,23 @@ class RentalTermsForm extends StatelessWidget {
         controller: controller,
         decoration: InputDecoration(
           labelText: isRequired ? '$labelText *' : labelText,
+          labelStyle: TextStyle(color: Colors.grey[700]),
           hintText: hintText,
           prefixIcon: prefixIcon != null
-              ? Icon(prefixIcon,
-                  color: Theme.of(context).primaryColor.withOpacity(0.8))
+              ? Icon(
+                  prefixIcon,
+                  color: Colors.grey[600],
+                  size: 22,
+                )
               : null,
           suffixText: suffixText,
-          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10.0)),
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12.0)),
           focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(10.0),
-            borderSide:
-                BorderSide(color: Theme.of(context).primaryColor, width: 1.5),
+            borderRadius: BorderRadius.circular(12.0),
+            borderSide: BorderSide(color: Colors.grey[800]!, width: 1.5),
           ),
           enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(10.0),
+            borderRadius: BorderRadius.circular(12.0),
             borderSide: BorderSide(color: Colors.grey[400]!, width: 1.0),
           ),
           contentPadding:
@@ -81,10 +84,21 @@ class RentalTermsForm extends StatelessWidget {
   }
 
   Widget _buildPaymentMethodDropdown(BuildContext context) {
-    const List<String> paymentMethods = ['Tiền mặt', 'Thanh toán chuyển khoản'];
-    // Initialize controller with default value if empty
+    const List<Map<String, dynamic>> paymentMethods = [
+      {
+        'label': 'Tiền mặt',
+        'icon': Icons.money_outlined,
+        'color': Colors.green
+      },
+      {
+        'label': 'Thanh toán chuyển khoản',
+        'icon': Icons.account_balance_outlined,
+        'color': Colors.blue
+      },
+    ];
+
     if (paymentMethodController.text.isEmpty) {
-      paymentMethodController.text = paymentMethods[0];
+      paymentMethodController.text = paymentMethods[0]['label'];
     }
 
     return Padding(
@@ -93,29 +107,41 @@ class RentalTermsForm extends StatelessWidget {
         valueListenable: ValueNotifier<String>(paymentMethodController.text),
         builder: (context, value, child) {
           return DropdownButtonFormField<String>(
-            value: paymentMethods.contains(value) ? value : paymentMethods[0],
+            value: paymentMethods.any((e) => e['label'] == value)
+                ? value
+                : paymentMethods[0]['label'],
             decoration: InputDecoration(
               labelText: 'Phương thức thanh toán *',
+              labelStyle: TextStyle(color: Colors.grey[700]),
               prefixIcon: Icon(Icons.payment_outlined,
-                  color: Theme.of(context).primaryColor.withOpacity(0.8)),
+                  color: Colors.grey[600], size: 22),
               border:
-                  OutlineInputBorder(borderRadius: BorderRadius.circular(10.0)),
+                  OutlineInputBorder(borderRadius: BorderRadius.circular(12.0)),
               focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(10.0),
-                borderSide: BorderSide(
-                    color: Theme.of(context).primaryColor, width: 1.5),
+                borderRadius: BorderRadius.circular(12.0),
+                borderSide: BorderSide(color: Colors.grey[800]!, width: 1.5),
               ),
               enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(10.0),
+                borderRadius: BorderRadius.circular(12.0),
                 borderSide: BorderSide(color: Colors.grey[400]!, width: 1.0),
               ),
               contentPadding:
                   const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
             ),
-            items: paymentMethods.map((String method) {
+            items: paymentMethods.map((method) {
               return DropdownMenuItem<String>(
-                value: method,
-                child: Text(method),
+                value: method['label'],
+                child: Row(
+                  children: [
+                    Icon(method['icon'], color: method['color'], size: 20),
+                    const SizedBox(width: 10),
+                    Text(
+                      method['label'],
+                      style: const TextStyle(
+                          fontSize: 16, fontWeight: FontWeight.w500),
+                    ),
+                  ],
+                ),
               );
             }).toList(),
             onChanged: (String? newValue) {
@@ -126,6 +152,8 @@ class RentalTermsForm extends StatelessWidget {
             validator: (value) =>
                 Validators.requiredField(value, 'phương thức thanh toán'),
             isExpanded: true,
+            dropdownColor: Colors.white,
+            style: TextStyle(color: Colors.grey[900], fontSize: 16),
           );
         },
       ),

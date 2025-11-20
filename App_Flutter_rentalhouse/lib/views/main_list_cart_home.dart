@@ -1,5 +1,6 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_rentalhouse/config/loading.dart';
 import 'package:flutter_rentalhouse/models/rental.dart';
 import 'package:flutter_rentalhouse/services/rental_service.dart';
 import 'package:flutter_rentalhouse/viewmodels/vm_auth.dart';
@@ -8,6 +9,7 @@ import 'package:flutter_rentalhouse/viewmodels/vm_favorite.dart';
 import 'package:flutter_rentalhouse/views/chat_user.dart';
 import 'package:flutter_rentalhouse/views/rental_detail_view.dart';
 import 'package:intl/intl.dart';
+import 'package:lottie/lottie.dart';
 import 'package:provider/provider.dart';
 import '../config/api_routes.dart';
 
@@ -263,7 +265,7 @@ class RentalItemWidget extends StatelessWidget {
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           Text(
-                            'Giá: ${formatCurrency(rental.price)} (có thương lượng)',
+                            'Giá: ${formatCurrency(rental.price)}',
                             style: const TextStyle(
                                 fontSize: 16,
                                 color: Colors.green,
@@ -273,6 +275,7 @@ class RentalItemWidget extends StatelessWidget {
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               if (!isMyPost)
+                                // Nâng cấp Icon Yêu thích (Favorite)
                                 GestureDetector(
                                   onTap: isLoading
                                       ? null
@@ -334,9 +337,14 @@ class RentalItemWidget extends StatelessWidget {
                                     margin: const EdgeInsets.only(right: 16),
                                     decoration: BoxDecoration(
                                       color: isFavorite
-                                          ? Colors.red.withOpacity(0.1)
-                                          : Colors.grey.withOpacity(0.1),
-                                      shape: BoxShape.circle,
+                                          ? Colors.red.shade600
+                                          : Colors.white,
+                                      borderRadius: BorderRadius.circular(12),
+                                      border: isFavorite
+                                          ? null
+                                          : Border.all(
+                                              color: Colors.grey.shade300,
+                                              width: 1),
                                     ),
                                     child: isLoading
                                         ? const SizedBox(
@@ -346,19 +354,22 @@ class RentalItemWidget extends StatelessWidget {
                                               strokeWidth: 2,
                                               valueColor:
                                                   AlwaysStoppedAnimation<Color>(
-                                                      Colors.grey),
+                                                      Colors.blueGrey),
                                             ),
                                           )
                                         : Icon(
-                                            Icons.favorite,
+                                            isFavorite
+                                                ? Icons.favorite
+                                                : Icons.favorite_border,
                                             color: isFavorite
-                                                ? Colors.red
-                                                : Colors.grey,
+                                                ? Colors.white
+                                                : Colors.red.shade700,
                                             size: 24,
                                           ),
                                   ),
                                 ),
                               if (!isMyPost)
+                                // Nâng cấp Icon Nhắn tin (Chat)
                                 GestureDetector(
                                   onTap: () async {
                                     if (authViewModel.currentUser == null) {
@@ -387,8 +398,40 @@ class RentalItemWidget extends StatelessWidget {
                                     }
 
                                     try {
-                                      print(
-                                          'Initiating conversation for rentalId: ${rental.id}, landlordId: ${rental.userId}');
+                                      // Hiển thị dialog loading với text
+                                      showDialog(
+                                        context: context,
+                                        barrierDismissible: false,
+                                        builder: (_) => Dialog(
+                                          backgroundColor: Colors.transparent,
+                                          child: SizedBox(
+                                            height: 140,
+                                            child: Column(
+                                              mainAxisAlignment:
+                                                  MainAxisAlignment.center,
+                                              children: [
+                                                Lottie.asset(
+                                                  AssetsConfig.loadingLottie,
+                                                  width: 100,
+                                                  height: 100,
+                                                  fit: BoxFit.contain,
+                                                ),
+                                                const SizedBox(height: 12),
+                                                const Text(
+                                                  'Đang mở cuộc trò chuyện ...',
+                                                  style: TextStyle(
+                                                    color: Colors.white,
+                                                    fontSize: 16,
+                                                    fontWeight: FontWeight.w500,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ),
+                                      );
+
+                                      // Tạo hoặc lấy conversation
                                       final conversation = await chatViewModel
                                           .getOrCreateConversation(
                                         rentalId: rental.id!,
@@ -402,12 +445,14 @@ class RentalItemWidget extends StatelessWidget {
                                             'Không thể tạo hoặc lấy cuộc trò chuyện');
                                       }
 
-                                      // Cập nhật danh sách cuộc trò chuyện
+                                      // Cập nhật danh sách conversations
                                       await chatViewModel.fetchConversations(
                                           authViewModel.currentUser!.token!);
 
-                                      print(
-                                          'Conversation created/fetched with ID: ${conversation.id}');
+                                      // Ẩn dialog loading
+                                      Navigator.of(context).pop();
+
+                                      // Chuyển sang ChatScreen
                                       Navigator.push(
                                         context,
                                         _createRoute(ChatScreen(
@@ -417,7 +462,8 @@ class RentalItemWidget extends StatelessWidget {
                                         )),
                                       );
                                     } catch (e) {
-                                      print('Error opening chat: $e');
+                                      Navigator.of(context)
+                                          .pop(); // ẩn dialog nếu có lỗi
                                       ScaffoldMessenger.of(context)
                                           .showSnackBar(
                                         SnackBar(
@@ -431,18 +477,18 @@ class RentalItemWidget extends StatelessWidget {
                                   child: Container(
                                     padding: const EdgeInsets.all(10),
                                     decoration: BoxDecoration(
-                                      color: Colors.blue.withOpacity(0.1),
-                                      shape: BoxShape.circle,
+                                      color: Colors.blue.shade600,
+                                      borderRadius: BorderRadius.circular(12),
                                     ),
                                     child: const Icon(
-                                      Icons.chat,
-                                      color: Colors.blue,
+                                      Icons.message_rounded,
+                                      color: Colors.white,
                                       size: 24,
                                     ),
                                   ),
                                 ),
                             ],
-                          ),
+                          )
                         ],
                       ),
                       const SizedBox(height: 4),
@@ -514,18 +560,8 @@ class RentalItemWidget extends StatelessWidget {
                               ),
                             ],
                           ),
-                          Container(
-                            decoration: BoxDecoration(
-                              gradient: LinearGradient(
-                                colors: [
-                                  Colors.lightBlue.shade400,
-                                  Colors.blue.shade800
-                                ],
-                                begin: Alignment.centerLeft,
-                                end: Alignment.centerRight,
-                              ),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
+                          SizedBox(
+                            height: 44,
                             child: ElevatedButton(
                               onPressed: () {
                                 Navigator.push(
@@ -535,22 +571,27 @@ class RentalItemWidget extends StatelessWidget {
                                 );
                               },
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.transparent,
-                                shadowColor: Colors.transparent,
+                                backgroundColor: Colors.blue.shade700,
                                 foregroundColor: Colors.white,
+                                elevation: 0,
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(8),
                                 ),
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 16, vertical: 8),
+                                padding:
+                                    const EdgeInsets.symmetric(horizontal: 20),
                               ),
                               child: Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: const [
-                                  Text('Xem chi tiết',
-                                      style: TextStyle(fontSize: 14)),
-                                  SizedBox(width: 5),
-                                  Icon(Icons.chevron_right, size: 18),
+                                  Text(
+                                    'Xem chi tiết',
+                                    style: TextStyle(
+                                      fontSize: 15,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                  SizedBox(width: 6),
+                                  Icon(Icons.chevron_right, size: 20),
                                 ],
                               ),
                             ),

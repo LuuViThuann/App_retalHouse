@@ -40,24 +40,19 @@ class _FavoriteViewState extends State<FavoriteView> {
     return Scaffold(
       backgroundColor: Colors.grey[100],
       appBar: AppBar(
-        backgroundColor: Colors.blueAccent,
+        backgroundColor: Colors.blue[700],
         elevation: 0,
-        title: const Text(
-          'Danh sách bài viết yêu thích',
-          style: TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.w600,
-            fontSize: 18,
-          ),
+        title: Text(
+          "Danh sách bài viết đã lưu",
+          style: const TextStyle(
+              fontWeight: FontWeight.bold, color: Colors.white, fontSize: 19),
         ),
         leading: IconButton(
           icon: const Icon(Icons.favorite, color: Colors.white),
           onPressed: () => Navigator.pop(context),
         ),
         shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(
-            bottom: Radius.circular(20),
-          ),
+          borderRadius: BorderRadius.vertical(bottom: Radius.circular(20)),
         ),
       ),
       body: FavoriteListBody(

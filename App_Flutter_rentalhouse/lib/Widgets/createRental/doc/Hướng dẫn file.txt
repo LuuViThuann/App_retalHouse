@@ -1,0 +1,13 @@
+- area : Nhập các diện tích 
+
+- choice : Lựa chọn loại và trạng thái hoạt động bài viết 
+
+- contact_info : Nhập các thông tin liên hệ 
+
+- detail_create_rental : nhập các nội thật và môi trường xung quanh 
+
+- image_choice : chọn ảnh bài viết
+
+- info_basic_rental : các thông tin đầu bài đăng 
+
+- 

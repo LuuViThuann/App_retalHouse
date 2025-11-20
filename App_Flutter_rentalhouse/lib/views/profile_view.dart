@@ -60,26 +60,24 @@ class _ProfileViewState extends State<ProfileView> {
           backgroundColor: Colors.white,
           // --------------
           appBar: AppBar(
-            backgroundColor: Colors.blueAccent,
+            backgroundColor: Colors.blue[700],
             elevation: 0,
-            title: const Text(
+            title: Text(
               'Hồ sơ người dùng',
-              style: TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.w600,
-                fontSize: 18,
-              ),
+              style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                  fontSize: 19),
             ),
             leading: IconButton(
               icon: const Icon(Icons.person, color: Colors.white),
               onPressed: () => Navigator.pop(context),
             ),
             shape: const RoundedRectangleBorder(
-              borderRadius: BorderRadius.vertical(
-                bottom: Radius.circular(20),
-              ),
+              borderRadius: BorderRadius.vertical(bottom: Radius.circular(20)),
             ),
           ),
+
           //---------------
 
           body: SingleChildScrollView(
