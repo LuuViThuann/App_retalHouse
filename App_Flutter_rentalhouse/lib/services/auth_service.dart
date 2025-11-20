@@ -10,7 +10,7 @@ import 'package:google_sign_in/google_sign_in.dart';
 import 'package:http/http.dart' as http;
 import '../config/api_routes.dart';
 import '../models/user.dart';
-
+import 'dart:async';
 class AuthService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
@@ -131,53 +131,66 @@ class AuthService {
     required String password,
   }) async {
     try {
+      // 1. Đăng nhập Firebase trước (đã ok)
       final userCredential = await _auth.signInWithEmailAndPassword(
-          email: email, password: password);
-      final user = userCredential.user;
-      if (user == null) {
-        print('AuthService: No user found for login');
-        throw Exception('Failed to login');
-      }
-      final idToken = await user.getIdToken();
-      if (idToken == null) {
-        print('AuthService: No ID token for logged-in user');
-        throw Exception('Failed to obtain ID token');
-      }
-      final response = await http.post(
-        Uri.parse(ApiRoutes.login),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'email': email,
-          'password': password,
-          'idToken': idToken,
-        }),
+        email: email,
+        password: password,
       );
+
+      final user = userCredential.user;
+      if (user == null) throw Exception('Đăng nhập thất bại');
+
+      // 2. Lấy ID token
+      final idToken = await user.getIdToken();
+      if (idToken == null) throw Exception('Không lấy được token');
+
+      // 3. GỌI BACKEND CHỈ GỬI idToken THÔI (QUAN TRỌNG NHẤT)
+      final response = await http
+          .post(
+            Uri.parse(ApiRoutes.login),
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({'idToken': idToken}), // ← CHỈ GỬI CÁI NÀY
+          )
+          .timeout(
+              const Duration(seconds: 20)); // tăng timeout lên 20s cho chắc
+
+      print('Login API Response: ${response.statusCode} - ${response.body}');
+
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        // final avatarBase64 = await fetchAvatarBase64(user.uid, idToken);
-        String? avatarBase64 = data['avatarBase64'];
+
+        String? avatarBase64 = data['avatarBase64'] as String?;
         if (avatarBase64 == null || avatarBase64.isEmpty) {
           avatarBase64 = await fetchAvatarBase64(user.uid, idToken);
         }
+
         return AppUser(
           id: data['id'] as String,
           email: data['email'] as String,
           phoneNumber: data['phoneNumber'] as String? ?? '',
           address: data['address'] as String? ?? '',
+          username: data['username'] as String? ?? '',
           createdAt: DateTime.parse(
               data['createdAt'] as String? ?? DateTime.now().toIso8601String()),
-          username: data['username'] as String? ?? '',
           token: idToken,
           avatarBase64: avatarBase64,
         );
       } else {
-        final errorData = jsonDecode(response.body);
-        throw Exception(
-            'Đăng nhập thất bại: ${errorData['message'] ?? response.body}');
+        final error = jsonDecode(response.body);
+        throw Exception(error['message'] ?? 'Đăng nhập thất bại');
       }
+    } on FirebaseAuthException catch (e) {
+      String msg = 'Đăng nhập thất bại';
+      if (e.code == 'user-not-found') msg = 'Email không tồn tại';
+      if (e.code == 'wrong-password' || e.code == 'invalid-credential')
+        msg = 'Mật khẩu sai';
+      throw Exception(msg);
+    } on TimeoutException catch (_) {
+      throw Exception(
+          'Kết nối server quá lâu. Vui lòng kiểm tra mạng và thử lại.');
     } catch (e) {
-      print('AuthService: Error during login: $e');
-      throw Exception('Đăng nhập thất bại: $e');
+      print('AuthService: Login error: $e');
+      rethrow;
     }
   }
 

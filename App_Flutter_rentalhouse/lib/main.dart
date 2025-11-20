@@ -81,7 +81,6 @@ class RentalApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => RentalViewModel()),
         ChangeNotifierProvider(create: (_) => FavoriteViewModel()),
         ChangeNotifierProvider(create: (_) => ChatViewModel()),
-       
       ],
       child: MaterialApp(
         debugShowCheckedModeBanner: false,

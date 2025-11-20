@@ -23,7 +23,6 @@ class FavoriteViewModel with ChangeNotifier {
   // Trạng thái loading cho cả danh sách (dùng khi fetch ban đầu hoặc xóa nhiều)
   bool get isListLoading => _isListLoading;
 
-
   FavoriteViewModel() {
     // Không nên gọi async trong constructor. Load từ initState của View hoặc một hàm khởi tạo riêng.
     // _loadFavoritesFromPrefs(); // Sẽ được gọi bởi View nếu cần thiết
@@ -35,12 +34,12 @@ class FavoriteViewModel with ChangeNotifier {
     notifyListeners();
   }
 
-
   Future<void> _loadFavoritesFromPrefs() async {
     // Hàm này có thể không cần thiết nếu bạn luôn fetch từ server khi có token
     // Hoặc dùng để hiển thị cache khi offline
     final prefs = await SharedPreferences.getInstance();
-    final favoritesJson = prefs.getString('favorites_cache'); // Sử dụng key khác để tránh nhầm lẫn
+    final favoritesJson = prefs
+        .getString('favorites_cache'); // Sử dụng key khác để tránh nhầm lẫn
     if (favoritesJson != null) {
       try {
         final List<dynamic> data = jsonDecode(favoritesJson);
@@ -56,7 +55,8 @@ class FavoriteViewModel with ChangeNotifier {
   Future<void> _saveFavoritesToPrefs() async {
     final prefs = await SharedPreferences.getInstance();
     try {
-      final favoritesJson = jsonEncode(_favorites.map((f) => f.toJson()).toList());
+      final favoritesJson =
+          jsonEncode(_favorites.map((f) => f.toJson()).toList());
       await prefs.setString('favorites_cache', favoritesJson);
     } catch (e) {
       print('Lỗi khi lưu danh sách yêu thích vào bộ nhớ cache: $e');
@@ -89,28 +89,37 @@ class FavoriteViewModel with ChangeNotifier {
         // Ánh xạ dữ liệu từ API của bạn. Giả sử API trả về danh sách các đối tượng Favorite đầy đủ
         // hoặc danh sách các đối tượng có chứa rentalId.
         // Ví dụ, nếu API trả về [{ "rentalId": { "_id": "someId", ... }, "userId": "userId" }]
-        _favorites = data.map((json) {
-          // Kiểm tra cấu trúc JSON trả về từ API của bạn
-          if (json['rentalId'] is String) { // Nếu rentalId là String trực tiếp
-            return Favorite.fromJson({
-              'userId': json['userId'] as String? ?? '', // Cung cấp giá trị mặc định nếu null
-              'rentalId': json['rentalId'] as String,
-            });
-          } else if (json['rentalId'] is Map && json['rentalId']['_id'] is String) { // Nếu rentalId là object có _id
-            return Favorite.fromJson({
-              'userId': json['userId'] as String? ?? '',
-              'rentalId': json['rentalId']['_id'] as String,
-            });
-          }
-          // Nếu cấu trúc không khớp, trả về null hoặc throw error, rồi filter out nulls
-          return null;
-        }).whereType<Favorite>().toList(); // Lọc bỏ các giá trị null nếu có
+        _favorites = data
+            .map((json) {
+              // Kiểm tra cấu trúc JSON trả về từ API của bạn
+              if (json['rentalId'] is String) {
+                // Nếu rentalId là String trực tiếp
+                return Favorite.fromJson({
+                  'userId': json['userId'] as String? ??
+                      '', // Cung cấp giá trị mặc định nếu null
+                  'rentalId': json['rentalId'] as String,
+                });
+              } else if (json['rentalId'] is Map &&
+                  json['rentalId']['_id'] is String) {
+                // Nếu rentalId là object có _id
+                return Favorite.fromJson({
+                  'userId': json['userId'] as String? ?? '',
+                  'rentalId': json['rentalId']['_id'] as String,
+                });
+              }
+              // Nếu cấu trúc không khớp, trả về null hoặc throw error, rồi filter out nulls
+              return null;
+            })
+            .whereType<Favorite>()
+            .toList(); // Lọc bỏ các giá trị null nếu có
 
         await _saveFavoritesToPrefs(); // Lưu cache
         _errorMessage = null;
       } else {
-        _errorMessage = 'Lỗi ${response.statusCode}: Không thể tải danh sách yêu thích.';
-        print('Fetch favorites error: ${response.statusCode} - ${response.body}');
+        _errorMessage =
+            'Lỗi ${response.statusCode}: Không thể tải danh sách yêu thích.';
+        print(
+            'Fetch favorites error: ${response.statusCode} - ${response.body}');
       }
     } catch (e) {
       _errorMessage = 'Lỗi kết nối hoặc timeout. Vui lòng thử lại.';
@@ -121,10 +130,8 @@ class FavoriteViewModel with ChangeNotifier {
     }
   }
 
-
   // Hàm này không còn cần thiết nếu removeFavorite chỉ xóa
   // Future<bool> toggleFavorite(String userId, String rentalId, String token) async {...}
-
 
   Future<bool> addFavorite(String userId, String rentalId, String token) async {
     // Hàm này dùng ở nơi khác, không phải màn hình FavoriteView
@@ -145,16 +152,22 @@ class FavoriteViewModel with ChangeNotifier {
     notifyListeners();
 
     try {
-      final response = await http.post(
-        Uri.parse(ApiRoutes.favorites),
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $token',
-        },
-        body: jsonEncode({'rentalId': rentalId, 'userId': userId}), // Gửi cả userId nếu API cần
-      ).timeout(const Duration(seconds: 10));
+      final response = await http
+          .post(
+            Uri.parse(ApiRoutes.favorites),
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': 'Bearer $token',
+            },
+            body: jsonEncode({
+              'rentalId': rentalId,
+              'userId': userId
+            }), // Gửi cả userId nếu API cần
+          )
+          .timeout(const Duration(seconds: 10));
 
-      if (response.statusCode == 201 || response.statusCode == 200) { // 201 Created, 200 OK
+      if (response.statusCode == 201 || response.statusCode == 200) {
+        // 201 Created, 200 OK
         // Giả sử API trả về đối tượng favorite mới hoặc xác nhận
         // Thêm vào danh sách local nếu API không trả về danh sách mới nhất
         _favorites.add(Favorite(userId: userId, rentalId: rentalId));
@@ -162,7 +175,8 @@ class FavoriteViewModel with ChangeNotifier {
         _errorMessage = null;
         return true;
       } else {
-        _errorMessage = 'Lỗi ${response.statusCode}: Không thể thêm vào yêu thích.';
+        _errorMessage =
+            'Lỗi ${response.statusCode}: Không thể thêm vào yêu thích.';
         print('Add favorite error: ${response.statusCode} - ${response.body}');
         return false;
       }
@@ -195,21 +209,25 @@ class FavoriteViewModel with ChangeNotifier {
 
     try {
       final response = await http.delete(
-        Uri.parse('${ApiRoutes.favorites}/$rentalId'), // API endpoint để xóa một favorite
+        Uri.parse(
+            '${ApiRoutes.favorites}/$rentalId'), // API endpoint để xóa một favorite
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $token',
         },
       ).timeout(const Duration(seconds: 10));
 
-      if (response.statusCode == 200 || response.statusCode == 204) { // 200 OK, 204 No Content
+      if (response.statusCode == 200 || response.statusCode == 204) {
+        // 200 OK, 204 No Content
         _favorites.removeWhere((favorite) => favorite.rentalId == rentalId);
         await _saveFavoritesToPrefs();
         _errorMessage = null;
         return true;
       } else {
-        _errorMessage = 'Lỗi ${response.statusCode}: Không thể xóa khỏi yêu thích.';
-        print('Remove favorite error: ${response.statusCode} - ${response.body}');
+        _errorMessage =
+            'Lỗi ${response.statusCode}: Không thể xóa khỏi yêu thích.';
+        print(
+            'Remove favorite error: ${response.statusCode} - ${response.body}');
         return false;
       }
     } catch (e) {
@@ -217,13 +235,15 @@ class FavoriteViewModel with ChangeNotifier {
       print('Remove favorite exception: $e');
       return false;
     } finally {
-      _itemLoadingStates.remove(rentalId); // Xóa trạng thái loading của item này
+      _itemLoadingStates
+          .remove(rentalId); // Xóa trạng thái loading của item này
       // Hoặc _itemLoadingStates[rentalId] = false;
       notifyListeners();
     }
   }
 
-  Future<bool> removeMultipleFavorites(List<String> rentalIds, String token) async {
+  Future<bool> removeMultipleFavorites(
+      List<String> rentalIds, String token) async {
     if (token.isEmpty) {
       _errorMessage = 'Vui lòng đăng nhập.';
       notifyListeners();
@@ -259,7 +279,8 @@ class FavoriteViewModel with ChangeNotifier {
           if (firstError == null) {
             firstError = 'Lỗi ${response.statusCode} khi xóa ID $rentalId.';
           }
-          print('Error removing $rentalId: ${response.statusCode} - ${response.body}');
+          print(
+              'Error removing $rentalId: ${response.statusCode} - ${response.body}');
         }
       } catch (e) {
         if (firstError == null) {
@@ -280,14 +301,35 @@ class FavoriteViewModel with ChangeNotifier {
       _errorMessage = 'Một số mục không xóa được. $firstError';
     } else if (successfullyRemoved.isEmpty && rentalIds.isNotEmpty) {
       _errorMessage = 'Không thể xóa các mục đã chọn. $firstError';
-    }
-    else {
+    } else {
       _errorMessage = null; // Xóa lỗi nếu tất cả thành công
     }
 
     _isListLoading = false;
     notifyListeners(); // Gọi một lần sau khi tất cả hoàn tất
     return firstError == null;
+  }
+
+  void addFavoriteLocally(Favorite favorite) {
+    // Kiểm tra xem đã có trong danh sách chưa
+    if (!_favorites.any((fav) => fav.rentalId == favorite.rentalId)) {
+      _favorites.insert(0, favorite); // Thêm vào đầu danh sách
+      _saveFavoritesToPrefs(); // Lưu vào cache
+      notifyListeners(); // Cập nhật UI
+    }
+  }
+
+  /// Xóa favorite khỏi danh sách cục bộ (gọi từ trang chi tiết khi bỏ yêu thích)
+  /// Không gọi API, chỉ cập nhật state và cache
+  void removeFavoriteLocally(String rentalId) {
+    final initialLength = _favorites.length;
+    _favorites.removeWhere((favorite) => favorite.rentalId == rentalId);
+
+    // Chỉ lưu cache và thông báo nếu thực sự có xóa được
+    if (_favorites.length < initialLength) {
+      _saveFavoritesToPrefs(); // Lưu vào cache
+      notifyListeners(); // Cập nhật UI
+    }
   }
 
   bool isFavorite(String rentalId) {

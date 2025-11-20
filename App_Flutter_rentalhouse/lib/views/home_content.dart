@@ -5,13 +5,16 @@ import 'package:flutter_rentalhouse/Widgets/Favorite/favorite_item_shimmer.dart'
 import 'package:flutter_rentalhouse/Widgets/Favorite/favorite_rental.dart';
 import 'package:flutter_rentalhouse/Widgets/HomeMain/PropertyType_house.dart';
 import 'package:flutter_rentalhouse/Widgets/HomeMain/all_rental.dart';
+import 'package:flutter_rentalhouse/Widgets/Rental/RentalCardHorizontal.dart';
 import 'package:flutter_rentalhouse/models/rental.dart';
 import 'package:flutter_rentalhouse/services/chat_ai_service.dart';
 import 'package:flutter_rentalhouse/services/rental_service.dart';
-import 'package:flutter_rentalhouse/utils/rental_filter.dart'; // ← Import filter
+import 'package:flutter_rentalhouse/utils/rental_filter.dart';
 import 'package:flutter_rentalhouse/viewmodels/vm_auth.dart';
+import 'package:flutter_rentalhouse/viewmodels/vm_chat.dart';
 import 'package:flutter_rentalhouse/viewmodels/vm_favorite.dart';
 import 'package:flutter_rentalhouse/viewmodels/vm_rental.dart';
+import 'package:flutter_rentalhouse/views/chat_user.dart';
 import 'package:flutter_rentalhouse/views/favorite_view.dart';
 import 'package:flutter_rentalhouse/views/login_view.dart';
 import 'package:flutter_rentalhouse/views/my_profile_view.dart';
@@ -38,7 +41,6 @@ class _HomeContentState extends State<HomeContent> {
   List<dynamic> provinces = [];
   bool isLoadingProvinces = true;
 
-  // DÙNG DUY NHẤT FILTER
   RentalFilter filter = const RentalFilter();
 
   @override
@@ -96,7 +98,6 @@ class _HomeContentState extends State<HomeContent> {
     });
   }
 
-  // Lọc bài đăng mới nhất trong tháng hiện tại
   List<dynamic> getFilteredLatestRentals(RentalViewModel vm) {
     final now = DateTime.now();
     final thisMonthRentals = vm.rentals
@@ -119,7 +120,6 @@ class _HomeContentState extends State<HomeContent> {
     return formatter.format(amount);
   }
 
-  // ==================== SHIMMER YÊU THÍCH ====================
   Widget _buildFavoriteShimmer() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -142,7 +142,6 @@ class _HomeContentState extends State<HomeContent> {
     );
   }
 
-  // ==================== PHẦN YÊU THÍCH ====================
   Widget _buildFavoriteSection() {
     return Consumer<FavoriteViewModel>(
       builder: (context, favoriteViewModel, child) {
@@ -230,7 +229,6 @@ class _HomeContentState extends State<HomeContent> {
     );
   }
 
-  // ==================== BÀI ĐĂNG MỚI NHẤT (CÓ LỌC) ====================
   Widget _buildLatestPostsSection() {
     final rentalViewModel = Provider.of<RentalViewModel>(context, listen: true);
     final filteredRentals = getFilteredLatestRentals(rentalViewModel);
@@ -262,8 +260,6 @@ class _HomeContentState extends State<HomeContent> {
           ],
         ),
         const SizedBox(height: 10),
-
-        // Thanh filter ngang
         Container(
           width: double.infinity,
           color: Colors.grey[50],
@@ -342,8 +338,6 @@ class _HomeContentState extends State<HomeContent> {
             ),
           ),
         ),
-
-        // Nút Xóa bộ lọc
         if (hasActiveFilter)
           Align(
             alignment: Alignment.centerRight,
@@ -354,10 +348,7 @@ class _HomeContentState extends State<HomeContent> {
                       color: Colors.redAccent, fontWeight: FontWeight.w600)),
             ),
           ),
-
         const SizedBox(height: 10),
-
-        // Hiển thị danh sách bài đăng ==========================
         filteredRentals.isEmpty
             ? const Center(
                 child: Padding(
@@ -366,22 +357,22 @@ class _HomeContentState extends State<HomeContent> {
                       style: TextStyle(fontSize: 16, color: Colors.grey)),
                 ),
               )
-            : ListView.separated(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                itemCount: filteredRentals.length,
-                separatorBuilder: (_, __) => const SizedBox(height: 12),
-                itemBuilder: (context, index) =>
-                    RentalItemWidget(rental: filteredRentals[index]),
+            : SizedBox(
+                height: 280,
+                child: ListView.separated(
+                  scrollDirection: Axis.horizontal,
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  itemCount: filteredRentals.length,
+                  separatorBuilder: (_, __) => const SizedBox(width: 12),
+                  itemBuilder: (context, index) =>
+                      RentalCardHorizontal(rental: filteredRentals[index]),
+                ),
               ),
-
-        // ================================================
         const SizedBox(height: 20),
       ],
     );
   }
 
-  // Chip giống hệt các màn khác
   Widget _buildFilterChip({
     required IconData icon,
     required String title,
@@ -422,7 +413,6 @@ class _HomeContentState extends State<HomeContent> {
     );
   }
 
-  // BottomSheet giống hệt PropertyTypeScreen
   void _showFilterSheet(String type, String sheetTitle) {
     showModalBottomSheet(
       context: context,
@@ -537,7 +527,6 @@ class _HomeContentState extends State<HomeContent> {
     );
   }
 
-  // ==================== SHIMMER LOADING CHUNG ====================
   Widget _buildShimmerLoading() {
     return Shimmer.fromColors(
       baseColor: Colors.grey[300]!,
@@ -625,7 +614,6 @@ class _HomeContentState extends State<HomeContent> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Header + Avatar
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
@@ -665,8 +653,6 @@ class _HomeContentState extends State<HomeContent> {
                   ],
                 ),
                 const SizedBox(height: 20),
-
-                // Search bar
                 TextField(
                   controller: _searchController,
                   decoration: InputDecoration(
@@ -703,8 +689,6 @@ class _HomeContentState extends State<HomeContent> {
                   },
                 ),
                 const SizedBox(height: 25),
-
-                // Banner
                 Container(
                   height: MediaQuery.of(context).size.height * 0.22,
                   width: double.infinity,
@@ -728,8 +712,6 @@ class _HomeContentState extends State<HomeContent> {
                   ),
                 ),
                 const SizedBox(height: 35),
-
-                // Danh mục loại nhà
                 SizedBox(
                   height: 155,
                   child: SingleChildScrollView(
@@ -758,11 +740,7 @@ class _HomeContentState extends State<HomeContent> {
                     ),
                   ),
                 ),
-
-                // Yêu thích
                 if (authViewModel.currentUser != null) _buildFavoriteSection(),
-
-                // Nội dung chính
                 if (authViewModel.currentUser == null)
                   Padding(
                     padding: const EdgeInsets.symmetric(vertical: 50),
@@ -834,7 +812,6 @@ class _HomeContentState extends State<HomeContent> {
     );
   }
 
-  // Widget danh mục loại nhà
   Widget _buildCategoryItem(
       IconData icon, String label, BuildContext context, String propertyType) {
     return Container(

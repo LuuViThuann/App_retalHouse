@@ -9,8 +9,10 @@ import 'package:flutter_rentalhouse/Widgets/Comment/comment_user.dart';
 import 'package:flutter_rentalhouse/Widgets/Detail/detail_tab.dart';
 import 'package:flutter_rentalhouse/Widgets/Detail/info_chip.dart';
 import 'package:flutter_rentalhouse/models/rental.dart';
+import 'package:flutter_rentalhouse/models/favorite.dart';
 import 'package:flutter_rentalhouse/services/rental_service.dart';
 import 'package:flutter_rentalhouse/viewmodels/vm_auth.dart';
+import 'package:flutter_rentalhouse/viewmodels/vm_favorite.dart';
 import 'package:intl/intl.dart';
 import 'package:photo_view/photo_view.dart';
 import '../config/api_routes.dart';
@@ -93,13 +95,17 @@ class _RentalDetailScreenState extends State<RentalDetailScreen>
     );
 
     final authViewModel = Provider.of<AuthViewModel>(context, listen: false);
-    if (authViewModel.currentUser != null) {
-     
-    }
+    if (authViewModel.currentUser != null) {}
   }
 
   Future<void> _toggleFavorite() async {
     setState(() => _isLoadingFavorite = true);
+
+    final authViewModel = Provider.of<AuthViewModel>(context, listen: false);
+    final favoriteViewModel =
+        Provider.of<FavoriteViewModel>(context, listen: false);
+    final token = authViewModel.currentUser?.token ?? '';
+
     await _rentalService.toggleFavorite(
       rental: widget.rental,
       isFavorite: _isFavorite,
@@ -109,79 +115,25 @@ class _RentalDetailScreenState extends State<RentalDetailScreen>
           _isLoadingFavorite = false;
         });
 
-        final snackBar = SnackBar(
-          behavior: SnackBarBehavior.floating,
-          margin: const EdgeInsets.all(16),
-          elevation: 0,
-          backgroundColor: Colors.transparent, // để lộ gradient
-          duration: const Duration(seconds: 2),
-          content: TweenAnimationBuilder<double>(
-            tween: Tween(begin: 0.0, end: 1.0),
-            duration: const Duration(milliseconds: 500),
-            curve: Curves.easeOutCubic,
-            builder: (context, value, child) {
-              return Opacity(
-                opacity: value,
-                child: Transform.translate(
-                  offset: Offset(0, (1 - value) * 20), // hiệu ứng trượt lên
-                  child: child,
-                ),
-              );
-            },
-            child: Container(
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [
-                    const Color.fromARGB(255, 1, 180, 64),
-                    const Color.fromARGB(255, 85, 221, 112),
-                  ],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-                borderRadius: BorderRadius.circular(16),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black26,
-                    blurRadius: 8,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
-              ),
-              child: Row(
-                children: [
-                  AnimatedSwitcher(
-                    duration: const Duration(milliseconds: 400),
-                    transitionBuilder: (child, anim) =>
-                        ScaleTransition(scale: anim, child: child),
-                    child: Icon(
-                      newFavoriteStatus
-                          ? Icons.favorite
-                          : Icons.favorite_border,
-                      key: ValueKey(newFavoriteStatus),
-                      color: Colors.white,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      newFavoriteStatus
-                          ? 'Đã thêm vào yêu thích '
-                          : 'Đã xóa khỏi yêu thích ',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        );
+        // 👇 CẬP NHẬT FAVORITE VIEWMODEL
+        if (newFavoriteStatus) {
+          // Thêm vào yêu thích
+          if (!favoriteViewModel.isFavorite(widget.rental.id)) {
+            final newFavorite = Favorite(
+              userId: authViewModel.currentUser?.id ?? '',
+              rentalId: widget.rental.id,
+              createdAt: DateTime.now(),
+            );
+            // Thêm vào danh sách và lưu cache
+            favoriteViewModel.addFavoriteLocally(newFavorite);
+          }
+        } else {
+          // Xóa khỏi yêu thích
+          favoriteViewModel.removeFavoriteLocally(widget.rental.id);
+        }
 
-        ScaffoldMessenger.of(context).showSnackBar(snackBar);
+        // Hiển thị SnackBar thành công
+        _showSuccessSnackBar(newFavoriteStatus);
       },
       onError: (error) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -219,6 +171,80 @@ class _RentalDetailScreenState extends State<RentalDetailScreen>
       },
       context: context,
     );
+  }
+
+  void _showSuccessSnackBar(bool isFavorited) {
+    final snackBar = SnackBar(
+      behavior: SnackBarBehavior.floating,
+      margin: const EdgeInsets.all(16),
+      elevation: 0,
+      backgroundColor: Colors.transparent,
+      duration: const Duration(seconds: 2),
+      content: TweenAnimationBuilder<double>(
+        tween: Tween(begin: 0.0, end: 1.0),
+        duration: const Duration(milliseconds: 500),
+        curve: Curves.easeOutCubic,
+        builder: (context, value, child) {
+          return Opacity(
+            opacity: value,
+            child: Transform.translate(
+              offset: Offset(0, (1 - value) * 20),
+              child: child,
+            ),
+          );
+        },
+        child: Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [
+                const Color.fromARGB(255, 1, 180, 64),
+                const Color.fromARGB(255, 85, 221, 112),
+              ],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black26,
+                blurRadius: 8,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Row(
+            children: [
+              AnimatedSwitcher(
+                duration: const Duration(milliseconds: 400),
+                transitionBuilder: (child, anim) =>
+                    ScaleTransition(scale: anim, child: child),
+                child: Icon(
+                  isFavorited ? Icons.favorite : Icons.favorite_border,
+                  key: ValueKey(isFavorited),
+                  color: Colors.white,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  isFavorited
+                      ? 'Đã thêm vào yêu thích'
+                      : 'Đã xóa khỏi yêu thích',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    ScaffoldMessenger.of(context).showSnackBar(snackBar);
   }
 
   void _showFullScreenImage(String imageUrl) {
@@ -266,8 +292,7 @@ class _RentalDetailScreenState extends State<RentalDetailScreen>
   Future<void> _refreshBookingStatus() async {
     final authViewModel = Provider.of<AuthViewModel>(context, listen: false);
     if (authViewModel.currentUser != null) {
-    //
-     
+      //
     }
   }
 
@@ -704,7 +729,6 @@ class _RentalDetailScreenState extends State<RentalDetailScreen>
                               );
                             }
 
-                            // 👇 Thêm return này để tránh lỗi
                             return const SizedBox.shrink();
                           },
                         ),
