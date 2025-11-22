@@ -10,6 +10,8 @@
 
 - Điều chỉnh giao diện chỗ tạo bài đăng : ==> DONE 
 
+- Tạo Banner quảng cáo ở trang HOME : ==> DONE 
+
 - Cập nhật địa chỉ sau khi sáp nhập : Chưa có API phiên bản hoàn chỉnh 
 
 - Lỗi đang lấy tọa độ vị trí sai khi đăng bài : Do sài hàng Free cùi nên chịu 
@@ -24,23 +26,14 @@
 
 - Thêm mục thông báo khi có tương tác : VD -> admin từ chối bài đăng + lý do và thông báo 
 
-- Tạo Banner quảng cáo ở trang HOME 
-
 - Lỗi khi tạo bài đăng nhập địa chỉ sẽ bị cập nhật vào địa chỉ tài khoản -> sai 
+
+- Khi lưu thông tin tin mới hồ sơ sẽ bị mất nút điều hướng 
 
 # BỔ SUNG THÊM TÍNH NĂNG ===================================: 
 
 - Tạo thêm ADMIN quản lý kiểm duyệt các banner quảng cáo,  bài đăng , tin tức , tài khoản , sự kiện , chat , ...
 
-+ auth_service 
-
-+ vm_auth
-
-+ login_view 
-
-+ Thư mục HomeMain 
-
-+ main_list_cart_home
-
 - Thống kê bài đăng hôm nay , tài khoản người dùng mới 
 
+                                           

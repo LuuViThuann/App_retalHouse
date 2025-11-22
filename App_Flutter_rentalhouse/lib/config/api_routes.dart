@@ -1,9 +1,14 @@
 class ApiRoutes {
   static const String rootUrl =
-      'http://192.168.1.13:3000'; // 192.168.43.168 - mạng dữ liệu
+      'http://192.168.1.17:3000'; // 192.168.43.168 - mạng dữ liệu
   static const String baseUrl = '$rootUrl/api';
   static const String serverBaseUrl = rootUrl;
   static const String socketUrl = serverBaseUrl;
+
+  // ==================== BANNER (NEW) ====================
+  static const String banners = '$baseUrl/banners';
+  static String bannerById(String bannerId) => '$banners/$bannerId';
+  static const String adminBanners = '$banners/admin';
 
   // Định nghĩa các endpoint dữ liệu cụ thể ------------------------------------------
   static const String searchHistory = '$baseUrl/search-history';

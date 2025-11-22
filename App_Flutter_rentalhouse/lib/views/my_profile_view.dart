@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_rentalhouse/Widgets/Profile/enter_new_address.dart';
 import 'package:flutter_rentalhouse/config/loading.dart';
 import 'package:flutter_rentalhouse/views/change_address_profile.dart';
+import 'package:flutter_rentalhouse/views/home.dart';
+import 'package:flutter_rentalhouse/views/Admin/View/HomeAdminScreen.dart';
 import 'package:lottie/lottie.dart';
 import 'package:provider/provider.dart';
 import 'package:image_picker/image_picker.dart';
@@ -23,6 +25,8 @@ class _MyProfileViewState extends State<MyProfileView> {
   late TextEditingController _userNameController;
   final ImagePicker _picker = ImagePicker();
   String? _email;
+  bool _isFromAdmin = false;
+  bool _isNavigating = false;
 
   @override
   void initState() {
@@ -30,7 +34,11 @@ class _MyProfileViewState extends State<MyProfileView> {
     _phoneController = TextEditingController();
     _addressController = TextEditingController();
     _userNameController = TextEditingController();
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      final args = ModalRoute.of(context)?.settings.arguments;
+      _isFromAdmin = args is bool ? args : false;
+
       final authViewModel = Provider.of<AuthViewModel>(context, listen: false);
       final user = authViewModel.currentUser;
       if (user != null) {
@@ -117,25 +125,27 @@ class _MyProfileViewState extends State<MyProfileView> {
         address: _addressController.text.trim(),
         username: _userNameController.text.trim(),
       );
-      if (authViewModel.errorMessage == null && mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Thông tin đã được cập nhật thành công!'),
-            backgroundColor: Colors.green,
-            duration: Duration(seconds: 2),
-          ),
-        );
-        setState(() {
-          _isEditing = false;
-        });
-      } else if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-                'Lỗi: ${authViewModel.errorMessage ?? 'Không thể cập nhật thông tin'}'),
-            backgroundColor: Colors.red,
-          ),
-        );
+      if (mounted) {
+        if (authViewModel.errorMessage == null) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Thông tin đã được cập nhật thành công!'),
+              backgroundColor: Colors.green,
+              duration: Duration(seconds: 2),
+            ),
+          );
+          setState(() {
+            _isEditing = false;
+          });
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                  'Lỗi: ${authViewModel.errorMessage ?? 'Không thể cập nhật thông tin'}'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
       }
     } catch (e) {
       if (mounted) {
@@ -228,6 +238,71 @@ class _MyProfileViewState extends State<MyProfileView> {
         _pickAddressFromMap();
       } else if (value == 'manual') {
         _pickAddressManually();
+      }
+    });
+  }
+
+  void _showLoadingDialog(String message) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => Dialog(
+        backgroundColor: Colors.transparent,
+        child: SizedBox(
+          height: 140,
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Lottie.asset(
+                AssetsConfig.loadingLottie,
+                width: 100,
+                height: 100,
+                fit: BoxFit.contain,
+              ),
+              const SizedBox(height: 12),
+              Text(
+                message,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _navigateToHome() {
+    setState(() {
+      _isNavigating = true;
+    });
+    _showLoadingDialog('Đang di chuyển trang ...');
+    Future.delayed(const Duration(seconds: 1), () {
+      if (mounted) {
+        Navigator.pushAndRemoveUntil(
+          context,
+          MaterialPageRoute(builder: (context) => const HomeScreen()),
+          (route) => false,
+        );
+      }
+    });
+  }
+
+  void _navigateToAdmin() {
+    setState(() {
+      _isNavigating = true;
+    });
+    _showLoadingDialog('Đang di chuyển trang ...');
+    Future.delayed(const Duration(seconds: 1), () {
+      if (mounted) {
+        Navigator.pushAndRemoveUntil(
+          context,
+          MaterialPageRoute(builder: (context) => const HomeAdminScreen()),
+          (route) => false,
+        );
       }
     });
   }
@@ -541,11 +616,151 @@ class _MyProfileViewState extends State<MyProfileView> {
                             ),
                           ),
                           const SizedBox(height: 20),
+                          if (_isEditing)
+                            ElevatedButton(
+                              onPressed: () {
+                                setState(() {
+                                  _isEditing = false;
+                                });
+                              },
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.grey,
+                                foregroundColor: Colors.white,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                              ),
+                              child: const SizedBox(
+                                width: double.infinity,
+                                height: 50,
+                                child: Center(
+                                  child: Text(
+                                    'Hủy',
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          const SizedBox(height: 20),
+                          // ADMIN BUTTONS SECTION - LUÔN HIỂN THỊ
+                          Consumer<AuthViewModel>(
+                            builder: (context, viewModel, _) {
+                              return _buildAdminSection(context, viewModel);
+                            },
+                          ),
                         ],
                       ),
                     ),
         );
       },
+    );
+  }
+
+  Widget _buildAdminSection(BuildContext context, AuthViewModel authViewModel) {
+    final isAdmin = authViewModel.currentUser?.role == 'admin';
+
+    // Luôn hiển thị phần admin nếu user là admin, bất kể đang chỉnh sửa hay không
+    if (!isAdmin) return const SizedBox.shrink();
+
+    return Column(
+      children: [
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [
+                Colors.orange.withOpacity(0.1),
+                Colors.orange.withOpacity(0.05),
+              ],
+            ),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: Colors.orange.withOpacity(0.2)),
+          ),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.orange.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(Icons.admin_panel_settings,
+                    color: Colors.orange, size: 24),
+              ),
+              const SizedBox(width: 12),
+              const Text(
+                'Quản Trị Viên',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.orange,
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+        Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: Colors.grey.withOpacity(0.1)),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.grey.withOpacity(0.05),
+                blurRadius: 20,
+                offset: const Offset(0, 8),
+              ),
+            ],
+          ),
+          child: SizedBox(
+            width: double.infinity,
+            height: 50,
+            child: ElevatedButton(
+              onPressed: _isNavigating
+                  ? null
+                  : () {
+                      if (_isFromAdmin) {
+                        _navigateToHome();
+                      } else {
+                        _navigateToAdmin();
+                      }
+                    },
+              style: ElevatedButton.styleFrom(
+                backgroundColor:
+                    _isFromAdmin ? Colors.blueAccent : Colors.orange,
+                foregroundColor: Colors.white,
+                elevation: 0,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    _isFromAdmin ? Icons.arrow_back : Icons.dashboard,
+                    size: 20,
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    _isFromAdmin ? 'Quay lại ứng dụng' : 'Trở lại quản trị',
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 20),
+      ],
     );
   }
 

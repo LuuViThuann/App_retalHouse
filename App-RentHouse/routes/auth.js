@@ -13,115 +13,117 @@ const EMAILJS_USER_ID = process.env.EMAILJS_USER_ID || 'bGlLdgP91zmfcVxzm';
 const EMAILJS_API_TOKEN = process.env.EMAILJS_API_TOKEN; // Private Key from .env
 
 // Đăng ký người dùng
+// POST /register - Đăng ký người dùng mới
 router.post('/register', async (req, res) => {
-  const { email, password, phoneNumber, address, username, avatarBase64 } = req.body;
+  const { idToken, phoneNumber, address, username, avatarBase64 } = req.body;
 
-  // Kiểm tra các trường bắt buộc
-  if (!email || !password || !phoneNumber || !address || !username || !avatarBase64) {
-    console.error('Missing required fields:', req.body);
-    return res.status(400).json({ message: 'Vui lòng điền đầy đủ các trường bắt buộc' });
+  // === 1. KIỂM TRA BẮT BUỘC ===
+  if (!idToken) {
+    return res.status(400).json({ message: 'Thiếu ID token' });
+  }
+  if (!phoneNumber || !address || !username || !avatarBase64) {
+    return res.status(400).json({ message: 'Vui lòng điền đầy đủ thông tin' });
   }
 
-  // Kiểm tra định dạng email
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  if (!emailRegex.test(email)) {
-    return res.status(400).json({ message: 'Email không hợp lệ' });
-  }
-
-  // Kiểm tra định dạng số điện thoại (10 chữ số)
+  // Kiểm tra định dạng số điện thoại
   const phoneRegex = /^\d{10}$/;
   if (!phoneRegex.test(phoneNumber)) {
-    return res.status(400).json({ message: 'Số điện thoại phải có 10 chữ số' });
+    return res.status(400).json({ message: 'Số điện thoại phải có đúng 10 chữ số' });
   }
 
-  // Kiểm tra độ dài mật khẩu
-  if (password.length < 6) {
-    return res.status(400).json({ message: 'Mật khẩu phải có ít nhất 6 ký tự' });
+  // Kiểm tra avatarBase64 hợp lệ
+  const avatarRegex = /^(data:image\/(jpeg|png);base64,)?[A-Za-z0-9+/=]+$/;
+  if (!avatarRegex.test(avatarBase64)) {
+    return res.status(400).json({ message: 'Ảnh đại diện không hợp lệ (chỉ hỗ trợ JPEG/PNG)' });
   }
 
- // Kiểm tra định dạng và tính toàn vẹn avatarBase64
-const avatarRegex = /^(data:image\/(jpeg|png);base64,)?[A-Za-z0-9+/=]+$/;
-if (!avatarRegex.test(avatarBase64)) {
-  return res.status(400).json({ message: 'Ảnh đại diện không hợp lệ. Chỉ hỗ trợ định dạng JPEG hoặc PNG.' });
-}
+  // Loại bỏ tiền tố MIME
+  let base64Data = avatarBase64.replace(/^data:image\/(jpeg|png);base64,/, '');
 
-// Luôn loại bỏ tiền tố MIME nếu có
-const base64Data = avatarBase64.replace(/^data:image\/(jpeg|png);base64,/, '');
-
-try {
-  Buffer.from(base64Data, 'base64');
-  if (base64Data.length > 5 * 1024 * 1024) {
-    return res.status(400).json({ message: 'Ảnh đại diện quá lớn (tối đa 5MB)' });
+  // Kiểm tra kích thước (< 5MB)
+  try {
+    const buffer = Buffer.from(base64Data, 'base64');
+    if (buffer.length > 5 * 1024 * 1024) {
+      return res.status(400).json({ message: 'Ảnh đại diện quá lớn (tối đa 5MB)' });
+    }
+  } catch (err) {
+    return res.status(400).json({ message: 'Dữ liệu base64 không hợp lệ' });
   }
-} catch (err) {
-  return res.status(400).json({ message: 'Ảnh đại diện không hợp lệ: Dữ liệu base64 không đúng' });
-}
 
   try {
-    // Kiểm tra email đã tồn tại trong Firebase
-    const existingUser = await admin.auth().getUserByEmail(email).catch(() => null);
-    if (existingUser) {
-      return res.status(400).json({ message: 'Email đã được sử dụng' });
+    // === 2. XÁC THỰC ID TOKEN TỪ FIREBASE ===
+    const decodedToken = await admin.auth().verifyIdToken(idToken);
+    const uid = decodedToken.uid;
+    const email = decodedToken.email;
+
+    if (!email) {
+      return res.status(400).json({ message: 'Token không chứa email' });
     }
 
-    // Kiểm tra số điện thoại đã tồn tại trong Firestore
-    const usersSnapshot = await admin.firestore().collection('Users').where('phoneNumber', '==', phoneNumber).get();
-    if (!usersSnapshot.empty) {
+    // === 3. KIỂM TRA TRÙNG SỐ ĐIỆN THOẠI ===
+    const [firestoreCheck, mongoCheck] = await Promise.all([
+      admin.firestore().collection('Users').where('phoneNumber', '==', phoneNumber).get(),
+      User.findOne({ phoneNumber })
+    ]);
+
+    if (!firestoreCheck.empty || mongoCheck) {
       return res.status(400).json({ message: 'Số điện thoại đã được sử dụng' });
     }
 
-    // Kiểm tra số điện thoại trong MongoDB
-    const mongoUserByPhone = await User.findOne({ phoneNumber });
-    if (mongoUserByPhone) {
-      return res.status(400).json({ message: 'Số điện thoại đã được sử dụng trong MongoDB' });
+    // === 4. KIỂM TRA USER ĐÃ TỒN TẠI TRONG MONGODB CHƯA? ===
+    const existingMongoUser = await User.findOne({ _id: uid });
+
+    if (existingMongoUser) {
+      return res.status(400).json({ message: 'Tài khoản đã được đăng ký trước đó' });
     }
 
-    // Tạo người dùng trong Firebase Authentication
-    const userRecord = await admin.auth().createUser({
+    // === 5. LƯU VÀO FIRESTORE ===
+    await admin.firestore().collection('Users').doc(uid).set({
       email,
-      password,
+      phoneNumber,
+      address,
+      username,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    }, { merge: true });
+
+    // === 6. LƯU VÀO MONGODB ===
+    const newUser = new User({
+      _id: uid,
+      email,
+      phoneNumber,
+      address,
+      username,
+      avatarBase64: base64Data,
+      role: 'user', // Mặc định là user
     });
 
-    try {
-      // Lưu thông tin người dùng vào Firestore (không lưu avatarBase64)
-      await admin.firestore().collection('Users').doc(userRecord.uid).set({
-        email,
-        phoneNumber,
-        address,
-        username,
-        createdAt: admin.firestore.FieldValue.serverTimestamp(),
-      });
+    await newUser.save();
 
-      // Lưu thông tin người dùng vào MongoDB (sử dụng base64 đã loại bỏ tiền tố)
-      const newUser = new User({
-        _id: userRecord.uid,
-        email,
-        phoneNumber,
-        address,
-        username,
-        avatarBase64: base64Data,
-      });
-      await newUser.save();
+    // === 7. TRẢ VỀ KẾT QUẢ ===
+    res.status(201).json({
+      id: uid,
+      email,
+      phoneNumber,
+      address,
+      username,
+      avatarBase64: base64Data,
+      role: 'user',
+      createdAt: new Date().toISOString(),
+      message: 'Đăng ký thành công',
+    });
 
-      // Trả về thông tin người dùng với base64 không có tiền tố
-      res.status(201).json({
-        id: userRecord.uid,
-        email: userRecord.email,
-        phoneNumber,
-        address,
-        username,
-        avatarBase64: base64Data,
-        createdAt: new Date().toISOString(),
-      });
-    } catch (innerErr) {
-      // Rollback: Xóa người dùng trong Firebase nếu lưu vào Firestore hoặc MongoDB thất bại
-      await admin.auth().deleteUser(userRecord.uid);
-      console.error('Rollback: Deleted Firebase user due to error:', innerErr);
-      throw innerErr;
-    }
   } catch (err) {
     console.error('Registration error:', err);
-    res.status(400).json({ message: `Đăng ký thất bại: ${err.message}` });
+
+    // Nếu lỗi nghiêm trọng (ví dụ token giả mạo, lỗi server)
+    if (err.code === 'auth/id-token-expired' || err.code === 'auth/argument-error') {
+      return res.status(401).json({ message: 'Token không hợp lệ hoặc đã hết hạn' });
+    }
+
+    res.status(400).json({
+      message: err.message || 'Đăng ký thất bại, vui lòng thử lại',
+    });
   }
 });
 
@@ -161,6 +163,16 @@ router.post('/login', async (req, res) => {
     const userData = userDoc.data();
     const mongoUser = await User.findOne({ _id: user.uid });
 
+    // XÁC ĐỊNH ROLE
+    let role = 'user';
+    if (mongoUser && mongoUser.role === 'admin') {
+      role = 'admin';
+    } else if (decodedToken.email === 'admin@yourapp.com') { // hoặc kiểm tra custom claim
+      role = 'admin';
+      // Tự động cập nhật role nếu là admin email
+      await User.updateOne({ _id: uid }, { role: 'admin' }, { upsert: true });
+    }
+
     res.json({
       id: user.uid,
       email: user.email || userData.email,
@@ -169,6 +181,7 @@ router.post('/login', async (req, res) => {
       username: userData.username || '',
       avatarBase64: mongoUser?.avatarBase64 || userData.avatarBase64 || '',
       createdAt: userData.createdAt ? userData.createdAt.toDate().toISOString() : new Date().toISOString(),
+      role: role,
     });
   } catch (err) {
     console.error('Login error:', err);

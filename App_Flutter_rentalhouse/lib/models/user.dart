@@ -9,6 +9,7 @@ class AppUser {
   final String? token;
   final String? avatarBase64;
   final String username;
+  final String role; // 'user' | 'admin'
 
   AppUser({
     required this.id,
@@ -19,6 +20,7 @@ class AppUser {
     this.token,
     this.avatarBase64,
     required this.username,
+    this.role = 'user',
   });
 
   factory AppUser.fromJson(Map<String, dynamic> data) {
@@ -32,6 +34,7 @@ class AppUser {
       token: data['token'] as String?,
       avatarBase64: data['avatarBase64'] as String?,
       username: data['username'] as String? ?? '',
+      role: data['role'] as String? ?? 'user',
     );
   }
 

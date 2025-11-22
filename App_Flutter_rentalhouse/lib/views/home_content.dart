@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
@@ -14,6 +15,8 @@ import 'package:flutter_rentalhouse/viewmodels/vm_auth.dart';
 import 'package:flutter_rentalhouse/viewmodels/vm_chat.dart';
 import 'package:flutter_rentalhouse/viewmodels/vm_favorite.dart';
 import 'package:flutter_rentalhouse/viewmodels/vm_rental.dart';
+import 'package:flutter_rentalhouse/views/Admin/Service/banner.dart';
+import 'package:flutter_rentalhouse/views/Admin/model/banner.dart';
 import 'package:flutter_rentalhouse/views/chat_user.dart';
 import 'package:flutter_rentalhouse/views/favorite_view.dart';
 import 'package:flutter_rentalhouse/views/login_view.dart';
@@ -37,26 +40,32 @@ class HomeContent extends StatefulWidget {
 
 class _HomeContentState extends State<HomeContent> {
   final TextEditingController _searchController = TextEditingController();
+  final PageController _bannerController = PageController();
+  final BannerService _bannerService = BannerService();
 
   List<dynamic> provinces = [];
+  List<BannerModel> banners = [];
   bool isLoadingProvinces = true;
+  bool isLoadingBanners = true;
+  late ValueNotifier<int> _currentBannerIndex;
+  Timer? _bannerTimer;
 
   RentalFilter filter = const RentalFilter();
 
   @override
   void initState() {
     super.initState();
+    _currentBannerIndex = ValueNotifier<int>(0);
     fetchProvinces();
+    fetchBanners();
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final authViewModel = Provider.of<AuthViewModel>(context, listen: false);
-
       final favoriteViewModel =
           Provider.of<FavoriteViewModel>(context, listen: false);
 
       if (authViewModel.currentUser != null) {
         final token = authViewModel.currentUser!.token ?? '';
-
         if (token.isNotEmpty) {
           favoriteViewModel.fetchFavorites(token);
         }
@@ -88,6 +97,48 @@ class _HomeContentState extends State<HomeContent> {
     }
   }
 
+  Future<void> fetchBanners() async {
+    try {
+      final fetchedBanners = await _bannerService.fetchActiveBanners();
+      setState(() {
+        banners = fetchedBanners;
+        isLoadingBanners = false;
+      });
+      _startBannerAutoScroll();
+    } catch (e) {
+      setState(() => isLoadingBanners = false);
+      debugPrint('Lỗi tải banner: $e');
+    }
+  }
+
+  void _startBannerAutoScroll() {
+    _bannerTimer?.cancel();
+    if (banners.isEmpty) return;
+
+    _bannerTimer = Timer.periodic(const Duration(seconds: 2), (timer) {
+      if (!mounted || !_bannerController.hasClients) return;
+
+      try {
+        final nextPage = (_currentBannerIndex.value + 1) % banners.length;
+        _bannerController.animateToPage(
+          nextPage,
+          duration: const Duration(milliseconds: 600),
+          curve: Curves.easeInOut,
+        );
+      } catch (e) {
+        debugPrint('Banner scroll error: $e');
+      }
+    });
+  }
+
+  String _getBannerImageUrl(String imageUrl) {
+    if (imageUrl.isEmpty) return '';
+    if (imageUrl.startsWith('http')) {
+      return imageUrl;
+    }
+    return '${ApiRoutes.serverBaseUrl}$imageUrl';
+  }
+
   void clearAllFilters() {
     final canTho = provinces.firstWhere(
       (p) => p['name'] == 'Cần Thơ',
@@ -111,6 +162,9 @@ class _HomeContentState extends State<HomeContent> {
   @override
   void dispose() {
     _searchController.dispose();
+    _bannerTimer?.cancel();
+    _bannerController.dispose();
+    _currentBannerIndex.dispose();
     super.dispose();
   }
 
@@ -118,6 +172,179 @@ class _HomeContentState extends State<HomeContent> {
     final formatter =
         NumberFormat.currency(locale: 'vi_VN', symbol: '₫', decimalDigits: 0);
     return formatter.format(amount);
+  }
+
+  Widget _buildBannerSlider() {
+    // Loading state
+    if (isLoadingBanners) {
+      return Shimmer.fromColors(
+        baseColor: Colors.grey[300]!,
+        highlightColor: Colors.grey[100]!,
+        child: Container(
+          height: MediaQuery.of(context).size.height * 0.22,
+          width: double.infinity,
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(15),
+          ),
+        ),
+      );
+    }
+
+    // Nếu không có ảnh hiển thị mặc đinh ====================
+    if (banners.isEmpty) {
+      return Container(
+        height: MediaQuery.of(context).size.height * 0.22,
+        width: double.infinity,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(15),
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(15),
+          child: Image.asset(
+            'assets/img/banner.jpg',
+            fit: BoxFit.cover,
+            errorBuilder: (_, __, ___) => Container(
+              color: Colors.grey[300],
+              child:
+                  const Icon(Icons.broken_image, size: 50, color: Colors.grey),
+            ),
+          ),
+        ),
+      );
+    }
+
+    // Banner Slider
+    return Stack(
+      children: [
+        Container(
+          height: MediaQuery.of(context).size.height * 0.22,
+          width: double.infinity,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(15),
+          ),
+          child: PageView.builder(
+            controller: _bannerController,
+            onPageChanged: (index) {
+              _currentBannerIndex.value = index;
+            },
+            itemCount: banners.length,
+            itemBuilder: (context, index) {
+              final banner = banners[index];
+              final fullImageUrl = _getBannerImageUrl(banner.imageUrl);
+
+              return GestureDetector(
+                onTap: () {
+                  if (banner.link != null && banner.link!.isNotEmpty) {
+                    debugPrint('Banner link: ${banner.link}');
+                  }
+                },
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(15),
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      // Image
+                      CachedNetworkImage(
+                        imageUrl: fullImageUrl,
+                        fit: BoxFit.cover,
+                        placeholder: (context, url) => Shimmer.fromColors(
+                          baseColor: Colors.grey[300]!,
+                          highlightColor: Colors.grey[100]!,
+                          child: Container(color: Colors.white),
+                        ),
+                        errorWidget: (context, url, error) => Container(
+                          color: Colors.grey[300],
+                          child: const Icon(Icons.broken_image,
+                              size: 50, color: Colors.grey),
+                        ),
+                      ),
+
+                      if (banner.title.isNotEmpty)
+                        Positioned(
+                          bottom: 0,
+                          left: 0,
+                          right: 0,
+                          child: Container(
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                begin: Alignment.bottomCenter,
+                                end: Alignment.topCenter,
+                                colors: [
+                                  Colors.black.withOpacity(0.8),
+                                  Colors.transparent,
+                                ],
+                              ),
+                            ),
+                            padding: const EdgeInsets.all(12),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  banner.title,
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                if (banner.description.isNotEmpty) ...[
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    banner.description,
+                                    style: TextStyle(
+                                      color: Colors.white.withOpacity(0.85),
+                                      fontSize: 11,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ]
+                              ],
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+        // Dots indicator - sử dụng ValueNotifier để tránh rebuild toàn bộ layout
+        Positioned(
+          bottom: 10,
+          left: 0,
+          right: 0,
+          child: ValueListenableBuilder<int>(
+            valueListenable: _currentBannerIndex,
+            builder: (context, currentIndex, child) {
+              return Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: List.generate(
+                  banners.length,
+                  (index) => AnimatedContainer(
+                    duration: const Duration(milliseconds: 300),
+                    margin: const EdgeInsets.symmetric(horizontal: 4),
+                    width: currentIndex == index ? 24 : 8,
+                    height: 8,
+                    decoration: BoxDecoration(
+                      color: currentIndex == index
+                          ? Colors.white
+                          : Colors.white.withOpacity(0.5),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+      ],
+    );
   }
 
   Widget _buildFavoriteShimmer() {
@@ -689,28 +916,7 @@ class _HomeContentState extends State<HomeContent> {
                   },
                 ),
                 const SizedBox(height: 25),
-                Container(
-                  height: MediaQuery.of(context).size.height * 0.22,
-                  width: double.infinity,
-                  decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(15),
-                      boxShadow: [
-                        BoxShadow(
-                            color: Colors.grey.withOpacity(0.3),
-                            spreadRadius: 2,
-                            blurRadius: 6,
-                            offset: const Offset(0, 4))
-                      ]),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(15),
-                    child: Image.asset('assets/img/banner.jpg',
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => Container(
-                            color: Colors.grey[300],
-                            child: const Icon(Icons.broken_image,
-                                size: 50, color: Colors.grey))),
-                  ),
-                ),
+                _buildBannerSlider(),
                 const SizedBox(height: 35),
                 SizedBox(
                   height: 155,
@@ -796,7 +1002,7 @@ class _HomeContentState extends State<HomeContent> {
                     borderRadius:
                         BorderRadius.vertical(top: Radius.circular(25))),
                 builder: (_) => const ChatAIBottomSheet(
-                    apiKey: 'AIzaSyAQ2qxzF90d2Yj03y_vt1Sb9AdIlbiBauE'),
+                    apiKey: 'AIzaSyCwwXFPAOFpxKy4OnujJ6lpxkoHb9VBTq4'),
               );
             },
             constraints: const BoxConstraints.tightFor(width: 145, height: 145),

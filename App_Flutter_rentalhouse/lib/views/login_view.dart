@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_rentalhouse/config/loading.dart';
 import 'package:flutter_rentalhouse/utils/snackbar.dart';
 import 'package:flutter_rentalhouse/viewmodels/vm_chat.dart';
+import 'package:flutter_rentalhouse/views/Admin/View/HomeAdminScreen.dart';
 import 'package:flutter_rentalhouse/views/forgot_password.dart';
 import 'package:flutter_rentalhouse/views/home.dart';
 import 'package:lottie/lottie.dart';
@@ -29,50 +30,44 @@ class _LoginScreenState extends State<LoginScreen> {
     super.dispose();
   }
 
+// Trong _handleLoginSuccess
   Future<void> _handleLoginSuccess(BuildContext context,
       AuthViewModel authViewModel, ChatViewModel chatViewModel) async {
-    if (authViewModel.errorMessage == null &&
-        authViewModel.currentUser != null) {
-      final token = authViewModel.currentUser!.token;
+    if (authViewModel.currentUser != null &&
+        authViewModel.errorMessage == null) {
+      final user = authViewModel.currentUser!;
+      final token = user.token;
+
       if (token == null || token.isEmpty) {
-        print(
-            'LoginScreen: Empty token for user: ${authViewModel.currentUser!.id}');
-        showCustomSnackBar(
-          context,
-          'Đăng nhập thất bại: Token không hợp lệ',
-          backgroundColor: Colors.red,
-          icon: Icons.error_outline,
-          actionLabel: 'Đóng',
-          onActionPressed: () =>
-              ScaffoldMessenger.of(context).hideCurrentSnackBar(),
-        );
+        showCustomSnackBar(context, 'Token không hợp lệ',
+            backgroundColor: Colors.red);
         return;
       }
-      print('LoginScreen: Setting token: ${token.substring(0, 10)}...');
+
       chatViewModel.setToken(token);
-      showCustomSnackBar(
-        context,
-        'Đăng nhập thành công',
-        backgroundColor: Colors.green,
-        icon: Icons.check_circle,
-        actionLabel: 'Đóng',
-        onActionPressed: () =>
-            ScaffoldMessenger.of(context).hideCurrentSnackBar(),
-      );
-      Navigator.pushAndRemoveUntil(
-        context,
-        MaterialPageRoute(builder: (context) => const HomeScreen()),
-        (Route<dynamic> route) => false,
-      );
+
+      showCustomSnackBar(context, 'Đăng nhập thành công!',
+          backgroundColor: Colors.green);
+
+      // ĐIỀU HƯỚNG THEO ROLE
+      if (user.role == 'admin') {
+        Navigator.pushAndRemoveUntil(
+          context,
+          MaterialPageRoute(builder: (context) => const HomeAdminScreen()),
+          (route) => false,
+        );
+      } else {
+        Navigator.pushAndRemoveUntil(
+          context,
+          MaterialPageRoute(builder: (context) => const HomeScreen()),
+          (route) => false,
+        );
+      }
     } else {
       showCustomSnackBar(
         context,
         authViewModel.errorMessage ?? 'Đăng nhập thất bại',
         backgroundColor: Colors.red,
-        icon: Icons.error_outline,
-        actionLabel: 'Đóng',
-        onActionPressed: () =>
-            ScaffoldMessenger.of(context).hideCurrentSnackBar(),
       );
     }
   }

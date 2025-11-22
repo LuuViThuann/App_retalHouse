@@ -16,6 +16,8 @@ const favoriteRoutes = require('./routes/favorite');
 const commentRoutes = require('./routes/comment');
 const profileRoutes = require('./routes/profile');
 const bookingRoutes = require('./routes/booking');
+const bannerRoutes = require('./routes/banner');
+
 
 require('./models/conversation');
 require('./models/message');
@@ -45,6 +47,9 @@ const redisClient = redis.createClient({
 redisClient.on('error', (err) => console.log('Redis Client Error', err));
 redisClient.connect().catch((err) => console.error('Redis Connection Error:', err));
 
+app.use(express.json({ limit: '10mb' }));           // Cho JSON (avatarBase64)
+app.use(express.urlencoded({ limit: '10mb', extended: true }));
+
 app.use(cors({
   origin: ['http://localhost:3000', 'http://localhost:8081'],
   methods: ['GET', 'POST', 'PUT', 'DELETE'],
@@ -67,6 +72,7 @@ app.use('/api', favoriteRoutes);
 app.use('/api', commentRoutes(io));
 app.use('/api/profile', profileRoutes);
 app.use('/api', bookingRoutes);
+app.use('/api/banners', bannerRoutes);
 
 io.use(async (socket, next) => {
   const token = socket.handshake.headers.authorization?.replace('Bearer ', '');
@@ -120,6 +126,14 @@ io.on('connection', (socket) => {
 app.use((err, req, res, next) => {
   console.error(err.stack);
   res.status(500).json({ message: 'Something went wrong!' });
+});
+
+app.use((err, req, res, next) => {
+  console.error('Global error:', err.stack);
+  if (err.type === 'entity.too.large') {
+    return res.status(413).json({ message: 'File hoặc dữ liệu gửi lên quá lớn!' });
+  }
+  res.status(500).json({ message: 'Có lỗi xảy ra từ server!' });
 });
 
 server.listen(PORT, () => {

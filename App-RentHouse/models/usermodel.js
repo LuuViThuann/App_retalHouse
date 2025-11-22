@@ -10,7 +10,7 @@ const userSchema = new mongoose.Schema({
     type: String,
     required: true,
     unique: true,
-  },
+  }, 
   password: {
     type: String,
     required: false, 
@@ -28,6 +28,12 @@ const userSchema = new mongoose.Schema({
   avatarBase64: {
     type: String,
     default: null, // lưu trữ ảnh đại diện dưới dạng base64
+  },
+ role: {
+    type: String,
+    enum: ['user', 'admin'],
+    default: 'user',
+    index: true  // Thêm index để query nhanh
   },
 });
 

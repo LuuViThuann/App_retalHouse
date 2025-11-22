@@ -212,7 +212,7 @@ class AuthViewModel extends ChangeNotifier {
   }) async {
     _isLoading = true;
     _errorMessage = null;
-    notifyListeners();
+    notifyListeners(); // Notify ngay khi bắt đầu
 
     try {
       AppUser? updatedUser = await _authService.updateProfile(
@@ -234,7 +234,7 @@ class AuthViewModel extends ChangeNotifier {
       _errorMessage = e.toString();
     } finally {
       _isLoading = false;
-      notifyListeners();
+      notifyListeners(); // Notify khi hoàn thành
     }
   }
 

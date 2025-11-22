@@ -11,6 +11,7 @@ import 'package:http/http.dart' as http;
 import '../config/api_routes.dart';
 import '../models/user.dart';
 import 'dart:async';
+
 class AuthService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
@@ -60,38 +61,41 @@ class AuthService {
     required String username,
     required String avatarBase64,
   }) async {
-    // Kiểm tra định dạng đầu vào
-    if (!_isValidEmail(email)) {
-      throw Exception('Email không hợp lệ');
-    }
-    if (!_isValidPhoneNumber(phoneNumber)) {
+    // Validation như cũ...
+    if (!_isValidEmail(email)) throw Exception('Email không hợp lệ');
+    if (!_isValidPhoneNumber(phoneNumber))
       throw Exception('Số điện thoại phải có 10 chữ số');
-    }
-    if (!_isValidPassword(password)) {
+    if (!_isValidPassword(password))
       throw Exception('Mật khẩu phải có ít nhất 6 ký tự');
-    }
-    if (!_isValidAvatarBase64(avatarBase64)) {
-      print('AuthService: Invalid avatarBase64: $avatarBase64');
+    if (!_isValidAvatarBase64(avatarBase64))
       throw Exception('Ảnh đại diện không hợp lệ');
-    }
-    if (!_isValidUsername(username)) {
+    if (!_isValidUsername(username))
       throw Exception('Tên người dùng phải có ít nhất 3 ký tự');
-    }
-    if (!_isValidAddress(address)) {
-      throw Exception('Vui lòng nhập địa chỉ');
-    }
+    if (!_isValidAddress(address)) throw Exception('Vui lòng nhập địa chỉ');
 
     try {
-      // Loại bỏ tiền tố MIME trước khi gửi
+      // BƯỚC 1: ĐĂNG KÝ TRƯỚC TRONG FIREBASE AUTH (Flutter)
+      final userCredential = await _auth.createUserWithEmailAndPassword(
+        email: email,
+        password: password,
+      );
+
+      final user = userCredential.user;
+      if (user == null) throw Exception('Tạo tài khoản Firebase thất bại');
+
+      // BƯỚC 2: LẤY ID TOKEN NGAY SAU KHI ĐĂNG KÝ
+      final idToken = await user.getIdToken();
+      if (idToken == null)
+        throw Exception('Không lấy được ID token sau khi đăng ký');
+
+      // BƯỚC 3: GỬI THÔNG TIN + TOKEN ĐẾN BACKEND
       final rawBase64 = _stripMimePrefix(avatarBase64);
 
-      // Gửi request tới backend
       final response = await http.post(
         Uri.parse(ApiRoutes.register),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
-          'email': email,
-          'password': password,
+          'idToken': idToken, // QUAN TRỌNG: GỬI TOKEN THAY VÌ EMAIL + PASS
           'phoneNumber': phoneNumber,
           'address': address,
           'username': username,
@@ -99,30 +103,39 @@ class AuthService {
         }),
       );
 
-      print(
-          'AuthService: Register response: ${response.statusCode}, body: ${response.body}');
+      print('Register API Response: ${response.statusCode} - ${response.body}');
 
       if (response.statusCode == 201) {
         final data = jsonDecode(response.body);
-        final idToken = await _auth.currentUser?.getIdToken(true);
+
         return AppUser(
-          id: data['id'] as String,
-          email: data['email'] as String,
-          phoneNumber: data['phoneNumber'] as String,
-          address: data['address'] as String,
-          createdAt: DateTime.parse(data['createdAt'] as String),
-          username: data['username'] as String,
+          id: user.uid,
+          email: user.email ?? email,
+          phoneNumber: phoneNumber,
+          address: address,
+          username: username,
+          createdAt: DateTime.now(),
           token: idToken,
-          avatarBase64: data['avatarBase64'] as String?,
+          avatarBase64: rawBase64,
+          role: data['role'] ?? 'user', // Nhận role từ backend
         );
       } else {
-        final errorData = jsonDecode(response.body);
-        print('AuthService: Register error: ${errorData['message']}');
-        throw Exception(errorData['message'] ?? 'Đăng ký thất bại');
+        // Nếu backend lỗi → xóa user Firebase đã tạo (rollback)
+        await user
+            .delete()
+            .catchError((e) => print('Rollback delete user failed: $e'));
+        final error = jsonDecode(response.body);
+        throw Exception(error['message'] ?? 'Đăng ký thất bại');
       }
+    } on FirebaseAuthException catch (e) {
+      String msg = 'Đăng ký thất bại';
+      if (e.code == 'email-already-in-use') msg = 'Email đã được sử dụng';
+      if (e.code == 'weak-password') msg = 'Mật khẩu quá yếu';
+      if (e.code == 'invalid-email') msg = 'Email không hợp lệ';
+      throw Exception(msg);
     } catch (e) {
       print('AuthService: Registration error: $e');
-      throw Exception('Đăng ký thất bại: $e');
+      rethrow;
     }
   }
 
@@ -164,6 +177,8 @@ class AuthService {
           avatarBase64 = await fetchAvatarBase64(user.uid, idToken);
         }
 
+        final String userRole = data['role'] as String? ?? 'user';
+
         return AppUser(
           id: data['id'] as String,
           email: data['email'] as String,
@@ -174,6 +189,7 @@ class AuthService {
               data['createdAt'] as String? ?? DateTime.now().toIso8601String()),
           token: idToken,
           avatarBase64: avatarBase64,
+          role: userRole,
         );
       } else {
         final error = jsonDecode(response.body);
