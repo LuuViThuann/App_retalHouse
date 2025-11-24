@@ -16,6 +16,7 @@ import 'package:flutter_rentalhouse/viewmodels/vm_chat.dart';
 import 'package:flutter_rentalhouse/viewmodels/vm_favorite.dart';
 import 'package:flutter_rentalhouse/viewmodels/vm_rental.dart';
 import 'package:flutter_rentalhouse/views/Admin/Service/banner.dart';
+import 'package:flutter_rentalhouse/views/Admin/Widget/HomeMain/News_home.dart';
 import 'package:flutter_rentalhouse/views/Admin/model/banner.dart';
 import 'package:flutter_rentalhouse/views/chat_user.dart';
 import 'package:flutter_rentalhouse/views/favorite_view.dart';
@@ -985,6 +986,7 @@ class _HomeContentState extends State<HomeContent> {
                           style: const TextStyle(color: Colors.red)))
                 else
                   _buildLatestPostsSection(),
+                  const NewsHighlightSection(),
               ],
             ),
           ),

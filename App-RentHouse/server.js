@@ -16,11 +16,13 @@ const favoriteRoutes = require('./routes/favorite');
 const commentRoutes = require('./routes/comment');
 const profileRoutes = require('./routes/profile');
 const bookingRoutes = require('./routes/booking');
-const bannerRoutes = require('./routes/banner');
 
+const bannerRoutes = require('./routes/banner');
+const newsRoutes = require('./routes/news');
 
 require('./models/conversation');
 require('./models/message');
+require('./models/news');
 
 // Initialize Firebase Admin SDK
 if (!admin.apps.length) {
@@ -72,7 +74,10 @@ app.use('/api', favoriteRoutes);
 app.use('/api', commentRoutes(io));
 app.use('/api/profile', profileRoutes);
 app.use('/api', bookingRoutes);
+
 app.use('/api/banners', bannerRoutes);
+app.use('/api/news', newsRoutes);
+
 
 io.use(async (socket, next) => {
   const token = socket.handshake.headers.authorization?.replace('Bearer ', '');

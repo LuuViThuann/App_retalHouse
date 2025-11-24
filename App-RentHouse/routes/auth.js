@@ -12,6 +12,263 @@ const EMAILJS_TEMPLATE_ID = process.env.EMAILJS_TEMPLATE_ID || 'template_1k09fcg
 const EMAILJS_USER_ID = process.env.EMAILJS_USER_ID || 'bGlLdgP91zmfcVxzm';
 const EMAILJS_API_TOKEN = process.env.EMAILJS_API_TOKEN; // Private Key from .env
 
+
+// ============================== THÔNG TIN XỬ LÝ QUẢN LÝ NGƯỜI DÙNG BÊN ADMIN ========================================= // 
+const verifyAdmin = async (req, res, next) => {
+  try {
+    const idToken = req.headers.authorization?.split('Bearer ')[1];
+    if (!idToken) return res.status(401).json({ message: 'Thiếu token' });
+
+    const decodedToken = await admin.auth().verifyIdToken(idToken);
+    const uid = decodedToken.uid;
+
+    const mongoUser = await User.findOne({ _id: uid });
+    if (!mongoUser || mongoUser.role !== 'admin') {
+      return res.status(403).json({ message: 'Chỉ admin mới có quyền truy cập' });
+    }
+
+    req.adminId = uid;
+    next();
+  } catch (err) {
+    res.status(401).json({ message: 'Token không hợp lệ' });
+  }
+};
+
+// ✅ CẬP NHẬT: Trả về avatarBase64 trong danh sách (nhưng kiểm soát kích thước)
+router.get('/admin/users', verifyAdmin, async (req, res) => {
+  try {
+    const page = Math.max(1, parseInt(req.query.page) || 1);
+    const limit = Math.min(50, Math.max(10, parseInt(req.query.limit) || 20));
+    const skip = (page - 1) * limit;
+
+    const [users, total] = await Promise.all([
+      User.find({})
+        .select('username email phoneNumber role createdAt _id avatarBase64')
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .lean(),
+      User.countDocuments()
+    ]);
+
+    // Xử lý ảnh: nếu quá lớn thì tạm thời không trả (sẽ fetch riêng sau)
+    const formattedUsers = users.map(u => {
+      let avatar = null;
+      if (u.avatarBase64 && u.avatarBase64.length > 0) {
+        // Nếu ảnh < 500KB thì trả luôn, nếu > thì để null (sẽ fetch riêng)
+        if (u.avatarBase64.length < 500000) {
+          avatar = u.avatarBase64;
+        }
+      }
+      return {
+        id: u._id.toString(),
+        username: u.username || 'Chưa đặt tên',
+        email: u.email || 'Chưa có email',
+        phoneNumber: u.phoneNumber || 'Chưa có số điện thoại',
+        role: u.role || 'user',
+        createdAt: u.createdAt,
+        avatarBase64: avatar, // ✅ Trả về ảnh nếu nhỏ
+        hasAvatar: !!u.avatarBase64 && u.avatarBase64.length > 100
+      };
+    });
+
+    res.json({
+      users: formattedUsers,
+      pagination: { page, limit, total, totalPages: Math.ceil(total / limit) }
+    });
+  } catch (err) {
+    console.error('Lỗi lấy danh sách:', err);
+    res.status(500).json({ message: 'Lỗi server' });
+  }
+});
+
+// ✅ CẬP NHẬT: Lấy chi tiết người dùng + ảnh đầy đủ
+router.get('/admin/users/:id', verifyAdmin, async (req, res) => {
+  try {
+    const user = await User.findById(req.params.id)
+      .select('username email phoneNumber role createdAt address avatarBase64')
+      .lean();
+
+    if (!user) return res.status(404).json({ message: 'Không tìm thấy' });
+
+    res.json({
+      id: user._id.toString(),
+      username: user.username || 'Chưa đặt tên',
+      email: user.email || 'Chưa có email',
+      phoneNumber: user.phoneNumber || 'Chưa có số điện thoại',
+      address: user.address || 'Chưa cập nhật',
+      role: user.role || 'user',
+      createdAt: user.createdAt,
+      avatarBase64: user.avatarBase64 || null, // ✅ Trả ảnh đầy đủ
+      hasAvatar: !!user.avatarBase64 && user.avatarBase64.length > 100
+    });
+  } catch (err) {
+    res.status(500).json({ message: 'Lỗi server' });
+  }
+});
+
+// ✅ GIỮ NGUYÊN: Endpoint riêng để fetch ảnh (dự phòng cho ảnh lớn)
+router.get('/admin/users/:id/avatar', verifyAdmin, async (req, res) => {
+  try {
+    const user = await User.findById(req.params.id).select('avatarBase64').lean();
+    if (!user || !user.avatarBase64) {
+      return res.status(404).json({ avatarBase64: null });
+    }
+    res.json({ avatarBase64: user.avatarBase64 });
+  } catch (err) {
+    res.status(500).json({ message: 'Lỗi tải ảnh' });
+  }
+});
+
+// ✅ Cập nhật AVATAR - SYNC CẢ MONGODB VÀ FIRESTORE
+router.put('/admin/users/:id/avatar', verifyAdmin, async (req, res) => {
+  try {
+    const { avatarBase64 } = req.body;
+
+    if (!avatarBase64 || typeof avatarBase64 !== 'string') {
+      return res.status(400).json({ message: 'Thiếu hoặc sai định dạng ảnh base64' });
+    }
+
+    if (avatarBase64.length > 6_000_000) {
+      return res.status(400).json({ message: 'Ảnh quá lớn, vui lòng chọn ảnh nhỏ hơn 4MB' });
+    }
+
+    // ✅ Cập nhật MongoDB
+    const updatedUser = await User.findByIdAndUpdate(
+      req.params.id,
+      { avatarBase64 },
+      { new: true }
+    ).select('username avatarBase64');
+
+    if (!updatedUser) {
+      return res.status(404).json({ message: 'Không tìm thấy người dùng' });
+    }
+
+    // ✅ Cập nhật Firestore đồng thời
+    await admin.firestore()
+      .collection('Users')
+      .doc(req.params.id)
+      .update({
+        avatarBase64: avatarBase64,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp()
+      })
+      .catch(err => {
+        console.log(`Firestore user không tồn tại hoặc lỗi cập nhật: ${req.params.id}`, err.message);
+      });
+
+    res.json({
+      message: 'Đổi ảnh đại diện thành công',
+      user: {
+        id: updatedUser._id.toString(),
+        username: updatedUser.username,
+        avatarBase64: updatedUser.avatarBase64
+      }
+    });
+  } catch (err) {
+    console.error('Lỗi đổi ảnh admin:', err.message);
+    res.status(500).json({ message: 'Không thể cập nhật ảnh' });
+  }
+});
+
+// ✅ Cập nhật thông tin người dùng (admin) - CẬP NHẬT CẢ MONGODB VÀ FIRESTORE
+router.put('/admin/users/:id', verifyAdmin, async (req, res) => {
+  try {
+    const { username, email, phoneNumber, role } = req.body;
+
+    const updateFields = {};
+    if (username !== undefined) updateFields.username = username;
+    if (email !== undefined) updateFields.email = email;
+    if (phoneNumber !== undefined) updateFields.phoneNumber = phoneNumber;
+    if (role && ['user', 'admin'].includes(role)) {
+      updateFields.role = role;
+    }
+
+    if (Object.keys(updateFields).length === 0) {
+      return res.status(400).json({ message: 'Không có dữ liệu để cập nhật' });
+    }
+
+    // ✅ Cập nhật MongoDB
+    const updatedUser = await User.findByIdAndUpdate(
+      req.params.id,
+      updateFields,
+      { new: true, runValidators: true }
+    ).select('-avatarBase64');
+
+    if (!updatedUser) {
+      return res.status(404).json({ message: 'Không tìm thấy người dùng' });
+    }
+
+    // ✅ Cập nhật Firestore đồng thời
+    const firestoreUpdateData = {};
+    if (username !== undefined) firestoreUpdateData.username = username;
+    if (email !== undefined) firestoreUpdateData.email = email;
+    if (phoneNumber !== undefined) firestoreUpdateData.phoneNumber = phoneNumber;
+    if (role !== undefined) firestoreUpdateData.role = role;
+    
+    // Thêm timestamp
+    firestoreUpdateData.updatedAt = admin.firestore.FieldValue.serverTimestamp();
+
+    await admin.firestore()
+      .collection('Users')
+      .doc(req.params.id)
+      .update(firestoreUpdateData)
+      .catch(err => {
+        console.log(`Firestore user không tồn tại hoặc lỗi cập nhật: ${req.params.id}`, err.message);
+      });
+
+    res.json({
+      message: 'Cập nhật thành công',
+      user: {
+        id: updatedUser._id.toString(),
+        username: updatedUser.username,
+        email: updatedUser.email,
+        phoneNumber: updatedUser.phoneNumber,
+        role: updatedUser.role
+      }
+    });
+  } catch (err) {
+    console.error('Lỗi cập nhật người dùng:', err.message);
+    res.status(500).json({ message: 'Cập nhật thất bại' });
+  }
+});
+
+// ✅ Xóa người dùng - XÓA CẢ MONGODB, FIRESTORE, FIREBASE AUTH
+router.delete('/admin/users/:id', verifyAdmin, async (req, res) => {
+  try {
+    const userId = req.params.id;
+
+    // ✅ Xóa trong MongoDB
+    const deletedUser = await User.findByIdAndDelete(userId);
+    if (!deletedUser) {
+      return res.status(404).json({ message: 'Người dùng không tồn tại' });
+    }
+
+    // ✅ Xóa trong Firestore
+    await admin.firestore()
+      .collection('Users')
+      .doc(userId)
+      .delete()
+      .catch(err => {
+        console.log(`Firestore user không tồn tại hoặc lỗi xóa: ${userId}`, err.message);
+      });
+
+    // ✅ Xóa trong Firebase Auth
+    await admin.auth()
+      .deleteUser(userId)
+      .catch(err => {
+        console.log(`Firebase Auth user đã bị xóa trước đó hoặc lỗi: ${userId}`, err.message);
+      });
+
+    res.json({ message: 'Xóa người dùng thành công' });
+  } catch (err) {
+    console.error('Lỗi xóa người dùng:', err.message);
+    res.status(500).json({ message: 'Xóa người dùng thất bại' });
+  }
+});
+
+
+// =======================================================
+
 // Đăng ký người dùng
 // POST /register - Đăng ký người dùng mới
 router.post('/register', async (req, res) => {
@@ -83,6 +340,7 @@ router.post('/register', async (req, res) => {
       phoneNumber,
       address,
       username,
+      role: 'user', // ✅ THÊM role vào Firestore
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     }, { merge: true });
@@ -95,7 +353,7 @@ router.post('/register', async (req, res) => {
       address,
       username,
       avatarBase64: base64Data,
-      role: 'user', // Mặc định là user
+      role: 'user',
     });
 
     await newUser.save();
@@ -474,5 +732,6 @@ router.get('/user/:id/avatar', async (req, res) => {
     res.status(400).json({ message: err.message });
   }
 });
+
 
 module.exports = router;

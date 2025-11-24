@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_rentalhouse/views/NewSave.dart';
 import 'package:flutter_rentalhouse/views/login_view.dart';
 import 'package:flutter_rentalhouse/views/my_profile_view.dart';
 import 'package:flutter_rentalhouse/Widgets/Profile/my_post.dart';
 import 'package:flutter_rentalhouse/Widgets/Profile/recent_comment.dart';
 import 'package:flutter_rentalhouse/Widgets/Profile/notification_view.dart';
 import 'package:flutter_rentalhouse/views/forgot_password.dart';
+import 'package:flutter_rentalhouse/views/notification_user.dart';
 import 'package:flutter_rentalhouse/views/register_view.dart';
 
 class AppNavigator {
@@ -33,10 +35,18 @@ class AppNavigator {
   }
 
   // Dẫn thông tin thông báo  ----------------------------------------------
-  static void goToBookings(BuildContext context) {
+  static void goToNotification(BuildContext context) {
     Navigator.push(
       context,
-      MaterialPageRoute(builder: (context) => Container()),
+      MaterialPageRoute(builder: (context) => NotificationUser()),
+    );
+  }
+
+  // Dẫn thông tin thông báo  ----------------------------------------------
+  static void goToNewsSave(BuildContext context) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => Newsave()),
     );
   }
 

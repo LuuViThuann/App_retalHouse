@@ -1,15 +1,45 @@
 class ApiRoutes {
   static const String rootUrl =
-      'http://192.168.1.17:3000'; // 192.168.43.168 - mạng dữ liệu
+      'http://192.168.1.189:3000'; // 192.168.43.168 - mạng dữ liệu
   static const String baseUrl = '$rootUrl/api';
   static const String serverBaseUrl = rootUrl;
   static const String socketUrl = serverBaseUrl;
 
-  // ==================== BANNER (NEW) ====================
+  // ==================== BANNER  ====================
   static const String banners = '$baseUrl/banners';
   static String bannerById(String bannerId) => '$banners/$bannerId';
   static const String adminBanners = '$banners/admin';
+  // ==================== NEW ====================
+  static const String news = '$baseUrl/news';
+  static String newsById(String newsId) => '$news/$newsId';
+  static const String featuredNews = '$news/featured';
+  static const String adminNews = '$news/admin/all';
+  // ==================== ADMIN USER MANAGEMENT ====================
+static const String adminUsers = '$baseUrl/auth/admin/users';
 
+  // GET: Danh sách người dùng
+  static String adminUserList({int? page, int? limit}) {
+    final params = <String, String>{};
+    if (page != null) params['page'] = page.toString();
+    if (limit != null) params['limit'] = limit.toString();
+    final uri = Uri.parse(adminUsers).replace(queryParameters: params);
+    return uri.toString();
+  }
+
+  // GET: Chi tiết người dùng (không có ảnh)
+  static String adminUserDetail(String userId) => '$adminUsers/$userId';
+
+  // PUT: Cập nhật thông tin người dùng
+  static String adminUserUpdate(String userId) => '$adminUsers/$userId';
+
+  // DELETE: Xóa người dùng
+  static String adminUserDelete(String userId) => '$adminUsers/$userId';
+
+  // PUT: Cập nhật avatar (giữ nguyên như cũ - đã đúng)
+  static String adminUserAvatarUpdate(String userId) => '$adminUsers/$userId/avatar';
+
+  // GET: LẤY RIÊNG ẢNH ĐẠI DIỆN (MỚI - BẮT BUỘC PHẢI CÓ)
+  static String adminUserAvatar(String userId) => '$adminUsers/$userId/avatar';
   // Định nghĩa các endpoint dữ liệu cụ thể ------------------------------------------
   static const String searchHistory = '$baseUrl/search-history';
 

@@ -30,6 +30,10 @@
 
 - Khi lưu thông tin tin mới hồ sơ sẽ bị mất nút điều hướng 
 
+- Lỗi ChatAI hết hạn KEY : tìm cái khác free 
+
+- Khi đăng ký tài khoản mới không đăng nhập được 
+
 # BỔ SUNG THÊM TÍNH NĂNG ===================================: 
 
 - Tạo thêm ADMIN quản lý kiểm duyệt các banner quảng cáo,  bài đăng , tin tức , tài khoản , sự kiện , chat , ...

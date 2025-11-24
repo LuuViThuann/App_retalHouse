@@ -103,13 +103,17 @@ class _ProfileViewState extends State<ProfileView> {
                   SizedBox(height: 24),
                   ProfileMenuItem(
                     icon: Icons.person_outline,
-                    text: 'Thông tin cá nhân',
+                    text: 'Thông tin cá nhân',  
                     onTap: () => AppNavigator.goToProfile(context),
                   ),
                   ProfileMenuItem(
                       icon: Icons.notifications_paused,
                       text: 'Thông báo gần đây',
-                      onTap: () => AppNavigator.goToBookings(context)),
+                      onTap: () => AppNavigator.goToNotification(context)),
+                  ProfileMenuItem(
+                      icon: Icons.newspaper,
+                      text: 'Tin tức đã lưu',
+                      onTap: () => AppNavigator.goToNewsSave(context)),
                   ProfileMenuItem(
                       icon: Icons.book,
                       text: 'Danh sách bài đăng của bạn',
