@@ -42,11 +42,11 @@ class AppNavigator {
     );
   }
 
-  // Dẫn thông tin thông báo  ----------------------------------------------
+  // Dẫn thông tin trang danh sách tin tức đã lưu  ----------------------------------------------
   static void goToNewsSave(BuildContext context) {
     Navigator.push(
       context,
-      MaterialPageRoute(builder: (context) => Newsave()),
+      MaterialPageRoute(builder: (context) => SavedArticlesView()),
     );
   }
 
@@ -63,14 +63,6 @@ class AppNavigator {
     Navigator.push(
       context,
       MaterialPageRoute(builder: (context) => RecentCommentsView()),
-    );
-  }
-
-  // Dẫn các thông tin của tài khoản ----------------------------------------------
-  static void goToNotifications(BuildContext context) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (context) => NotificationsView()),
     );
   }
 

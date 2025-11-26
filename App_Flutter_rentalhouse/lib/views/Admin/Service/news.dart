@@ -69,11 +69,11 @@ class NewsService {
     int page = 1,
     int limit = 10,
   }) async {
-    final uri = Uri.parse('${ApiRoutes.baseUrl}/news?page=$page&limit=$limit');
+    final uri = Uri.parse('${ApiRoutes.news}?page=$page&limit=$limit');
     final response = await http.get(uri, headers: await _headers()).timeout(
-      const Duration(seconds: 30),
-      onTimeout: () => throw Exception('Timeout'),
-    );
+          const Duration(seconds: 30),
+          onTimeout: () => throw Exception('Timeout'),
+        );
 
     if (response.statusCode == 200) {
       return jsonDecode(utf8.decode(response.bodyBytes));
@@ -83,11 +83,11 @@ class NewsService {
 
   /// Lấy tin tức nổi bật
   Future<List<dynamic>> fetchFeaturedNews({int limit = 3}) async {
-    final uri = Uri.parse('${ApiRoutes.baseUrl}/news/featured?limit=$limit');
+    final uri = Uri.parse('${ApiRoutes.featuredNews}?limit=$limit');
     final response = await http.get(uri, headers: await _headers()).timeout(
-      const Duration(seconds: 30),
-      onTimeout: () => throw Exception('Timeout'),
-    );
+          const Duration(seconds: 30),
+          onTimeout: () => throw Exception('Timeout'),
+        );
 
     if (response.statusCode == 200) {
       return jsonDecode(utf8.decode(response.bodyBytes)) as List;
@@ -97,11 +97,11 @@ class NewsService {
 
   /// Lấy chi tiết 1 tin tức (tăng view)
   Future<Map<String, dynamic>> fetchNewsDetail(String newsId) async {
-    final uri = Uri.parse('${ApiRoutes.baseUrl}/news/$newsId');
+    final uri = Uri.parse(ApiRoutes.newsById(newsId));
     final response = await http.get(uri, headers: await _headers()).timeout(
-      const Duration(seconds: 30),
-      onTimeout: () => throw Exception('Timeout'),
-    );
+          const Duration(seconds: 30),
+          onTimeout: () => throw Exception('Timeout'),
+        );
 
     if (response.statusCode == 200) {
       return jsonDecode(utf8.decode(response.bodyBytes));
@@ -111,6 +111,161 @@ class NewsService {
     throw Exception('Lấy chi tiết thất bại');
   }
 
+  // ====================== SAVED ARTICLES APIs ======================
+
+  /// Lưu tin tức
+  Future<void> saveArticle(String newsId) async {
+    try {
+      final uri = Uri.parse(ApiRoutes.saveArticle(newsId));
+      print('Saving article: $uri');
+      print('NewsId: $newsId');
+
+      final headers = await _headers(requireAuth: true);
+      print('Headers: $headers');
+
+      final response = await http
+          .post(
+            uri,
+            headers: headers,
+          )
+          .timeout(
+            const Duration(seconds: 30),
+            onTimeout: () => throw Exception('Timeout'),
+          );
+
+      print('Save response status: ${response.statusCode}');
+      print('Save response body: ${response.body}');
+
+      if (response.statusCode == 201) {
+        return;
+      } else if (response.statusCode == 400) {
+        final error = jsonDecode(response.body);
+        throw Exception(error['message'] ?? 'Bạn đã lưu tin tức này');
+      } else if (response.statusCode == 401) {
+        throw Exception('Token hết hạn, vui lòng đăng nhập lại');
+      } else if (response.statusCode == 404) {
+        throw Exception('Tin tức không tồn tại');
+      } else if (response.statusCode == 500) {
+        final error = jsonDecode(response.body);
+        throw Exception('Lỗi server: ${error['message'] ?? 'Không xác định'}');
+      }
+      throw Exception('Không thể lưu tin tức (${response.statusCode})');
+    } catch (e) {
+      print('Error in saveArticle: $e');
+      rethrow;
+    }
+  }
+
+  /// Bỏ lưu tin tức
+  Future<void> unsaveArticle(String newsId) async {
+    try {
+      final uri = Uri.parse(ApiRoutes.unsaveArticle(newsId));
+      print('Unsaving article: $uri');
+
+      final headers = await _headers(requireAuth: true);
+      final response = await http
+          .delete(
+            uri,
+            headers: headers,
+          )
+          .timeout(
+            const Duration(seconds: 30),
+            onTimeout: () => throw Exception('Timeout'),
+          );
+
+      print('Unsave response status: ${response.statusCode}');
+      print('Unsave response body: ${response.body}');
+
+      if (response.statusCode == 200) {
+        return;
+      } else if (response.statusCode == 401) {
+        throw Exception('Token hết hạn');
+      } else if (response.statusCode == 404) {
+        throw Exception('Tin tức không tồn tại');
+      } else if (response.statusCode == 500) {
+        final error = jsonDecode(response.body);
+        throw Exception('Lỗi server: ${error['message'] ?? 'Không xác định'}');
+      }
+      throw Exception('Không thể bỏ lưu tin tức (${response.statusCode})');
+    } catch (e) {
+      print('Error in unsaveArticle: $e');
+      rethrow;
+    }
+  }
+
+  /// Kiểm tra tin tức có được lưu không
+  Future<bool> checkIsSaved(String newsId) async {
+    try {
+      final uri = Uri.parse(ApiRoutes.checkIsSaved(newsId));
+      print('Checking if saved: $uri');
+
+      final headers = await _headers(requireAuth: true);
+      final response = await http
+          .get(
+            uri,
+            headers: headers,
+          )
+          .timeout(
+            const Duration(seconds: 30),
+            onTimeout: () => throw Exception('Timeout'),
+          );
+
+      print('Check saved response status: ${response.statusCode}');
+      print('Check saved response body: ${response.body}');
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return data['isSaved'] ?? false;
+      } else if (response.statusCode == 401) {
+        print('Token hết hạn khi kiểm tra');
+        return false;
+      }
+      return false;
+    } catch (e) {
+      print('Error in checkIsSaved: $e');
+      return false;
+    }
+  }
+
+  /// Lấy tất cả tin tức đã lưu của user (có phân trang)
+  Future<Map<String, dynamic>> fetchSavedArticles({
+    int page = 1,
+    int limit = 10,
+  }) async {
+    try {
+      final uri =
+          Uri.parse('${ApiRoutes.savedArticles}?page=$page&limit=$limit');
+      print('Fetching saved articles: $uri');
+
+      final headers = await _headers(requireAuth: true);
+      final response = await http
+          .get(
+            uri,
+            headers: headers,
+          )
+          .timeout(
+            const Duration(seconds: 30),
+            onTimeout: () => throw Exception('Timeout'),
+          );
+
+      print('Fetch saved articles response status: ${response.statusCode}');
+      print('Response body: ${response.body}');
+
+      if (response.statusCode == 200) {
+        return jsonDecode(utf8.decode(response.bodyBytes));
+      } else if (response.statusCode == 401) {
+        throw Exception('Token hết hạn, vui lòng đăng nhập lại');
+      } else if (response.statusCode == 500) {
+        final error = jsonDecode(response.body);
+        throw Exception('Lỗi server: ${error['message'] ?? 'Không xác định'}');
+      }
+      throw Exception('Tải tin tức đã lưu thất bại (${response.statusCode})');
+    } catch (e) {
+      print('Error in fetchSavedArticles: $e');
+      rethrow;
+    }
+  }
+
   // ====================== ADMIN APIs (yêu cầu đăng nhập + quyền admin) ======================
 
   /// Admin: Lấy tất cả tin tức (kể cả chưa active)
@@ -118,12 +273,16 @@ class NewsService {
     int page = 1,
     int limit = 20,
   }) async {
-    final uri = Uri.parse(
-        '${ApiRoutes.baseUrl}/news/admin/all?page=$page&limit=$limit');
-    final response = await http.get(uri, headers: await _headers(requireAuth: true)).timeout(
-      const Duration(seconds: 30),
-      onTimeout: () => throw Exception('Timeout'),
-    );
+    final uri = Uri.parse('${ApiRoutes.adminNews}?page=$page&limit=$limit');
+    final response = await http
+        .get(
+          uri,
+          headers: await _headers(requireAuth: true),
+        )
+        .timeout(
+          const Duration(seconds: 30),
+          onTimeout: () => throw Exception('Timeout'),
+        );
 
     if (response.statusCode == 200) {
       return jsonDecode(utf8.decode(response.bodyBytes));
@@ -149,7 +308,7 @@ class NewsService {
 
     final request = http.MultipartRequest(
       'POST',
-      Uri.parse('${ApiRoutes.baseUrl}/news'),
+      Uri.parse(ApiRoutes.news),
     );
 
     // Header + token
@@ -175,9 +334,9 @@ class NewsService {
     ));
 
     final streamedResponse = await request.send().timeout(
-      const Duration(seconds: 60),
-      onTimeout: () => throw Exception('Upload timeout'),
-    );
+          const Duration(seconds: 60),
+          onTimeout: () => throw Exception('Upload timeout'),
+        );
     final response = await http.Response.fromStream(streamedResponse);
 
     if (response.statusCode == 201) {
@@ -209,7 +368,7 @@ class NewsService {
 
     final request = http.MultipartRequest(
       'PUT',
-      Uri.parse('${ApiRoutes.baseUrl}/news/$newsId'),
+      Uri.parse(ApiRoutes.newsById(newsId)),
     );
 
     request.headers.addAll(await _headers(requireAuth: true));
@@ -234,9 +393,9 @@ class NewsService {
     }
 
     final streamedResponse = await request.send().timeout(
-      const Duration(seconds: 60),
-      onTimeout: () => throw Exception('Upload timeout'),
-    );
+          const Duration(seconds: 60),
+          onTimeout: () => throw Exception('Upload timeout'),
+        );
     final response = await http.Response.fromStream(streamedResponse);
 
     if (response.statusCode == 200) {
@@ -253,14 +412,16 @@ class NewsService {
 
   /// Admin: Xóa tin tức
   Future<void> deleteNews(String newsId) async {
-    final uri = Uri.parse('${ApiRoutes.baseUrl}/news/$newsId');
-    final response = await http.delete(
-      uri,
-      headers: await _headers(requireAuth: true),
-    ).timeout(
-      const Duration(seconds: 30),
-      onTimeout: () => throw Exception('Timeout'),
-    );
+    final uri = Uri.parse(ApiRoutes.newsById(newsId));
+    final response = await http
+        .delete(
+          uri,
+          headers: await _headers(requireAuth: true),
+        )
+        .timeout(
+          const Duration(seconds: 30),
+          onTimeout: () => throw Exception('Timeout'),
+        );
 
     if (response.statusCode == 200) {
       return;

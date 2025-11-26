@@ -12,7 +12,7 @@ const redis = require('redis');
 const rentalRoutes = require('./routes/rental');
 const authRoutes = require('./routes/auth');
 const chatRoutes = require('./routes/chat');
-const favoriteRoutes = require('./routes/favorite');
+const favoriteRoutes = require('./routes/favorite'); 
 const commentRoutes = require('./routes/comment');
 const profileRoutes = require('./routes/profile');
 const bookingRoutes = require('./routes/booking');
@@ -20,9 +20,11 @@ const bookingRoutes = require('./routes/booking');
 const bannerRoutes = require('./routes/banner');
 const newsRoutes = require('./routes/news');
 
+
 require('./models/conversation');
 require('./models/message');
 require('./models/news');
+require('./models/savedArticle');
 
 // Initialize Firebase Admin SDK
 if (!admin.apps.length) {

@@ -5,6 +5,7 @@ const mongoose = require('mongoose');
 const Rental = require('../models/Rental');
 const Favorite = require('../models/favorite');
 const { Comment, Reply, LikeComment } = require('../models/comments');
+const User = require('../models/usermodel');
 const admin = require('firebase-admin');
 const multer = require('multer');
 const path = require('path');
@@ -39,6 +40,115 @@ const upload = multer({
 });
 router.use('/uploads', express.static(path.join(__dirname, '..', 'uploads')));
 
+
+
+//====================
+
+const verifyAdmin = async (req, res, next) => {
+  try {
+    const token = req.header('Authorization')?.replace('Bearer ', '');
+    if (!token) return res.status(401).json({ message: 'No token provided' });
+
+    const decodedToken = await admin.auth().verifyIdToken(token);
+    const uid = decodedToken.uid;
+    req.userId = uid;
+    req.isAdmin = true;
+    next();
+  } catch (err) {
+    res.status(401).json({ message: 'Authentication failed', error: err.message });
+  }
+};
+// ========== ADMIN ROUTES ==========
+
+// 👥 Admin: Get Users with Post Count
+router.get('/admin/users-with-posts', verifyAdmin, async (req, res) => {
+  try {
+    const page = Math.max(1, parseInt(req.query.page) || 1);
+    const limit = Math.min(50, Math.max(10, parseInt(req.query.limit) || 20));
+    const skip = (page - 1) * limit;
+
+    const usersWithPosts = await Rental.aggregate([
+      {
+        $group: {
+          _id: '$userId',
+          postsCount: { $sum: 1 },
+          latestPost: { $max: '$createdAt' },
+        },
+      },
+      { $sort: { latestPost: -1 } },
+      { $skip: skip },
+      { $limit: limit },
+    ]);
+
+    const userIds = usersWithPosts.map(u => u._id);
+    const userDetails = await User.find({ _id: { $in: userIds } })
+      .select('_id username email phoneNumber role')
+      .lean();
+
+    const result = usersWithPosts.map(u => {
+      const userDetail = userDetails.find(ud => ud._id.toString() === u._id);
+      return {
+        id: u._id,
+        username: userDetail?.username || 'Chưa cập nhật',
+        email: userDetail?.email || '',
+        phoneNumber: userDetail?.phoneNumber || '',
+        postsCount: u.postsCount,
+        latestPost: u.latestPost,
+        role: userDetail?.role || 'user',
+      };
+    });
+
+    const total = await Rental.distinct('userId');
+
+    res.json({
+      users: result,
+      pagination: {
+        page,
+        limit,
+        total: total.length,
+        totalPages: Math.ceil(total.length / limit),
+      },
+    });
+  } catch (err) {
+    console.error('Error:', err);
+    res.status(500).json({ message: 'Failed to fetch users', error: err.message });
+  }
+});
+
+// 📄 Admin: Get User Posts
+router.get('/admin/user-posts/:userId', verifyAdmin, async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const page = Math.max(1, parseInt(req.query.page) || 1);
+    const limit = Math.min(50, Math.max(10, parseInt(req.query.limit) || 10));
+    const skip = (page - 1) * limit;
+
+    const rentals = await Rental.find({ userId })
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit)
+      .lean();
+
+    const total = await Rental.countDocuments({ userId });
+
+    const rentalsWithBadge = rentals.map(rental => ({
+      ...rental,
+      isNew: _isNewPost(rental.createdAt),
+    }));
+
+    res.json({
+      rentals: rentalsWithBadge,
+      total,
+      page,
+      pages: Math.ceil(total / limit),
+      hasMore: page < Math.ceil(total / limit),
+    });
+  } catch (err) {
+    console.error('Error:', err);
+    res.status(500).json({ message: 'Failed to fetch user posts', error: err.message });
+  }
+});
+//=======================================================================
 const authMiddleware = async (req, res, next) => {
   const token = req.header('Authorization')?.replace('Bearer ', '');
   if (!token) return res.status(401).json({ message: 'No token provided' });
@@ -245,7 +355,7 @@ const geocodeAddressFree = async (address) => {
   }
 };
 
-router.get('/rentals/search', [sanitizeHeadersMiddleware], async (req, res) => {
+router.get('/rentals/search', [sanitizeHeadersMiddleware], async (req, res) => { 
   try {
     const { search, minPrice, maxPrice, propertyType, status, page = 1, limit = 10 } = req.query;
     const propertyTypes = propertyType ? (Array.isArray(propertyType) ? propertyType : [propertyType]) : [];

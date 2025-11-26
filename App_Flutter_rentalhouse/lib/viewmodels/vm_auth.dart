@@ -11,7 +11,7 @@ class AuthViewModel extends ChangeNotifier {
   List<Rental> _myPosts = [];
   List<Comment> _recentComments = [];
   List<NotificationModel> _notifications = [];
-  bool _isLoading = false; 
+  bool _isLoading = false;
   String? _errorMessage;
   int _postsPage = 1;
   int _commentsPage = 1;

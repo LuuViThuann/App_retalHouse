@@ -3,42 +3,44 @@ const mongoose = require('mongoose');
 const notificationSchema = new mongoose.Schema({
   userId: {
     type: String,
+    ref: 'User',
     required: true,
-    ref: 'User'
+    index: true,
   },
   type: {
     type: String,
+    enum: ['rental_approved', 'rental_rejected', 'rental_deleted', 'comment', 'message'],
     required: true,
-    enum: ['Comment', 'Reply', 'System', 'Booking']
+  },
+  title: {
+    type: String,
+    required: true,
   },
   message: {
     type: String,
-    required: true
-  },
-  content: {
-    type: String,
-    required: true
+    required: true,
   },
   rentalId: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'Rental'
+    ref: 'Rental',
+    default: null,
   },
-  commentId: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Comment'
+  details: {
+    type: mongoose.Schema.Types.Mixed,
+    default: null,
   },
-  bookingId: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Booking'
-  },
-  isRead: {
+  read: {
     type: Boolean,
-    default: false
+    default: false,
+    index: true,
   },
   createdAt: {
     type: Date,
-    default: Date.now
-  }
+    default: Date.now,
+  },
 });
+
+// TTL Index - xóa thông báo cũ hơn 30 ngày
+notificationSchema.index({ createdAt: 1 }, { expireAfterSeconds: 2592000 });
 
 module.exports = mongoose.model('Notification', notificationSchema);

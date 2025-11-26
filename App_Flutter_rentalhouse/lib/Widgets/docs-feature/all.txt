@@ -40,4 +40,8 @@
 
 - Thống kê bài đăng hôm nay , tài khoản người dùng mới 
 
+- // // ✅ Xóa cache ảnh (dùng khi refresh)
+  void clearAvatarCache() {
+    _avatarCache.clear();
+  }
                                            

@@ -1,9 +1,20 @@
 class ApiRoutes {
   static const String rootUrl =
-      'http://192.168.1.189:3000'; // 192.168.43.168 - mạng dữ liệu
+      'http://192.168.1.153:3000'; // 192.168.43.168 - mạng dữ liệu
   static const String baseUrl = '$rootUrl/api';
   static const String serverBaseUrl = rootUrl;
   static const String socketUrl = serverBaseUrl;
+
+// ================ ADMIN - QUẢN LÝ BÀI VIẾT =============
+  static const String adminUsersWithPosts = '$baseUrl/admin/users-with-posts';
+  static String adminUsersWithPostsPaginated({int page = 1, int limit = 20}) {
+    return '$adminUsersWithPosts?page=$page&limit=$limit';
+  }
+
+  /// GET /api/admin/user-posts/{userId}?page=1&limit=10
+  static String adminUserPosts(String userId, {int page = 1, int limit = 10}) {
+    return '$baseUrl/admin/user-posts/$userId?page=$page&limit=$limit';
+  }
 
   // ==================== BANNER  ====================
   static const String banners = '$baseUrl/banners';
@@ -14,8 +25,15 @@ class ApiRoutes {
   static String newsById(String newsId) => '$news/$newsId';
   static const String featuredNews = '$news/featured';
   static const String adminNews = '$news/admin/all';
+
+  // News Save/Unsave routes
+  static String saveArticle(String newsId) => '$news/$newsId/save';
+  static String unsaveArticle(String newsId) => '$news/$newsId/unsave';
+  static String checkIsSaved(String newsId) => '$news/$newsId/is-saved';
+  static const String savedArticles = '$news/user/saved-articles';
+
   // ==================== ADMIN USER MANAGEMENT ====================
-static const String adminUsers = '$baseUrl/auth/admin/users';
+  static const String adminUsers = '$baseUrl/auth/admin/users';
 
   // GET: Danh sách người dùng
   static String adminUserList({int? page, int? limit}) {
@@ -36,7 +54,8 @@ static const String adminUsers = '$baseUrl/auth/admin/users';
   static String adminUserDelete(String userId) => '$adminUsers/$userId';
 
   // PUT: Cập nhật avatar (giữ nguyên như cũ - đã đúng)
-  static String adminUserAvatarUpdate(String userId) => '$adminUsers/$userId/avatar';
+  static String adminUserAvatarUpdate(String userId) =>
+      '$adminUsers/$userId/avatar';
 
   // GET: LẤY RIÊNG ẢNH ĐẠI DIỆN (MỚI - BẮT BUỘC PHẢI CÓ)
   static String adminUserAvatar(String userId) => '$adminUsers/$userId/avatar';

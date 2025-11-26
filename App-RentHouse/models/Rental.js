@@ -69,7 +69,7 @@ const rentalSchema = new mongoose.Schema({
     renewalTerms: { type: String },
   },
   contactInfo: {
-    name: { type: String },
+    name: { type: String }, 
     phone: { type: String },
     availableHours: { type: String },
   },
@@ -92,6 +92,7 @@ const rentalSchema = new mongoose.Schema({
     enum: ['success', 'failed', 'pending', 'manual'],
     default: 'pending',
   },
+  
   createdAt: {
     type: Date,
     default: Date.now,

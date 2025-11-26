@@ -197,7 +197,6 @@ class _ManageUsersScreenState extends State<ManageUsersScreen>
   }
 }
 
-// ✅ WIDGET CON TÁCH RỜI - Không rebuild parent
 class _UserListItem extends StatefulWidget {
   final Map<String, dynamic> user;
   final String userId;

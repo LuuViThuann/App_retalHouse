@@ -1,5 +1,4 @@
 // lib/views/news_detail_view.dart
-
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_rentalhouse/config/api_routes.dart';
@@ -7,6 +6,7 @@ import 'package:flutter_rentalhouse/views/Admin/Service/news.dart';
 import 'package:flutter_rentalhouse/views/Admin/model/news.dart';
 import 'package:intl/intl.dart';
 import 'package:shimmer/shimmer.dart';
+import 'package:share_plus/share_plus.dart';
 
 class NewsDetailView extends StatefulWidget {
   final NewsModel news;
@@ -20,6 +20,8 @@ class NewsDetailView extends StatefulWidget {
 class _NewsDetailViewState extends State<NewsDetailView> {
   late NewsModel news;
   bool isLoading = true;
+  bool isSaved = false;
+  bool isSaving = false;
   final NewsService _newsService = NewsService();
 
   @override
@@ -27,6 +29,7 @@ class _NewsDetailViewState extends State<NewsDetailView> {
     super.initState();
     news = widget.news;
     _loadNewsDetail();
+    _checkIfSaved();
   }
 
   Future<void> _loadNewsDetail() async {
@@ -36,7 +39,7 @@ class _NewsDetailViewState extends State<NewsDetailView> {
 
       if (mounted) {
         setState(() {
-          news = NewsModel.fromJson(data); // Chuyển Map thành NewsModel
+          news = NewsModel.fromJson(data);
           isLoading = false;
         });
       }
@@ -44,11 +47,73 @@ class _NewsDetailViewState extends State<NewsDetailView> {
       if (mounted) {
         setState(() => isLoading = false);
         debugPrint('Error loading news detail: $e');
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Không tải được chi tiết tin tức')),
-        );
+        _showSnackBar('Không tải được chi tiết tin tức');
       }
     }
+  }
+
+  Future<void> _checkIfSaved() async {
+    try {
+      final saved = await _newsService.checkIsSaved(news.id);
+      if (mounted) {
+        setState(() => isSaved = saved);
+      }
+    } catch (e) {
+      debugPrint('Error checking saved: $e');
+    }
+  }
+
+  Future<void> _toggleSaveArticle() async {
+    if (isSaving) return;
+
+    setState(() => isSaving = true);
+
+    try {
+      if (isSaved) {
+        await _newsService.unsaveArticle(news.id);
+        if (mounted) {
+          setState(() => isSaved = false);
+          _showSnackBar('Đã bỏ lưu tin tức');
+        }
+      } else {
+        await _newsService.saveArticle(news.id);
+        if (mounted) {
+          setState(() => isSaved = true);
+          _showSnackBar('Đã lưu tin tức');
+        }
+      }
+    } catch (e) {
+      _showSnackBar(e.toString());
+      debugPrint('Error saving article: $e');
+    } finally {
+      if (mounted) {
+        setState(() => isSaving = false);
+      }
+    }
+  }
+
+  Future<void> _shareArticle() async {
+    try {
+      final String shareText =
+          '${news.title}\n\n${news.summary}\n\nXem thêm chi tiết tại ứng dụng của tôi!';
+
+      await Share.share(
+        shareText,
+        subject: news.title,
+      );
+    } catch (e) {
+      _showSnackBar('Lỗi chia sẻ: $e');
+      debugPrint('Error sharing article: $e');
+    }
+  }
+
+  void _showSnackBar(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        duration: const Duration(seconds: 2),
+      ),
+    );
   }
 
   String _formatDate(DateTime dateTime) {
@@ -141,6 +206,29 @@ class _NewsDetailViewState extends State<NewsDetailView> {
                       onPressed: () => Navigator.pop(context),
                     ),
                   ),
+                  actions: [
+                    Container(
+                      margin: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.95),
+                        borderRadius: BorderRadius.circular(8),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.1),
+                            blurRadius: 8,
+                          ),
+                        ],
+                      ),
+                      child: IconButton(
+                        icon: Icon(
+                          isSaved ? Icons.bookmark : Icons.bookmark_border,
+                          color: isSaved ? Colors.orange[600] : Colors.black,
+                          size: 24,
+                        ),
+                        onPressed: _toggleSaveArticle,
+                      ),
+                    ),
+                  ],
                   flexibleSpace: FlexibleSpaceBar(
                     background: Stack(
                       fit: StackFit.expand,
@@ -395,7 +483,6 @@ class _NewsDetailViewState extends State<NewsDetailView> {
   }
 
   Widget _buildHtmlContent(String htmlContent) {
-    // Loại bỏ các tag HTML và giữ lại text
     String plainText = _stripHtmlTags(htmlContent);
 
     return SelectableText(
@@ -442,22 +529,15 @@ class _NewsDetailViewState extends State<NewsDetailView> {
               icon: Icons.share,
               label: 'Chia sẻ',
               color: Colors.blue[600]!,
-              onTap: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Chức năng chia sẻ sắp có')),
-                );
-              },
+              onTap: _shareArticle,
             ),
             const SizedBox(width: 12),
             _buildShareButton(
-              icon: Icons.bookmark_border,
-              label: 'Lưu',
-              color: Colors.orange[600]!,
-              onTap: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Đã lưu tin tức này')),
-                );
-              },
+              icon: isSaved ? Icons.bookmark : Icons.bookmark_border,
+              label: isSaved ? 'Đã lưu' : 'Lưu',
+              color: isSaved ? Colors.orange[600]! : Colors.orange[300]!,
+              onTap: _toggleSaveArticle,
+              isLoading: isSaving,
             ),
           ],
         ),
@@ -470,12 +550,13 @@ class _NewsDetailViewState extends State<NewsDetailView> {
     required String label,
     required Color color,
     required VoidCallback onTap,
+    bool isLoading = false,
   }) {
     return Expanded(
       child: Material(
         color: Colors.transparent,
         child: InkWell(
-          onTap: onTap,
+          onTap: isLoading ? null : onTap,
           borderRadius: BorderRadius.circular(12),
           child: Container(
             padding: const EdgeInsets.symmetric(vertical: 12),
@@ -486,7 +567,17 @@ class _NewsDetailViewState extends State<NewsDetailView> {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(icon, color: color, size: 24),
+                if (isLoading)
+                  SizedBox(
+                    width: 24,
+                    height: 24,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      valueColor: AlwaysStoppedAnimation(color),
+                    ),
+                  )
+                else
+                  Icon(icon, color: color, size: 24),
                 const SizedBox(height: 4),
                 Text(
                   label,
