@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_rentalhouse/config/api_routes.dart';
 import 'package:flutter_rentalhouse/models/rental.dart';
+import 'package:flutter_rentalhouse/views/Admin/View/UserPostDetail.dart';
 import 'package:flutter_rentalhouse/views/Admin/ViewModel/admin_viewmodel.dart';
+import 'package:flutter_rentalhouse/views/Admin/Widget/UserDetail/DeleteReasonDialog.dart';
 import 'package:provider/provider.dart';
 
 class ManagePostsScreen extends StatefulWidget {
@@ -515,15 +518,15 @@ class _ManagePostsScreenState extends State<ManagePostsScreen> {
                     ),
                     const SizedBox(width: 8),
                     Expanded(
-                      child: OutlinedButton.icon(
+                      child: ElevatedButton.icon(
                         onPressed: () {
-                          _showDeleteConfirmDialog(context, post.id);
+                          _showDeleteConfirmDialog(context, post);
                         },
                         icon: const Icon(Icons.delete, size: 16),
                         label: const Text('Xóa'),
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: Colors.red,
-                          side: const BorderSide(color: Colors.red),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.red,
+                          foregroundColor: Colors.white,
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(6),
                           ),
@@ -558,7 +561,7 @@ class _ManagePostsScreenState extends State<ManagePostsScreen> {
           Image.network(
             post.images[0].contains('http')
                 ? post.images[0]
-                : 'http://192.168.1.153:3000${post.images[0]}',
+                : '${ApiRoutes.rootUrl}${post.images[0]}',
             fit: BoxFit.cover,
             width: double.infinity,
             errorBuilder: (context, error, stackTrace) {
@@ -635,208 +638,36 @@ class _ManagePostsScreenState extends State<ManagePostsScreen> {
 
   // ========== SHOW POST DETAIL DIALOG ==========
   void _showPostDetailDialog(BuildContext context, Rental post) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (context) => DraggableScrollableSheet(
-        initialChildSize: 0.9,
-        minChildSize: 0.5,
-        maxChildSize: 0.95,
-        builder: (context, scrollController) => SingleChildScrollView(
-          controller: scrollController,
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Close Button
-                Center(
-                  child: Container(
-                    height: 4,
-                    width: 40,
-                    margin: const EdgeInsets.only(bottom: 16),
-                    decoration: BoxDecoration(
-                      color: Colors.grey[300],
-                      borderRadius: BorderRadius.circular(2),
-                    ),
-                  ),
-                ),
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => UserPostDetailScreen(
+          post: post,
+          userName: _selectedUserName ?? 'Người dùng',
+          onPostDeleted: () {
+            debugPrint('🔄 Post deleted! Refreshing list...');
 
-                // Title
-                Text(
-                  post.title,
-                  style: const TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 16),
-
-                // Images Carousel
-                if (post.images.isNotEmpty)
-                  SizedBox(
-                    height: 250,
-                    child: ListView.builder(
-                      scrollDirection: Axis.horizontal,
-                      itemCount: post.images.length,
-                      itemBuilder: (context, index) {
-                        return Container(
-                          margin: const EdgeInsets.only(right: 8),
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(8),
-                            image: DecorationImage(
-                              image: NetworkImage(
-                                post.images[index].contains('http')
-                                    ? post.images[index]
-                                    : 'http://192.168.1.153:3000${post.images[index]}',
-                              ),
-                              fit: BoxFit.cover,
-                            ),
-                          ),
-                          width: 200,
-                        );
-                      },
-                    ),
-                  ),
-
-                const SizedBox(height: 16),
-
-                // Price
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Colors.blue[50],
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text(
-                        'Giá thuê:',
-                        style: TextStyle(fontWeight: FontWeight.w600),
-                      ),
-                      Text(
-                        '${(post.price / 1000000).toStringAsFixed(1)}M đ/tháng',
-                        style: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.blue,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-
-                const SizedBox(height: 12),
-
-                // Details
-                _buildDetailRow('Diện tích:',
-                    '${post.area['total']?.toStringAsFixed(0) ?? '0'}m²'),
-                _buildDetailRow('Loại BĐS:', post.propertyType),
-                _buildDetailRow('Địa chỉ:', post.location['short'] ?? ''),
-                _buildDetailRow('Trạng thái:',
-                    post.status == 'available' ? 'Còn trống' : 'Đã thuê'),
-
-                const SizedBox(height: 16),
-
-                // Description
-                if (post.surroundings.isNotEmpty)
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'Xung quanh:',
-                        style: TextStyle(fontWeight: FontWeight.w600),
-                      ),
-                      const SizedBox(height: 8),
-                      Wrap(
-                        spacing: 8,
-                        children: post.surroundings
-                            .map((item) => Chip(label: Text(item)))
-                            .toList(),
-                      ),
-                    ],
-                  ),
-
-                const SizedBox(height: 16),
-
-                // Contact Info
-                if (post.contactInfo['phone'] != null)
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: Colors.grey[100],
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Liên hệ: ${post.contactInfo['name'] ?? ''}',
-                          style: const TextStyle(fontWeight: FontWeight.w600),
-                        ),
-                        Text(
-                          'ĐT: ${post.contactInfo['phone'] ?? ''}',
-                        ),
-                      ],
-                    ),
-                  ),
-              ],
-            ),
-          ),
+            // Cập nhật danh sách bài đăng
+            if (_selectedUserId != null) {
+              context.read<AdminViewModel>().fetchUserPosts(_selectedUserId!);
+            }
+          },
         ),
       ),
     );
   }
 
-  Widget _buildDetailRow(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(
-            label,
-            style: const TextStyle(fontWeight: FontWeight.w600),
-          ),
-          Expanded(
-            child: Text(
-              value,
-              textAlign: TextAlign.right,
-              style: TextStyle(color: Colors.grey[700]),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ========== SHOW DELETE CONFIRM DIALOG ==========
-  void _showDeleteConfirmDialog(BuildContext context, String rentalId) {
+  // ========== SHOW DELETE CONFIRM DIALOG WITH REASON ==========
+  void _showDeleteConfirmDialog(BuildContext context, Rental post) {
     showDialog(
       context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('Xóa bài đăng?'),
-        content: const Text('Bạn có chắc muốn xóa bài đăng này không?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('Hủy'),
-          ),
-          TextButton(
-            onPressed: () {
-              Navigator.pop(dialogContext);
-              _deletePost(context, rentalId);
-            },
-            child: const Text(
-              'Xóa',
-              style: TextStyle(color: Colors.red),
-            ),
-          ),
-        ],
+      builder: (dialogContext) => DeleteReasonDialog(
+        postTitle: post.title,
+        postAddress: post.location['short'] ?? 'N/A',
+        postPrice: post.price,
+        onConfirmDelete: () {
+          _deletePost(context, post.id);
+        },
       ),
     );
   }
@@ -844,24 +675,69 @@ class _ManagePostsScreenState extends State<ManagePostsScreen> {
   // ========== DELETE POST ==========
   Future<void> _deletePost(BuildContext context, String rentalId) async {
     final adminVM = context.read<AdminViewModel>();
-    final success = await adminVM.deleteUserPost(rentalId);
 
-    if (success) {
+    // Show loading indicator
+    if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('✅ Xóa bài đăng thành công'),
-          backgroundColor: Colors.green,
-          duration: Duration(seconds: 2),
+          content: Row(
+            children: [
+              SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                ),
+              ),
+              SizedBox(width: 12),
+              Text('Đang xóa bài viết...'),
+            ],
+          ),
+          duration: Duration(seconds: 30),
         ),
       );
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(adminVM.error ?? '❌ Xóa bài đăng thất bại'),
-          backgroundColor: Colors.red,
-          duration: const Duration(seconds: 2),
-        ),
-      );
+    }
+
+    final success = await adminVM.deleteUserPost(rentalId);
+
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).hideCurrentSnackBar();
+
+      if (success) {
+        debugPrint('✅ Delete successful from ManagePostsScreen');
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('✅ Xóa bài viết thành công'),
+            backgroundColor: Colors.green[600],
+            duration: const Duration(seconds: 2),
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
+          ),
+        );
+
+        // trong deleteUserPost() của AdminViewModel
+      } else {
+        debugPrint('❌ Delete failed');
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              adminVM.error ?? '❌ Xóa bài viết thất bại',
+              style: const TextStyle(color: Colors.white),
+            ),
+            backgroundColor: Colors.red[600],
+            duration: const Duration(seconds: 3),
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
+          ),
+        );
+      }
     }
   }
 

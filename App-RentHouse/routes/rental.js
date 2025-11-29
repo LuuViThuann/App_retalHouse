@@ -43,6 +43,12 @@ router.use('/uploads', express.static(path.join(__dirname, '..', 'uploads')));
 
 
 //====================
+const _isNewPost = (createdAt) => {
+  if (!createdAt) return false;
+  const difference = new Date() - new Date(createdAt);
+  const minutes = difference / (1000 * 60);
+  return minutes < 30; // 30 phút
+};
 
 const verifyAdmin = async (req, res, next) => {
   try {
@@ -58,7 +64,7 @@ const verifyAdmin = async (req, res, next) => {
     res.status(401).json({ message: 'Authentication failed', error: err.message });
   }
 };
-// ========== ADMIN ROUTES ==========
+// ========== ADMIN ROUTES ========================================================
 
 // 👥 Admin: Get Users with Post Count
 router.get('/admin/users-with-posts', verifyAdmin, async (req, res) => {
@@ -146,6 +152,222 @@ router.get('/admin/user-posts/:userId', verifyAdmin, async (req, res) => {
   } catch (err) {
     console.error('Error:', err);
     res.status(500).json({ message: 'Failed to fetch user posts', error: err.message });
+  }
+});
+// ========== ADMIN EDIT RENTAL ==========
+router.patch('/admin/rentals/:rentalId', verifyAdmin, upload.array('images'), async (req, res) => {
+  try {
+    if (!mongoose.Types.ObjectId.isValid(req.params.rentalId)) {
+      return res.status(400).json({ message: 'Invalid rental ID' });
+    }
+
+    const rental = await Rental.findById(req.params.rentalId);
+    if (!rental) {
+      return res.status(404).json({ message: 'Rental not found' });
+    }
+
+    const updatedData = {};
+    
+    if (req.body.title) updatedData.title = req.body.title;
+    if (req.body.price) updatedData.price = parseFloat(req.body.price) || rental.price;
+    
+    if (req.body.areaTotal || req.body.areaLivingRoom || req.body.areaBedrooms || req.body.areaBathrooms) {
+      updatedData.area = {
+        total: parseFloat(req.body.areaTotal) || rental.area.total,
+        livingRoom: parseFloat(req.body.areaLivingRoom) || rental.area.livingRoom,
+        bedrooms: parseFloat(req.body.areaBedrooms) || rental.area.bedrooms,
+        bathrooms: parseFloat(req.body.areaBathrooms) || rental.area.bathrooms,
+      };
+    }
+
+    if (req.body.locationShort || req.body.locationFullAddress || req.body.latitude || req.body.longitude) {
+      let coordinates = [
+        parseFloat(req.body.longitude) || rental.location.coordinates.coordinates[0],
+        parseFloat(req.body.latitude) || rental.location.coordinates.coordinates[1],
+      ];
+      let formattedAddress = rental.location.formattedAddress;
+      let geocodingStatus = rental.geocodingStatus || 'pending';
+
+      const { full: fullAddress } = normalizeVietnameseAddress(req.body.locationFullAddress || rental.location.fullAddress);
+      if (!fullAddress) {
+        return res.status(400).json({ message: 'Invalid or missing full address' });
+      }
+
+      if (coordinates[0] === 0 && coordinates[1] === 0 || isNaN(coordinates[0]) || isNaN(coordinates[1])) {
+        try {
+          const geocodeResult = await geocodeAddressFree(fullAddress);
+          coordinates = [geocodeResult.longitude, geocodeResult.latitude];
+          formattedAddress = geocodeResult.formattedAddress;
+          geocodingStatus = 'success';
+        } catch (geocodeError) {
+          console.error('Geocoding failed:', geocodeError.message);
+          coordinates = [0, 0];
+          formattedAddress = fullAddress;
+          geocodingStatus = 'failed';
+        }
+      } else if (req.body.latitude || req.body.longitude) {
+        geocodingStatus = 'manual';
+      }
+
+      updatedData.location = {
+        short: req.body.locationShort || rental.location.short,
+        fullAddress: fullAddress,
+        formattedAddress: formattedAddress,
+        coordinates: {
+          type: 'Point',
+          coordinates: coordinates,
+        },
+      };
+      updatedData.geocodingStatus = geocodingStatus;
+    }
+
+    if (req.body.propertyType) updatedData.propertyType = req.body.propertyType;
+    if (req.body.furniture) updatedData.furniture = req.body.furniture.split(',').map(item => item.trim());
+    if (req.body.amenities) updatedData.amenities = req.body.amenities.split(',').map(item => item.trim());
+    if (req.body.surroundings) updatedData.surroundings = req.body.surroundings.split(',').map(item => item.trim());
+    if (req.body.rentalTermsMinimumLease || req.body.rentalTermsDeposit || req.body.rentalTermsPaymentMethod || req.body.rentalTermsRenewalTerms) {
+      updatedData.rentalTerms = {
+        minimumLease: req.body.rentalTermsMinimumLease || rental.rentalTerms.minimumLease,
+        deposit: req.body.rentalTermsDeposit || rental.rentalTerms.deposit,
+        paymentMethod: req.body.rentalTermsPaymentMethod || rental.rentalTerms.paymentMethod,
+        renewalTerms: req.body.rentalTermsRenewalTerms || rental.rentalTerms.renewalTerms,
+      };
+    }
+    if (req.body.contactInfoName || req.body.contactInfoPhone || req.body.contactInfoAvailableHours) {
+      updatedData.contactInfo = {
+        name: req.body.contactInfoName || rental.contactInfo.name,
+        phone: req.body.contactInfoPhone || rental.contactInfo.phone,
+        availableHours: req.body.contactInfoAvailableHours || rental.contactInfo.availableHours,
+      };
+    }
+    if (req.body.status) updatedData.status = req.body.status;
+
+    let updatedImages = [...rental.images];
+    let removedImages = [];
+    
+    if (req.body.removedImages) {
+      try {
+        if (typeof req.body.removedImages === 'string') {
+          try {
+            removedImages = JSON.parse(req.body.removedImages);
+          } catch (e) {
+            removedImages = req.body.removedImages.split(',').map(s => s.trim()).filter(Boolean);
+          }
+        } else if (Array.isArray(req.body.removedImages)) {
+          removedImages = req.body.removedImages;
+        }
+      } catch (e) {
+        removedImages = [req.body.removedImages].filter(Boolean);
+      }
+      if (!Array.isArray(removedImages)) removedImages = [removedImages];
+
+      for (const image of removedImages) {
+        if (typeof image !== 'string' || !image.startsWith('/uploads/')) continue;
+        if (updatedImages.includes(image)) {
+          updatedImages = updatedImages.filter(img => img !== image);
+          const filePath = path.join(__dirname, '..', 'uploads', image.replace(/^\/uploads\//, ''));
+          try {
+            await fs.unlink(filePath);
+          } catch (err) {
+            if (err.code !== 'ENOENT') {
+              console.warn(`Failed to delete image: ${image}`);
+            }
+          }
+        }
+      }
+    }
+
+    if (req.files && req.files.length > 0) {
+      const newImages = req.files.map(file => `/uploads/${file.filename}`);
+      updatedImages = [...new Set([...updatedImages, ...newImages])];
+    }
+
+    updatedData.images = updatedImages;
+
+    const updatedRental = await Rental.findByIdAndUpdate(
+      req.params.rentalId,
+      { $set: updatedData },
+      { new: true, runValidators: true },
+    );
+
+    if (!updatedRental) {
+      return res.status(404).json({ message: 'Rental not found after update' });
+    }
+
+    await syncRentalToElasticsearch(updatedRental);
+    res.json({
+      message: 'Rental updated successfully',
+      rental: updatedRental,
+    });
+  } catch (err) {
+    console.error('Error updating rental:', err);
+    if (err instanceof multer.MulterError) {
+      return res.status(400).json({ message: `File upload error: ${err.message}` });
+    }
+    res.status(500).json({ message: 'Failed to update rental', error: err.message });
+  }
+});
+
+// ========== ADMIN DELETE RENTAL ==========
+router.delete('/admin/rentals/:rentalId', verifyAdmin, async (req, res) => {
+  try {
+    console.log('═══════════════════════════════════════════');
+    console.log('🗑️ DELETE REQUEST RECEIVED');
+    console.log('═══════════════════════════════════════════');
+    console.log('📌 Rental ID: ' + req.params.rentalId);
+    console.log('👤 User ID: ' + req.userId);
+    console.log('✅ Admin verified: ' + req.isAdmin);
+    
+    if (!mongoose.Types.ObjectId.isValid(req.params.rentalId)) {
+      return res.status(400).json({ message: 'Invalid rental ID' });
+    }
+
+    const rental = await Rental.findById(req.params.rentalId);
+    if (!rental) {
+      return res.status(404).json({ message: 'Rental not found' });
+    }
+
+    // ===== Delete images =====
+    for (const image of rental.images) {
+      if (!image.startsWith('/uploads/')) continue;
+      const filePath = path.join(__dirname, '..', 'uploads', image.replace(/^\/uploads\//, ''));
+      try {
+        await fs.unlink(filePath);
+        console.log('✅ Deleted image: ' + filePath);
+      } catch (err) {
+        console.warn('⚠️ Image not found: ' + filePath);
+      }
+    }
+
+    // ===== Delete from DB =====
+    await Comment.deleteMany({ rentalId: req.params.rentalId });
+    await Reply.deleteMany({ commentId: { $in: await Comment.find({ rentalId: req.params.rentalId }).distinct('_id') } });
+    await LikeComment.deleteMany({ targetId: req.params.rentalId, targetType: 'Comment' });
+    await Favorite.deleteMany({ rentalId: req.params.rentalId });
+    await Rental.findByIdAndDelete(req.params.rentalId);
+
+    // ===== Delete from Elasticsearch =====
+    try {
+      await elasticClient.delete({
+        index: 'rentals',
+        id: req.params.rentalId,
+      });
+      console.log('✅ Deleted from Elasticsearch');
+    } catch (esErr) {
+      console.warn('⚠️ Elasticsearch delete failed:', esErr.message);
+    }
+
+    console.log('═══════════════════════════════════════════');
+    console.log('✅ RENTAL DELETED SUCCESSFULLY');
+    console.log('═══════════════════════════════════════════');
+
+    res.json({ 
+      message: 'Rental deleted successfully',
+      deletedRentalId: req.params.rentalId,
+    });
+  } catch (err) {
+    console.error('❌ Error:', err);
+    res.status(500).json({ message: 'Failed to delete rental', error: err.message });
   }
 });
 //=======================================================================

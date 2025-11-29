@@ -461,30 +461,64 @@ class AdminViewModel extends ChangeNotifier {
   Future<bool> deleteUserPost(String rentalId) async {
     try {
       final token = await _getValidToken();
-      if (token == null) return false;
+      if (token == null) {
+        _error = 'Token is null - không lấy được token';
+        debugPrint('❌ Token is null');
+        return false;
+      }
+
+      debugPrint('═══════════════════════════════════════════');
+      debugPrint('🗑️ DELETE POST REQUEST');
+      debugPrint('═══════════════════════════════════════════');
+
+      // ✅ ĐÚNG - Gọi route /admin/rentals/:rentalId
+      final url = '${ApiRoutes.baseUrl}/admin/rentals/$rentalId';
+
+      debugPrint('🔗 DELETE URL: $url');
+      debugPrint('🔑 Token (first 50): ${token.substring(0, 50)}...');
 
       final response = await http.delete(
-        Uri.parse('${ApiRoutes.rentals}/$rentalId'),
+        Uri.parse(url),
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $token',
         },
       ).timeout(const Duration(seconds: 15));
 
+      debugPrint('📊 Response Status: ${response.statusCode}');
+      debugPrint('📋 Response Body: ${response.body}');
+      debugPrint('═══════════════════════════════════════════');
+
       if (response.statusCode == 200) {
+        // ✅ FIX: Xóa từ danh sách bài đăng
         _userPosts.removeWhere((post) => post.id == rentalId);
         _error = null;
+
+        // ✅ FIX: Notify listeners để cập nhật UI
         notifyListeners();
+
+        debugPrint('✅ SUCCESS: Rental deleted and UI updated');
         return true;
       } else if (response.statusCode == 401) {
-        _error = 'Token hết hạn';
+        _error = 'Token hết hạn - vui lòng đăng nhập lại';
+        debugPrint('❌ 401 Unauthorized: Token expired');
+        return false;
+      } else if (response.statusCode == 403) {
+        _error = 'Bạn không có quyền admin để xóa bài viết';
+        debugPrint('❌ 403 Forbidden');
+        return false;
+      } else if (response.statusCode == 404) {
+        _error = 'Bài viết không tồn tại';
+        debugPrint('❌ 404: Rental not found');
         return false;
       } else {
-        _error = 'Xóa bài đăng thất bại: ${response.statusCode}';
+        _error = 'Lỗi xóa bài đăng: ${response.statusCode}';
+        debugPrint('❌ ERROR ${response.statusCode}');
         return false;
       }
     } catch (e) {
       _error = 'Lỗi: $e';
+      debugPrint('❌ EXCEPTION: $e');
       return false;
     }
   }
@@ -499,5 +533,161 @@ class AdminViewModel extends ChangeNotifier {
       return;
     }
     await fetchUserPosts(userId, page: _postsPage + 1, limit: limit);
+  }
+
+  // ============ CHỈNH SỬA - XÓA BÀI VIẾT
+  /// ========== EDIT RENTAL METHODS ==========
+
+  /// Cập nhật bài đăng (chỉ admin mới có quyền)
+  Future<bool> adminEditRental(
+    String rentalId,
+    Map<String, dynamic> updateData, {
+    List<String>? imagesToRemove,
+  }) async {
+    try {
+      final token = await _getValidToken();
+      if (token == null) return false;
+
+      final request = http.MultipartRequest(
+        'PATCH',
+        Uri.parse('${ApiRoutes.rentals}/$rentalId'),
+      );
+
+      // Thêm headers
+      request.headers.addAll({
+        'Authorization': 'Bearer $token',
+        'Content-Type': 'multipart/form-data',
+      });
+
+      // Thêm các trường dữ liệu
+      updateData.forEach((key, value) {
+        if (value != null && value is! List) {
+          request.fields[key] = value.toString();
+        } else if (value is List) {
+          request.fields[key] = value.join(',');
+        }
+      });
+
+      // Thêm danh sách ảnh cần xóa
+      if (imagesToRemove != null && imagesToRemove.isNotEmpty) {
+        request.fields['removedImages'] = jsonEncode(imagesToRemove);
+      }
+
+      debugPrint('📤 Sending PATCH request to edit rental: $rentalId');
+
+      final response =
+          await request.send().timeout(const Duration(seconds: 30));
+
+      final responseBody = await response.stream.bytesToString();
+      debugPrint('📡 Response status: ${response.statusCode}');
+      debugPrint('📄 Response body: $responseBody');
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(responseBody);
+        _error = null;
+        debugPrint('✅ Rental updated successfully');
+        return true;
+      } else if (response.statusCode == 401) {
+        _error = 'Token hết hạn - vui lòng đăng nhập lại';
+        return false;
+      } else if (response.statusCode == 403) {
+        _error = 'Bạn không có quyền chỉnh sửa bài viết này';
+        return false;
+      } else {
+        _error = 'Lỗi cập nhật bài viết: ${response.statusCode}';
+        return false;
+      }
+    } catch (e) {
+      _error = 'Lỗi mạng: $e';
+      debugPrint('❌ Exception: $e');
+      return false;
+    }
+  }
+
+  /// ========== DELETE RENTAL METHODS ==========
+
+  /// Xóa bài đăng người dùng (chỉ admin)
+  Future<bool> adminDeleteRental(String rentalId) async {
+    try {
+      final token = await _getValidToken();
+      if (token == null) return false;
+
+      debugPrint('🗑️ Attempting to delete rental: $rentalId');
+
+      final response = await http.delete(
+        Uri.parse('${ApiRoutes.baseUrl}/admin/rentals/$rentalId'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      ).timeout(const Duration(seconds: 15));
+
+      debugPrint('📡 Delete response status: ${response.statusCode}');
+      debugPrint('📄 Delete response body: ${response.body}');
+
+      if (response.statusCode == 200) {
+        // Xóa từ danh sách bài đăng
+        _userPosts.removeWhere((post) => post.id == rentalId);
+        _error = null;
+        notifyListeners();
+        debugPrint('✅ Rental deleted successfully');
+        return true;
+      } else if (response.statusCode == 401) {
+        _error = 'Token hết hạn - vui lòng đăng nhập lại';
+        return false;
+      } else if (response.statusCode == 403) {
+        _error = 'Bạn không có quyền xóa bài viết này';
+        return false;
+      } else if (response.statusCode == 404) {
+        _error = 'Bài viết không tồn tại';
+        return false;
+      } else {
+        _error = 'Lỗi xóa bài viết: ${response.statusCode}';
+        return false;
+      }
+    } catch (e) {
+      _error = 'Lỗi mạng: $e';
+      debugPrint('❌ Exception: $e');
+      return false;
+    }
+  }
+
+  /// ========== GET SINGLE RENTAL FOR EDITING ==========
+
+  /// Lấy chi tiết một bài viết để chỉnh sửa
+  Future<Rental?> fetchRentalForEdit(String rentalId) async {
+    try {
+      _isLoading = true;
+      notifyListeners();
+
+      final response = await http.get(
+        Uri.parse('${ApiRoutes.rentals}/$rentalId'),
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      ).timeout(const Duration(seconds: 15));
+
+      debugPrint('📡 Fetch rental response: ${response.statusCode}');
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        final rental = Rental.fromJson(data);
+        _error = null;
+        _isLoading = false;
+        notifyListeners();
+        return rental;
+      } else {
+        _error = 'Không tải được bài viết: ${response.statusCode}';
+        _isLoading = false;
+        notifyListeners();
+        return null;
+      }
+    } catch (e) {
+      _error = 'Lỗi: $e';
+      debugPrint('❌ Exception: $e');
+      _isLoading = false;
+      notifyListeners();
+      return null;
+    }
   }
 }

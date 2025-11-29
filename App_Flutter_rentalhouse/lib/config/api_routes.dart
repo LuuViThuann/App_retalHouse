@@ -1,6 +1,6 @@
 class ApiRoutes {
   static const String rootUrl =
-      'http://192.168.1.153:3000'; // 192.168.43.168 - mạng dữ liệu
+      'http://192.168.1.230:3000'; // 192.168.43.168 - mạng dữ liệu
   static const String baseUrl = '$rootUrl/api';
   static const String serverBaseUrl = rootUrl;
   static const String socketUrl = serverBaseUrl;
@@ -14,6 +14,16 @@ class ApiRoutes {
   /// GET /api/admin/user-posts/{userId}?page=1&limit=10
   static String adminUserPosts(String userId, {int page = 1, int limit = 10}) {
     return '$baseUrl/admin/user-posts/$userId?page=$page&limit=$limit';
+  }
+
+  /// PATCH /api/admin/rentals/{rentalId} - Chỉnh sửa bài viết (Admin)
+  static String adminEditRental(String rentalId) {
+    return '$baseUrl/admin/rentals/$rentalId';
+  }
+
+  /// DELETE /api/admin/rentals/{rentalId} - Xóa bài viết (Admin)
+  static String adminDeleteRental(String rentalId) {
+    return '$baseUrl/admin/rentals/$rentalId';
   }
 
   // ==================== BANNER  ====================
