@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_dynamic_links/firebase_dynamic_links.dart';
+import 'package:flutter_rentalhouse/services/auth_service.dart';
 import 'package:flutter_rentalhouse/viewmodels/vm_auth.dart';
 import 'package:flutter_rentalhouse/viewmodels/vm_chat.dart';
 import 'package:flutter_rentalhouse/viewmodels/vm_favorite.dart';
@@ -86,6 +87,7 @@ class RentalApp extends StatelessWidget {
 
         // Admin
         ChangeNotifierProvider(create: (_) => AdminViewModel()),
+        Provider(create: (_) => AuthService()),
       ],
       child: MaterialApp(
         debugShowCheckedModeBanner: false,

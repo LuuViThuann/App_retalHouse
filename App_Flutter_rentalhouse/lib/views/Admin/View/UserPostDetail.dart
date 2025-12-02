@@ -3,6 +3,7 @@ import 'package:flutter_rentalhouse/config/api_routes.dart';
 import 'package:flutter_rentalhouse/models/rental.dart';
 import 'package:flutter_rentalhouse/views/Admin/ViewModel/admin_viewmodel.dart';
 import 'package:flutter_rentalhouse/views/Admin/Widget/UserDetail/DeleteReasonDialog.dart';
+import 'package:flutter_rentalhouse/views/Admin/Widget/UserDetail/EditRentalDialog.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
@@ -28,10 +29,15 @@ class _UserPostDetailScreenState extends State<UserPostDetailScreen> {
   late PageController _imageController;
   int _currentImageIndex = 0;
 
+  //  STATE: Lưu trữ rental hiện tại (có thể được cập nhật)
+  late Rental _currentRental;
+
   @override
   void initState() {
     super.initState();
     _imageController = PageController();
+    //  Khởi tạo _currentRental từ widget.post
+    _currentRental = widget.post;
   }
 
   @override
@@ -115,22 +121,22 @@ class _UserPostDetailScreenState extends State<UserPostDetailScreen> {
                       const SizedBox(height: 16),
 
                       // Property Details
-                      if (widget.post.furniture.isNotEmpty ||
-                          widget.post.amenities.isNotEmpty)
+                      if (_currentRental.furniture.isNotEmpty ||
+                          _currentRental.amenities.isNotEmpty)
                         _buildPropertyDetailsSection(),
 
-                      if (widget.post.surroundings.isNotEmpty) ...[
+                      if (_currentRental.surroundings.isNotEmpty) ...[
                         const SizedBox(height: 16),
                         _buildSurroundingsSection(),
                       ],
 
-                      if (widget.post.rentalTerms != null) ...[
+                      if (_currentRental.rentalTerms != null) ...[
                         const SizedBox(height: 16),
                         _buildRentalTermsSection(),
                       ],
 
                       // Contact Info
-                      if (widget.post.contactInfo != null) ...[
+                      if (_currentRental.contactInfo != null) ...[
                         const SizedBox(height: 16),
                         _buildContactInfoSection(),
                       ],
@@ -154,7 +160,7 @@ class _UserPostDetailScreenState extends State<UserPostDetailScreen> {
 
   // ========== IMAGE GALLERY ==========
   Widget _buildImageGallery() {
-    if (widget.post.images.isEmpty) {
+    if (_currentRental.images.isEmpty) {
       return Container(
         height: 250,
         width: double.infinity,
@@ -179,11 +185,11 @@ class _UserPostDetailScreenState extends State<UserPostDetailScreen> {
             onPageChanged: (index) {
               setState(() => _currentImageIndex = index);
             },
-            itemCount: widget.post.images.length,
+            itemCount: _currentRental.images.length,
             itemBuilder: (context, index) {
-              final imageUrl = widget.post.images[index].contains('http')
-                  ? widget.post.images[index]
-                  : '${ApiRoutes.rootUrl}${widget.post.images[index]}';
+              final imageUrl = _currentRental.images[index].contains('http')
+                  ? _currentRental.images[index]
+                  : '${ApiRoutes.rootUrl}${_currentRental.images[index]}';
 
               return Image.network(
                 imageUrl,
@@ -216,7 +222,7 @@ class _UserPostDetailScreenState extends State<UserPostDetailScreen> {
               borderRadius: BorderRadius.circular(20),
             ),
             child: Text(
-              '${_currentImageIndex + 1}/${widget.post.images.length}',
+              '${_currentImageIndex + 1}/${_currentRental.images.length}',
               style: const TextStyle(
                 color: Colors.white,
                 fontWeight: FontWeight.bold,
@@ -233,13 +239,15 @@ class _UserPostDetailScreenState extends State<UserPostDetailScreen> {
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
             decoration: BoxDecoration(
-              color: widget.post.status == 'available'
+              color: _currentRental.status == 'available'
                   ? Colors.green
                   : Colors.grey[700],
               borderRadius: BorderRadius.circular(20),
             ),
             child: Text(
-              widget.post.status == 'available' ? '✓ Còn trống' : '✗ Đã thuê',
+              _currentRental.status == 'available'
+                  ? '✓ Còn trống'
+                  : '✗ Đã thuê',
               style: const TextStyle(
                 color: Colors.white,
                 fontWeight: FontWeight.bold,
@@ -258,7 +266,7 @@ class _UserPostDetailScreenState extends State<UserPostDetailScreen> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: List.generate(
-                widget.post.images.length,
+                _currentRental.images.length,
                 (index) => Container(
                   margin: const EdgeInsets.symmetric(horizontal: 4),
                   width: 8,
@@ -284,7 +292,7 @@ class _UserPostDetailScreenState extends State<UserPostDetailScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          widget.post.title,
+          _currentRental.title,
           style: const TextStyle(
             fontSize: 22,
             fontWeight: FontWeight.bold,
@@ -332,7 +340,7 @@ class _UserPostDetailScreenState extends State<UserPostDetailScreen> {
             ),
           ),
           Text(
-            _formatPrice(widget.post.price),
+            _formatPrice(_currentRental.price),
             style: const TextStyle(
               color: Colors.white,
               fontSize: 28,
@@ -352,7 +360,8 @@ class _UserPostDetailScreenState extends State<UserPostDetailScreen> {
           child: _buildInfoCard(
             icon: '📐',
             label: 'Diện tích',
-            value: '${widget.post.area['total']?.toStringAsFixed(0) ?? '0'}m²',
+            value:
+                '${_currentRental.area['total']?.toStringAsFixed(0) ?? '0'}m²',
           ),
         ),
         const SizedBox(width: 12),
@@ -360,7 +369,7 @@ class _UserPostDetailScreenState extends State<UserPostDetailScreen> {
           child: _buildInfoCard(
             icon: '🏠',
             label: 'Loại BĐS',
-            value: widget.post.propertyType,
+            value: _currentRental.propertyType ?? 'N/A',
           ),
         ),
         const SizedBox(width: 12),
@@ -368,7 +377,8 @@ class _UserPostDetailScreenState extends State<UserPostDetailScreen> {
           child: _buildInfoCard(
             icon: '🛏️',
             label: 'Phòng ngủ',
-            value: '${widget.post.area['bedrooms']?.toStringAsFixed(0) ?? '0'}',
+            value:
+                '${_currentRental.area['bedrooms']?.toStringAsFixed(0) ?? '0'}',
           ),
         ),
       ],
@@ -443,7 +453,7 @@ class _UserPostDetailScreenState extends State<UserPostDetailScreen> {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  widget.post.location['short'] ?? 'Chưa cập nhật',
+                  _currentRental.location['short'] ?? 'Chưa cập nhật',
                   style: const TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w600,
@@ -487,7 +497,7 @@ class _UserPostDetailScreenState extends State<UserPostDetailScreen> {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  _formatDate(widget.post.createdAt),
+                  _formatDate(_currentRental.createdAt),
                   style: const TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w600,
@@ -514,7 +524,7 @@ class _UserPostDetailScreenState extends State<UserPostDetailScreen> {
           ),
         ),
         const SizedBox(height: 12),
-        if (widget.post.furniture.isNotEmpty) ...[
+        if (_currentRental.furniture.isNotEmpty) ...[
           const Text(
             'Nội thất:',
             style: TextStyle(fontWeight: FontWeight.w600),
@@ -523,7 +533,7 @@ class _UserPostDetailScreenState extends State<UserPostDetailScreen> {
           Wrap(
             spacing: 8,
             runSpacing: 8,
-            children: widget.post.furniture
+            children: _currentRental.furniture
                 .map(
                   (item) => Chip(
                     label: Text(item),
@@ -535,7 +545,7 @@ class _UserPostDetailScreenState extends State<UserPostDetailScreen> {
           ),
           const SizedBox(height: 12),
         ],
-        if (widget.post.amenities.isNotEmpty) ...[
+        if (_currentRental.amenities.isNotEmpty) ...[
           const Text(
             'Tiện ích:',
             style: TextStyle(fontWeight: FontWeight.w600),
@@ -544,7 +554,7 @@ class _UserPostDetailScreenState extends State<UserPostDetailScreen> {
           Wrap(
             spacing: 8,
             runSpacing: 8,
-            children: widget.post.amenities
+            children: _currentRental.amenities
                 .map(
                   (item) => Chip(
                     label: Text(item),
@@ -575,7 +585,7 @@ class _UserPostDetailScreenState extends State<UserPostDetailScreen> {
         Wrap(
           spacing: 8,
           runSpacing: 8,
-          children: widget.post.surroundings
+          children: _currentRental.surroundings
               .map(
                 (item) => Chip(
                   label: Text(item),
@@ -591,7 +601,7 @@ class _UserPostDetailScreenState extends State<UserPostDetailScreen> {
 
   // ========== RENTAL TERMS SECTION ==========
   Widget _buildRentalTermsSection() {
-    final terms = widget.post.rentalTerms;
+    final terms = _currentRental.rentalTerms;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -639,7 +649,7 @@ class _UserPostDetailScreenState extends State<UserPostDetailScreen> {
 
   // ========== CONTACT INFO SECTION ==========
   Widget _buildContactInfoSection() {
-    final contact = widget.post.contactInfo;
+    final contact = _currentRental.contactInfo;
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -686,17 +696,20 @@ class _UserPostDetailScreenState extends State<UserPostDetailScreen> {
               ),
             ],
           ),
-          if (contact?['availableHours'] != null) ...[
+          if (contact?['availableHours'] != null &&
+              (contact!['availableHours'] as String).isNotEmpty) ...[
             const SizedBox(height: 8),
             Row(
               children: [
                 const Icon(Icons.access_time, size: 20, color: Colors.green),
                 const SizedBox(width: 12),
-                Text(
-                  contact!['availableHours'],
-                  style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
+                Expanded(
+                  child: Text(
+                    contact['availableHours'],
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                 ),
               ],
@@ -731,14 +744,7 @@ class _UserPostDetailScreenState extends State<UserPostDetailScreen> {
             const SizedBox(width: 12),
             Expanded(
               child: ElevatedButton.icon(
-                onPressed: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Tính năng chỉnh sửa sẽ được cập nhật'),
-                      duration: Duration(seconds: 2),
-                    ),
-                  );
-                },
+                onPressed: () => _showEditDialog(),
                 icon: const Icon(Icons.edit, size: 18),
                 label: const Text('Chỉnh sửa'),
                 style: ElevatedButton.styleFrom(
@@ -774,14 +780,79 @@ class _UserPostDetailScreenState extends State<UserPostDetailScreen> {
     );
   }
 
+  // ========== SHOW EDIT DIALOG ==========
+  void _showEditDialog() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) => EditRentalDialogComplete(
+        rental: _currentRental,
+        onEditSuccess: () async {
+          debugPrint('✅ Edit dialog: Edit successful');
+
+          // Đóng dialog
+          if (mounted && Navigator.canPop(dialogContext)) {
+            Navigator.pop(dialogContext);
+          }
+
+          //  Chờ một chút để dialog đóng hoàn toàn
+          await Future.delayed(const Duration(milliseconds: 300));
+
+          //  Lấy dữ liệu mới từ server
+          if (mounted) {
+            debugPrint(' Fetching updated rental data from server...');
+            final updatedRental = await context
+                .read<AdminViewModel>()
+                .fetchRentalForEdit(_currentRental.id);
+
+            if (updatedRental != null && mounted) {
+              setState(() {
+                _currentRental = updatedRental;
+              });
+
+              //  Hiển thị snackbar thành công
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: const Text('✅ Cập nhật thông tin thành công'),
+                  backgroundColor: Colors.green[600],
+                  duration: const Duration(seconds: 2),
+                  behavior: SnackBarBehavior.floating,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+              );
+            } else {
+              debugPrint('❌ Failed to fetch updated rental data');
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: const Text('⚠️ Không thể lấy dữ liệu cập nhật'),
+                  backgroundColor: Colors.orange[600],
+                  duration: const Duration(seconds: 2),
+                  behavior: SnackBarBehavior.floating,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+              );
+            }
+          }
+
+          // ✅ Gọi callback để cập nhật danh sách cha
+          widget.onPostUpdated?.call();
+        },
+      ),
+    );
+  }
+
   // ========== SHOW DELETE REASON DIALOG ==========
   void _showDeleteReasonDialog() {
     showDialog(
       context: context,
       builder: (dialogContext) => DeleteReasonDialog(
-        postTitle: widget.post.title,
-        postAddress: widget.post.location['short'] ?? 'N/A',
-        postPrice: widget.post.price,
+        postTitle: _currentRental.title,
+        postAddress: _currentRental.location['short'] ?? 'N/A',
+        postPrice: _currentRental.price,
         onConfirmDelete: () {
           _performDelete();
         },
@@ -791,7 +862,6 @@ class _UserPostDetailScreenState extends State<UserPostDetailScreen> {
 
   // ========== PERFORM DELETE ==========
   Future<void> _performDelete() async {
-    // Show loading
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -814,15 +884,13 @@ class _UserPostDetailScreenState extends State<UserPostDetailScreen> {
       );
     }
 
-    // ✅ FIX: Gọi API xóa thật (không phải mock)
     final success =
-        await context.read<AdminViewModel>().deleteUserPost(widget.post.id);
+        await context.read<AdminViewModel>().deleteUserPost(_currentRental.id);
 
     if (mounted) {
       ScaffoldMessenger.of(context).hideCurrentSnackBar();
 
       if (success) {
-        // ✅ Xóa thành công
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: const Text('✅ Xóa bài viết thành công'),
@@ -838,14 +906,12 @@ class _UserPostDetailScreenState extends State<UserPostDetailScreen> {
         debugPrint('✅ Delete successful, calling onPostDeleted callback');
         widget.onPostDeleted?.call();
 
-        // Delay trước khi pop để user thấy notification
         await Future.delayed(const Duration(milliseconds: 500));
 
         if (mounted) {
           Navigator.pop(context);
         }
       } else {
-        // ❌ Xóa thất bại
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(

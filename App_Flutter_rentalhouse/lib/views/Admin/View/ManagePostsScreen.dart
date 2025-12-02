@@ -4,6 +4,7 @@ import 'package:flutter_rentalhouse/models/rental.dart';
 import 'package:flutter_rentalhouse/views/Admin/View/UserPostDetail.dart';
 import 'package:flutter_rentalhouse/views/Admin/ViewModel/admin_viewmodel.dart';
 import 'package:flutter_rentalhouse/views/Admin/Widget/UserDetail/DeleteReasonDialog.dart';
+import 'package:flutter_rentalhouse/views/Admin/Widget/UserDetail/EditRentalDialog.dart';
 import 'package:provider/provider.dart';
 
 class ManagePostsScreen extends StatefulWidget {
@@ -497,41 +498,66 @@ class _ManagePostsScreenState extends State<ManagePostsScreen> {
 
                 const SizedBox(height: 12),
 
-                // Action Buttons
-                Row(
+                // ✅ ACTION BUTTONS - 3 BUTTONS (View, Edit, Delete)
+                Column(
                   children: [
-                    Expanded(
-                      child: ElevatedButton.icon(
-                        onPressed: () {
-                          _showPostDetailDialog(context, post);
-                        },
-                        icon: const Icon(Icons.visibility, size: 16),
-                        label: const Text('Xem chi tiết'),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.blue,
-                          foregroundColor: Colors.white,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(6),
+                    // Row 1: Xem & Chỉnh sửa
+                    Row(
+                      children: [
+                        Expanded(
+                          child: ElevatedButton.icon(
+                            onPressed: () {
+                              _showPostDetailDialog(context, post);
+                            },
+                            icon: const Icon(Icons.visibility, size: 16),
+                            label: const Text('Xem'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.blue,
+                              foregroundColor: Colors.white,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              padding: const EdgeInsets.symmetric(vertical: 10),
+                            ),
                           ),
                         ),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: ElevatedButton.icon(
-                        onPressed: () {
-                          _showDeleteConfirmDialog(context, post);
-                        },
-                        icon: const Icon(Icons.delete, size: 16),
-                        label: const Text('Xóa'),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.red,
-                          foregroundColor: Colors.white,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(6),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: ElevatedButton.icon(
+                            onPressed: () {
+                              _showEditDialog(context, post);
+                            },
+                            icon: const Icon(Icons.edit, size: 16),
+                            label: const Text('Sửa'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.amber,
+                              foregroundColor: Colors.white,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              padding: const EdgeInsets.symmetric(vertical: 10),
+                            ),
                           ),
                         ),
-                      ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: ElevatedButton.icon(
+                            onPressed: () {
+                              _showDeleteConfirmDialog(context, post);
+                            },
+                            icon: const Icon(Icons.delete, size: 16),
+                            label: const Text('Xóa'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.red,
+                              foregroundColor: Colors.white,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              padding: const EdgeInsets.symmetric(vertical: 10),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
@@ -539,6 +565,22 @@ class _ManagePostsScreenState extends State<ManagePostsScreen> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  void _showEditDialog(BuildContext context, Rental post) {
+    showDialog(
+      context: context,
+      builder: (dialogContext) => EditRentalDialogComplete(
+        rental: post,
+        onEditSuccess: () {
+          debugPrint('✅ Post edited successfully');
+          // ✅ Refresh danh sách bài đăng
+          if (_selectedUserId != null) {
+            context.read<AdminViewModel>().fetchUserPosts(_selectedUserId!);
+          }
+        },
       ),
     );
   }
@@ -647,7 +689,15 @@ class _ManagePostsScreenState extends State<ManagePostsScreen> {
           onPostDeleted: () {
             debugPrint('🔄 Post deleted! Refreshing list...');
 
-            // Cập nhật danh sách bài đăng
+            // ✅ Cập nhật danh sách bài đăng
+            if (_selectedUserId != null) {
+              context.read<AdminViewModel>().fetchUserPosts(_selectedUserId!);
+            }
+          },
+          onPostUpdated: () {
+            debugPrint('🔄 Post updated! Refreshing list...');
+
+            // ✅ Cập nhật danh sách bài đăng
             if (_selectedUserId != null) {
               context.read<AdminViewModel>().fetchUserPosts(_selectedUserId!);
             }

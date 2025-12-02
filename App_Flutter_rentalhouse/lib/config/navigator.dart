@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_rentalhouse/views/NewSave.dart';
+import 'package:flutter_rentalhouse/views/UserFeedbackScreen%20.dart';
+import 'package:flutter_rentalhouse/views/about_us_screen.dart';
 import 'package:flutter_rentalhouse/views/login_view.dart';
 import 'package:flutter_rentalhouse/views/my_profile_view.dart';
 import 'package:flutter_rentalhouse/Widgets/Profile/my_post.dart';
@@ -71,6 +73,22 @@ class AppNavigator {
     Navigator.push(
       context,
       MaterialPageRoute(builder: (context) => const ForgotPasswordScreen()),
+    );
+  }
+
+// Dẫn thông tin về chúng tôi của ứng dụng ----------------------------------------------
+  static void goToAboutUs(BuildContext context) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => AboutUsScreen()),
+    );
+  }
+
+// Dẫn vào trang nhập góp ý phản hồi  ----------------------------------------------
+  static void goToresponUser(BuildContext context) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => UserFeedbackScreen()),
     );
   }
 

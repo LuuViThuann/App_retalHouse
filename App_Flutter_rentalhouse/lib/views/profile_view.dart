@@ -103,7 +103,7 @@ class _ProfileViewState extends State<ProfileView> {
                   SizedBox(height: 24),
                   ProfileMenuItem(
                     icon: Icons.person_outline,
-                    text: 'Thông tin cá nhân',  
+                    text: 'Thông tin cá nhân',
                     onTap: () => AppNavigator.goToProfile(context),
                   ),
                   ProfileMenuItem(
@@ -126,6 +126,14 @@ class _ProfileViewState extends State<ProfileView> {
                       icon: Icons.password,
                       text: 'Thay đổi mật khẩu',
                       onTap: () => AppNavigator.goToChangePassword(context)),
+                  ProfileMenuItem(
+                      icon: Icons.info_outline,
+                      text: 'Về chúng tôi',
+                      onTap: () => AppNavigator.goToAboutUs(context)),
+                  ProfileMenuItem(
+                      icon: Icons.send_sharp,
+                      text: 'Góp ý / phản hồi',
+                      onTap: () => AppNavigator.goToresponUser(context)),
                   ProfileMenuItem(
                     icon: Icons.logout,
                     text: 'Đăng xuất',

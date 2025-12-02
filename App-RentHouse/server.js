@@ -19,7 +19,7 @@ const bookingRoutes = require('./routes/booking');
 
 const bannerRoutes = require('./routes/banner');
 const newsRoutes = require('./routes/news');
-
+const aboutUsFeedbackRoutes = require('./routes/aboutus');
 
 require('./models/conversation');
 require('./models/message');
@@ -51,8 +51,8 @@ const redisClient = redis.createClient({
 redisClient.on('error', (err) => console.log('Redis Client Error', err));
 redisClient.connect().catch((err) => console.error('Redis Connection Error:', err));
 
-app.use(express.json({ limit: '10mb' }));           // Cho JSON (avatarBase64)
-app.use(express.urlencoded({ limit: '10mb', extended: true }));
+app.use(express.json({ limit: '50mb' }));           // Cho JSON (avatarBase64)
+app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
 app.use(cors({
   origin: ['http://localhost:3000', 'http://localhost:8081'],
@@ -79,7 +79,7 @@ app.use('/api', bookingRoutes);
 
 app.use('/api/banners', bannerRoutes);
 app.use('/api/news', newsRoutes);
-
+app.use('/api', aboutUsFeedbackRoutes);
 
 io.use(async (socket, next) => {
   const token = socket.handshake.headers.authorization?.replace('Bearer ', '');

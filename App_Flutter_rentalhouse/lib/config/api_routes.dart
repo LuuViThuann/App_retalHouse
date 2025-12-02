@@ -1,9 +1,43 @@
 class ApiRoutes {
   static const String rootUrl =
-      'http://192.168.1.230:3000'; // 192.168.43.168 - mạng dữ liệu
+      'http://192.168.1.223:3000'; // 192.168.43.168 - mạng dữ liệu
   static const String baseUrl = '$rootUrl/api';
   static const String serverBaseUrl = rootUrl;
   static const String socketUrl = serverBaseUrl;
+
+  // ================== ABOUT US  ==================
+  static const String aboutUs = '$baseUrl/aboutus';
+  static const String adminAboutUs = '$baseUrl/admin/aboutus';
+
+  static String adminAboutUsDetail(String id) => '$adminAboutUs/$id';
+  static String adminAboutUsDeleteImage(String id) => '$adminAboutUs/$id/image';
+  static String adminAboutUsDelete(String id) => '$adminAboutUs/$id';
+
+  // ================== FEEDBACK  ==================
+  static const String feedback = '$baseUrl/feedback';
+  static const String myFeedback = '$feedback/my-feedback';
+  static const String adminFeedback = '$baseUrl/admin/feedback';
+  static const String adminFeedbackStats = '$adminFeedback/stats';
+
+  static String adminFeedbackDetail(String id) => '$adminFeedback/$id';
+  static String adminFeedbackStatus(String id) => '$adminFeedback/$id/status';
+  static String adminFeedbackDelete(String id) => '$adminFeedback/$id';
+
+  static String adminFeedbackFiltered({
+    String? status,
+    String? feedbackType,
+    int page = 1,
+    int limit = 20,
+  }) {
+    final params = <String, String>{
+      'page': page.toString(),
+      'limit': limit.toString(),
+    };
+    if (status != null) params['status'] = status;
+    if (feedbackType != null) params['feedbackType'] = feedbackType;
+    final uri = Uri.parse(adminFeedback).replace(queryParameters: params);
+    return uri.toString();
+  }
 
 // ================ ADMIN - QUẢN LÝ BÀI VIẾT =============
   static const String adminUsersWithPosts = '$baseUrl/admin/users-with-posts';

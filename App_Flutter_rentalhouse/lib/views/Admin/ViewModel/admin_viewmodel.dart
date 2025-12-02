@@ -541,64 +541,76 @@ class AdminViewModel extends ChangeNotifier {
   /// Cập nhật bài đăng (chỉ admin mới có quyền)
   Future<bool> adminEditRental(
     String rentalId,
-    Map<String, dynamic> updateData, {
-    List<String>? imagesToRemove,
-  }) async {
+    Map<String, dynamic> updateData,
+  ) async {
     try {
       final token = await _getValidToken();
-      if (token == null) return false;
-
-      final request = http.MultipartRequest(
-        'PATCH',
-        Uri.parse('${ApiRoutes.rentals}/$rentalId'),
-      );
-
-      // Thêm headers
-      request.headers.addAll({
-        'Authorization': 'Bearer $token',
-        'Content-Type': 'multipart/form-data',
-      });
-
-      // Thêm các trường dữ liệu
-      updateData.forEach((key, value) {
-        if (value != null && value is! List) {
-          request.fields[key] = value.toString();
-        } else if (value is List) {
-          request.fields[key] = value.join(',');
-        }
-      });
-
-      // Thêm danh sách ảnh cần xóa
-      if (imagesToRemove != null && imagesToRemove.isNotEmpty) {
-        request.fields['removedImages'] = jsonEncode(imagesToRemove);
+      if (token == null) {
+        _error = 'Token is null';
+        return false;
       }
 
-      debugPrint('📤 Sending PATCH request to edit rental: $rentalId');
+      debugPrint('═══════════════════════════════════════════');
+      debugPrint('✏️ EDIT RENTAL REQUEST');
+      debugPrint('═══════════════════════════════════════════');
+      debugPrint('📌 Rental ID: $rentalId');
+      debugPrint('🔑 Token: ${token.substring(0, 50)}...');
 
-      final response =
-          await request.send().timeout(const Duration(seconds: 30));
+      final url = '${ApiRoutes.baseUrl}/admin/rentals/$rentalId';
+      debugPrint('🔗 URL: $url');
 
-      final responseBody = await response.stream.bytesToString();
-      debugPrint('📡 Response status: ${response.statusCode}');
-      debugPrint('📄 Response body: $responseBody');
+      // Build request body
+      final body = jsonEncode(updateData);
+      debugPrint('📝 Update Data: $body');
+
+      final response = await http
+          .patch(
+            Uri.parse(url),
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': 'Bearer $token',
+            },
+            body: body,
+          )
+          .timeout(const Duration(seconds: 30));
+
+      debugPrint('📊 Response Status: ${response.statusCode}');
+      debugPrint('📋 Response: ${response.body}');
+      debugPrint('═══════════════════════════════════════════');
 
       if (response.statusCode == 200) {
-        final data = jsonDecode(responseBody);
+        final data = jsonDecode(response.body);
+
+        // ✅ Cập nhật bài viết trong danh sách
+        final index = _userPosts.indexWhere((post) => post.id == rentalId);
+        if (index != -1) {
+          _userPosts[index] = Rental.fromJson(data['rental']);
+          debugPrint('✅ Updated rental in list');
+        }
+
         _error = null;
+        notifyListeners();
         debugPrint('✅ Rental updated successfully');
         return true;
       } else if (response.statusCode == 401) {
         _error = 'Token hết hạn - vui lòng đăng nhập lại';
+        debugPrint('❌ 401: Unauthorized');
         return false;
       } else if (response.statusCode == 403) {
         _error = 'Bạn không có quyền chỉnh sửa bài viết này';
+        debugPrint('❌ 403: Forbidden');
+        return false;
+      } else if (response.statusCode == 404) {
+        _error = 'Bài viết không tồn tại';
+        debugPrint('❌ 404: Not found');
         return false;
       } else {
-        _error = 'Lỗi cập nhật bài viết: ${response.statusCode}';
+        _error = 'Lỗi cập nhật: ${response.statusCode}';
+        debugPrint('❌ Error: ${response.statusCode}');
         return false;
       }
     } catch (e) {
-      _error = 'Lỗi mạng: $e';
+      _error = 'Lỗi: $e';
       debugPrint('❌ Exception: $e');
       return false;
     }
@@ -654,7 +666,6 @@ class AdminViewModel extends ChangeNotifier {
 
   /// ========== GET SINGLE RENTAL FOR EDITING ==========
 
-  /// Lấy chi tiết một bài viết để chỉnh sửa
   Future<Rental?> fetchRentalForEdit(String rentalId) async {
     try {
       _isLoading = true;
@@ -675,6 +686,7 @@ class AdminViewModel extends ChangeNotifier {
         _error = null;
         _isLoading = false;
         notifyListeners();
+        debugPrint('✅ Rental fetched successfully');
         return rental;
       } else {
         _error = 'Không tải được bài viết: ${response.statusCode}';

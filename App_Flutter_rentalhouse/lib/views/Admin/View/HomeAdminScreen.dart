@@ -1,11 +1,14 @@
-// lib/views/admin/home_admin_screen.dart
+
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_rentalhouse/models/user.dart';
 import 'package:flutter_rentalhouse/views/Admin/View/ManageBannersScreen.dart';
+import 'package:flutter_rentalhouse/views/Admin/View/ManageFeedbackScreen.dart';
 import 'package:flutter_rentalhouse/views/Admin/View/ManageNewsScreen.dart';
 import 'package:flutter_rentalhouse/views/Admin/View/ManagePostsScreen.dart';
 import 'package:flutter_rentalhouse/views/Admin/View/ManageUsersScreen.dart';
+import 'package:flutter_rentalhouse/views/ManageAboutUsScreen.dart';
+import 'package:flutter_rentalhouse/views/UserFeedbackScreen%20.dart';
 import 'package:flutter_rentalhouse/views/my_profile_view.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
@@ -52,7 +55,7 @@ class _HomeAdminScreenState extends State<HomeAdminScreen> {
   }
 }
 
-// Hàm xử lý ảnh avatar an toàn
+// Hàm xử lý ảnh avatar
 ImageProvider getAvatarProvider(String? avatarUrl) {
   if (avatarUrl != null && avatarUrl.isNotEmpty && avatarUrl.contains(',')) {
     try {
@@ -80,13 +83,13 @@ class AdminAvatar extends StatelessWidget {
       backgroundImage: getAvatarProvider(user?.avatarUrl),
       child: user?.avatarUrl == null
           ? Icon(Icons.admin_panel_settings,
-              size: radius * 1.2, color: Colors.redAccent)
+          size: radius * 1.2, color: Colors.redAccent)
           : null,
     );
   }
 }
 
-// Trang Tổng quan
+// Dashboard Overview
 class DashboardOverview extends StatelessWidget {
   const DashboardOverview({super.key});
 
@@ -176,7 +179,7 @@ class DashboardOverview extends StatelessWidget {
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.red.shade700,
                   padding:
-                      const EdgeInsets.symmetric(vertical: 18, horizontal: 32),
+                  const EdgeInsets.symmetric(vertical: 18, horizontal: 32),
                   shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(16)),
                 ),
@@ -222,7 +225,7 @@ class DashboardOverview extends StatelessWidget {
   }
 }
 
-// Trang Quản lý hệ thống
+// Admin Management Screen
 class ProfileAdminScreen extends StatelessWidget {
   final AppUser? user;
   const ProfileAdminScreen({super.key, this.user});
@@ -243,7 +246,7 @@ class ProfileAdminScreen extends StatelessWidget {
           Card(
             elevation: 8,
             shape:
-                RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
             child: ListTile(
               leading: AdminAvatar(user: user, radius: 36),
               title: Text(user?.username ?? 'Quản trị viên',
@@ -263,7 +266,7 @@ class ProfileAdminScreen extends StatelessWidget {
           ),
           const SizedBox(height: 32),
 
-          // MỤC THÔNG TIN CÁ NHÂN ĐẶT LÊN ĐẦU TIÊN, NỔI BẬT NHẤT
+          // Thông tin cá nhân (nổi bật)
           Card(
             elevation: 10,
             color: Colors.red.shade50,
@@ -282,14 +285,14 @@ class ProfileAdminScreen extends StatelessWidget {
               subtitle: const Text('Xem và chỉnh sửa hồ sơ Admin',
                   style: TextStyle(color: Colors.black87)),
               trailing:
-                  const Icon(Icons.arrow_forward_ios, color: Colors.redAccent),
+              const Icon(Icons.arrow_forward_ios, color: Colors.redAccent),
               onTap: () {
                 Navigator.push(
                   context,
                   MaterialPageRoute(
                     builder: (_) => const MyProfileView(),
                     settings:
-                        const RouteSettings(arguments: true), // true = từ admin
+                    const RouteSettings(arguments: true), // từ admin
                   ),
                 );
               },
@@ -297,41 +300,67 @@ class ProfileAdminScreen extends StatelessWidget {
           ),
           const SizedBox(height: 20),
 
-          // Các mục quản lý khác
+          // ✅ VIẾT NỘI DUNG GIỚI THIỆU (MỚI)
+          _menuItem(
+              context,
+              'Viết nội dung giới thiệu',
+              Icons.description,
+              Colors.indigo,
+                  () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                      builder: (_) => const ManageAboutUsScreen()))),
+
+          // ✅ GÓP Ý / PHẢN HỒI (MỚI)
+          _menuItem(
+              context,
+              'Góp ý / Phản hồi người dùng',
+              Icons.feedback,
+              Colors.amber,
+                  () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                      builder: (_) => const ManageFeedbackScreen()))),
+
           _menuItem(
               context,
               'Quản lý bài đăng',
               Icons.article_outlined,
               Colors.orangeAccent,
-              () => Navigator.push(
+                  () => Navigator.push(
                   context,
                   MaterialPageRoute(
                       builder: (_) => const ManagePostsScreen()))),
+
           _menuItem(
               context,
               'Quản lý người dùng',
               Icons.people_alt_rounded,
               Colors.green,
-              () => Navigator.push(
+                  () => Navigator.push(
                   context,
                   MaterialPageRoute(
                       builder: (_) => const ManageUsersScreen()))),
+
           _menuItem(
               context,
               'Quản lý Banner quảng cáo',
               Icons.image_search,
               Colors.blue,
-              () => Navigator.push(
+                  () => Navigator.push(
                   context,
                   MaterialPageRoute(
                       builder: (_) => const ManageBannersScreen()))),
+
           _menuItem(
               context,
               'Quản lý tin tức',
               Icons.newspaper,
               Colors.purple,
-              () => Navigator.push(context,
-                  MaterialPageRoute(builder: (_) => const ManageNewsScreen()))),
+                  () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                      builder: (_) => const ManageNewsScreen()))),
 
           const SizedBox(height: 40),
           ElevatedButton.icon(
@@ -389,10 +418,11 @@ class ProfileAdminScreen extends StatelessWidget {
                   context, '/login', (route) => false);
             },
             child:
-                const Text('Đăng xuất', style: TextStyle(color: Colors.white)),
+            const Text('Đăng xuất', style: TextStyle(color: Colors.white)),
           ),
         ],
       ),
     );
   }
 }
+
