@@ -81,6 +81,7 @@ class AppUser {
     String? token,
     String? avatarBase64,
     String? username,
+    String? role,
   }) {
     return AppUser(
       id: id ?? this.id,
@@ -91,6 +92,7 @@ class AppUser {
       token: token ?? this.token,
       avatarBase64: avatarBase64 ?? this.avatarBase64,
       username: username ?? this.username,
+      role: role ?? this.role,
     );
   }
 }

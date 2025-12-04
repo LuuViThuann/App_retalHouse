@@ -1,0 +1,21 @@
+
+POST,/comment,User (auth),Tạo bình luận mới cho một bài đăng nhà trọ,Tự động tạo thông báo cho chủ nhà nếu không phải chính mình
+POST,/reply,User (auth),Tạo phản hồi cho một bình luận (hỗ trợ trả lời lồng nhau),Tự động tạo thông báo cho chủ bài đăng
+GET,/my-posts,User (auth),Lấy danh sách bài đăng nhà trọ do chính mình tạo,Phân trang + điều chỉnh múi giờ +7
+GET,/recent-comments,User (auth),Lấy bình luận + phản hồi gần đây mà mình đã viết trên toàn hệ thống,"Gộp Comment + Reply, hiển thị kèm tên nhà trọ, avatar, hình ảnh"
+DELETE,/reply/:id,User (auth),Xóa phản hồi của chính mình,"Kiểm tra quyền sở hữu, tự động xóa khỏi mảng replies của Comment"
+GET,/my-posts-comments,User (auth),Lấy tất cả bình luận + phản hồi từ người khác trên các bài đăng của mình (chủ nhà xem),Rất quan trọng cho chủ trọ theo dõi tương tác người thuê
+
+==========
+
+Tính năng,Chi tiết : 
+
+Tự động gửi thông báo khi có bình luận/phản hồi,"Khi người thuê bình luận → chủ nhà nhận thông báo 
+ Khi có trả lời bình luận → chủ nhà cũng nhận thông báo"
+Dashboard cá nhân hoàn chỉnh,"- Người thuê: xem lại mình đã bình luận gì ở đâu
+
+- Chủ nhà: xem ai đang tương tác với bài đăng của mình"
+Hỗ trợ nested reply (trả lời lồng),parentReplyId được lưu → hỗ trợ cây trả lời đầy đủ
+Điều chỉnh múi giờ +7,Tất cả createdAt đều được cộng 7 tiếng để hiển thị đúng giờ Việt Nam
+Phân trang chuẩn,Hiệu suất cao dù có hàng nghìn bình luận
+Populate thông tin người dùng + nhà trọ,"Avatar, username, tiêu đề nhà trọ đều được lấy đầy đủ"

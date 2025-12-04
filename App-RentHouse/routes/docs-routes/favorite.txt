@@ -1,0 +1,14 @@
+
+POST,/favorites,User (auth),Thêm nhà/phòng vào danh sách yêu thích,{ rentalId }
+DELETE,/favorites/:rentalId,User (auth),Xóa khỏi danh sách yêu thích,:rentalId trong URL
+GET,/favorites,User (auth),Lấy toàn bộ danh sách yêu thích của người dùng hiện tại,Trả về mảng các Favorite đã populate rentalId
+
+
+=============
+Chi tiết tính năng : 
+
+Kiểm tra trùng lặp trước khi thêm (không cho thêm 2 lần cùng 1 nhà trọ)
+Kiểm tra tồn tại của rentalId trước khi thêm/xóa → tránh lỗi 404 muộn
+Khi xóa: kiểm tra cả rental tồn tại và favorite tồn tại → trả lỗi chính xác
+GET /favorites trả về full thông tin nhà trọ nhờ .populate('rentalId') → frontend dùng ngay được
+Bảo mật hoàn toàn bằng Firebase Auth token

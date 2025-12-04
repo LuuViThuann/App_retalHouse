@@ -1,6 +1,6 @@
 class ApiRoutes {
   static const String rootUrl =
-      'http://192.168.1.223:3000'; // 192.168.43.168 - mạng dữ liệu
+      'http://192.168.1.55:3000'; // 192.168.43.168 - mạng dữ liệu
   static const String baseUrl = '$rootUrl/api';
   static const String serverBaseUrl = rootUrl;
   static const String socketUrl = serverBaseUrl;
@@ -22,7 +22,27 @@ class ApiRoutes {
   static String adminFeedbackDetail(String id) => '$adminFeedback/$id';
   static String adminFeedbackStatus(String id) => '$adminFeedback/$id/status';
   static String adminFeedbackDelete(String id) => '$adminFeedback/$id';
+  static String deleteMyFeedback(String feedbackId) => '$feedback/$feedbackId';
 
+  // ================== FEEDBACK - DELETED/UNDO (NEW) ==================
+  /// GET /api/feedback/deleted/list - Lấy danh sách feedback đã xóa
+  static const String deletedFeedbackList = '$feedback/deleted/list';
+
+  /// POST /api/feedback/{id}/restore - Hoàn tác feedback đã xóa
+  static String restoreFeedback(String feedbackId) => '$feedback/$feedbackId/restore';
+
+  /// DELETE /api/feedback/{id}/permanent - Xóa vĩnh viễn feedback
+  static String permanentDeleteFeedback(String feedbackId) => '$feedback/$feedbackId/permanent';
+
+  // ================== FEEDBACK - ADMIN UNDO (NEW) ==================
+  /// GET /api/admin/feedback/deleted/list - Admin lấy danh sách feedback đã xóa
+  static const String adminDeletedFeedbackList = '$adminFeedback/deleted/list';
+
+  /// POST /api/admin/feedback/{id}/restore - Admin hoàn tác feedback
+  static String adminRestoreFeedback(String feedbackId) => '$adminFeedback/$feedbackId/restore';
+
+  /// DELETE /api/admin/feedback/{id}/permanent - Admin xóa vĩnh viễn
+  static String adminPermanentDeleteFeedback(String feedbackId) => '$adminFeedback/$feedbackId/permanent';
   static String adminFeedbackFiltered({
     String? status,
     String? feedbackType,
@@ -38,6 +58,47 @@ class ApiRoutes {
     final uri = Uri.parse(adminFeedback).replace(queryParameters: params);
     return uri.toString();
   }
+  // ================== NOTIFICATIONS  ==================
+  static const String notifications = '$baseUrl/notifications';
+
+  static String notificationsList({int page = 1, int limit = 20}) {
+    return '$notifications?page=$page&limit=$limit';
+  }
+
+  static String notificationDetail(String notificationId) =>
+      '$notifications/$notificationId';
+
+  static String markNotificationAsRead(String notificationId) =>
+      '$notifications/$notificationId/read';
+
+  static const String markAllNotificationsAsRead =
+      '$notifications/read-all';
+
+  static String deleteNotification(String notificationId) =>
+      '$notifications/$notificationId';
+
+  static const String deleteAllNotifications = notifications;
+
+  static const String unreadNotificationCount =
+      '$notifications/unread/count';
+
+  static const String notificationStats =
+      '$notifications/stats/overview';
+
+  // Lấy danh sách thông báo đã xóa (Thùng rác)
+  static const String deletedNotificationsList = '$notifications/deleted/list';
+
+  // Hoàn tác xóa thông báo RIÊNG LẺ
+  static String restoreNotification(String notificationId) =>
+      '$notifications/$notificationId/restore';
+
+  // Hoàn tác xóa tất cả thông báo
+  static const String restoreAllNotifications = '$notifications/restore';
+
+  //  Xóa vĩnh viễn thông báo khỏi undo stack
+  static String permanentDeleteNotification(String notificationId) =>
+      '$notifications/$notificationId/permanent';
+
 
 // ================ ADMIN - QUẢN LÝ BÀI VIẾT =============
   static const String adminUsersWithPosts = '$baseUrl/admin/users-with-posts';
@@ -170,7 +231,7 @@ class ApiRoutes {
 
   static const String myPosts = '$baseUrl/profile/my-posts';
   static const String recentComments = '$baseUrl/profile/recent-comments';
-  static const String notifications = '$baseUrl/profile/notifications';
+
 
   // Gọi các API địa chỉ --------------------
   static const String baseUrlAddress = 'https://provinces.open-api.vn/api';

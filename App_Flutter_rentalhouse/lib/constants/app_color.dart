@@ -18,4 +18,7 @@ class AppColors {
   static final blue700 = Colors.blue[700]!;
   static final blue800 = Colors.blue[800]!;
   static final blue900 = Colors.blue[900]!;
+
+  static const Color primaryBlue = Color(0xFF1976D2);
+  static final Color? greenSnackbar = Colors.green[700];
 }

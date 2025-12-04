@@ -18,7 +18,7 @@ class AuthService {
   final FacebookAuth _facebookAuth = FacebookAuth.instance;
   final GoogleSignIn _googleSignIn = GoogleSignIn(
     clientId:
-        '616377322079-eb0grhlmn2lbnifatbduclltcur9t3g4.apps.googleusercontent.com',
+    '616377322079-eb0grhlmn2lbnifatbduclltcur9t3g4.apps.googleusercontent.com',
     scopes: [
       'email',
       'profile',
@@ -29,12 +29,16 @@ class AuthService {
     baseUrl: ApiRoutes.baseUrl,
     headers: {'Content-Type': 'multipart/form-data'},
   ));
+
   // Hàm kiểm tra định dạng đầu vào
   bool _isValidEmail(String email) =>
       RegExp(r'^[^@]+@[^@]+\.[^@]+').hasMatch(email);
+
   bool _isValidPhoneNumber(String phoneNumber) =>
       RegExp(r'^\d{10}$').hasMatch(phoneNumber);
+
   bool _isValidPassword(String password) => password.length >= 6;
+
   bool _isValidAvatarBase64(String? avatarBase64) {
     if (avatarBase64 == null) return false;
     final regex = RegExp(r'^(data:image/(jpeg|png);base64,)?[A-Za-z0-9+/=]+$');
@@ -42,7 +46,9 @@ class AuthService {
   }
 
   bool _isValidUsername(String username) => username.length >= 3;
+
   bool _isValidAddress(String address) => address.isNotEmpty;
+
   // Hàm loại bỏ tiền tố MIME
   String _stripMimePrefix(String base64) {
     return base64.replaceAll(RegExp(r'^data:image/(jpeg|png);base64,'), '');
@@ -160,12 +166,12 @@ class AuthService {
       // 3. GỌI BACKEND CHỈ GỬI idToken THÔI (QUAN TRỌNG NHẤT)
       final response = await http
           .post(
-            Uri.parse(ApiRoutes.login),
-            headers: {'Content-Type': 'application/json'},
-            body: jsonEncode({'idToken': idToken}), // ← CHỈ GỬI CÁI NÀY
-          )
+        Uri.parse(ApiRoutes.login),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'idToken': idToken}), // ← CHỈ GỬI CÁI NÀY
+      )
           .timeout(
-              const Duration(seconds: 20)); // tăng timeout lên 20s cho chắc
+          const Duration(seconds: 20)); // tăng timeout lên 20s cho chắc
 
       print('Login API Response: ${response.statusCode} - ${response.body}');
 
@@ -218,13 +224,15 @@ class AuthService {
         return null;
       }
       print(
-          'AuthService: Google user: ${googleUser.email}, ID: ${googleUser.id}');
+          'AuthService: Google user: ${googleUser.email}, ID: ${googleUser
+              .id}');
       final googleAuth = await googleUser.authentication;
       final idToken = googleAuth.idToken;
       final accessToken = googleAuth.accessToken;
       if (idToken == null || idToken.isEmpty) {
         print(
-            'AuthService: No ID token from Google Sign-In, accessToken: ${accessToken?.substring(0, 10)}...');
+            'AuthService: No ID token from Google Sign-In, accessToken: ${accessToken
+                ?.substring(0, 10)}...');
         throw Exception('Failed to obtain ID token');
       }
       print('AuthService: Google ID token: ${idToken.substring(0, 10)}...');
@@ -245,7 +253,8 @@ class AuthService {
         throw Exception('Failed to obtain Firebase ID token');
       }
       print(
-          'AuthService: Firebase ID token: ${firebaseIdToken.substring(0, 10)}...');
+          'AuthService: Firebase ID token: ${firebaseIdToken.substring(
+              0, 10)}...');
       final response = await http.post(
         Uri.parse(ApiRoutes.login),
         headers: {'Content-Type': 'application/json'},
@@ -258,7 +267,8 @@ class AuthService {
         }),
       );
       print(
-          'AuthService: Google Sign-In API response: ${response.statusCode}, body: ${response.body}');
+          'AuthService: Google Sign-In API response: ${response
+              .statusCode}, body: ${response.body}');
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         final avatarBase64 = await fetchAvatarBase64(user.uid, firebaseIdToken);
@@ -276,9 +286,11 @@ class AuthService {
       } else {
         final errorData = jsonDecode(response.body);
         print(
-            'AuthService: Google Sign-In API error: ${errorData['message'] ?? response.body}');
+            'AuthService: Google Sign-In API error: ${errorData['message'] ??
+                response.body}');
         throw Exception(
-            'Đăng nhập Google thất bại: ${errorData['message'] ?? response.body}');
+            'Đăng nhập Google thất bại: ${errorData['message'] ??
+                response.body}');
       }
     } catch (e) {
       print('AuthService: Error signing in with Google: $e');
@@ -305,9 +317,9 @@ class AuthService {
         throw Exception('Failed to obtain access token');
       }
       final facebookAuthCredential =
-          FacebookAuthProvider.credential(accessToken.token);
+      FacebookAuthProvider.credential(accessToken.token);
       final userCredential =
-          await _auth.signInWithCredential(facebookAuthCredential);
+      await _auth.signInWithCredential(facebookAuthCredential);
       final user = userCredential.user;
       if (user == null) {
         print('AuthService: No user from Facebook Sign-In');
@@ -346,7 +358,8 @@ class AuthService {
         }),
       );
       print(
-          'AuthService: Facebook Sign-In response: ${response.statusCode}, body: ${response.body}');
+          'AuthService: Facebook Sign-In response: ${response
+              .statusCode}, body: ${response.body}');
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         final avatarBase64 = await fetchAvatarBase64(user.uid, idToken);
@@ -364,7 +377,8 @@ class AuthService {
       } else {
         final errorData = jsonDecode(response.body);
         throw Exception(
-            'Đăng nhập Facebook thất bại: ${errorData['message'] ?? response.body}');
+            'Đăng nhập Facebook thất bại: ${errorData['message'] ??
+                response.body}');
       }
     } catch (e) {
       print('AuthService: Error during Facebook sign-in: $e');
@@ -380,7 +394,8 @@ class AuthService {
         body: jsonEncode({'email': email}),
       );
       print(
-          'AuthService: Send reset email response: ${response.statusCode}, body: ${response.body}');
+          'AuthService: Send reset email response: ${response
+              .statusCode}, body: ${response.body}');
       if (response.statusCode == 200) {
         return 'Email đặt lại mật khẩu đã được gửi thành công';
       } else {
@@ -405,11 +420,13 @@ class AuthService {
         }),
       );
       print(
-          'AuthService: Reset password response: ${response.statusCode}, body: ${response.body}');
+          'AuthService: Reset password response: ${response
+              .statusCode}, body: ${response.body}');
       if (response.statusCode != 200) {
         final errorData = jsonDecode(response.body);
         throw Exception(
-            'Đặt lại mật khẩu thất bại: ${errorData['message'] ?? response.body}');
+            'Đặt lại mật khẩu thất bại: ${errorData['message'] ??
+                response.body}');
       }
     } catch (e) {
       print('AuthService: Error resetting password: $e');
@@ -441,7 +458,8 @@ class AuthService {
       } else {
         final errorData = jsonDecode(response.body);
         throw Exception(
-            'Thay đổi mật khẩu thất bại: ${errorData['message'] ?? response.body}');
+            'Thay đổi mật khẩu thất bại: ${errorData['message'] ??
+                response.body}');
       }
     } catch (e) {
       print('AuthService: Error during password change: $e');
@@ -490,7 +508,8 @@ class AuthService {
       } else {
         final errorData = jsonDecode(response.body);
         throw Exception(
-            'Cập nhật hồ sơ thất bại: ${errorData['message'] ?? response.body}');
+            'Cập nhật hồ sơ thất bại: ${errorData['message'] ??
+                response.body}');
       }
     } catch (e) {
       print('AuthService: Error during profile update: $e');
@@ -540,7 +559,8 @@ class AuthService {
         },
       );
       print(
-          'AuthService: Fetch avatar response: ${response.statusCode}, body: ${response.body}');
+          'AuthService: Fetch avatar response: ${response
+              .statusCode}, body: ${response.body}');
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         return data['avatarBase64'] as String?;
@@ -665,19 +685,19 @@ class AuthService {
           if (commentMap['replies'] != null) {
             commentMap['replies'] =
                 (commentMap['replies'] as List).map((reply) {
-              final replyMap = Map<String, dynamic>.from(reply);
-              if (replyMap['userId'] != null) {
-                final replyUserId =
+                  final replyMap = Map<String, dynamic>.from(reply);
+                  if (replyMap['userId'] != null) {
+                    final replyUserId =
                     Map<String, dynamic>.from(replyMap['userId']);
-                replyMap['userId'] = {
-                  ...replyUserId,
-                  'avatarBytes': replyUserId['avatarBase64'] != null
-                      ? base64Decode(replyUserId['avatarBase64'])
-                      : null,
-                };
-              }
-              return replyMap;
-            }).toList();
+                    replyMap['userId'] = {
+                      ...replyUserId,
+                      'avatarBytes': replyUserId['avatarBase64'] != null
+                          ? base64Decode(replyUserId['avatarBase64'])
+                          : null,
+                    };
+                  }
+                  return replyMap;
+                }).toList();
           }
           return Comment.fromJson(commentMap);
         }).toList();
@@ -701,41 +721,424 @@ class AuthService {
   Future<Map<String, dynamic>> fetchNotifications(
       {int page = 1, int limit = 10}) async {
     try {
-      final response = await http.get(
-        Uri.parse('${ApiRoutes.baseUrl}/notifications?page=$page&limit=$limit'),
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer ${_auth.currentUser?.uid}',
-        },
+      final user = _auth.currentUser;
+      if (user == null) {
+        print('AuthService: No user for fetching notifications');
+        return {'notifications': [], 'total': 0, 'page': page, 'pages': 1};
+      }
+
+      final idToken = await user.getIdToken(true);
+      if (idToken == null) {
+        print('AuthService: No ID token for fetching notifications');
+        return {'notifications': [], 'total': 0, 'page': page, 'pages': 1};
+      }
+
+      print('🔵 [FETCH NOTIFICATIONS]');
+      print('   userId: ${user.uid}');
+      print('   page: $page');
+      print('   limit: $limit');
+
+      final Uri url = Uri.parse(
+        '${ApiRoutes.baseUrl}/notifications?page=$page&limit=$limit',
       );
 
+      print('   URL: $url');
+
+      final response = await http.get(
+        url,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $idToken',
+        },
+      ).timeout(const Duration(seconds: 15));
+
+      print('✅ [FETCH NOTIFICATIONS] Response: ${response.statusCode}');
+      print('   Body: ${response.body}');
+
       if (response.statusCode == 200) {
-        return jsonDecode(response.body);
+        final data = jsonDecode(response.body);
+
+        final notifications = (data['notifications'] as List?)
+            ?.map((notification) {
+          try {
+            return NotificationModel.fromJson(notification);
+          } catch (e) {
+            print('⚠️ Error parsing notification: $e');
+            return null;
+          }
+        })
+            .whereType<NotificationModel>()
+            .toList() ??
+            [];
+
+        print('✅ [FETCH NOTIFICATIONS] Parsed ${notifications
+            .length} notifications');
+
+        return {
+          'notifications': notifications,
+          'total': data['pagination']?['total'] ?? 0,
+          'page': data['pagination']?['page'] ?? page,
+          'pages': data['pagination']?['pages'] ?? 1,
+        };
+      } else if (response.statusCode == 401) {
+        print('⚠️ [FETCH NOTIFICATIONS] Unauthorized - Token may be expired');
+        return {'notifications': [], 'total': 0, 'page': page, 'pages': 1};
       } else {
-        throw Exception('Failed to fetch notifications');
+        final errorData = jsonDecode(response.body);
+        print('❌ [FETCH NOTIFICATIONS] Error: ${response.statusCode}');
+        print('   Message: ${errorData['message']}');
+        throw Exception(
+          'Lấy thông báo thất bại: ${errorData['message'] ?? response.body}',
+        );
       }
+    } on TimeoutException catch (_) {
+      print('❌ [FETCH NOTIFICATIONS] Timeout');
+      throw Exception('Kết nối server quá lâu. Vui lòng kiểm tra mạng.');
     } catch (e) {
-      throw Exception('Error fetching notifications: $e');
+      print('❌ [FETCH NOTIFICATIONS] Error: $e');
+      throw Exception('Lấy thông báo thất bại: $e');
     }
   }
 
-  Future<void> deleteNotification(String notificationId) async {
+  Future<bool> markNotificationAsRead(String notificationId) async {
     try {
+      final user = _auth.currentUser;
+      if (user == null) return false;
+
+      final idToken = await user.getIdToken(true);
+      if (idToken == null) return false;
+
+      print('🔵 [MARK AS READ]');
+      print('   notificationId: $notificationId');
+
+      final response = await http.patch(
+        Uri.parse('${ApiRoutes.baseUrl}/notifications/$notificationId/read'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $idToken',
+        },
+      ).timeout(const Duration(seconds: 10));
+
+      if (response.statusCode == 200) {
+        print('✅ [MARK AS READ] Success');
+        return true;
+      } else {
+        print('❌ [MARK AS READ] Error: ${response.statusCode}');
+        return false;
+      }
+    } catch (e) {
+      print('❌ [MARK AS READ] Error: $e');
+      return false;
+    }
+  }
+
+  Future<bool> markAllNotificationsAsRead() async {
+    try {
+      final user = _auth.currentUser;
+      if (user == null) return false;
+
+      final idToken = await user.getIdToken(true);
+      if (idToken == null) return false;
+
+      print('🔵 [MARK ALL AS READ]');
+
+      final response = await http.patch(
+        Uri.parse('${ApiRoutes.baseUrl}/notifications/read-all'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $idToken',
+        },
+      ).timeout(const Duration(seconds: 10));
+
+      if (response.statusCode == 200) {
+        print('✅ [MARK ALL AS READ] Success');
+        return true;
+      } else {
+        print('❌ [MARK ALL AS READ] Error: ${response.statusCode}');
+        return false;
+      }
+    } catch (e) {
+      print('❌ [MARK ALL AS READ] Error: $e');
+      return false;
+    }
+  }
+
+  Future<bool> deleteNotification(String notificationId) async {
+    try {
+      final user = _auth.currentUser;
+      if (user == null) return false;
+
+      final idToken = await user.getIdToken(true);
+      if (idToken == null) return false;
+
+      print('🔵 [DELETE NOTIFICATION]');
+      print('   notificationId: $notificationId');
+
       final response = await http.delete(
         Uri.parse('${ApiRoutes.baseUrl}/notifications/$notificationId'),
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': 'Bearer ${_auth.currentUser?.uid}',
+          'Authorization': 'Bearer $idToken',
         },
-      );
+      ).timeout(const Duration(seconds: 10));
 
-      if (response.statusCode != 200) {
-        throw Exception('Failed to delete notification');
+      if (response.statusCode == 200) {
+        print('✅ [DELETE NOTIFICATION] Success');
+        return true;
+      } else {
+        print('❌ [DELETE NOTIFICATION] Error: ${response.statusCode}');
+        return false;
       }
     } catch (e) {
-      throw Exception('Error deleting notification: $e');
+      print('❌ [DELETE NOTIFICATION] Error: $e');
+      return false;
     }
   }
+
+  Future<int> getUnreadNotificationCount() async {
+    try {
+      final user = _auth.currentUser;
+      if (user == null) return 0;
+
+      final idToken = await user.getIdToken(true);
+      if (idToken == null) return 0;
+
+      final response = await http.get(
+        Uri.parse('${ApiRoutes.baseUrl}/notifications/unread/count'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $idToken',
+        },
+      ).timeout(const Duration(seconds: 10));
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return data['unreadCount'] as int? ?? 0;
+      }
+      return 0;
+    } catch (e) {
+      print('❌ [GET UNREAD COUNT] Error: $e');
+      return 0;
+    }
+  }
+
+// ✅ Lấy danh sách thông báo đã xóa (Thùng rác)
+  Future<Map<String, dynamic>> getDeletedNotifications() async {
+    try {
+      final user = _auth.currentUser;
+      if (user == null) {
+        return {'count': 0, 'data': []};
+      }
+
+      final idToken = await user.getIdToken(true);
+      if (idToken == null) {
+        return {'count': 0, 'data': []};
+      }
+
+      print('🔵 [GET DELETED NOTIFICATIONS]');
+
+      final response = await http.get(
+        Uri.parse('${ApiRoutes.baseUrl}/notifications/deleted/list'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $idToken',
+        },
+      ).timeout(const Duration(seconds: 10));
+
+      print('✅ [GET DELETED NOTIFICATIONS] Response: ${response.statusCode}');
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return {
+          'count': data['count'] as int? ?? 0,
+          'data': data['data'] as List? ?? [],
+        };
+      }
+      return {'count': 0, 'data': []};
+    } catch (e) {
+      print('❌ [GET DELETED NOTIFICATIONS] Error: $e');
+      return {'count': 0, 'data': []};
+    }
+  }
+
+// ✅ Hoàn tác xóa thông báo RIÊNG LẺ
+  Future<bool> undoDeleteNotificationSingle(String notificationId) async {
+    try {
+      final user = _auth.currentUser;
+      if (user == null) return false;
+
+      final idToken = await user.getIdToken(true);
+      if (idToken == null) return false;
+
+      print('🔵 [UNDO DELETE SINGLE]');
+      print('   notificationId: $notificationId');
+
+      final response = await http.post(
+        Uri.parse('${ApiRoutes.baseUrl}/notifications/$notificationId/restore'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $idToken',
+        },
+      ).timeout(const Duration(seconds: 10));
+
+      print('✅ [UNDO DELETE SINGLE] Response: ${response.statusCode}');
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        print('✅ [UNDO DELETE SINGLE] Restored: ${data['data']['_id']}');
+        return true;
+      } else if (response.statusCode == 404) {
+        print('⚠️ [UNDO DELETE SINGLE] Not found');
+        return false;
+      } else {
+        final errorData = jsonDecode(response.body);
+        print('❌ [UNDO DELETE SINGLE] Error: ${errorData['message']}');
+        throw Exception(
+          'Hoàn tác thất bại: ${errorData['message'] ?? response.body}',
+        );
+      }
+    } on TimeoutException catch (_) {
+      print('❌ [UNDO DELETE SINGLE] Timeout');
+      throw Exception('Kết nối server quá lâu. Vui lòng kiểm tra mạng.');
+    } catch (e) {
+      print('❌ [UNDO DELETE SINGLE] Error: $e');
+      throw Exception('Hoàn tác thất bại: $e');
+    }
+  }
+
+// ✅ Hoàn tác xóa tất cả thông báo
+  Future<bool> undoDeleteNotifications() async {
+    try {
+      final user = _auth.currentUser;
+      if (user == null) return false;
+
+      final idToken = await user.getIdToken(true);
+      if (idToken == null) return false;
+
+      print('🔵 [UNDO DELETE ALL NOTIFICATIONS]');
+
+      final response = await http.post(
+        Uri.parse('${ApiRoutes.baseUrl}/notifications/restore'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $idToken',
+        },
+      ).timeout(const Duration(seconds: 10));
+
+      print(
+          '✅ [UNDO DELETE ALL NOTIFICATIONS] Response: ${response.statusCode}');
+      print('   Body: ${response.body}');
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        print(
+            '✅ [UNDO DELETE ALL NOTIFICATIONS] Restored ${data['restoredCount']} notifications');
+        return true;
+      } else if (response.statusCode == 404) {
+        print('⚠️ [UNDO DELETE ALL NOTIFICATIONS] No undo available');
+        return false;
+      } else {
+        final errorData = jsonDecode(response.body);
+        print(
+            '❌ [UNDO DELETE ALL NOTIFICATIONS] Error: ${errorData['message']}');
+        throw Exception(
+          'Hoàn tác thất bại: ${errorData['message'] ?? response.body}',
+        );
+      }
+    } on TimeoutException catch (_) {
+      print('❌ [UNDO DELETE ALL NOTIFICATIONS] Timeout');
+      throw Exception('Kết nối server quá lâu. Vui lòng kiểm tra mạng.');
+    } catch (e) {
+      print('❌ [UNDO DELETE ALL NOTIFICATIONS] Error: $e');
+      throw Exception('Hoàn tác thất bại: $e');
+    }
+  }
+
+// ✅ Xóa vĩnh viễn từ undo stack
+  Future<bool> permanentDeleteFromUndo(String notificationId) async {
+    try {
+      final user = _auth.currentUser;
+      if (user == null) return false;
+
+      final idToken = await user.getIdToken(true);
+      if (idToken == null) return false;
+
+      print('🔵 [PERMANENT DELETE UNDO]');
+      print('   notificationId: $notificationId');
+
+      final response = await http.delete(
+        Uri.parse(
+            '${ApiRoutes.baseUrl}/notifications/$notificationId/permanent'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $idToken',
+        },
+      ).timeout(const Duration(seconds: 10));
+
+      print('✅ [PERMANENT DELETE UNDO] Response: ${response.statusCode}');
+
+      if (response.statusCode == 200) {
+        print('✅ [PERMANENT DELETE UNDO] Permanently deleted');
+        return true;
+      } else if (response.statusCode == 404) {
+        print('⚠️ [PERMANENT DELETE UNDO] Not found');
+        return false;
+      } else {
+        final errorData = jsonDecode(response.body);
+        print('❌ [PERMANENT DELETE UNDO] Error: ${errorData['message']}');
+        throw Exception(
+          'Xóa vĩnh viễn thất bại: ${errorData['message'] ?? response.body}',
+        );
+      }
+    } on TimeoutException catch (_) {
+      print('❌ [PERMANENT DELETE UNDO] Timeout');
+      throw Exception('Kết nối server quá lâu. Vui lòng kiểm tra mạng.');
+    } catch (e) {
+      print('❌ [PERMANENT DELETE UNDO] Error: $e');
+      throw Exception('Xóa vĩnh viễn thất bại: $e');
+    }
+  }
+
+  // ✅ Kiểm tra xem có thông báo hoàn tác không
+  Future<Map<String, dynamic>> checkUndoStatus() async {
+    try {
+      final user = _auth.currentUser;
+      if (user == null) {
+        return {'hasUndo': false, 'undoCount': 0};
+      }
+
+      final idToken = await user.getIdToken(true);
+      if (idToken == null) {
+        return {'hasUndo': false, 'undoCount': 0};
+      }
+
+      print('🔵 [CHECK UNDO STATUS]');
+
+      final response = await http.get(
+        Uri.parse('${ApiRoutes.baseUrl}/notifications/undo/status'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $idToken',
+        },
+      ).timeout(const Duration(seconds: 10));
+
+      print('✅ [CHECK UNDO STATUS] Response: ${response.statusCode}');
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return {
+          'hasUndo': data['hasUndo'] ?? false,
+          'undoCount': data['undoCount'] ?? 0,
+          'expiresIn': data['expiresIn'] ?? 0,
+        };
+      }
+      return {'hasUndo': false, 'undoCount': 0};
+    } catch (e) {
+      print('❌ [CHECK UNDO STATUS] Error: $e');
+      return {'hasUndo': false, 'undoCount': 0};
+    }
+  }
+
 
   Future<Rental> fetchRental(String rentalId) async {
     try {
@@ -759,7 +1162,8 @@ class AuthService {
         },
       );
       print(
-          'AuthService: Fetch rental response (rentalId: $rentalId): ${response.statusCode}, body: ${response.body}');
+          'AuthService: Fetch rental response (rentalId: $rentalId): ${response
+              .statusCode}, body: ${response.body}');
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         return Rental.fromJson(data);
@@ -773,6 +1177,7 @@ class AuthService {
       throw Exception('Failed to fetch rental: $e');
     }
   }
+
 
   Future<void> deleteRental(String rentalId) async {
     try {
@@ -794,7 +1199,8 @@ class AuthService {
       if (response.statusCode != 200) {
         final errorData = jsonDecode(response.body);
         throw Exception(
-            'Failed to delete rental: ${errorData['message'] ?? response.body}');
+            'Failed to delete rental: ${errorData['message'] ??
+                response.body}');
       }
     } catch (e) {
       print('AuthService: Error deleting rental (rentalId: $rentalId): $e');
@@ -824,9 +1230,9 @@ class AuthService {
       // Lọc ra các ảnh thực sự hợp lệ để xóa
       final validRemovedImages = (removedImages ?? [])
           .where((url) =>
-              url.isNotEmpty &&
-              url.startsWith('/uploads/') &&
-              currentRental.images.contains(url))
+      url.isNotEmpty &&
+          url.startsWith('/uploads/') &&
+          currentRental.images.contains(url))
           .toList();
 
       // Tạo request PATCH dạng multipart
@@ -855,28 +1261,54 @@ class AuthService {
             request.files.add(await http.MultipartFile.fromPath(
               'images',
               path,
-              filename: path.split('/').last,
+              filename: path
+                  .split('/')
+                  .last,
             ));
           }
         }
       }
 
       print(
-          'AuthService: PATCH rental $rentalId, fields: ${request.fields}, files: ${request.files.length}');
+          'AuthService: PATCH rental $rentalId, fields: ${request
+              .fields}, files: ${request.files.length}');
 
       final response = await request.send();
       final responseBody = await response.stream.bytesToString();
 
       print(
-          'AuthService: Update rental response ($rentalId): ${response.statusCode}, body: $responseBody');
+          'AuthService: Update rental response ($rentalId): ${response
+              .statusCode}, body: $responseBody');
 
       if (response.statusCode == 200) {
         final data = jsonDecode(responseBody);
-        return Rental.fromJson(data);
+
+        // ✅ FIX: Xử lý cả 'rental' và 'data' trong response
+        final rentalData = data['rental'] ?? data['data'] ?? data;
+
+        if (rentalData == null) {
+          throw Exception('Không nhận được dữ liệu bài đăng từ server');
+        }
+
+        // ✅ FIX: Xác thực ID tồn tại
+        if ((rentalData as Map<String, dynamic>)['id'] == null &&
+            (rentalData as Map<String, dynamic>)['_id'] == null) {
+          print('❌ AuthService: Missing ID in response: $rentalData');
+          throw Exception('RentalID is missing in JSON response');
+        }
+
+        final updatedRental = Rental.fromJson(rentalData);
+
+        if (updatedRental.id == null || updatedRental.id!.isEmpty) {
+          throw Exception('Không thể lấy ID bài đăng từ response');
+        }
+
+        return updatedRental;
       } else {
         final errorData = jsonDecode(responseBody);
         throw Exception(
-            'Cập nhật bài đăng thất bại: ${errorData['message'] ?? responseBody}');
+            'Cập nhật bài đăng thất bại: ${errorData['message'] ??
+                responseBody}');
       }
     } catch (e) {
       print('AuthService: Lỗi cập nhật bài đăng ($rentalId): $e');
@@ -884,7 +1316,6 @@ class AuthService {
     }
   }
 }
-
 extension AppUserExtension on AppUser {
   AppUser copyWith({
     String? id,

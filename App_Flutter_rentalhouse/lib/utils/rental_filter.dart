@@ -29,6 +29,7 @@ class RentalFilter {
     'Mặt bằng',
   ];
 
+
   const RentalFilter({
     this.selectedProvince,
     this.selectedAreaRange,

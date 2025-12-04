@@ -1,0 +1,24 @@
+
+GET,/notifications,User (auth),"Lấy danh sách thông báo cá nhân, có phân trang",?page=1&limit=20 – sắp xếp mới nhất trước
+GET,/notifications/:id,User (auth),Lấy chi tiết 1 thông báo,Kiểm tra quyền sở hữu
+PATCH,/notifications/:id/read,User (auth),Đánh dấu 1 thông báo là đã đọc,
+PATCH,/notifications/read-all,User (auth),Đánh dấu tất cả thông báo là đã đọc,
+DELETE,/notifications/:id,User (auth),Xóa 1 thông báo,Tự động lưu vào Redis để hỗ trợ UNDO trong 30 phút
+DELETE,/notifications,User (auth),Xóa toàn bộ thông báo của user,Cũng lưu toàn bộ vào Redis để UNDO
+POST,/notifications/undo/restore,User (auth),Hoàn tác xóa thông báo (Undo) – cực hiếm dự án có!,Khôi phục lại chính xác các thông báo vừa xóa trong vòng 30 phút
+GET,/notifications/undo/status,User (auth),"Kiểm tra xem có thể undo không, còn bao nhiêu thông báo, hết hạn khi nào","Trả về hasUndo, undoCount, expiresIn"
+GET,/notifications/unread/count,User (auth),Lấy số lượng thông báo chưa đọc (badge)**,Dùng cho icon chuông thông báo trên app
+GET,/notifications/stats/overview,User (auth),"Thống kê chi tiết: tổng, chưa đọc, theo loại, 5 thông báo gần nhất",Dùng cho trang quản lý thông báo hoặc dashboard cá nhân
+
+
+=============================
+
+Tính năng,Chi tiết : 
+
+Hệ thống UNDO xóa thông báo,Lưu tạm toàn bộ thông báo bị xóa vào Redis (TTL 30 phút) → người dùng lỡ tay xóa vẫn có thể khôi phục
+Realtime-ready,Dễ tích hợp Socket.IO emit khi có thông báo mới (chỉ cần thêm 1 dòng ở nơi tạo thông báo)
+Badge số thông báo chưa đọc,API riêng để frontend cập nhật realtime
+Thống kê thông báo mạnh mẽ,Dùng MongoDB Aggregation → trả về tổng quan đẹp cho trang cá nhân
+Phân trang chuẩn,Hiệu suất cao dù có hàng nghìn thông báo
+Bảo mật tuyệt đối,Mọi hành động đều kiểm tra userId === req.userId
+Log chi tiết + emoji,"Dễ debug, dễ theo dõi luồng hoạt động trong production"

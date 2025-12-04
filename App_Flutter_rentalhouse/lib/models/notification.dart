@@ -37,6 +37,8 @@ class NotificationModel {
         return '💬';
       case 'message':
         return '📧';
+      case 'feedback_response':
+        return '📝';
       default:
         return 'ℹ️';
     }
@@ -55,8 +57,30 @@ class NotificationModel {
         return const Color(0xFF2196F3); // Blue
       case 'message':
         return const Color(0xFF9C27B0); // Purple
+      case 'feedback_response':
+        return const Color(0xFF00BCD4); // Cyan
       default:
         return const Color(0xFF757575); // Grey
+    }
+  }
+
+  // Lấy text mô tả loại thông báo
+  String get typeLabel {
+    switch (type) {
+      case 'rental_approved':
+        return 'Bài đăng được duyệt';
+      case 'rental_rejected':
+        return 'Bài đăng bị từ chối';
+      case 'rental_deleted':
+        return 'Bài đăng bị xóa';
+      case 'comment':
+        return 'Bình luận mới';
+      case 'message':
+        return 'Tin nhắn';
+      case 'feedback_response':
+        return 'Phản hồi từ quản lý';
+      default:
+        return 'Thông báo';
     }
   }
 
@@ -106,14 +130,14 @@ class NotificationModel {
   }
 
   Map<String, dynamic> toJson() => {
-        '_id': id,
-        'userId': userId,
-        'type': type,
-        'title': title,
-        'message': message,
-        'rentalId': rentalId,
-        'details': details,
-        'read': read,
-        'createdAt': createdAt.toIso8601String(),
-      };
+    '_id': id,
+    'userId': userId,
+    'type': type,
+    'title': title,
+    'message': message,
+    'rentalId': rentalId,
+    'details': details,
+    'read': read,
+    'createdAt': createdAt.toIso8601String(),
+  };
 }

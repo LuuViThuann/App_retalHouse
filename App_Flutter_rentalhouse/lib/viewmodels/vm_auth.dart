@@ -225,6 +225,7 @@ class AuthViewModel extends ChangeNotifier {
           phoneNumber: phoneNumber,
           address: address,
           username: username,
+          role: _currentUser?.role,
         );
         _errorMessage = null;
       } else {
@@ -338,52 +339,218 @@ class AuthViewModel extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final data =
-          await _authService.fetchNotifications(page: page, limit: limit);
+      print('🔵 [FETCH NOTIFICATIONS ViewModel]');
+      print('   page: $page, limit: $limit');
+
+      final data = await _authService.fetchNotifications(page: page, limit: limit);
+
+      print('✅ [FETCH NOTIFICATIONS ViewModel] Success');
+      print('   notifications: ${data['notifications'].length}');
+      print('   total: ${data['total']}');
+
+      final notifications = data['notifications'] as List<NotificationModel>;
+
       if (page == 1) {
-        _notifications = (data['notifications'] as List)
-            .map((notification) => NotificationModel.fromJson(notification))
-            .toList();
+        _notifications = notifications;
       } else {
-        final newNotifications = (data['notifications'] as List)
-            .map((notification) => NotificationModel.fromJson(notification))
-            .toList();
-        _notifications.addAll(newNotifications);
+        _notifications.addAll(notifications);
       }
+
       _notificationsPage = data['page'] as int;
       _notificationsTotalPages = data['pages'] as int;
+
+      if (notifications.isEmpty && page == 1) {
+        print('⚠️ [FETCH NOTIFICATIONS ViewModel] No notifications found');
+        _errorMessage = null; // Không show error nếu không có thông báo
+      }
     } catch (e) {
-      _errorMessage = 'Failed to fetch notifications: $e';
+      print('❌ [FETCH NOTIFICATIONS ViewModel] Error: $e');
+      _errorMessage = 'Lấy thông báo thất bại: $e';
     } finally {
       _isLoading = false;
       notifyListeners();
     }
   }
 
-  Future<void> removeNotification(String notificationId) async {
+  Future<void> markNotificationAsRead(String notificationId) async {
     try {
-      await _authService.deleteNotification(notificationId);
-      _notifications
-          .removeWhere((notification) => notification.id == notificationId);
-      notifyListeners();
+      print('🔵 [MARK AS READ ViewModel]');
+      print('   notificationId: $notificationId');
+
+      bool success = await _authService.markNotificationAsRead(notificationId);
+
+      if (success) {
+        final index = _notifications.indexWhere((n) => n.id == notificationId);
+        if (index != -1) {
+          _notifications[index] = _notifications[index].copyWith(read: true);
+          print('✅ [MARK AS READ ViewModel] Updated local state');
+          notifyListeners();
+        }
+      }
     } catch (e) {
-      _errorMessage = 'Failed to remove notification: $e';
+      print('❌ [MARK AS READ ViewModel] Error: $e');
+      _errorMessage = 'Không thể cập nhật thông báo: $e';
       notifyListeners();
     }
   }
 
-  Future<void> restoreNotification(NotificationModel notification) async {
+  Future<void> markAllNotificationsAsRead() async {
     try {
-      await fetchNotifications(page: 1);
-      if (!_notifications.any((n) => n.id == notification.id)) {
-        _notifications.add(notification);
+      print('🔵 [MARK ALL AS READ ViewModel]');
+
+      bool success = await _authService.markAllNotificationsAsRead();
+
+      if (success) {
+        for (var i = 0; i < _notifications.length; i++) {
+          _notifications[i] = _notifications[i].copyWith(read: true);
+        }
+        print('✅ [MARK ALL AS READ ViewModel] Updated all notifications');
         notifyListeners();
       }
     } catch (e) {
-      _errorMessage = 'Failed to restore notification: $e';
+      print('❌ [MARK ALL AS READ ViewModel] Error: $e');
+      _errorMessage = 'Không thể cập nhật: $e';
       notifyListeners();
     }
   }
+
+  Future<void> deleteNotification(String notificationId) async {
+    try {
+      print('🔵 [DELETE NOTIFICATION ViewModel]');
+      print('   notificationId: $notificationId');
+
+      bool success = await _authService.deleteNotification(notificationId);
+
+      if (success) {
+        _notifications.removeWhere((n) => n.id == notificationId);
+        print('✅ [DELETE NOTIFICATION ViewModel] Removed from list');
+        notifyListeners();
+      }
+    } catch (e) {
+      print('❌ [DELETE NOTIFICATION ViewModel] Error: $e');
+      _errorMessage = 'Không thể xóa thông báo: $e';
+      notifyListeners();
+    }
+  }
+
+  Future<int> getUnreadCount() async {
+    try {
+      return await _authService.getUnreadNotificationCount();
+    } catch (e) {
+      print('❌ [GET UNREAD COUNT ViewModel] Error: $e');
+      return 0;
+    }
+  }
+
+// ✅ Lấy danh sách thông báo đã xóa
+  Future<Map<String, dynamic>> getDeletedNotifications() async {
+    try {
+      print('🔵 [GET DELETED NOTIFICATIONS ViewModel]');
+
+      final result = await _authService.getDeletedNotifications();
+
+      print('✅ [GET DELETED NOTIFICATIONS ViewModel] count: ${result['count']}');
+
+      return result;
+    } catch (e) {
+      print('❌ [GET DELETED NOTIFICATIONS ViewModel] Error: $e');
+      return {'count': 0, 'data': []};
+    }
+  }
+
+// ✅ Hoàn tác thông báo RIÊNG LẺ
+  Future<bool> undoDeleteNotificationSingle(String notificationId) async {
+    try {
+      print('🔵 [UNDO DELETE SINGLE ViewModel]');
+      print('   notificationId: $notificationId');
+
+      bool success = await _authService.undoDeleteNotificationSingle(notificationId);
+
+      if (success) {
+        print('✅ [UNDO DELETE SINGLE ViewModel] Success');
+        await fetchNotifications(page: 1);
+        notifyListeners();
+        return true;
+      } else {
+        print('⚠️ [UNDO DELETE SINGLE ViewModel] Failed');
+        return false;
+      }
+    } catch (e) {
+      print('❌ [UNDO DELETE SINGLE ViewModel] Error: $e');
+      _errorMessage = 'Hoàn tác thất bại: $e';
+      notifyListeners();
+      rethrow;
+    }
+  }
+
+// ✅ Hoàn tác xóa tất cả
+  Future<bool> undoDeleteNotifications() async {
+    try {
+      print('🔵 [UNDO DELETE ALL NOTIFICATIONS ViewModel]');
+
+      bool success = await _authService.undoDeleteNotifications();
+
+      if (success) {
+        print('✅ [UNDO DELETE ALL NOTIFICATIONS ViewModel] Success');
+        await fetchNotifications(page: 1);
+        notifyListeners();
+        return true;
+      } else {
+        print('⚠️ [UNDO DELETE ALL NOTIFICATIONS ViewModel] Failed');
+        return false;
+      }
+    } catch (e) {
+      print('❌ [UNDO DELETE ALL NOTIFICATIONS ViewModel] Error: $e');
+      _errorMessage = 'Hoàn tác thất bại: $e';
+      notifyListeners();
+      rethrow;
+    }
+  }
+
+// ✅ Xóa vĩnh viễn
+  Future<bool> permanentDeleteFromUndo(String notificationId) async {
+    try {
+      print('🔵 [PERMANENT DELETE UNDO ViewModel]');
+      print('   notificationId: $notificationId');
+
+      bool success = await _authService.permanentDeleteFromUndo(notificationId);
+
+      if (success) {
+        print('✅ [PERMANENT DELETE UNDO ViewModel] Success');
+        // Reload deleted notifications
+        await getDeletedNotifications();
+        notifyListeners();
+        return true;
+      } else {
+        print('⚠️ [PERMANENT DELETE UNDO ViewModel] Failed');
+        return false;
+      }
+    } catch (e) {
+      print('❌ [PERMANENT DELETE UNDO ViewModel] Error: $e');
+      _errorMessage = 'Xóa vĩnh viễn thất bại: $e';
+      notifyListeners();
+      rethrow;
+    }
+  }
+
+
+  // ✅ Kiểm tra xem có thông báo hoàn tác không
+  Future<Map<String, dynamic>> checkUndoStatus() async {
+    try {
+      print('🔵 [CHECK UNDO STATUS ViewModel]');
+
+      final result = await _authService.checkUndoStatus();
+
+      print('✅ [CHECK UNDO STATUS ViewModel] hasUndo: ${result['hasUndo']} - undoCount: ${result['undoCount']}');
+
+      return result;
+    } catch (e) {
+      print('❌ [CHECK UNDO STATUS ViewModel] Error: $e');
+      return {'hasUndo': false, 'undoCount': 0};
+    }
+  }
+
+
 
   Future<void> deleteRental(String rentalId) async {
     _isLoading = true;

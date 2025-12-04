@@ -577,7 +577,7 @@ const geocodeAddressFree = async (address) => {
   }
 };
 
-router.get('/rentals/search', [sanitizeHeadersMiddleware], async (req, res) => { 
+router.get('/rentals/search', [sanitizeHeadersMiddleware], async (req, res) => {  
   try {
     const { search, minPrice, maxPrice, propertyType, status, page = 1, limit = 10 } = req.query;
     const propertyTypes = propertyType ? (Array.isArray(propertyType) ? propertyType : [propertyType]) : [];
@@ -1017,11 +1017,17 @@ router.patch('/rentals/:id', authMiddleware, upload.array('images'), async (req,
     }
 
     await syncRentalToElasticsearch(updatedRental);
+    
+    // ✅ QUAN TRỌNG: Trả về rental object với tất cả thông tin bao gồm _id
     res.json({
       message: updatedData.location?.coordinates?.coordinates[0] === 0 && updatedData.location?.coordinates?.coordinates[1] === 0 
         ? 'Rental updated successfully, but geocoding failed. Coordinates set to [0, 0]. Please update coordinates using /rentals/fix-coordinates/:id.'
         : 'Rental updated successfully',
-      rental: updatedRental,
+      rental: {
+        _id: updatedRental._id.toString(), // ✅ Thêm _id
+        id: updatedRental._id.toString(),  // ✅ Thêm id (alias)
+        ...updatedRental.toObject(),
+      },
     });
   } catch (err) {
     console.error('Error updating rental:', err);

@@ -1,0 +1,57 @@
+ABOUT US ROUTES
+
+GET,/aboutus,Public,Lấy nội dung About Us đang active
+
+GET,/admin/aboutus,Admin,Lấy danh sách tất cả About Us (admin)
+
+POST,/admin/aboutus,Admin + Upload,Tạo mới hoặc cập nhật About Us + ảnh
+
+DELETE,/admin/aboutus/:id/image,Admin,Xóa một ảnh trong About Us
+
+DELETE,/admin/aboutus/:id,Admin,Xóa hoàn toàn một bản About Us
+
+============================================================================================ < 
+
+FEEDBACK ROUTES - USER (Người dùng thông thường)
+
+
+POST,/feedback,User,"Gửi feedback mới (có thể đính kèm file, video, ảnh...)"
+
+GET,/feedback/my-feedback,User,Lấy danh sách feedback của chính mình
+
+DELETE,/feedback/:id,User,Xóa feedback của mình (có backup trong Redis 7 ngày)
+
+POST,/feedback/:id/restore,User,Hoàn tác feedback đã xóa (trong vòng 7 ngày)
+
+GET,/feedback/deleted/list,User,Xem danh sách feedback đã xóa của mình (có thể hoàn tác)
+
+DELETE,/feedback/:id/permanent,User,Xóa vĩnh viễn feedback (xóa luôn backup trong Redis)
+
+============================================================================================ < 
+
+FEEDBACK ROUTES - ADMIN (Quản trị viên)
+
+GET,/admin/feedback,Admin,"Lấy danh sách tất cả feedback (có phân trang, lọc theo loại, trạng thái)"
+
+PATCH,/admin/feedback/:id/status,Admin,Cập nhật trạng thái feedback + trả lời (gửi thông báo cho user)
+
+GET,/admin/feedback/stats,Admin,"Thống kê feedback (theo trạng thái, loại, rating trung bình...)"
+
+============================================================================================ < 
+
+Quản lý xóa & hoàn tác (Admin)
+
+DELETE,/admin/feedback/:id,Admin,Xóa feedback (có backup Redis 7 ngày)
+
+POST,/admin/feedback/:id/restore,Admin,Hoàn tác feedback đã xóa bởi admin
+
+GET,/admin/feedback/deleted/list,Admin,Xem tất cả feedback đã xóa (của mọi người)
+
+DELETE,/admin/feedback/:id/permanent,Admin,Xóa vĩnh viễn feedback (xóa backup Redis)
+
+============================================================================================ < 
+
+Debug / Tool (Admin)
+
+GET,/admin/user-notifications/:userId,Admin,Xem danh sách thông báo của một user cụ thể (dùng để debug)
+

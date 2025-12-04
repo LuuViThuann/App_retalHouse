@@ -1,0 +1,25 @@
+ADMIN - QUẢN LÝ NGƯỜI DÙNG (Chỉ Admin)
+
+GET,/admin/users,Admin,"Lấy danh sách người dùng (phân trang, trả avatar nhỏ <500KB)"
+GET,/admin/users/:id,Admin,Lấy chi tiết một người dùng (trả luôn avatar đầy đủ)
+GET,/admin/users/:id/avatar,Admin,Lấy riêng avatarBase64 của người dùng (dùng khi ảnh lớn)
+PUT,/admin/users/:id/avatar,Admin,Cập nhật ảnh đại diện (đồng bộ MongoDB + Firestore)
+PUT,/admin/users/:id,Admin,"Cập nhật thông tin người dùng: username, email, phone, role (đồng bộ cả MongoDB + Firestore)"
+DELETE,/admin/users/:id,Admin,Xóa người dùng hoàn toàn (xóa MongoDB + Firestore + Firebase Auth)
+
+
+==============
+
+AUTH & USER PROFILE (Public / User)
+
+Method,Route,Quyền truy cập,Mô tả
+POST,/register,Public,"Đăng ký tài khoản mới (bắt buộc avatar, phone, address...)"
+POST,/login,Public,Đăng nhập bằng Firebase ID Token → trả thông tin user + role
+POST,/send-reset-email,Public,Gửi email đặt lại mật khẩu (Firebase Auth)
+POST,/reset-password,Public,Xác nhận mã OOB và đặt lại mật khẩu
+POST,/send-otp,Public,Gửi mã OTP qua email (dùng EmailJS)
+POST,/verify-otp,Public,Xác minh OTP (có thể kèm đổi mật khẩu)
+POST,/change-password,User (có token),Đổi mật khẩu khi đã đăng nhập
+POST,/update-profile,User (có token),"Cập nhật thông tin cá nhân: phone, address, username (đồng bộ MongoDB + Firestore)"
+POST,/upload-image,User (có token),Upload ảnh đại diện (lưu vào MongoDB)
+GET,/user/:id/avatar,User (chính chủ),Lấy avatarBase64 của chính mình

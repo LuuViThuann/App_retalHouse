@@ -5,7 +5,7 @@ const mongoose = require('mongoose');
 const admin = require('firebase-admin');
 const Rental = require('../models/Rental');
 const { Comment, Reply } = require('../models/comments');
-const Notification = require('../models/notification');
+
 
 // Authentication middleware
 const authMiddleware = async (req, res, next) => {
@@ -361,53 +361,6 @@ router.get('/my-posts-comments', authMiddleware, async (req, res) => {
 });
 
 
-router.get('/notifications', authMiddleware, async (req, res) => {
-  try {
-    const { page = 1, limit = 10 } = req.query;
-    const skip = (Number(page) - 1) * Number(limit);
 
-    const [notifications, total] = await Promise.all([
-      Notification.find({ userId: req.userId })
-        .populate('rentalId', 'title')
-        .populate('userId', 'avatarBase64 username')
-        .sort({ createdAt: -1 })
-        .skip(skip)
-        .limit(Number(limit))
-        .lean(),
-      Notification.countDocuments({ userId: req.userId }),
-    ]);
 
-    const adjustedNotifications = notifications.map(notification => ({
-      ...adjustTimestamps(notification),
-      isRead: notification.isRead || false,
-    }));
-
-    res.json({
-      notifications: adjustedNotifications,
-      total,
-      page: Number(page),
-      pages: Math.ceil(total / Number(limit)),
-    });
-  } catch (err) {
-    console.error('Fetch notifications error:', err.stack);
-    res.status(500).json({ message: 'Failed to fetch notifications', error: err.message });
-  }
-});
-
-// Delete notification
-router.delete('/notifications/:id', authMiddleware, async (req, res) => {
-  try {
-    const { id } = req.params;
-    const notification = await Notification.findOne({ _id: id, userId: req.userId });
-    if (!notification) {
-      return res.status(404).json({ message: 'Notification not found or unauthorized' });
-    }
-
-    await Notification.findByIdAndDelete(id);
-    res.json({ message: 'Notification deleted successfully' });
-  } catch (err) {
-    console.error('Delete notification error:', err);
-    res.status(500).json({ message: 'Failed to delete notification', error: err.message });
-  }
-});
 module.exports = router;

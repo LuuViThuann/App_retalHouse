@@ -9,7 +9,7 @@ const notificationSchema = new mongoose.Schema({
   },
   type: {
     type: String,
-    enum: ['rental_approved', 'rental_rejected', 'rental_deleted', 'comment', 'message'],
+    enum: ['rental_approved', 'rental_rejected', 'rental_deleted', 'comment', 'message', 'feedback_response'],
     required: true,
   },
   title: {

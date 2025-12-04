@@ -7,27 +7,24 @@ import 'package:flutter_rentalhouse/Widgets/Favorite/favorite_rental.dart';
 import 'package:flutter_rentalhouse/Widgets/HomeMain/PropertyType_house.dart';
 import 'package:flutter_rentalhouse/Widgets/HomeMain/all_rental.dart';
 import 'package:flutter_rentalhouse/Widgets/Rental/RentalCardHorizontal.dart';
+import 'package:flutter_rentalhouse/config/navigator.dart';
 import 'package:flutter_rentalhouse/models/rental.dart';
 import 'package:flutter_rentalhouse/services/chat_ai_service.dart';
 import 'package:flutter_rentalhouse/services/rental_service.dart';
 import 'package:flutter_rentalhouse/utils/rental_filter.dart';
 import 'package:flutter_rentalhouse/viewmodels/vm_auth.dart';
-import 'package:flutter_rentalhouse/viewmodels/vm_chat.dart';
 import 'package:flutter_rentalhouse/viewmodels/vm_favorite.dart';
 import 'package:flutter_rentalhouse/viewmodels/vm_rental.dart';
 import 'package:flutter_rentalhouse/views/Admin/Service/banner.dart';
 import 'package:flutter_rentalhouse/views/Admin/Widget/HomeMain/News_home.dart';
 import 'package:flutter_rentalhouse/views/Admin/model/banner.dart';
-import 'package:flutter_rentalhouse/views/chat_user.dart';
 import 'package:flutter_rentalhouse/views/favorite_view.dart';
 import 'package:flutter_rentalhouse/views/login_view.dart';
-import 'package:flutter_rentalhouse/views/my_profile_view.dart';
 import 'package:flutter_rentalhouse/views/rental_detail_view.dart';
 import 'package:flutter_rentalhouse/views/search_rental.dart';
 import 'package:provider/provider.dart';
 import 'package:shimmer/shimmer.dart';
 import '../models/user.dart';
-import 'main_list_cart_home.dart';
 import 'package:intl/intl.dart';
 import '../config/api_routes.dart';
 import 'package:http/http.dart' as http;
@@ -43,6 +40,8 @@ class _HomeContentState extends State<HomeContent> {
   final TextEditingController _searchController = TextEditingController();
   final PageController _bannerController = PageController();
   final BannerService _bannerService = BannerService();
+  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
+  int _unreadNotificationCount = 0;
 
   List<dynamic> provinces = [];
   List<BannerModel> banners = [];
@@ -50,6 +49,7 @@ class _HomeContentState extends State<HomeContent> {
   bool isLoadingBanners = true;
   late ValueNotifier<int> _currentBannerIndex;
   Timer? _bannerTimer;
+  Timer? _notificationTimer;
 
   RentalFilter filter = const RentalFilter();
 
@@ -63,12 +63,17 @@ class _HomeContentState extends State<HomeContent> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final authViewModel = Provider.of<AuthViewModel>(context, listen: false);
       final favoriteViewModel =
-          Provider.of<FavoriteViewModel>(context, listen: false);
+      Provider.of<FavoriteViewModel>(context, listen: false);
+      final rentalViewModel = Provider.of<RentalViewModel>(context, listen: false);
 
       if (authViewModel.currentUser != null) {
         final token = authViewModel.currentUser!.token ?? '';
         if (token.isNotEmpty) {
           favoriteViewModel.fetchFavorites(token);
+
+          rentalViewModel.refreshAllRentals();
+          _loadUnreadCount();
+          _startNotificationTimer();
         }
       }
     });
@@ -84,7 +89,7 @@ class _HomeContentState extends State<HomeContent> {
           isLoadingProvinces = false;
 
           final canTho = data.firstWhere(
-            (p) => p['name'] == 'Cần Thơ',
+                (p) => p['name'] == 'Cần Thơ',
             orElse: () => null,
           );
 
@@ -112,18 +117,41 @@ class _HomeContentState extends State<HomeContent> {
     }
   }
 
+  Future<void> _loadUnreadCount() async {
+    try {
+      final authViewModel = Provider.of<AuthViewModel>(context, listen: false);
+      final count = await authViewModel.getUnreadCount();
+      if (mounted) {
+        setState(() {
+          _unreadNotificationCount = count;
+        });
+      }
+    } catch (e) {
+      debugPrint('Lỗi tải số thông báo: $e');
+    }
+  }
+
+  void _startNotificationTimer() {
+    _notificationTimer?.cancel();
+    _notificationTimer = Timer.periodic(const Duration(seconds: 30), (timer) {
+      if (mounted) {
+        _loadUnreadCount();
+      }
+    });
+  }
+
   void _startBannerAutoScroll() {
     _bannerTimer?.cancel();
     if (banners.isEmpty) return;
 
-    _bannerTimer = Timer.periodic(const Duration(seconds: 2), (timer) {
+    _bannerTimer = Timer.periodic(const Duration(seconds: 7), (timer) {
       if (!mounted || !_bannerController.hasClients) return;
 
       try {
         final nextPage = (_currentBannerIndex.value + 1) % banners.length;
         _bannerController.animateToPage(
           nextPage,
-          duration: const Duration(milliseconds: 600),
+          duration: const Duration(milliseconds: 1),
           curve: Curves.easeInOut,
         );
       } catch (e) {
@@ -142,7 +170,7 @@ class _HomeContentState extends State<HomeContent> {
 
   void clearAllFilters() {
     final canTho = provinces.firstWhere(
-      (p) => p['name'] == 'Cần Thơ',
+          (p) => p['name'] == 'Cần Thơ',
       orElse: () => null,
     );
     setState(() {
@@ -154,7 +182,7 @@ class _HomeContentState extends State<HomeContent> {
     final now = DateTime.now();
     final thisMonthRentals = vm.rentals
         .where((r) =>
-            r.createdAt.year == now.year && r.createdAt.month == now.month)
+    r.createdAt.year == now.year && r.createdAt.month == now.month)
         .toList();
 
     return filter.apply(rentals: thisMonthRentals).take(5).toList();
@@ -164,6 +192,7 @@ class _HomeContentState extends State<HomeContent> {
   void dispose() {
     _searchController.dispose();
     _bannerTimer?.cancel();
+    _notificationTimer?.cancel();
     _bannerController.dispose();
     _currentBannerIndex.dispose();
     super.dispose();
@@ -171,12 +200,352 @@ class _HomeContentState extends State<HomeContent> {
 
   String formatCurrency(double amount) {
     final formatter =
-        NumberFormat.currency(locale: 'vi_VN', symbol: '₫', decimalDigits: 0);
+    NumberFormat.currency(locale: 'vi_VN', symbol: '₫', decimalDigits: 0);
     return formatter.format(amount);
   }
 
+  Widget _buildDrawer(BuildContext context, AuthViewModel authViewModel) {
+    final AppUser? user = authViewModel.currentUser;
+
+    ImageProvider avatarImage = const AssetImage('assets/img/imageuser.jpg');
+    if (user != null &&
+        user.avatarBase64 != null &&
+        user.avatarBase64!.isNotEmpty) {
+      try {
+        final bytes = base64Decode(user.avatarBase64!);
+        avatarImage = MemoryImage(bytes);
+      } catch (e) {
+        debugPrint('Error decoding avatar: $e');
+      }
+    }
+
+    return Drawer(
+      child: Container(
+        color: Colors.grey[50],
+        child: Column(
+          children: [
+            // Header Drawer - Style ngân hàng
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.fromLTRB(24, 60, 24, 32),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.05),
+                    blurRadius: 10,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: Colors.blue[700]!,
+                        width: 2,
+                      ),
+                    ),
+                    child: CircleAvatar(
+                      radius: 32,
+                      backgroundImage: avatarImage,
+                      backgroundColor: Colors.grey[200],
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          user?.username ?? 'Tên người dùng',
+                          style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFF1A1A1A),
+                            letterSpacing: -0.5,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          user?.email ?? 'Email@gmail.com',
+                          style: TextStyle(
+                            color: Colors.grey[600],
+                            fontSize: 13,
+                            letterSpacing: -0.2,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            // Menu Items
+            Expanded(
+              child: ListView(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                children: [
+                  // Tài khoản Section
+                  _buildSectionHeader('TÀI KHOẢN'),
+                  _buildModernMenuItem(
+                    icon: Icons.person_outline_rounded,
+                    text: 'Thông tin cá nhân',
+                    iconColor: Colors.blue[700]!,
+                    onTap: () {
+                      Navigator.pop(context);
+                      AppNavigator.goToProfile(context);
+                    },
+                  ),
+                  _buildModernMenuItem(
+                    icon: Icons.lock_outline_rounded,
+                    text: 'Thay đổi mật khẩu',
+                    iconColor: Colors.orange[700]!,
+                    onTap: () {
+                      Navigator.pop(context);
+                      AppNavigator.goToChangePassword(context);
+                    },
+                  ),
+
+                  // Hoạt động Section
+                  _buildSectionHeader('HOẠT ĐỘNG'),
+                  _buildModernMenuItem(
+                    icon: Icons.notifications_none_rounded,
+                    text: 'Thông báo',
+                    iconColor: Colors.purple[700]!,
+                    trailing: _unreadNotificationCount > 0
+                        ? _buildBadge(_unreadNotificationCount.toString())
+                        : null,
+                    onTap: () {
+                      Navigator.pop(context);
+                      AppNavigator.goToNotification(context);
+                      // Reload count khi quay lại
+                      Future.delayed(const Duration(milliseconds: 500), () {
+                        if (mounted) _loadUnreadCount();
+                      });
+                    },
+                  ),
+                  _buildModernMenuItem(
+                    icon: Icons.article_outlined,
+                    text: 'Bài đăng của tôi',
+                    iconColor: Colors.green[700]!,
+                    onTap: () {
+                      Navigator.pop(context);
+                      AppNavigator.goToPosts(context);
+                    },
+                  ),
+                  _buildModernMenuItem(
+                    icon: Icons.chat_bubble_outline_rounded,
+                    text: 'Bình luận gần đây',
+                    iconColor: Colors.teal[700]!,
+                    onTap: () {
+                      Navigator.pop(context);
+                      AppNavigator.goToComments(context);
+                    },
+                  ),
+                  _buildModernMenuItem(
+                    icon: Icons.bookmark_border_rounded,
+                    text: 'Tin tức đã lưu',
+                    iconColor: Colors.amber[700]!,
+                    onTap: () {
+                      Navigator.pop(context);
+                      AppNavigator.goToNewsSave(context);
+                    },
+                  ),
+
+                  // Hỗ trợ Section
+                  _buildSectionHeader('HỖ TRỢ'),
+                  _buildModernMenuItem(
+                    icon: Icons.info_outline_rounded,
+                    text: 'Về chúng tôi',
+                    iconColor: Colors.indigo[700]!,
+                    onTap: () {
+                      Navigator.pop(context);
+                      AppNavigator.goToAboutUs(context);
+                    },
+                  ),
+                  _buildModernMenuItem(
+                    icon: Icons.feedback_outlined,
+                    text: 'Góp ý & Phản hồi',
+                    iconColor: Colors.pink[700]!,
+                    onTap: () {
+                      Navigator.pop(context);
+                      AppNavigator.goToresponUser(context);
+                    },
+                  ),
+
+                  const SizedBox(height: 8),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: Divider(color: Colors.grey[300], height: 1),
+                  ),
+                  const SizedBox(height: 8),
+
+                  _buildModernMenuItem(
+                    icon: Icons.logout_rounded,
+                    text: 'Đăng xuất',
+                    iconColor: Colors.red[600]!,
+                    textColor: Colors.red[600]!,
+                    onTap: () {
+                      Navigator.pop(context);
+                      _showLogoutDialog(context, authViewModel);
+                    },
+                  ),
+                  const SizedBox(height: 16),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSectionHeader(String title) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(24, 16, 24, 8),
+      child: Text(
+        title,
+        style: TextStyle(
+          fontSize: 11,
+          fontWeight: FontWeight.w600,
+          color: Colors.grey[600],
+          letterSpacing: 0.5,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildModernMenuItem({
+    required IconData icon,
+    required String text,
+    required Color iconColor,
+    Color? textColor,
+    Widget? trailing,
+    required VoidCallback onTap,
+  }) {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      decoration: const BoxDecoration(
+        color: Colors.white,
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            child: Row(
+              children: [
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: iconColor.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(
+                    icon,
+                    color: iconColor,
+                    size: 22,
+                  ),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Text(
+                    text,
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w500,
+                      color: textColor ?? const Color(0xFF1A1A1A),
+                      letterSpacing: -0.2,
+                    ),
+                  ),
+                ),
+                if (trailing != null)
+                  trailing
+                else
+                  Icon(
+                    Icons.chevron_right_rounded,
+                    color: Colors.grey[400],
+                    size: 20,
+                  ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildBadge(String count) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      decoration: BoxDecoration(
+        color: Colors.red[500],
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Text(
+        count,
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 11,
+          fontWeight: FontWeight.bold,
+        ),
+      ),
+    );
+  }
+
+  void _showLogoutDialog(BuildContext context, AuthViewModel authViewModel) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          backgroundColor: Colors.white,
+          title: const Text('Xác nhận đăng xuất'),
+          content: const Text('Bạn có chắc chắn muốn đăng xuất?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Hủy'),
+            ),
+            TextButton(
+              onPressed: () {
+                authViewModel.logout();
+                Navigator.pop(context);
+                if (authViewModel.errorMessage == null) {
+                  Navigator.pushReplacement(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const LoginScreen(),
+                    ),
+                  );
+                } else {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(authViewModel.errorMessage!),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                }
+              },
+              child: const Text(
+                'Đăng xuất',
+                style: TextStyle(color: Colors.red),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   Widget _buildBannerSlider() {
-    // Loading state
     if (isLoadingBanners) {
       return Shimmer.fromColors(
         baseColor: Colors.grey[300]!,
@@ -192,7 +561,6 @@ class _HomeContentState extends State<HomeContent> {
       );
     }
 
-    // Nếu không có ảnh hiển thị mặc đinh ====================
     if (banners.isEmpty) {
       return Container(
         height: MediaQuery.of(context).size.height * 0.22,
@@ -208,14 +576,13 @@ class _HomeContentState extends State<HomeContent> {
             errorBuilder: (_, __, ___) => Container(
               color: Colors.grey[300],
               child:
-                  const Icon(Icons.broken_image, size: 50, color: Colors.grey),
+              const Icon(Icons.broken_image, size: 50, color: Colors.grey),
             ),
           ),
         ),
       );
     }
 
-    // Banner Slider
     return Stack(
       children: [
         Container(
@@ -245,7 +612,6 @@ class _HomeContentState extends State<HomeContent> {
                   child: Stack(
                     fit: StackFit.expand,
                     children: [
-                      // Image
                       CachedNetworkImage(
                         imageUrl: fullImageUrl,
                         fit: BoxFit.cover,
@@ -260,7 +626,6 @@ class _HomeContentState extends State<HomeContent> {
                               size: 50, color: Colors.grey),
                         ),
                       ),
-
                       if (banner.title.isNotEmpty)
                         Positioned(
                           bottom: 0,
@@ -315,7 +680,6 @@ class _HomeContentState extends State<HomeContent> {
             },
           ),
         ),
-        // Dots indicator - sử dụng ValueNotifier để tránh rebuild toàn bộ layout
         Positioned(
           bottom: 10,
           left: 0,
@@ -327,7 +691,7 @@ class _HomeContentState extends State<HomeContent> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: List.generate(
                   banners.length,
-                  (index) => AnimatedContainer(
+                      (index) => AnimatedContainer(
                     duration: const Duration(milliseconds: 300),
                     margin: const EdgeInsets.symmetric(horizontal: 4),
                     width: currentIndex == index ? 24 : 8,
@@ -361,7 +725,7 @@ class _HomeContentState extends State<HomeContent> {
         Column(
           children: List.generate(
               2,
-              (_) => const Padding(
+                  (_) => const Padding(
                   padding: EdgeInsets.only(bottom: 12),
                   child: RentalItemShimmer())),
         ),
@@ -400,7 +764,7 @@ class _HomeContentState extends State<HomeContent> {
                   child: Row(mainAxisSize: MainAxisSize.min, children: [
                     Text('Xem tất cả',
                         style:
-                            TextStyle(fontSize: 14, color: Colors.blue[700])),
+                        TextStyle(fontSize: 14, color: Colors.blue[700])),
                     const SizedBox(width: 4),
                     Icon(Icons.arrow_forward,
                         size: 14, color: Colors.blue[700]),
@@ -420,13 +784,13 @@ class _HomeContentState extends State<HomeContent> {
                   future: fav.rental != null
                       ? Future.value(fav.rental)
                       : RentalService().fetchRentalById(
-                          rentalId: fav.rentalId,
-                          token:
-                              Provider.of<AuthViewModel>(context, listen: false)
-                                      .currentUser
-                                      ?.token ??
-                                  '',
-                        ),
+                    rentalId: fav.rentalId,
+                    token:
+                    Provider.of<AuthViewModel>(context, listen: false)
+                        .currentUser
+                        ?.token ??
+                        '',
+                  ),
                   builder: (context, snapshot) {
                     if (snapshot.connectionState == ConnectionState.waiting)
                       return const RentalItemShimmer();
@@ -499,7 +863,7 @@ class _HomeContentState extends State<HomeContent> {
               children: [
                 Container(
                   padding:
-                      const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
                         colors: [Colors.blue[600]!, Colors.blue[800]!]),
@@ -524,7 +888,7 @@ class _HomeContentState extends State<HomeContent> {
                             borderRadius: BorderRadius.circular(10)),
                         child: const Text("●",
                             style:
-                                TextStyle(color: Colors.white, fontSize: 10)),
+                            TextStyle(color: Colors.white, fontSize: 10)),
                       ),
                     ],
                   ]),
@@ -579,23 +943,23 @@ class _HomeContentState extends State<HomeContent> {
         const SizedBox(height: 10),
         filteredRentals.isEmpty
             ? const Center(
-                child: Padding(
-                  padding: EdgeInsets.all(20),
-                  child: Text('Không có bài đăng phù hợp!',
-                      style: TextStyle(fontSize: 16, color: Colors.grey)),
-                ),
-              )
+          child: Padding(
+            padding: EdgeInsets.all(20),
+            child: Text('Không có bài đăng phù hợp!',
+                style: TextStyle(fontSize: 16, color: Colors.grey)),
+          ),
+        )
             : SizedBox(
-                height: 280,
-                child: ListView.separated(
-                  scrollDirection: Axis.horizontal,
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  itemCount: filteredRentals.length,
-                  separatorBuilder: (_, __) => const SizedBox(width: 12),
-                  itemBuilder: (context, index) =>
-                      RentalCardHorizontal(rental: filteredRentals[index]),
-                ),
-              ),
+          height: 280,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            itemCount: filteredRentals.length,
+            separatorBuilder: (_, __) => const SizedBox(width: 12),
+            itemBuilder: (context, index) =>
+                RentalCardHorizontal(rental: filteredRentals[index]),
+          ),
+        ),
         const SizedBox(height: 20),
       ],
     );
@@ -650,7 +1014,7 @@ class _HomeContentState extends State<HomeContent> {
           borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
       builder: (_) => Padding(
         padding:
-            EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+        EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
         child: DraggableScrollableSheet(
           expand: false,
           initialChildSize: 0.7,
@@ -690,10 +1054,10 @@ class _HomeContentState extends State<HomeContent> {
                   itemCount: type == 'province'
                       ? provinces.length
                       : type == 'property'
-                          ? RentalFilter.propertyTypes.length
-                          : type == 'area'
-                              ? RentalFilter.areaOptions.length
-                              : RentalFilter.priceOptions.length,
+                      ? RentalFilter.propertyTypes.length
+                      : type == 'area'
+                      ? RentalFilter.areaOptions.length
+                      : RentalFilter.priceOptions.length,
                   itemBuilder: (context, index) {
                     dynamic item;
                     String display;
@@ -713,7 +1077,7 @@ class _HomeContentState extends State<HomeContent> {
                     }
 
                     final bool isSelected = (type == 'province' &&
-                            filter.selectedProvince?['name'] == display) ||
+                        filter.selectedProvince?['name'] == display) ||
                         (type == 'property' &&
                             filter.selectedPropertyType == display) ||
                         (type == 'area' &&
@@ -726,7 +1090,7 @@ class _HomeContentState extends State<HomeContent> {
                           ? const Icon(Icons.check_circle, color: Colors.blue)
                           : const Icon(Icons.circle_outlined),
                       title:
-                          Text(display, style: const TextStyle(fontSize: 16)),
+                      Text(display, style: const TextStyle(fontSize: 16)),
                       onTap: () {
                         setState(() {
                           if (type == 'province') {
@@ -794,7 +1158,7 @@ class _HomeContentState extends State<HomeContent> {
 
   @override
   Widget build(BuildContext context) {
-    final rentalViewModel = Provider.of<RentalViewModel>(context);
+    final rentalViewModel = Provider.of<RentalViewModel>(context, listen: true);
     final authViewModel = Provider.of<AuthViewModel>(context);
 
     final AppUser? user = authViewModel.currentUser;
@@ -833,12 +1197,15 @@ class _HomeContentState extends State<HomeContent> {
     ];
 
     return Scaffold(
+      key: _scaffoldKey,
       backgroundColor: Colors.grey[50],
+      drawer: _buildDrawer(context, authViewModel),
+      drawerEdgeDragWidth: 0,
       body: SafeArea(
         child: SingleChildScrollView(
           child: Padding(
             padding:
-                const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+            const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -871,8 +1238,7 @@ class _HomeContentState extends State<HomeContent> {
                       ),
                     ),
                     GestureDetector(
-                      onTap: () => Navigator.push(context,
-                          MaterialPageRoute(builder: (_) => MyProfileView())),
+                      onTap: () => _scaffoldKey.currentState?.openDrawer(),
                       child: CircleAvatar(
                           radius: 24,
                           backgroundImage: avatarImage,
@@ -887,32 +1253,63 @@ class _HomeContentState extends State<HomeContent> {
                     hintText: 'Nhập thông tin tìm kiếm...',
                     hintStyle: TextStyle(color: Colors.grey[500]),
                     prefixIcon: Icon(Icons.search, color: Colors.grey[600]),
-                    suffixIcon: GestureDetector(
-                      onTap: () => Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                              builder: (_) => const SearchScreen())),
-                      child: Container(
-                          margin: const EdgeInsets.all(4),
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(
+                    suffixIcon: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        GestureDetector(
+                          onTap: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (_) => const SearchScreen()),
+                          ),
+                          child: Container(
+                            margin: const EdgeInsets.symmetric(horizontal: 4),
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
                               color: Colors.teal[50],
-                              borderRadius: BorderRadius.circular(10)),
-                          child: Icon(Icons.tune, color: Colors.blue[700])),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Icon(Icons.tune, color: Colors.blue[700], size: 25),
+                          ),
+                        ),
+                        GestureDetector(
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(builder: (_) => Container()),
+                            );
+                          },
+                          child: Container(
+                            margin: const EdgeInsets.symmetric(horizontal: 4),
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: Colors.blue[700],
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: const Icon(
+                              Icons.map_outlined,
+                              color: Colors.white,
+                              size: 25,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                     filled: true,
                     fillColor: Colors.grey[100],
                     border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide.none),
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide.none,
+                    ),
+                    contentPadding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
                   ),
                   onSubmitted: (value) {
                     if (value.trim().isNotEmpty) {
                       Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                              builder: (_) =>
-                                  SearchScreen(initialSearchQuery: value)));
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => SearchScreen(initialSearchQuery: value),
+                        ),
+                      );
                     }
                   },
                 ),
@@ -929,7 +1326,7 @@ class _HomeContentState extends State<HomeContent> {
                         Row(
                             children: List.generate(
                                 3,
-                                (i) => _buildCategoryItem(
+                                    (i) => _buildCategoryItem(
                                     propertyIcons[i],
                                     propertyTypes[i],
                                     context,
@@ -938,7 +1335,7 @@ class _HomeContentState extends State<HomeContent> {
                         Row(
                             children: List.generate(
                                 3,
-                                (i) => _buildCategoryItem(
+                                    (i) => _buildCategoryItem(
                                     propertyIcons[i + 3],
                                     propertyTypes[i + 3],
                                     context,
@@ -959,7 +1356,7 @@ class _HomeContentState extends State<HomeContent> {
                           const SizedBox(height: 16),
                           const Text('Vui lòng đăng nhập để xem bài đăng',
                               style:
-                                  TextStyle(fontSize: 16, color: Colors.grey)),
+                              TextStyle(fontSize: 16, color: Colors.grey)),
                           const SizedBox(height: 20),
                           ElevatedButton(
                             style: ElevatedButton.styleFrom(
@@ -981,12 +1378,12 @@ class _HomeContentState extends State<HomeContent> {
                 else if (rentalViewModel.isLoading)
                   _buildShimmerLoading()
                 else if (rentalViewModel.errorMessage != null)
-                  Center(
-                      child: Text('Lỗi: ${rentalViewModel.errorMessage}',
-                          style: const TextStyle(color: Colors.red)))
-                else
-                  _buildLatestPostsSection(),
-                  const NewsHighlightSection(),
+                    Center(
+                        child: Text('Lỗi: ${rentalViewModel.errorMessage}',
+                            style: const TextStyle(color: Colors.red)))
+                  else
+                    _buildLatestPostsSection(),
+                const NewsHighlightSection(),
               ],
             ),
           ),
@@ -1002,7 +1399,7 @@ class _HomeContentState extends State<HomeContent> {
                 isScrollControlled: true,
                 shape: const RoundedRectangleBorder(
                     borderRadius:
-                        BorderRadius.vertical(top: Radius.circular(25))),
+                    BorderRadius.vertical(top: Radius.circular(25))),
                 builder: (_) => const ChatAIBottomSheet(
                     apiKey: 'AIzaSyCwwXFPAOFpxKy4OnujJ6lpxkoHb9VBTq4'),
               );

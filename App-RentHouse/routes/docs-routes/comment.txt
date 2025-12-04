@@ -1,0 +1,41 @@
+
+GET,/comments/:rentalId,Public,Lấy danh sách bình luận + trả lời dạng cây (nested replies) + like của một nhà trọ,"Query: ?page=1&limit=5 
+ Phân trang, tự động +7h, trả kèm avatar + username + likes"
+
+POST,/comments,User (auth) + Upload,Tạo bình luận mới (có thể kèm ảnh + đánh giá sao),"Body: rentalId, content, rating (optional) 
+ Files: images[]"
+
+PUT,/comments/:commentId,User (chính chủ) + Upload,Sửa bình luận (nội dung + thêm/xóa ảnh),"Body: content, imagesToRemove (array URL) 
+ Files: images[] để thêm ảnh mới"
+
+DELETE,/comments/:commentId,User (chính chủ),Xóa bình luận + xóa luôn tất cả reply + like bên dưới,Xóa cascade toàn bộ dữ liệu liên quan
+
+POST,/comments/:commentId/replies,User (auth) + Upload,Trả lời bình luận (hỗ trợ trả lời lồng nhau – parentReplyId),"Body: content, parentReplyId (optional) 
+ Files: images[]"
+
+PUT,/comments/:commentId/replies/:replyId,User (chính chủ) + Upload,Sửa trả lời (nội dung + thêm/xóa ảnh),"Body: content, imagesToRemove 
+ Files: images[]"
+
+DELETE,/comments/:commentId/replies/:replyId,User (chính chủ),Xóa trả lời (xóa cả các trả lời con bên dưới),Xóa cascade theo cây
+
+POST,/comments/:commentId/like,User (auth),Thích bình luận (toggle like/unlike),"Tự động toggle, trả về toàn bộ comment đã cập nhật"
+
+DELETE,/comments/:commentId/unlike,User (auth),Bỏ thích bình luận,
+
+POST,/comments/:commentId/replies/:replyId/like,User (auth),Thích trả lời (toggle),
+
+DELETE,/comments/:commentId/replies/:replyId/unlike,User (auth),Bỏ thích trả lời,
+
+=========================
+
+Tính năng,Chi tiết
+Nested Replies (cây trả lời),"Hỗ trợ trả lời lồng nhau không giới hạn cấp độ, xây dựng cây tự động bằng buildReplyTree"
+Realtime Socket.IO,"10+ sự kiện realtime: newComment, updateComment, deleteComment, newReply, updateReply, deleteReply, likeComment, unlikeComment, likeReply, unlikeReply"
+Like hệ thống chung,Một model LikeComment dùng chung cho cả Comment và Reply → dễ mở rộng
+Toggle Like/Unlike,Gọi 1 endpoint → tự động like hoặc unlike nếu đã like trước đó
+Upload ảnh bình luận & trả lời,"Giới hạn 100MB (có thể giảm), lưu vào /Uploads/"
+Xóa cascade hoàn chỉnh,"Xóa comment → xóa hết reply + like 
+ Xóa reply → xóa hết reply con + like"
+Tự động +7 giờ (UTC+7),Mọi createdAt đều được cộng 7 tiếng để hiển thị đúng giờ Việt Nam
+Populate avatar + username,Lấy từ MongoDB User model → hiển thị đầy đủ thông tin người dùng
+Phân trang bình luận,Hiệu suất cao dù có hàng nghìn bình luận

@@ -1,0 +1,14 @@
+
+
+GET,/banners,Public,Lấy danh sách banner đang active (sắp xếp theo position),"Trả về mảng banner (có imageUrl, title, link…)"
+
+GET,/banners/admin,Admin,Lấy tất cả banner (kể cả không active) – dùng quản trị,Cần token admin
+
+POST,/banners,Admin + Upload,Tạo mới banner,"multipart/form-data 
+• image (file ảnh) 
+• title (bắt buộc) 
+• description, link, isActive, position (tùy chọn)"
+
+PUT,/banners/:id,Admin + Upload,Cập nhật banner (có thể thay ảnh mới),Nếu có image mới → tự động xóa ảnh cũ trên disk
+
+DELETE,/banners/:id,Admin,Xóa banner + xóa luôn file ảnh trên server,Xóa cả document và file vật lý

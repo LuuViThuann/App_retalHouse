@@ -1,0 +1,31 @@
+
+GET,/news,Public,"Lấy danh sách tin tức công khai (isActive = true), có phân trang","?page=1&limit=10 
+ Sắp xếp: featured trước → mới nhất sau"
+
+GET,/news/featured,Public,Lấy tin tức nổi bật (featured + active),?limit=3 mặc định
+GET,/news/:id,Public,Lấy chi tiết 1 tin tức → tự động tăng views +1,Tăng views realtime
+GET,/news/user/saved-articles,User (auth),"Lấy danh sách tin tức đã lưu của user hiện tại, có phân trang",Giữ nguyên thứ tự lưu gần nhất
+POST,/news/:newsId/save,User (auth),Lưu tin tức vào danh sách yêu thích,Kiểm tra trùng → không cho lưu lại
+DELETE,/news/:newsId/unsave,User (auth),Bỏ lưu tin tức,
+GET,/news/:newsId/is-saved,User (auth),Kiểm tra xem user đã lưu tin này chưa,Trả về { isSaved: true/false }
+
+GET,/news/admin/all,Admin,"Lấy tất cả tin tức (kể cả không active), dùng quản trị",Phân trang
+
+POST,/news,Admin + Upload,Tạo tin tức mới,"multipart/form-data 
+ image (bắt buộc), title, content, summary, featured, category…"
+
+PUT,/news/:id,Admin + Upload,Cập nhật tin tức (có thể thay ảnh → tự động xóa ảnh cũ),Nếu có ảnh mới → xóa ảnh cũ trên disk
+DELETE,/news/:id,Admin,Xóa tin tức + xóa luôn file ảnh trên server,
+
+==================
+
+Chi tiết các tính năng : 
+
+Phân quyền rõ ràng,Public / User / Admin được tách biệt hoàn toàn
+Upload ảnh tin tức,"Giới hạn 10MB, chỉ chấp nhận JPEG/JPG/PNG/WebP, lưu vào Uploads/news/"
+Tự động xóa ảnh cũ,Khi cập nhật hoặc xóa tin tức → xóa luôn file ảnh cũ tránh rác trên server
+Hệ thống lưu bài (Saved Articles),"Model riêng SavedArticle → dễ quản lý, phân trang, kiểm tra trạng thái lưu, giữ thứ tự lưu"
+Tăng views tự động,Mỗi lần xem chi tiết → tăng views +1 (dùng $inc)
+Tin tức nổi bật,Trường featured + sắp xếp ưu tiên
+Tự động tạo summary,Nếu không nhập summary → lấy 100 ký tự đầu của title
+Phân trang toàn diện,"Cả public, saved articles và admin đều có phân trang chuẩn"

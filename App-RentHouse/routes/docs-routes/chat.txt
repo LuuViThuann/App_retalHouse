@@ -1,0 +1,34 @@
+
+POST,/conversations,User (auth),Tạo hoặc lấy cuộc trò chuyện giữa người thuê và chủ nhà dựa trên rentalId + landlordId,"Body: { rentalId, landlordId } 
+ Tự động tạo nếu chưa tồn tại, trả về conversation + thông tin người kia + rental"
+
+GET,/conversations,User (auth),Lấy danh sách tất cả các cuộc trò chuyện của người dùng hiện tại (có cache Redis 1h),"Trả về mảng conversation đã được enrich (avatar, username, lastMessage, unreadCount, rental info)"
+
+DELETE,/conversations/:conversationId,User (auth),Xóa hoàn toàn một cuộc trò chuyện (cả tin nhắn bên trong),Xóa cả Message + Conversation + xóa cache Redis + emit Socket.IO deleteConversation
+
+GET,/messages/:conversationId,User (auth),"Lấy tin nhắn trong một conversation (phân trang bằng cursor, mặc định 10 tin)","Query: ?cursor=...&limit=10 
+ Đánh dấu đã đọc (unread = 0) + cache Redis"
+
+POST,/messages,User (auth) + Upload,Gửi tin nhắn (text + ảnh) vào một conversation,"multipart/form-data 
+ Body: conversationId, content (optional) 
+ Files: images[] (max 20MB tổng)"
+
+DELETE,/messages/:messageId,User (auth),Xóa tin nhắn của chính mình,"Chỉ được xóa tin của mình 
+ Cập nhật lại lastMessage nếu cần + emit deleteMessage"
+ 
+PATCH,/messages/:messageId,User (auth) + Upload,"Sửa tin nhắn (thay nội dung, thêm ảnh, xóa ảnh)","Body: content, removeImages (JSON array URL) 
+ Files: images[] để thêm ảnh mới"
+
+ ======================
+
+ Tính năng,Chi tiết
+Xác thực đa nền tảng,Hỗ trợ cả Firebase Auth token và Google Sign-In token (OAuth2)
+Cache thông minh,Redis cache user data (24h) + danh sách conversation (1h) → giảm tải Firestore/MongoDB
+Realtime với Socket.IO,"receiveMessage, updateMessage, deleteMessage, updateConversation, deleteConversation"
+Unread count,"Dùng Map trong MongoDB → tăng/giảm chính xác, tự động reset khi người dùng xem tin nhắn"
+Tự động enrich dữ liệu,Lấy avatar + username từ Firestore + MongoDB + Rental.contactInfo (fallback nhiều lớp)
+Điều chỉnh múi giờ +7,Tự động cộng 7 giờ cho createdAt/updatedAt (Việt Nam)
+Phân trang tin nhắn bằng cursor,"Load more cũ → mới, hiệu suất cao"
+Upload ảnh tin nhắn,"Max 20MB, lưu vào /Uploads/, trả về URL đầy đủ"
+Sửa tin nhắn linh hoạt,"Thêm/xóa ảnh, sửa nội dung"
+Xóa conversation triệt để,Xóa cả tin nhắn + document + thông báo realtime cho cả 2 bên
