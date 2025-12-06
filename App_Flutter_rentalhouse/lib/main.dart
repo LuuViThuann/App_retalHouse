@@ -9,11 +9,13 @@ import 'package:flutter_rentalhouse/viewmodels/vm_rental.dart';
 import 'package:flutter_rentalhouse/views/Admin/ViewModel/admin_viewmodel.dart';
 import 'package:flutter_rentalhouse/views/login_view.dart';
 import 'package:flutter_rentalhouse/views/welcome.dart';
-import 'package:flutter_rentalhouse/views/reset_password.dart'; // Thêm import ResetPasswordScreen
+import 'package:flutter_rentalhouse/views/reset_password.dart';
 import 'package:provider/provider.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await dotenv.load(fileName: "assets/.env");
   await Firebase.initializeApp();
   runApp(RentalApp());
 }

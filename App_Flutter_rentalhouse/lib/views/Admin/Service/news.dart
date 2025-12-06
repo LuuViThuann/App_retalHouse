@@ -71,9 +71,9 @@ class NewsService {
   }) async {
     final uri = Uri.parse('${ApiRoutes.news}?page=$page&limit=$limit');
     final response = await http.get(uri, headers: await _headers()).timeout(
-          const Duration(seconds: 30),
-          onTimeout: () => throw Exception('Timeout'),
-        );
+      const Duration(seconds: 30),
+      onTimeout: () => throw Exception('Timeout'),
+    );
 
     if (response.statusCode == 200) {
       return jsonDecode(utf8.decode(response.bodyBytes));
@@ -85,9 +85,9 @@ class NewsService {
   Future<List<dynamic>> fetchFeaturedNews({int limit = 3}) async {
     final uri = Uri.parse('${ApiRoutes.featuredNews}?limit=$limit');
     final response = await http.get(uri, headers: await _headers()).timeout(
-          const Duration(seconds: 30),
-          onTimeout: () => throw Exception('Timeout'),
-        );
+      const Duration(seconds: 30),
+      onTimeout: () => throw Exception('Timeout'),
+    );
 
     if (response.statusCode == 200) {
       return jsonDecode(utf8.decode(response.bodyBytes)) as List;
@@ -99,9 +99,9 @@ class NewsService {
   Future<Map<String, dynamic>> fetchNewsDetail(String newsId) async {
     final uri = Uri.parse(ApiRoutes.newsById(newsId));
     final response = await http.get(uri, headers: await _headers()).timeout(
-          const Duration(seconds: 30),
-          onTimeout: () => throw Exception('Timeout'),
-        );
+      const Duration(seconds: 30),
+      onTimeout: () => throw Exception('Timeout'),
+    );
 
     if (response.statusCode == 200) {
       return jsonDecode(utf8.decode(response.bodyBytes));
@@ -118,23 +118,19 @@ class NewsService {
     try {
       final uri = Uri.parse(ApiRoutes.saveArticle(newsId));
       print('Saving article: $uri');
-      print('NewsId: $newsId');
 
       final headers = await _headers(requireAuth: true);
-      print('Headers: $headers');
-
       final response = await http
           .post(
-            uri,
-            headers: headers,
-          )
+        uri,
+        headers: headers,
+      )
           .timeout(
-            const Duration(seconds: 30),
-            onTimeout: () => throw Exception('Timeout'),
-          );
+        const Duration(seconds: 30),
+        onTimeout: () => throw Exception('Timeout'),
+      );
 
       print('Save response status: ${response.statusCode}');
-      print('Save response body: ${response.body}');
 
       if (response.statusCode == 201) {
         return;
@@ -145,9 +141,6 @@ class NewsService {
         throw Exception('Token hết hạn, vui lòng đăng nhập lại');
       } else if (response.statusCode == 404) {
         throw Exception('Tin tức không tồn tại');
-      } else if (response.statusCode == 500) {
-        final error = jsonDecode(response.body);
-        throw Exception('Lỗi server: ${error['message'] ?? 'Không xác định'}');
       }
       throw Exception('Không thể lưu tin tức (${response.statusCode})');
     } catch (e) {
@@ -165,16 +158,13 @@ class NewsService {
       final headers = await _headers(requireAuth: true);
       final response = await http
           .delete(
-            uri,
-            headers: headers,
-          )
+        uri,
+        headers: headers,
+      )
           .timeout(
-            const Duration(seconds: 30),
-            onTimeout: () => throw Exception('Timeout'),
-          );
-
-      print('Unsave response status: ${response.statusCode}');
-      print('Unsave response body: ${response.body}');
+        const Duration(seconds: 30),
+        onTimeout: () => throw Exception('Timeout'),
+      );
 
       if (response.statusCode == 200) {
         return;
@@ -182,9 +172,6 @@ class NewsService {
         throw Exception('Token hết hạn');
       } else if (response.statusCode == 404) {
         throw Exception('Tin tức không tồn tại');
-      } else if (response.statusCode == 500) {
-        final error = jsonDecode(response.body);
-        throw Exception('Lỗi server: ${error['message'] ?? 'Không xác định'}');
       }
       throw Exception('Không thể bỏ lưu tin tức (${response.statusCode})');
     } catch (e) {
@@ -197,28 +184,20 @@ class NewsService {
   Future<bool> checkIsSaved(String newsId) async {
     try {
       final uri = Uri.parse(ApiRoutes.checkIsSaved(newsId));
-      print('Checking if saved: $uri');
-
       final headers = await _headers(requireAuth: true);
       final response = await http
           .get(
-            uri,
-            headers: headers,
-          )
+        uri,
+        headers: headers,
+      )
           .timeout(
-            const Duration(seconds: 30),
-            onTimeout: () => throw Exception('Timeout'),
-          );
-
-      print('Check saved response status: ${response.statusCode}');
-      print('Check saved response body: ${response.body}');
+        const Duration(seconds: 30),
+        onTimeout: () => throw Exception('Timeout'),
+      );
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         return data['isSaved'] ?? false;
-      } else if (response.statusCode == 401) {
-        print('Token hết hạn khi kiểm tra');
-        return false;
       }
       return false;
     } catch (e) {
@@ -234,30 +213,24 @@ class NewsService {
   }) async {
     try {
       final uri =
-          Uri.parse('${ApiRoutes.savedArticles}?page=$page&limit=$limit');
+      Uri.parse('${ApiRoutes.savedArticles}?page=$page&limit=$limit');
       print('Fetching saved articles: $uri');
 
       final headers = await _headers(requireAuth: true);
       final response = await http
           .get(
-            uri,
-            headers: headers,
-          )
+        uri,
+        headers: headers,
+      )
           .timeout(
-            const Duration(seconds: 30),
-            onTimeout: () => throw Exception('Timeout'),
-          );
-
-      print('Fetch saved articles response status: ${response.statusCode}');
-      print('Response body: ${response.body}');
+        const Duration(seconds: 30),
+        onTimeout: () => throw Exception('Timeout'),
+      );
 
       if (response.statusCode == 200) {
         return jsonDecode(utf8.decode(response.bodyBytes));
       } else if (response.statusCode == 401) {
         throw Exception('Token hết hạn, vui lòng đăng nhập lại');
-      } else if (response.statusCode == 500) {
-        final error = jsonDecode(response.body);
-        throw Exception('Lỗi server: ${error['message'] ?? 'Không xác định'}');
       }
       throw Exception('Tải tin tức đã lưu thất bại (${response.statusCode})');
     } catch (e) {
@@ -266,9 +239,9 @@ class NewsService {
     }
   }
 
-  // ====================== ADMIN APIs (yêu cầu đăng nhập + quyền admin) ======================
+  // ====================== ADMIN APIs ======================
 
-  /// Admin: Lấy tất cả tin tức (kể cả chưa active)
+  /// Admin: Lấy tất cả tin tức
   Future<Map<String, dynamic>> fetchAllNewsAdmin({
     int page = 1,
     int limit = 20,
@@ -276,13 +249,13 @@ class NewsService {
     final uri = Uri.parse('${ApiRoutes.adminNews}?page=$page&limit=$limit');
     final response = await http
         .get(
-          uri,
-          headers: await _headers(requireAuth: true),
-        )
+      uri,
+      headers: await _headers(requireAuth: true),
+    )
         .timeout(
-          const Duration(seconds: 30),
-          onTimeout: () => throw Exception('Timeout'),
-        );
+      const Duration(seconds: 30),
+      onTimeout: () => throw Exception('Timeout'),
+    );
 
     if (response.statusCode == 200) {
       return jsonDecode(utf8.decode(response.bodyBytes));
@@ -294,17 +267,24 @@ class NewsService {
     throw Exception('Tải danh sách tin tức thất bại');
   }
 
-  /// Admin: Tạo tin tức mới
+  /// Admin: Tạo tin tức mới (multiple images)
   Future<Map<String, dynamic>> createNews({
     required String title,
     required String content,
     required String summary,
-    required File imageFile,
+    required List<File> imageFiles, // Thay đổi: danh sách file
     String author = 'Admin',
     String category = 'Tin tức',
     bool featured = false,
   }) async {
-    await _validateImageFile(imageFile);
+    if (imageFiles.isEmpty) {
+      throw Exception('Vui lòng chọn ít nhất 1 ảnh');
+    }
+
+    // Validate tất cả file
+    for (var file in imageFiles) {
+      await _validateImageFile(file);
+    }
 
     final request = http.MultipartRequest(
       'POST',
@@ -325,18 +305,20 @@ class NewsService {
       'featured': featured.toString(),
     });
 
-    // File ảnh
-    final mimeType = _determineMimeType(imageFile.path);
-    request.files.add(await http.MultipartFile.fromPath(
-      'image',
-      imageFile.path,
-      contentType: MediaType.parse(mimeType),
-    ));
+    // Thêm tất cả ảnh
+    for (var imageFile in imageFiles) {
+      final mimeType = _determineMimeType(imageFile.path);
+      request.files.add(await http.MultipartFile.fromPath(
+        'images', // Thay đổi: 'images' (plural)
+        imageFile.path,
+        contentType: MediaType.parse(mimeType),
+      ));
+    }
 
     final streamedResponse = await request.send().timeout(
-          const Duration(seconds: 60),
-          onTimeout: () => throw Exception('Upload timeout'),
-        );
+      const Duration(seconds: 60),
+      onTimeout: () => throw Exception('Upload timeout'),
+    );
     final response = await http.Response.fromStream(streamedResponse);
 
     if (response.statusCode == 201) {
@@ -352,7 +334,7 @@ class NewsService {
     throw Exception('Tạo tin tức thất bại (${response.statusCode})');
   }
 
-  /// Admin: Cập nhật tin tức
+  /// Admin: Cập nhật tin tức (multiple images)
   Future<Map<String, dynamic>> updateNews({
     required String newsId,
     required String title,
@@ -362,9 +344,13 @@ class NewsService {
     String category = 'Tin tức',
     required bool featured,
     required bool isActive,
-    File? imageFile,
+    List<File>? imageFiles, // Thay đổi: danh sách file
   }) async {
-    if (imageFile != null) await _validateImageFile(imageFile);
+    if (imageFiles != null && imageFiles.isNotEmpty) {
+      for (var file in imageFiles) {
+        await _validateImageFile(file);
+      }
+    }
 
     final request = http.MultipartRequest(
       'PUT',
@@ -383,19 +369,22 @@ class NewsService {
       'isActive': isActive.toString(),
     });
 
-    if (imageFile != null) {
-      final mimeType = _determineMimeType(imageFile.path);
-      request.files.add(await http.MultipartFile.fromPath(
-        'image',
-        imageFile.path,
-        contentType: MediaType.parse(mimeType),
-      ));
+    // Thêm ảnh nếu có
+    if (imageFiles != null && imageFiles.isNotEmpty) {
+      for (var imageFile in imageFiles) {
+        final mimeType = _determineMimeType(imageFile.path);
+        request.files.add(await http.MultipartFile.fromPath(
+          'images',
+          imageFile.path,
+          contentType: MediaType.parse(mimeType),
+        ));
+      }
     }
 
     final streamedResponse = await request.send().timeout(
-          const Duration(seconds: 60),
-          onTimeout: () => throw Exception('Upload timeout'),
-        );
+      const Duration(seconds: 60),
+      onTimeout: () => throw Exception('Upload timeout'),
+    );
     final response = await http.Response.fromStream(streamedResponse);
 
     if (response.statusCode == 200) {
@@ -415,13 +404,13 @@ class NewsService {
     final uri = Uri.parse(ApiRoutes.newsById(newsId));
     final response = await http
         .delete(
-          uri,
-          headers: await _headers(requireAuth: true),
-        )
+      uri,
+      headers: await _headers(requireAuth: true),
+    )
         .timeout(
-          const Duration(seconds: 30),
-          onTimeout: () => throw Exception('Timeout'),
-        );
+      const Duration(seconds: 30),
+      onTimeout: () => throw Exception('Timeout'),
+    );
 
     if (response.statusCode == 200) {
       return;

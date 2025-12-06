@@ -1,6 +1,21 @@
+
+/***
+ * - Đưa các much lưu ảnh sau vòa cloud :
+ * - Ảnh đại diện user
+ * - Ảnh bài viết
+ * - Ảnh about us
+ * - Ảnh banner
+ * - Ảnh news
+ * - Ảnh trong feedback
+
+ * **/
+
+
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 class ApiRoutes {
+
   static const String rootUrl =
-      'http://192.168.1.55:3000'; // 192.168.43.168 - mạng dữ liệu
+      'http://192.168.1.215:3000'; // 192.168.43.168 - mạng dữ liệu
   static const String baseUrl = '$rootUrl/api';
   static const String serverBaseUrl = rootUrl;
   static const String socketUrl = serverBaseUrl;
@@ -240,4 +255,13 @@ class ApiRoutes {
       Uri.parse('$baseUrlAddress/p/$provinceCode?depth=2');
   static Uri getWards(String districtCode) =>
       Uri.parse('$baseUrlAddress/d/$districtCode?depth=2');
+
+  static String get openAIApiKey {
+    final key = dotenv.env['OPENAI_API_KEY'];
+    if (key == null || key.isEmpty) {
+      throw Exception('OPENAI_API_KEY không được tìm thấy trong .env');
+    }
+    return key;
+  }
+
 }

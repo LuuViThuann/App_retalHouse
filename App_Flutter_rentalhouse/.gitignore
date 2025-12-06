@@ -45,3 +45,6 @@ app.*.map.json
 
 #Ignore cursor AI rules
 .cursor\rules\codacy.mdc
+
+# .gitignore
+/assets/.env

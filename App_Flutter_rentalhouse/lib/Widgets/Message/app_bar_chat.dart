@@ -192,11 +192,7 @@ class _ChatAppBarState extends State<ChatAppBar> with TickerProviderStateMixin {
     return AppBar(
       flexibleSpace: Container(
         decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: [Colors.blue[600]!, Colors.blue[800]!],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
+         color: Colors.blue[700],
           boxShadow: [
             BoxShadow(
               color: Colors.black.withOpacity(0.2),

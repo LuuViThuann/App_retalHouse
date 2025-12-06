@@ -28,6 +28,7 @@ import '../models/user.dart';
 import 'package:intl/intl.dart';
 import '../config/api_routes.dart';
 import 'package:http/http.dart' as http;
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 class HomeContent extends StatefulWidget {
   const HomeContent({super.key});
@@ -41,7 +42,7 @@ class _HomeContentState extends State<HomeContent> {
   final PageController _bannerController = PageController();
   final BannerService _bannerService = BannerService();
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
-  int _unreadNotificationCount = 0;
+  late ValueNotifier<int> _unreadNotificationCount;
 
   List<dynamic> provinces = [];
   List<BannerModel> banners = [];
@@ -57,6 +58,7 @@ class _HomeContentState extends State<HomeContent> {
   void initState() {
     super.initState();
     _currentBannerIndex = ValueNotifier<int>(0);
+    _unreadNotificationCount = ValueNotifier<int>(0);
     fetchProvinces();
     fetchBanners();
 
@@ -121,13 +123,17 @@ class _HomeContentState extends State<HomeContent> {
     try {
       final authViewModel = Provider.of<AuthViewModel>(context, listen: false);
       final count = await authViewModel.getUnreadCount();
+
       if (mounted) {
-        setState(() {
-          _unreadNotificationCount = count;
-        });
+
+        _unreadNotificationCount.value = count;
+        debugPrint('📊 Updated notification count: $count');
       }
     } catch (e) {
-      debugPrint('Lỗi tải số thông báo: $e');
+      debugPrint('❌ Lỗi tải số thông báo: $e');
+      if (mounted) {
+        _unreadNotificationCount.value = 0;
+      }
     }
   }
 
@@ -195,6 +201,7 @@ class _HomeContentState extends State<HomeContent> {
     _notificationTimer?.cancel();
     _bannerController.dispose();
     _currentBannerIndex.dispose();
+    _unreadNotificationCount.dispose();
     super.dispose();
   }
 
@@ -318,13 +325,15 @@ class _HomeContentState extends State<HomeContent> {
                     icon: Icons.notifications_none_rounded,
                     text: 'Thông báo',
                     iconColor: Colors.purple[700]!,
-                    trailing: _unreadNotificationCount > 0
-                        ? _buildBadge(_unreadNotificationCount.toString())
-                        : null,
+                    trailing: ValueListenableBuilder<int>(
+                      valueListenable: _unreadNotificationCount,
+                      builder: (context, count, child) {
+                        return count > 0 ? _buildBadge(count.toString()) : const SizedBox.shrink();
+                      },
+                    ),
                     onTap: () {
                       Navigator.pop(context);
                       AppNavigator.goToNotification(context);
-                      // Reload count khi quay lại
                       Future.delayed(const Duration(milliseconds: 500), () {
                         if (mounted) _loadUnreadCount();
                       });
@@ -1265,10 +1274,10 @@ class _HomeContentState extends State<HomeContent> {
                             margin: const EdgeInsets.symmetric(horizontal: 4),
                             padding: const EdgeInsets.all(8),
                             decoration: BoxDecoration(
-                              color: Colors.teal[50],
+                              color: Colors.blue[700],
                               borderRadius: BorderRadius.circular(10),
                             ),
-                            child: Icon(Icons.tune, color: Colors.blue[700], size: 25),
+                            child: Icon(Icons.tune, color: Colors.white, size: 25),
                           ),
                         ),
                         GestureDetector(
@@ -1389,31 +1398,47 @@ class _HomeContentState extends State<HomeContent> {
           ),
         ),
       ),
+      // ========================= NÚT CHAT AI ======================================
       floatingActionButton: Column(
         mainAxisAlignment: MainAxisAlignment.end,
         children: [
           RawMaterialButton(
             onPressed: () {
+              final apiKey = dotenv.env['OPENAI_API_KEY'] ?? '';
+
+              if (apiKey.isEmpty) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('API Key không tồn tại!')),
+                );
+                return;
+              }
+
               showModalBottomSheet(
                 context: context,
                 isScrollControlled: true,
                 shape: const RoundedRectangleBorder(
-                    borderRadius:
-                    BorderRadius.vertical(top: Radius.circular(25))),
-                builder: (_) => const ChatAIBottomSheet(
-                    apiKey: 'AIzaSyCwwXFPAOFpxKy4OnujJ6lpxkoHb9VBTq4'),
+                  borderRadius: BorderRadius.vertical(top: Radius.circular(25)),
+                ),
+                builder: (_) => ChatAIBottomSheet(apiKey: ApiRoutes.openAIApiKey),
               );
             },
             constraints: const BoxConstraints.tightFor(width: 145, height: 145),
             shape: const CircleBorder(),
             child: ClipOval(
-                child: Image.asset('assets/img/chatbox.png',
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => const Icon(Icons.broken_image,
-                        size: 40, color: Colors.grey))),
+              child: Image.asset(
+                'assets/img/chatbox.png',
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) => const Icon(
+                  Icons.broken_image,
+                  size: 40,
+                  color: Colors.grey,
+                ),
+              ),
+            ),
           ),
         ],
       ),
+      // ==========================================================================
     );
   }
 

@@ -1,15 +1,13 @@
-// lib/views/Admin/screens/manage_news_screen.dart
-
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_rentalhouse/config/api_routes.dart';
+import 'package:flutter_rentalhouse/utils/Snackbar_process.dart';
 import 'package:flutter_rentalhouse/utils/loadingDialog.dart';
 import 'package:flutter_rentalhouse/views/Admin/Service/news.dart';
+import 'package:flutter_rentalhouse/views/Admin/View/AddNewScreen.dart';
 import 'package:flutter_rentalhouse/views/Admin/View/NewsDetailScreen.dart';
 import 'package:flutter_rentalhouse/views/Admin/Widget/HomeMain/EditNew.dart';
 import 'package:flutter_rentalhouse/views/Admin/model/news.dart';
-import 'package:image_picker/image_picker.dart';
-import 'package:rich_editor/rich_editor.dart';
 import 'package:shimmer/shimmer.dart';
 
 class ManageNewsScreen extends StatefulWidget {
@@ -19,10 +17,13 @@ class ManageNewsScreen extends StatefulWidget {
   State<ManageNewsScreen> createState() => _ManageNewsScreenState();
 }
 
-class _ManageNewsScreenState extends State<ManageNewsScreen> {
+class _ManageNewsScreenState extends State<ManageNewsScreen> with AutomaticKeepAliveClientMixin {
   final NewsService _newsService = NewsService();
   List<NewsModel> newsList = [];
   bool isLoading = false;
+
+  @override
+  bool get wantKeepAlive => true;
 
   @override
   void initState() {
@@ -44,16 +45,55 @@ class _ManageNewsScreenState extends State<ManageNewsScreen> {
             .toList();
       });
     } catch (e) {
-      _showSnackBar('Lỗi tải tin tức: ${e.toString()}', isError: true);
+      if (mounted) {
+        AppSnackBar.show(
+          context,
+          AppSnackBar.error(message: 'Lỗi tải tin tức: ${e.toString()}'),
+        );
+      }
     } finally {
       if (mounted) setState(() => isLoading = false);
     }
+  }
+
+  // Fetch trong background không làm giật màn hình
+  Future<void> _silentRefresh() async {
+    try {
+      final result = await _newsService.fetchAllNewsAdmin(page: 1, limit: 50);
+      if (!mounted) return;
+
+      setState(() {
+        newsList = (result['data'] as List)
+            .map((e) => NewsModel.fromJson(e as Map<String, dynamic>))
+            .toList();
+      });
+    } catch (e) {
+      debugPrint('Silent refresh error: $e');
+    }
+  }
+
+  // Cập nhật item trong danh sách
+  void _updateNewsInList(NewsModel updatedNews) {
+    final index = newsList.indexWhere((n) => n.id == updatedNews.id);
+    if (index != -1) {
+      setState(() {
+        newsList[index] = updatedNews;
+      });
+    }
+  }
+
+  // Thêm item vào đầu danh sách
+  void _addNewsToList(NewsModel newNews) {
+    setState(() {
+      newsList.insert(0, newNews);
+    });
   }
 
   Future<void> _deleteNews(String newsId) async {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
+        backgroundColor: Colors.white,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: const Text('Xóa tin tức'),
         content: const Text(
@@ -73,32 +113,104 @@ class _ManageNewsScreenState extends State<ManageNewsScreen> {
 
     if (confirm != true) return;
 
-    setState(() => isLoading = true);
     try {
       await _newsService.deleteNews(newsId);
-      _showSnackBar('Xóa tin tức thành công');
-      _fetchNews();
+
+      if (mounted) {
+        // Xóa khỏi danh sách ngay lập tức
+        setState(() {
+          newsList.removeWhere((n) => n.id == newsId);
+        });
+
+        AppSnackBar.show(
+          context,
+          AppSnackBar.success(message: 'Xóa tin tức thành công'),
+        );
+      }
     } catch (e) {
-      _showSnackBar('Xóa thất bại: ${e.toString()}', isError: true);
-    } finally {
-      if (mounted) setState(() => isLoading = false);
+      if (mounted) {
+        AppSnackBar.show(
+          context,
+          AppSnackBar.error(message: 'Xóa thất bại: ${e.toString()}'),
+        );
+      }
     }
   }
 
-  void _showSnackBar(String message, {bool isError = false}) {
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: isError ? Colors.red : Colors.green,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+  Future<void> _navigateToEdit(NewsModel news) async {
+    final result = await Navigator.push<Map<String, dynamic>>(
+      context,
+      PageRouteBuilder(
+        pageBuilder: (context, animation, secondaryAnimation) => EditNewsScreen(
+          news: news,
+          onNewsUpdated: () {},
+        ),
+        transitionsBuilder: (context, animation, secondaryAnimation, child) {
+          const begin = Offset(1.0, 0.0);
+          const end = Offset.zero;
+          const curve = Curves.easeInOut;
+          var tween = Tween(begin: begin, end: end).chain(CurveTween(curve: curve));
+          return SlideTransition(
+            position: animation.drive(tween),
+            child: child,
+          );
+        },
+        transitionDuration: const Duration(milliseconds: 300),
       ),
     );
+
+    // Chỉ cập nhật khi có thay đổi thực sự
+    if (result != null && result['success'] == true && mounted) {
+      final updatedNews = result['news'] as NewsModel?;
+      if (updatedNews != null) {
+        _updateNewsInList(updatedNews);
+
+        // Fetch trong background để đồng bộ
+        Future.delayed(const Duration(milliseconds: 800), () {
+          if (mounted) _silentRefresh();
+        });
+      }
+    }
+  }
+
+  Future<void> _navigateToAdd() async {
+    final result = await Navigator.push<Map<String, dynamic>>(
+      context,
+      PageRouteBuilder(
+        pageBuilder: (context, animation, secondaryAnimation) => AddNewsScreen(
+          onNewsAdded: () {},
+        ),
+        transitionsBuilder: (context, animation, secondaryAnimation, child) {
+          const begin = Offset(0.0, 1.0);
+          const end = Offset.zero;
+          const curve = Curves.easeInOut;
+          var tween = Tween(begin: begin, end: end).chain(CurveTween(curve: curve));
+          return SlideTransition(
+            position: animation.drive(tween),
+            child: child,
+          );
+        },
+        transitionDuration: const Duration(milliseconds: 300),
+      ),
+    );
+
+    // Chỉ cập nhật khi có thay đổi thực sự
+    if (result != null && result['success'] == true && mounted) {
+      final newNews = result['news'] as NewsModel?;
+      if (newNews != null) {
+        _addNewsToList(newNews);
+
+        // Fetch trong background để đồng bộ
+        Future.delayed(const Duration(milliseconds: 800), () {
+          if (mounted) _silentRefresh();
+        });
+      }
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    super.build(context); // QUAN TRỌNG: Phải gọi super.build cho AutomaticKeepAliveClientMixin
     return Scaffold(
       backgroundColor: Colors.grey[50],
       appBar: AppBar(
@@ -117,26 +229,21 @@ class _ManageNewsScreenState extends State<ManageNewsScreen> {
       body: isLoading && newsList.isEmpty
           ? _buildShimmerLoading()
           : newsList.isEmpty
-              ? _buildEmptyState()
-              : RefreshIndicator(
-                  onRefresh: _fetchNews,
-                  child: ListView.builder(
-                    padding: const EdgeInsets.all(16),
-                    itemCount: newsList.length,
-                    itemBuilder: (context, index) =>
-                        _buildNewsCard(newsList[index]),
-                  ),
-                ),
+          ? _buildEmptyState()
+          : RefreshIndicator(
+        onRefresh: _fetchNews,
+        child: ListView.builder(
+          padding: const EdgeInsets.all(16),
+          itemCount: newsList.length,
+          itemBuilder: (context, index) =>
+              _buildNewsCard(newsList[index]),
+        ),
+      ),
       floatingActionButton: FloatingActionButton(
         backgroundColor: Colors.blue[700],
         elevation: 6,
         child: const Icon(Icons.add, color: Colors.white),
-        onPressed: () => Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (_) => AddNewsScreen(onNewsAdded: _fetchNews),
-          ),
-        ),
+        onPressed: _navigateToAdd,
       ),
     );
   }
@@ -191,7 +298,7 @@ class _ManageNewsScreenState extends State<ManageNewsScreen> {
               ),
             ),
 
-            // === NÚT XEM CHI TIẾT - DỄ BẤM NHẤT ===
+            // === NÚT XEM CHI TIẾT ===
             Positioned(
               top: 12,
               left: 12,
@@ -199,13 +306,13 @@ class _ManageNewsScreenState extends State<ManageNewsScreen> {
                 onPressed: () => _viewNewsDetail(news),
                 icon: const Icon(Icons.visibility, size: 18),
                 label:
-                    const Text('Xem chi tiết', style: TextStyle(fontSize: 13)),
+                const Text('Xem chi tiết', style: TextStyle(fontSize: 13)),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.white,
                   foregroundColor: Colors.blue[700],
                   elevation: 4,
                   padding:
-                      const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                  const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                   shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(20)),
                 ),
@@ -215,10 +322,10 @@ class _ManageNewsScreenState extends State<ManageNewsScreen> {
             // === Tag nổi bật ===
             Positioned(
               top: 12,
-              right: 80, // để chừa chỗ cho menu
+              right: 80,
               child: Container(
                 padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                 decoration: BoxDecoration(
                   color: news.featured
                       ? Colors.orange.shade600
@@ -243,7 +350,7 @@ class _ManageNewsScreenState extends State<ManageNewsScreen> {
               ),
             ),
 
-            // === Menu Chỉnh sửa / Xóa (giờ dễ bấm hơn nhờ icon lớn) ===
+            // === Menu Chỉnh sửa / Xóa ===
             Positioned(
               top: 8,
               right: 8,
@@ -251,6 +358,7 @@ class _ManageNewsScreenState extends State<ManageNewsScreen> {
                 color: Colors.black.withOpacity(0.4),
                 borderRadius: BorderRadius.circular(30),
                 child: PopupMenuButton<String>(
+                  color: Colors.white,
                   padding: const EdgeInsets.all(12),
                   icon: const Icon(Icons.more_vert,
                       color: Colors.white, size: 28),
@@ -274,13 +382,7 @@ class _ManageNewsScreenState extends State<ManageNewsScreen> {
                   ],
                   onSelected: (value) {
                     if (value == 'edit') {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => EditNewsScreen(
-                              news: news, onNewsUpdated: _fetchNews),
-                        ),
-                      );
+                      _navigateToEdit(news);
                     } else if (value == 'delete') {
                       _deleteNews(news.id);
                     }
@@ -333,7 +435,6 @@ class _ManageNewsScreenState extends State<ManageNewsScreen> {
   void _viewNewsDetail(NewsModel news) async {
     AppLoadingDialog.show(context, message: 'Đang mở tin tức...');
 
-    // Đợi chút để animation mượt
     await Future.delayed(const Duration(milliseconds: 400));
 
     if (!mounted) {
@@ -344,8 +445,7 @@ class _ManageNewsScreenState extends State<ManageNewsScreen> {
     await Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) =>
-            NewsDetailView(news: news), // Dùng chung trang chi tiết người dùng
+        builder: (_) => NewsDetailView(news: news),
       ),
     );
 
@@ -390,271 +490,6 @@ class _ManageNewsScreenState extends State<ManageNewsScreen> {
           ),
         ),
       ),
-    );
-  }
-}
-
-// ===================== ADD NEWS SCREEN =====================
-class AddNewsScreen extends StatefulWidget {
-  final VoidCallback onNewsAdded;
-  const AddNewsScreen({required this.onNewsAdded, super.key});
-
-  @override
-  State<AddNewsScreen> createState() => _AddNewsScreenState();
-}
-
-class _AddNewsScreenState extends State<AddNewsScreen> {
-  final NewsService _newsService = NewsService();
-  final ImagePicker _picker = ImagePicker();
-
-  File? selectedImage;
-  final titleController = TextEditingController();
-  final summaryController = TextEditingController();
-  final authorController = TextEditingController(text: 'Admin');
-  final categoryController = TextEditingController(text: 'Tin tức');
-
-  final GlobalKey<RichEditorState> _editorKey = GlobalKey<RichEditorState>();
-  bool featured = false;
-  bool isLoading = false;
-
-  Future<void> _pickImage() async {
-    final picked =
-        await _picker.pickImage(source: ImageSource.gallery, imageQuality: 85);
-    if (picked != null) {
-      setState(() => selectedImage = File(picked.path));
-    }
-  }
-
-  void _showSnackBar(String msg, {bool isError = false}) {
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(msg),
-        backgroundColor: isError ? Colors.red : Colors.green,
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
-  }
-
-  Future<void> _createNews() async {
-    final title = titleController.text.trim();
-    if (title.isEmpty)
-      return _showSnackBar('Vui lòng nhập tiêu đề', isError: true);
-    if (selectedImage == null)
-      return _showSnackBar('Vui lòng chọn ảnh', isError: true);
-
-    final html = await _editorKey.currentState?.getHtml();
-    if (html == null ||
-        html.trim().isEmpty ||
-        html == '<br>' ||
-        html == '<p><br></p>') {
-      return _showSnackBar('Vui lòng nhập nội dung bài viết', isError: true);
-    }
-
-    setState(() => isLoading = true);
-
-    try {
-      final defaultSummary =
-          title.length > 120 ? '${title.substring(0, 120)}...' : title;
-
-      await _newsService.createNews(
-        title: title,
-        content: html,
-        summary: summaryController.text.trim().isEmpty
-            ? defaultSummary
-            : summaryController.text.trim(),
-        imageFile: selectedImage!,
-        author: authorController.text.trim(),
-        category: categoryController.text.trim(),
-        featured: featured,
-      );
-
-      _showSnackBar('Thêm tin tức thành công!');
-      widget.onNewsAdded();
-      if (mounted) Navigator.pop(context);
-    } catch (e) {
-      _showSnackBar('Lỗi: ${e.toString()}', isError: true);
-    } finally {
-      if (mounted) setState(() => isLoading = false);
-    }
-  }
-
-  @override
-  void dispose() {
-    titleController.dispose();
-    summaryController.dispose();
-    authorController.dispose();
-    categoryController.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.grey[50],
-      appBar: AppBar(
-        title: const Text('Thêm Tin tức Mới'),
-        backgroundColor: Colors.white,
-        foregroundColor: Colors.black,
-        elevation: 0,
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Ảnh đại diện
-            GestureDetector(
-              onTap: _pickImage,
-              child: Container(
-                width: double.infinity,
-                height: 260,
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(
-                      color: Colors.blue[300]!,
-                      width: 2,
-                      style: BorderStyle.solid),
-                  color: Colors.blue[50],
-                ),
-                child: selectedImage == null
-                    ? Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(Icons.add_a_photo,
-                              size: 64, color: Colors.blue[700]),
-                          const SizedBox(height: 16),
-                          Text(
-                            'Chọn ảnh tin tức',
-                            style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.blue[700]),
-                          ),
-                        ],
-                      )
-                    : ClipRRect(
-                        borderRadius: BorderRadius.circular(18),
-                        child: Image.file(selectedImage!,
-                            fit: BoxFit.cover,
-                            width: double.infinity,
-                            height: 260),
-                      ),
-              ),
-            ),
-            const SizedBox(height: 24),
-
-            _buildTextField('Tiêu đề *', titleController),
-            const SizedBox(height: 16),
-            Row(
-              children: [
-                Expanded(
-                    child: _buildTextField('Danh mục', categoryController)),
-                const SizedBox(width: 12),
-                Expanded(child: _buildTextField('Tác giả', authorController)),
-              ],
-            ),
-            const SizedBox(height: 16),
-            _buildTextField('Tóm tắt (không bắt buộc)', summaryController,
-                maxLines: 4),
-            const SizedBox(height: 20),
-
-            const Text('Nội dung bài viết *',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
-            const SizedBox(height: 8),
-            Container(
-              height: 420,
-              decoration: BoxDecoration(
-                border: Border.all(color: Colors.grey[300]!),
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: RichEditor(
-                key: _editorKey,
-                editorOptions: RichEditorOptions(
-                  placeholder: 'Viết nội dung bài viết tại đây...',
-                  padding: const EdgeInsets.all(12),
-                  baseTextColor: Colors.black87,
-                ),
-              ),
-            ),
-            const SizedBox(height: 20),
-
-            Row(
-              children: [
-                Checkbox(
-                  value: featured,
-                  activeColor: Colors.orange,
-                  onChanged: (v) => setState(() => featured = v ?? false),
-                ),
-                const Text('Đánh dấu là tin tức nổi bật',
-                    style: TextStyle(fontSize: 16)),
-              ],
-            ),
-            const SizedBox(height: 32),
-
-            SizedBox(
-              width: double.infinity,
-              height: 56,
-              child: ElevatedButton(
-                onPressed: isLoading ? null : _createNews,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.blue[700],
-                  elevation: 4,
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16)),
-                ),
-                child: isLoading
-                    ? const SizedBox(
-                        height: 24,
-                        width: 24,
-                        child: CircularProgressIndicator(
-                            color: Colors.white, strokeWidth: 2.5),
-                      )
-                    : const Text('Thêm Tin tức',
-                        style: TextStyle(
-                            fontSize: 17,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white)),
-              ),
-            ),
-            const SizedBox(height: 20),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildTextField(String label, TextEditingController controller,
-      {int maxLines = 1}) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(label,
-            style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
-        const SizedBox(height: 8),
-        TextField(
-          controller: controller,
-          maxLines: maxLines,
-          decoration: InputDecoration(
-            filled: true,
-            fillColor: Colors.white,
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(14),
-              borderSide: BorderSide(color: Colors.grey[300]!),
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(14),
-              borderSide: BorderSide(color: Colors.grey[300]!),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(14),
-              borderSide: BorderSide(color: Colors.blue[700]!, width: 2),
-            ),
-            contentPadding:
-                const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-          ),
-        ),
-      ],
     );
   }
 }

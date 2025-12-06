@@ -76,11 +76,7 @@ class _ConversationInfoPageState extends State<ConversationInfoPage> {
         elevation: 0,
         flexibleSpace: Container(
           decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [Colors.blue.shade700, Colors.blue.shade900],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
+           color: Colors.blue[700],
             borderRadius:
                 const BorderRadius.vertical(bottom: Radius.circular(24)),
           ),

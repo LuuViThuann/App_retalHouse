@@ -23,14 +23,22 @@ class _ConversationsScreenState extends State<ConversationsScreen>
   Timer? _debounce;
   final ValueNotifier<List<Conversation>> _filteredConversations =
       ValueNotifier<List<Conversation>>([]);
+  bool _isInitialized = false;
 
   @override
   void initState() {
     super.initState();
+
+    // ✅ FIX 1: Unfocus sau khi build xong
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _searchFocusNode.unfocus();
+
+      // ✅ FIX 2: Load conversations SAU KHI build xong
+      if (!_isInitialized) {
+        _isInitialized = true;
+        _loadConversations();
+      }
     });
-    _loadConversations();
   }
 
   @override
@@ -43,29 +51,44 @@ class _ConversationsScreenState extends State<ConversationsScreen>
   }
 
   Future<void> _loadConversations() async {
+    if (!mounted) return;
+
     final authViewModel = Provider.of<AuthViewModel>(context, listen: false);
     final chatViewModel = Provider.of<ChatViewModel>(context, listen: false);
 
     if (authViewModel.currentUser != null) {
-      await chatViewModel.fetchConversations(authViewModel.currentUser!.token!);
-      _filteredConversations.value = chatViewModel.conversations;
+      final token = authViewModel.currentUser!.token;
+      if (token != null && token.isNotEmpty) {
+        await chatViewModel.fetchConversations(token);
+        if (mounted) {
+          _filteredConversations.value = chatViewModel.conversations;
+        }
+      } else {
+        if (mounted) {
+          SnackbarUtils.showError(context, 'Token không hợp lệ');
+        }
+      }
     } else {
-      SnackbarUtils.showError(
-          context, 'Vui lòng đăng nhập để xem cuộc trò chuyện');
+      if (mounted) {
+        SnackbarUtils.showError(
+            context, 'Vui lòng đăng nhập để xem cuộc trò chuyện');
+      }
     }
   }
 
   void _onSearchChanged(String value) {
     if (_debounce?.isActive ?? false) _debounce?.cancel();
-    _debounce = Timer(const Duration(milliseconds: 200), () {
+    _debounce = Timer(const Duration(milliseconds: 300), () {
+      if (!mounted) return;
+
       final chatViewModel = Provider.of<ChatViewModel>(context, listen: false);
       _filteredConversations.value = value.isEmpty
           ? chatViewModel.conversations
           : chatViewModel.conversations.where((conversation) {
-              final username =
-                  conversation.landlord['username']?.toLowerCase() ?? '';
-              return username.contains(value.toLowerCase());
-            }).toList();
+        final username =
+            conversation.landlord['username']?.toLowerCase() ?? '';
+        return username.contains(value.toLowerCase());
+      }).toList();
     });
   }
 
@@ -77,11 +100,7 @@ class _ConversationsScreenState extends State<ConversationsScreen>
         elevation: 0,
         flexibleSpace: Container(
           decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [Colors.blue.shade700, Colors.blue.shade900],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
+           color: Colors.blue[700],
             borderRadius: const BorderRadius.vertical(
               bottom: Radius.circular(24),
             ),
@@ -126,11 +145,7 @@ class _ConversationsScreenState extends State<ConversationsScreen>
         },
         child: Container(
           decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [Colors.blue.shade50, Colors.white],
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-            ),
+           color: Colors.white
           ),
           child: Consumer2<AuthViewModel, ChatViewModel>(
             builder: (context, authViewModel, chatViewModel, child) {

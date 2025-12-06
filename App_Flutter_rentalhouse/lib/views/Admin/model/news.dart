@@ -2,9 +2,10 @@
 class NewsModel {
   final String id;
   final String title;
-  final String content; // JSON Delta format
+  final String content;
   final String summary;
-  final String imageUrl;
+  final List<String> imageUrls; // Nhiều ảnh
+  final String imageUrl; // Ảnh đầu tiên (tương thích)
   final String author;
   final String category;
   final bool isActive;
@@ -18,6 +19,7 @@ class NewsModel {
     required this.title,
     required this.content,
     required this.summary,
+    required this.imageUrls,
     required this.imageUrl,
     required this.author,
     required this.category,
@@ -28,24 +30,48 @@ class NewsModel {
     required this.updatedAt,
   });
 
-  String getFullImageUrl(String baseUrl) {
-    if (imageUrl.startsWith('http')) {
-      return imageUrl;
+  /// Lấy full URL ảnh
+  String getFullImageUrl(String baseUrl, {int index = 0}) {
+    if (imageUrls.isEmpty) return '';
+
+    final url = index < imageUrls.length ? imageUrls[index] : imageUrls[0];
+
+    if (url.startsWith('http')) {
+      return url;
     }
-    if (imageUrl.startsWith('/')) {
-      return '$baseUrl$imageUrl';
+    if (url.startsWith('/')) {
+      return '$baseUrl$url';
     }
-    return '$baseUrl/$imageUrl';
+    return '$baseUrl/$url';
+  }
+
+  /// Lấy tất cả full URLs
+  List<String> getAllFullImageUrls(String baseUrl) {
+    return imageUrls.map((url) {
+      if (url.startsWith('http')) return url;
+      if (url.startsWith('/')) return '$baseUrl$url';
+      return '$baseUrl/$url';
+    }).toList();
   }
 
   factory NewsModel.fromJson(Map<String, dynamic> json) {
     try {
+      // Xử lý imageUrls (mảng hoặc string cũ)
+      List<String> urls = [];
+
+      if (json['imageUrls'] is List) {
+        urls = List<String>.from(json['imageUrls']);
+      } else if (json['imageUrl'] is String) {
+        urls = [(json['imageUrl'] as String).trim()];
+      }
+
       return NewsModel(
         id: json['_id']?.toString() ?? '',
         title: (json['title'] ?? '').toString().trim(),
         content: (json['content'] ?? '').toString(),
         summary: (json['summary'] ?? '').toString().trim(),
-        imageUrl: (json['imageUrl'] ?? '').toString().trim(),
+        imageUrls: urls,
+        imageUrl: urls.isNotEmpty ? urls[0] : '',
         author: (json['author'] ?? 'Admin').toString().trim(),
         category: (json['category'] ?? 'Tin tức').toString().trim(),
         isActive: json['isActive'] == true || json['isActive'] == 'true',
@@ -76,6 +102,7 @@ class NewsModel {
       'title': title,
       'content': content,
       'summary': summary,
+      'imageUrls': imageUrls,
       'imageUrl': imageUrl,
       'author': author,
       'category': category,
@@ -89,5 +116,5 @@ class NewsModel {
 
   @override
   String toString() =>
-      'NewsModel(id: $id, title: $title, featured: $featured, views: $views)';
+      'NewsModel(id: $id, title: $title, images: ${imageUrls.length}, featured: $featured)';
 }

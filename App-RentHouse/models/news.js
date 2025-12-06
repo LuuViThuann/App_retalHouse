@@ -15,9 +15,14 @@ const newsSchema = new mongoose.Schema({
     type: String,
     trim: true,
   },
+  // Thay đổi: Hỗ trợ nhiều ảnh
+  imageUrls: {
+    type: [String], // Mảng URLs
+    default: [],
+  },
+  // Giữ lại imageUrl để tương thích (ảnh đầu tiên)
   imageUrl: {
     type: String,
-    required: true,
   },
   author: {
     type: String,
@@ -49,6 +54,22 @@ const newsSchema = new mongoose.Schema({
     type: Date,
     default: Date.now,
   },
+});
+
+// Middleware: Tự động set imageUrl từ imageUrls[0]
+newsSchema.pre('save', function(next) {
+  if (this.imageUrls && this.imageUrls.length > 0) {
+    this.imageUrl = this.imageUrls[0];
+  }
+  next();
+});
+
+newsSchema.pre('findByIdAndUpdate', function(next) {
+  const update = this.getUpdate();
+  if (update.imageUrls && update.imageUrls.length > 0) {
+    update.imageUrl = update.imageUrls[0];
+  }
+  next();
 });
 
 // Indexes

@@ -1,5 +1,5 @@
 import 'dart:convert';
-import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_rentalhouse/config/api_routes.dart';
 import 'package:flutter_rentalhouse/models/conversation.dart';
 import 'package:flutter_rentalhouse/models/message.dart';
@@ -10,6 +10,7 @@ import 'package:socket_io_client/socket_io_client.dart' as io;
 class ChatViewModel extends ChangeNotifier {
   final List<Conversation> _conversations = [];
   final List<Message> _messages = [];
+  bool _isNotifying = false;
   bool _isLoading = false;
   bool _hasMoreMessages = true;
   String? _errorMessage;
@@ -206,7 +207,7 @@ class ChatViewModel extends ChangeNotifier {
       final tempIndex = isTemp
           ? -1
           : _messages.indexWhere((msg) =>
-              msg.id.startsWith('temp_') && msg.content == message.content);
+      msg.id.startsWith('temp_') && msg.content == message.content);
       if (tempIndex != -1) {
         _messages[tempIndex] = message;
       } else {
@@ -219,12 +220,13 @@ class ChatViewModel extends ChangeNotifier {
       }
     }
     _hasMoreMessages = true;
+
+    //  Chỉ notify một lần, không gọi nhiều lần
     _notify();
   }
-
   void _updateConversationUnreadCount(String conversationId, String senderId) {
     final index =
-        _conversations.indexWhere((conv) => conv.id == conversationId);
+    _conversations.indexWhere((conv) => conv.id == conversationId);
     if (index != -1 && _conversations[index].participants.contains(senderId)) {
       final conv = _conversations[index];
       _conversations[index] = Conversation(
@@ -325,8 +327,10 @@ class ChatViewModel extends ChangeNotifier {
       _setError('No token available. Please sign in.');
       return;
     }
+
     _token = token;
     _setLoading(true);
+
     try {
       final conversations = await _chatService.fetchConversations(token);
       _conversations
@@ -337,8 +341,9 @@ class ChatViewModel extends ChangeNotifier {
     } catch (e) {
       print('ChatViewModel: Error fetching conversations: $e');
       _setError('Error fetching conversations: $e');
+    } finally {
+      _setLoading(false);
     }
-    _setLoading(false);
   }
 
   Future<Conversation?> fetchConversationById(
@@ -715,6 +720,7 @@ class ChatViewModel extends ChangeNotifier {
   void _setLoading(bool value) {
     if (_isLoading != value) {
       _isLoading = value;
+      // Không gọi _notify() trực tiếp, để _notify tự xử lý
       _notify();
     }
   }
@@ -794,8 +800,15 @@ class ChatViewModel extends ChangeNotifier {
   }
 
   void _notify() {
-    if (hasListeners) {
-      notifyListeners();
+    if (!_isNotifying && hasListeners) {
+      _isNotifying = true;
+      // Delay notify để tránh gọi trong build phase
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (hasListeners) {
+          notifyListeners();
+        }
+        _isNotifying = false;
+      });
     }
   }
 
@@ -803,7 +816,7 @@ class ChatViewModel extends ChangeNotifier {
     final index = _messages.indexWhere((msg) => msg.id == messageId);
     if (index != -1) {
       _messages[index] = updatedMessage;
-      notifyListeners();
+      _notify();
     }
   }
 

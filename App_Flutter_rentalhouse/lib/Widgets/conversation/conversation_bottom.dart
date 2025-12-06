@@ -17,249 +17,239 @@ void showSearchBottomSheet({
   showModalBottomSheet(
     context: context,
     isScrollControlled: true,
-    shape: const RoundedRectangleBorder(
-      borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-    ),
-    backgroundColor: Colors.white.withOpacity(0.95),
+    backgroundColor: Colors.transparent,
     transitionAnimationController: AnimationController(
       vsync: vsync,
-      duration: const Duration(milliseconds: 400),
+      duration: const Duration(milliseconds: 350),
       animationBehavior: AnimationBehavior.preserve,
     )..forward(),
     builder: (context) {
-      return Padding(
-        padding: EdgeInsets.only(
-          bottom: MediaQuery.of(context).viewInsets.bottom,
-          left: 20,
-          right: 20,
-          top: 20,
+      return Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              Colors.grey.shade50,
+              Colors.white,
+            ],
+          ),
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.1),
+              blurRadius: 20,
+              spreadRadius: 5,
+              offset: const Offset(0, -2),
+            ),
+          ],
         ),
-        child: ValueListenableBuilder<List<Conversation>>(
-          valueListenable: filteredConversations,
-          builder: (context, filteredConversations, child) {
-            return Container(
-              decoration: const BoxDecoration(
-                borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        child: Padding(
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.of(context).viewInsets.bottom + 16,
+            left: 24,
+            right: 24,
+            top: 8,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Drag Handle
+              Container(
+                width: 40,
+                height: 4,
+                margin: const EdgeInsets.only(bottom: 24),
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade300,
+                  borderRadius: BorderRadius.circular(2),
+                ),
               ),
-              constraints: BoxConstraints(
-                maxHeight: MediaQuery.of(context).size.height * 0.75,
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Container(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [Colors.blue.shade50, Colors.white],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
+
+              // Header
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 4),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: Colors.blue.shade50,
+                        shape: BoxShape.circle,
                       ),
-                      borderRadius: BorderRadius.circular(16),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.blue.shade100.withOpacity(0.2),
-                          blurRadius: 8,
-                          spreadRadius: 1,
-                          offset: const Offset(0, 2),
-                        ),
-                      ],
+                      child: Icon(
+                        Icons.search_rounded,
+                        color: Colors.blue.shade700,
+                        size: 24,
+                      ),
                     ),
-                    child: TextField(
-                      controller: searchController,
-                      focusNode: searchFocusNode,
-                      decoration: InputDecoration(
-                        hintText: 'Tìm kiếm người dùng...',
-                        hintStyle: TextStyle(
-                          color: Colors.grey.shade500,
-                          fontWeight: FontWeight.w400,
+                    const SizedBox(width: 12),
+                    Text(
+                      'Tìm kiếm tin nhắn',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.grey.shade900,
+                        letterSpacing: -0.5,
+                      ),
+                    ),
+                    const Spacer(),
+                    IconButton(
+                      onPressed: () => Navigator.pop(context),
+                      icon: Icon(
+                        Icons.close_rounded,
+                        color: Colors.grey.shade600,
+                        size: 24,
+                      ),
+                      style: IconButton.styleFrom(
+                        backgroundColor: Colors.grey.shade100,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
                         ),
-                        prefixIcon: AnimatedScale(
-                          scale: searchFocusNode.hasFocus ? 1.1 : 1.0,
-                          duration: const Duration(milliseconds: 200),
-                          child: Icon(Icons.search,
-                              color: AppStyles.primaryColor, size: 24),
-                        ),
-                        suffixIcon: searchController.text.isNotEmpty
-                            ? IconButton(
-                                icon: AnimatedScale(
-                                  scale: 1.0,
-                                  duration: const Duration(milliseconds: 200),
-                                  child: Icon(Icons.clear,
-                                      color: Colors.grey.shade600, size: 22),
-                                ),
-                                onPressed: () {
-                                  searchController.clear();
-                                  onSearchChanged('');
-                                },
-                              )
-                            : null,
-                        border: OutlineInputBorder(
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: 24),
+
+              // Search Field
+              ValueListenableBuilder<List<Conversation>>(
+                valueListenable: filteredConversations,
+                builder: (context, filteredConversations, child) {
+                  return Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        decoration: BoxDecoration(
+                          color: Colors.white,
                           borderRadius: BorderRadius.circular(16),
-                          borderSide: BorderSide.none,
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(16),
-                          borderSide: BorderSide(
-                            color: AppStyles.primaryColor,
+                          border: Border.all(
+                            color: searchFocusNode.hasFocus
+                                ? Colors.blue.shade300
+                                : Colors.grey.shade200,
                             width: 2,
                           ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: searchFocusNode.hasFocus
+                                  ? Colors.blue.shade100.withOpacity(0.3)
+                                  : Colors.grey.shade200.withOpacity(0.2),
+                              blurRadius: 12,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
                         ),
-                        filled: true,
-                        fillColor: Colors.transparent,
-                        contentPadding: const EdgeInsets.symmetric(
-                          vertical: 12,
-                          horizontal: 16,
-                        ),
-                      ),
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w500,
-                        color: Colors.black87,
-                      ),
-                      onChanged: onSearchChanged,
-                      onTap: () {
-                        searchFocusNode.requestFocus();
-                      },
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-                  Expanded(
-                    child: filteredConversations.isEmpty
-                        ? Center(
-                            child: Shimmer.fromColors(
-                              baseColor: Colors.grey.shade200,
-                              highlightColor: Colors.grey.shade100,
-                              child: Column(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Icon(
-                                    Icons.search_off,
-                                    size: 48,
-                                    color: Colors.grey.shade400,
-                                  ),
-                                  const SizedBox(height: 12),
-                                  Text(
-                                    searchController.text.isEmpty
-                                        ? 'Không có cuộc trò chuyện nào'
-                                        : 'Không tìm thấy người dùng nào',
-                                    style: TextStyle(
-                                      color: Colors.grey.shade600,
-                                      fontFamily: 'Roboto',
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.w500,
-                                    ),
-                                  ),
-                                ],
+                        child: TextField(
+                          controller: searchController,
+                          focusNode: searchFocusNode,
+                          autofocus: true,
+                          decoration: InputDecoration(
+                            hintText: 'Nhập tên người dùng...',
+                            hintStyle: TextStyle(
+                              color: Colors.grey.shade400,
+                              fontWeight: FontWeight.w400,
+                              fontSize: 15,
+                            ),
+                            prefixIcon: Padding(
+                              padding: const EdgeInsets.all(12),
+                              child: Icon(
+                                Icons.search_rounded,
+                                color: searchFocusNode.hasFocus
+                                    ? Colors.blue.shade600
+                                    : Colors.grey.shade400,
+                                size: 24,
                               ),
                             ),
-                          )
-                        : ListView.builder(
-                            padding: EdgeInsets.zero,
-                            itemCount: filteredConversations.length,
-                            itemBuilder: (context, index) {
-                              final conversation = filteredConversations[index];
-                              final landlord = conversation.landlord;
-                              return InkWell(
-                                onTap: () {
-                                  Navigator.pop(context);
-                                  Navigator.push(
-                                    context,
-                                    NavigationUtils.createSlideRoute(
-                                      ChatScreen(
-                                        rentalId: conversation.rentalId,
-                                        landlordId: conversation.landlord['id'],
-                                        conversationId: conversation.id,
-                                      ),
-                                    ),
-                                  );
-                                },
-                                borderRadius: BorderRadius.circular(16),
-                                child: AnimatedContainer(
-                                  duration: const Duration(milliseconds: 200),
-                                  margin: const EdgeInsets.only(bottom: 16),
-                                  padding: const EdgeInsets.symmetric(
-                                      vertical: 12, horizontal: 16),
-                                  decoration: BoxDecoration(
-                                    gradient: LinearGradient(
-                                      colors: [
-                                        Colors.blue.shade50,
-                                        Colors.white,
-                                      ],
-                                      begin: Alignment.topLeft,
-                                      end: Alignment.bottomRight,
-                                    ),
-                                    borderRadius: BorderRadius.circular(16),
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: Colors.blue.shade100
-                                            .withOpacity(0.2),
-                                        blurRadius: 8,
-                                        spreadRadius: 1,
-                                        offset: const Offset(0, 2),
-                                      ),
-                                    ],
-                                    border: Border.all(
-                                      color:
-                                          Colors.blue.shade100.withOpacity(0.5),
-                                    ),
-                                  ),
-                                  child: Row(
-                                    children: [
-                                      CircleAvatar(
-                                        radius: 26,
-                                        backgroundColor: Colors.blue.shade100,
-                                        backgroundImage:
-                                            landlord['avatarBase64']
-                                                        ?.isNotEmpty ==
-                                                    true
-                                                ? MemoryImage(base64Decode(
-                                                    landlord['avatarBase64']
-                                                        as String))
-                                                : null,
-                                        child:
-                                            landlord['avatarBase64']?.isEmpty ==
-                                                    true
-                                                ? Icon(
-                                                    Icons.person,
-                                                    color: Colors.blue.shade700,
-                                                    size: 30,
-                                                  )
-                                                : null,
-                                      ),
-                                      const SizedBox(width: 16),
-                                      Expanded(
-                                        child: Text(
-                                          landlord['username'] ?? 'Chủ nhà',
-                                          style: TextStyle(
-                                            fontWeight: FontWeight.w600,
-                                            fontFamily: 'Roboto',
-                                            fontSize: 16,
-                                            color: Colors.blue.shade800,
-                                            letterSpacing: 0.2,
-                                          ),
-                                        ),
-                                      ),
-                                      AnimatedScale(
-                                        scale: 1.0,
-                                        duration:
-                                            const Duration(milliseconds: 200),
-                                        child: Icon(
-                                          Icons.chat,
-                                          color: AppStyles.primaryColor,
-                                          size: 24,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
+                            suffixIcon: searchController.text.isNotEmpty
+                                ? IconButton(
+                              icon: Container(
+                                padding: const EdgeInsets.all(6),
+                                decoration: BoxDecoration(
+                                  color: Colors.grey.shade200,
+                                  shape: BoxShape.circle,
                                 ),
-                              );
-                            },
+                                child: Icon(
+                                  Icons.close_rounded,
+                                  color: Colors.grey.shade700,
+                                  size: 16,
+                                ),
+                              ),
+                              onPressed: () {
+                                searchController.clear();
+                                onSearchChanged('');
+                              },
+                            )
+                                : null,
+                            border: InputBorder.none,
+                            contentPadding: const EdgeInsets.symmetric(
+                              vertical: 16,
+                              horizontal: 16,
+                            ),
                           ),
-                  ),
-                ],
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w500,
+                            color: Colors.grey.shade900,
+                            letterSpacing: -0.2,
+                          ),
+                          onChanged: onSearchChanged,
+                        ),
+                      ),
+
+                      // Result count
+                      if (searchController.text.isNotEmpty) ...[
+                        const SizedBox(height: 16),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 8),
+                          child: Row(
+                            children: [
+                              Text(
+                                filteredConversations.isEmpty
+                                    ? 'Không có kết quả'
+                                    : '${filteredConversations.length} kết quả',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w500,
+                                  color: Colors.grey.shade600,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+
+                      const SizedBox(height: 20),
+
+                      // Results List
+                      Container(
+                        constraints: BoxConstraints(
+                          maxHeight: MediaQuery.of(context).size.height * 0.5,
+                        ),
+                        child: filteredConversations.isEmpty
+                            ? _buildEmptyState(searchController.text.isEmpty)
+                            : ListView.separated(
+                          padding: EdgeInsets.zero,
+                          shrinkWrap: true,
+                          itemCount: filteredConversations.length,
+                          separatorBuilder: (context, index) =>
+                          const SizedBox(height: 12),
+                          itemBuilder: (context, index) {
+                            final conversation =
+                            filteredConversations[index];
+                            return _buildConversationItem(
+                              context,
+                              conversation,
+                            );
+                          },
+                        ),
+                      ),
+                    ],
+                  );
+                },
               ),
-            );
-          },
+            ],
+          ),
         ),
       );
     },
@@ -267,4 +257,223 @@ void showSearchBottomSheet({
     searchController.clear();
     onSearchChanged('');
   });
+}
+
+Widget _buildEmptyState(bool isInitial) {
+  return Center(
+    child: Padding(
+      padding: const EdgeInsets.symmetric(vertical: 48, horizontal: 24),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: Colors.grey.shade100,
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              isInitial ? Icons.chat_bubble_outline_rounded : Icons.search_off_rounded,
+              size: 48,
+              color: Colors.grey.shade400,
+            ),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            isInitial
+                ? 'Bắt đầu tìm kiếm'
+                : 'Không tìm thấy kết quả',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w600,
+              color: Colors.grey.shade700,
+              letterSpacing: -0.3,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            isInitial
+                ? 'Nhập tên người dùng để tìm kiếm'
+                : 'Thử tìm kiếm với từ khóa khác',
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w400,
+              color: Colors.grey.shade500,
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
+Widget _buildConversationItem(
+    BuildContext context,
+    Conversation conversation,
+    ) {
+  final landlord = conversation.landlord;
+  final hasUnread = conversation.unreadCount > 0;
+
+  return Material(
+    color: Colors.transparent,
+    child: InkWell(
+      onTap: () {
+        Navigator.pop(context);
+        Navigator.push(
+          context,
+          NavigationUtils.createSlideRoute(
+            ChatScreen(
+              rentalId: conversation.rentalId,
+              landlordId: conversation.landlord['id'],
+              conversationId: conversation.id,
+            ),
+          ),
+        );
+      },
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        decoration: BoxDecoration(
+          color: hasUnread ? Colors.blue.shade50 : Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: hasUnread
+                ? Colors.blue.shade200.withOpacity(0.5)
+                : Colors.grey.shade200,
+            width: 1,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: hasUnread
+                  ? Colors.blue.shade100.withOpacity(0.2)
+                  : Colors.grey.shade200.withOpacity(0.2),
+              blurRadius: 6,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            // Avatar with badge
+            Stack(
+              clipBehavior: Clip.none,
+              children: [
+                Container(
+                  width: 52,
+                  height: 52,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: hasUnread
+                          ? Colors.blue.shade300
+                          : Colors.grey.shade300,
+                      width: 2,
+                    ),
+                  ),
+                  child: ClipOval(
+                    child: landlord['avatarBase64']?.isNotEmpty == true
+                        ? Image.memory(
+                      base64Decode(landlord['avatarBase64'] as String),
+                      fit: BoxFit.cover,
+                    )
+                        : Container(
+                      color: Colors.blue.shade100,
+                      child: Icon(
+                        Icons.person_rounded,
+                        color: Colors.blue.shade700,
+                        size: 28,
+                      ),
+                    ),
+                  ),
+                ),
+                if (hasUnread)
+                  Positioned(
+                    right: -2,
+                    top: -2,
+                    child: Container(
+                      padding: const EdgeInsets.all(5),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [Colors.red.shade400, Colors.red.shade600],
+                        ),
+                        shape: BoxShape.circle,
+                        border: Border.all(color: Colors.white, width: 2),
+                      ),
+                      constraints: const BoxConstraints(
+                        minWidth: 20,
+                        minHeight: 20,
+                      ),
+                      child: Center(
+                        child: Text(
+                          conversation.unreadCount > 9
+                              ? '9+'
+                              : '${conversation.unreadCount}',
+                          style: const TextStyle(
+                            fontSize: 9,
+                            fontWeight: FontWeight.w700,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+            const SizedBox(width: 14),
+
+            // Content
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    landlord['username'] ?? 'Chủ nhà',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 16,
+                      color: Colors.grey.shade900,
+                      letterSpacing: -0.3,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  if (conversation.lastMessage != null) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      conversation.lastMessage!.content.isNotEmpty
+                          ? conversation.lastMessage!.content
+                          : 'Hình ảnh',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w400,
+                        color: Colors.grey.shade600,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ],
+              ),
+            ),
+
+            const SizedBox(width: 8),
+
+            // Action icon
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.blue.shade50,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(
+                Icons.chevron_right_rounded,
+                color: Colors.blue.shade600,
+                size: 20,
+              ),
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
 }

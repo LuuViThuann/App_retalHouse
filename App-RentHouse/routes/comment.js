@@ -1090,7 +1090,7 @@ module.exports = (io) => {
         const buildReplyTree = (replyList, parentId = null) => {
           return replyList
             .filter((reply) =>
-              parentId
+              parentId 
                 ? reply.parentReplyId?.toString() === parentId
                 : !reply.parentReplyId
             )
