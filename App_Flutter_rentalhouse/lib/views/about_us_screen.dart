@@ -14,6 +14,7 @@ class AboutUsScreen extends StatefulWidget {
 
 class _AboutUsScreenState extends State<AboutUsScreen> {
   Map<String, dynamic>? _aboutUs;
+  List<String> _imageUrls = []; // ✅ FIX: Tách riêng list URLs
   bool _isLoading = true;
   String? _error;
   int _currentImageIndex = 0;
@@ -25,16 +26,16 @@ class _AboutUsScreenState extends State<AboutUsScreen> {
     super.initState();
     _pageController = PageController();
     _fetchAboutUs();
-    _startAutoPlay();
   }
 
   void _startAutoPlay() {
-    _timer = Timer.periodic(const Duration(seconds: 5), (timer) {
-      if (!mounted) return;
-      final images = List<String>.from(_aboutUs?['images'] ?? []);
-      if (images.length <= 1) return;
+    _timer?.cancel();
+    if (_imageUrls.length <= 1) return;
 
-      int nextPage = (_currentImageIndex + 1) % images.length;
+    _timer = Timer.periodic(const Duration(seconds: 5), (timer) {
+      if (!mounted || _imageUrls.isEmpty) return;
+
+      int nextPage = (_currentImageIndex + 1) % _imageUrls.length;
       _pageController.animateToPage(
         nextPage,
         duration: const Duration(milliseconds: 600),
@@ -61,15 +62,47 @@ class _AboutUsScreenState extends State<AboutUsScreen> {
           .get(Uri.parse('${ApiRoutes.baseUrl}/aboutus'))
           .timeout(const Duration(seconds: 15));
 
+      print('📥 [ABOUTUS SCREEN] Response: ${response.statusCode}');
+      print('Body: ${response.body}');
+
       if (response.statusCode == 200) {
         final json = jsonDecode(response.body);
         if (json['data'] != null) {
+          final data = json['data'];
+
+          // ✅ FIX: Parse images correctly (cả object array và string array)
+          final List<String> urls = [];
+          if (data['images'] != null) {
+            final images = data['images'] as List;
+            print('🔍 Images type: ${images.runtimeType}');
+            print('🔍 Images length: ${images.length}');
+
+            for (int i = 0; i < images.length; i++) {
+              final img = images[i];
+              if (img is Map<String, dynamic>) {
+                // Format mới: {url, cloudinaryId, order}
+                final url = img['url'] as String?;
+                if (url != null && url.isNotEmpty) {
+                  urls.add(url);
+                }
+              } else if (img is String) {
+                // Format cũ: chỉ URL string
+                if (img.isNotEmpty) {
+                  urls.add(img);
+                }
+              }
+            }
+          }
+
+          print('✅ Parsed ${urls.length} image URLs');
+
           setState(() {
-            _aboutUs = json['data'];
+            _aboutUs = data;
+            _imageUrls = urls;
             _currentImageIndex = 0;
-            _timer?.cancel();
-            _startAutoPlay();
           });
+
+          _startAutoPlay();
         } else {
           setState(() {
             _error = json['message'] ?? 'Chưa có nội dung giới thiệu';
@@ -83,6 +116,7 @@ class _AboutUsScreenState extends State<AboutUsScreen> {
         throw Exception('Lỗi tải dữ liệu');
       }
     } catch (e) {
+      print('❌ [ABOUTUS SCREEN] Error: $e');
       setState(() {
         _error = 'Không thể kết nối đến máy chủ. Vui lòng kiểm tra kết nối và thử lại.';
       });
@@ -158,7 +192,6 @@ class _AboutUsScreenState extends State<AboutUsScreen> {
   Widget _buildModernContent() {
     final title = _aboutUs!['title'] ?? 'Công ty chúng tôi';
     final description = _aboutUs!['description'] ?? '';
-    final images = List<String>.from(_aboutUs!['images'] ?? []);
 
     return SingleChildScrollView(
       physics: const AlwaysScrollableScrollPhysics(),
@@ -166,7 +199,7 @@ class _AboutUsScreenState extends State<AboutUsScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // === SLIDER ẢNH (có thể kéo tay + auto play) ===
-          if (images.isNotEmpty) ...[
+          if (_imageUrls.isNotEmpty) ...[
             SizedBox(
               height: 280,
               child: PageView.builder(
@@ -174,20 +207,32 @@ class _AboutUsScreenState extends State<AboutUsScreen> {
                 onPageChanged: (index) {
                   setState(() => _currentImageIndex = index);
                 },
-                itemCount: images.length,
+                itemCount: _imageUrls.length,
                 itemBuilder: (context, index) {
-                  final imageUrl = '${ApiRoutes.rootUrl}${images[index]}';
+                  final imageUrl = _imageUrls[index];
+
+                  // ✅ FIX: Kiểm tra URL đã có protocol chưa
+                  final fullUrl = imageUrl.startsWith('http')
+                      ? imageUrl
+                      : '${ApiRoutes.rootUrl}$imageUrl';
+
                   return CachedNetworkImage(
-                    imageUrl: imageUrl,
+                    imageUrl: fullUrl,
                     fit: BoxFit.cover,
                     width: double.infinity,
                     placeholder: (_, __) => Container(
                       color: Colors.grey[200],
-                      child: const Center(child: CircularProgressIndicator(color: Colors.blue)),
+                      child: const Center(
+                        child: CircularProgressIndicator(color: Colors.blue),
+                      ),
                     ),
                     errorWidget: (_, __, ___) => Container(
                       color: Colors.grey[200],
-                      child: const Icon(Icons.image_not_supported, size: 60, color: Colors.grey),
+                      child: const Icon(
+                        Icons.image_not_supported,
+                        size: 60,
+                        color: Colors.grey,
+                      ),
                     ),
                   );
                 },
@@ -195,12 +240,12 @@ class _AboutUsScreenState extends State<AboutUsScreen> {
             ),
 
             // Dots indicator
-            if (images.length > 1)
+            if (_imageUrls.length > 1)
               Padding(
                 padding: const EdgeInsets.symmetric(vertical: 16),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
-                  children: images.asMap().entries.map((entry) {
+                  children: _imageUrls.asMap().entries.map((entry) {
                     return AnimatedContainer(
                       duration: const Duration(milliseconds: 300),
                       width: _currentImageIndex == entry.key ? 28 : 10,

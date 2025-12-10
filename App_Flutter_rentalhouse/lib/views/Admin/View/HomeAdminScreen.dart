@@ -8,7 +8,6 @@ import 'package:flutter_rentalhouse/views/Admin/View/ManageNewsScreen.dart';
 import 'package:flutter_rentalhouse/views/Admin/View/ManagePostsScreen.dart';
 import 'package:flutter_rentalhouse/views/Admin/View/ManageUsersScreen.dart';
 import 'package:flutter_rentalhouse/views/ManageAboutUsScreen.dart';
-import 'package:flutter_rentalhouse/views/UserFeedbackScreen%20.dart';
 import 'package:flutter_rentalhouse/views/my_profile_view.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';

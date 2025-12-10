@@ -1,6 +1,5 @@
-import 'dart:convert';
+import 'package:cached_network_image/cached_network_image.dart'; // ✅ ADD THIS
 import 'package:flutter/material.dart';
-import 'package:flutter_rentalhouse/constants/app_style.dart';
 import 'package:flutter_rentalhouse/models/conversation.dart';
 import 'package:flutter_rentalhouse/utils/navigation_conversation.dart';
 import 'package:flutter_rentalhouse/utils/snackbar_conversation.dart';
@@ -59,6 +58,9 @@ class ConversationTile extends StatelessWidget {
         messageIcon = Icons.image_rounded;
       }
     }
+
+    // ✅ Changed: Get avatarUrl instead of avatarBase64
+    final avatarUrl = conversation.landlord['avatarUrl']?.toString() ?? '';
 
     return Dismissible(
       key: Key(conversation.id),
@@ -119,7 +121,7 @@ class ConversationTile extends StatelessWidget {
             ),
             child: Row(
               children: [
-                // Avatar
+                // ✅ Avatar - UPDATED to use CachedNetworkImage
                 Stack(
                   clipBehavior: Clip.none,
                   children: [
@@ -145,13 +147,31 @@ class ConversationTile extends StatelessWidget {
                         ],
                       ),
                       child: ClipOval(
-                        child: conversation
-                            .landlord['avatarBase64']?.isNotEmpty ==
-                            true
-                            ? Image.memory(
-                          base64Decode(
-                              conversation.landlord['avatarBase64']),
+                        child: avatarUrl.isNotEmpty
+                            ? CachedNetworkImage(
+                          imageUrl: avatarUrl, // ✅ Direct Cloudinary URL
                           fit: BoxFit.cover,
+                          placeholder: (context, url) => Container(
+                            color: Colors.blue.shade100,
+                            child: Center(
+                              child: SizedBox(
+                                width: 24,
+                                height: 24,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.blue.shade700,
+                                ),
+                              ),
+                            ),
+                          ),
+                          errorWidget: (context, url, error) => Container(
+                            color: Colors.blue.shade100,
+                            child: Icon(
+                              Icons.person_rounded,
+                              size: 28,
+                              color: Colors.blue.shade700,
+                            ),
+                          ),
                         )
                             : Container(
                           color: Colors.blue.shade100,

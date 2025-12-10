@@ -1,6 +1,6 @@
 import 'dart:convert';
+import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:dio/dio.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_facebook_auth/flutter_facebook_auth.dart';
 import 'package:flutter_rentalhouse/models/comments.dart';
@@ -8,6 +8,7 @@ import 'package:flutter_rentalhouse/models/notification.dart';
 import 'package:flutter_rentalhouse/models/rental.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:http/http.dart' as http;
+import 'package:http_parser/http_parser.dart';
 import '../config/api_routes.dart';
 import '../models/user.dart';
 import 'dart:async';
@@ -17,70 +18,41 @@ class AuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FacebookAuth _facebookAuth = FacebookAuth.instance;
   final GoogleSignIn _googleSignIn = GoogleSignIn(
-    clientId:
-    '616377322079-eb0grhlmn2lbnifatbduclltcur9t3g4.apps.googleusercontent.com',
-    scopes: [
-      'email',
-      'profile',
-      'https://www.googleapis.com/auth/userinfo.profile'
-    ],
+    clientId: '616377322079-eb0grhlmn2lbnifatbduclltcur9t3g4.apps.googleusercontent.com',
+    scopes: ['email', 'profile', 'https://www.googleapis.com/auth/userinfo.profile'],
   );
-  final Dio _dio = Dio(BaseOptions(
-    baseUrl: ApiRoutes.baseUrl,
-    headers: {'Content-Type': 'multipart/form-data'},
-  ));
 
-  // Hàm kiểm tra định dạng đầu vào
-  bool _isValidEmail(String email) =>
-      RegExp(r'^[^@]+@[^@]+\.[^@]+').hasMatch(email);
-
-  bool _isValidPhoneNumber(String phoneNumber) =>
-      RegExp(r'^\d{10}$').hasMatch(phoneNumber);
-
+  // Validation functions
+  bool _isValidEmail(String email) => RegExp(r'^[^@]+@[^@]+\.[^@]+').hasMatch(email);
+  bool _isValidPhoneNumber(String phoneNumber) => RegExp(r'^\d{10}$').hasMatch(phoneNumber);
   bool _isValidPassword(String password) => password.length >= 6;
-
-  bool _isValidAvatarBase64(String? avatarBase64) {
-    if (avatarBase64 == null) return false;
-    final regex = RegExp(r'^(data:image/(jpeg|png);base64,)?[A-Za-z0-9+/=]+$');
-    return regex.hasMatch(avatarBase64);
-  }
-
   bool _isValidUsername(String username) => username.length >= 3;
-
   bool _isValidAddress(String address) => address.isNotEmpty;
 
-  // Hàm loại bỏ tiền tố MIME
-  String _stripMimePrefix(String base64) {
-    return base64.replaceAll(RegExp(r'^data:image/(jpeg|png);base64,'), '');
-  }
-
-  // Hàm thêm tiền tố MIME khi cần hiển thị
-  String _addMimePrefix(String base64, {String mimeType = 'image/png'}) {
-    return 'data:$mimeType;base64,$base64';
-  }
-
+  // ============================================
+  // REGISTER
+  // ============================================
   Future<AppUser?> register({
     required String email,
     required String password,
     required String phoneNumber,
     required String address,
     required String username,
-    required String avatarBase64,
+    required String imagePath,
   }) async {
-    // Validation như cũ...
     if (!_isValidEmail(email)) throw Exception('Email không hợp lệ');
-    if (!_isValidPhoneNumber(phoneNumber))
-      throw Exception('Số điện thoại phải có 10 chữ số');
-    if (!_isValidPassword(password))
-      throw Exception('Mật khẩu phải có ít nhất 6 ký tự');
-    if (!_isValidAvatarBase64(avatarBase64))
-      throw Exception('Ảnh đại diện không hợp lệ');
-    if (!_isValidUsername(username))
-      throw Exception('Tên người dùng phải có ít nhất 3 ký tự');
+    if (!_isValidPhoneNumber(phoneNumber)) throw Exception('Số điện thoại phải có 10 chữ số');
+    if (!_isValidPassword(password)) throw Exception('Mật khẩu phải có ít nhất 6 ký tự');
+    if (!_isValidUsername(username)) throw Exception('Tên người dùng phải có ít nhất 3 ký tự');
     if (!_isValidAddress(address)) throw Exception('Vui lòng nhập địa chỉ');
+    if (imagePath.isEmpty) throw Exception('Vui lòng chọn ảnh');
 
     try {
-      // BƯỚC 1: ĐĂNG KÝ TRƯỚC TRONG FIREBASE AUTH (Flutter)
+      print('═══════════════════════════════════════════');
+      print('📝 REGISTER USER');
+      print('═══════════════════════════════════════════');
+
+      // Step 1: Create Firebase auth
       final userCredential = await _auth.createUserWithEmailAndPassword(
         email: email,
         password: password,
@@ -89,30 +61,33 @@ class AuthService {
       final user = userCredential.user;
       if (user == null) throw Exception('Tạo tài khoản Firebase thất bại');
 
-      // BƯỚC 2: LẤY ID TOKEN NGAY SAU KHI ĐĂNG KÝ
+      print('✅ Firebase user created: ${user.uid}');
+
+      // Step 2: Get ID token
       final idToken = await user.getIdToken();
-      if (idToken == null)
-        throw Exception('Không lấy được ID token sau khi đăng ký');
+      if (idToken == null) throw Exception('Không lấy được ID token');
 
-      // BƯỚC 3: GỬI THÔNG TIN + TOKEN ĐẾN BACKEND
-      final rawBase64 = _stripMimePrefix(avatarBase64);
+      print('✅ ID token obtained');
 
-      final response = await http.post(
-        Uri.parse(ApiRoutes.register),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'idToken': idToken, // QUAN TRỌNG: GỬI TOKEN THAY VÌ EMAIL + PASS
-          'phoneNumber': phoneNumber,
-          'address': address,
-          'username': username,
-          'avatarBase64': rawBase64,
-        }),
-      );
+      // Step 3: Upload with file
+      var request = http.MultipartRequest('POST', Uri.parse(ApiRoutes.register));
+      request.fields['idToken'] = idToken;
+      request.fields['phoneNumber'] = phoneNumber;
+      request.fields['address'] = address;
+      request.fields['username'] = username;
 
-      print('Register API Response: ${response.statusCode} - ${response.body}');
+      // ✅ Upload file with field 'avatar'
+      request.files.add(await http.MultipartFile.fromPath('avatar', imagePath));
+
+      print('📤 Sending multipart request...');
+      final response = await request.send();
+      final responseBody = await response.stream.bytesToString();
+
+      print('📊 Response: ${response.statusCode}');
+      print('📋 Body: ${responseBody.substring(0, 200)}');
 
       if (response.statusCode == 201) {
-        final data = jsonDecode(response.body);
+        final data = jsonDecode(responseBody);
 
         return AppUser(
           id: user.uid,
@@ -122,15 +97,12 @@ class AuthService {
           username: username,
           createdAt: DateTime.now(),
           token: idToken,
-          avatarBase64: rawBase64,
-          role: data['role'] ?? 'user', // Nhận role từ backend
+          avatarUrl: data['avatarUrl'] as String?,
+          role: data['role'] ?? 'user',
         );
       } else {
-        // Nếu backend lỗi → xóa user Firebase đã tạo (rollback)
-        await user
-            .delete()
-            .catchError((e) => print('Rollback delete user failed: $e'));
-        final error = jsonDecode(response.body);
+        await user.delete();
+        final error = jsonDecode(responseBody);
         throw Exception(error['message'] ?? 'Đăng ký thất bại');
       }
     } on FirebaseAuthException catch (e) {
@@ -140,17 +112,19 @@ class AuthService {
       if (e.code == 'invalid-email') msg = 'Email không hợp lệ';
       throw Exception(msg);
     } catch (e) {
-      print('AuthService: Registration error: $e');
+      print('❌ Registration error: $e');
       rethrow;
     }
   }
 
+  // ============================================
+  // LOGIN
+  // ============================================
   Future<AppUser?> login({
     required String email,
     required String password,
   }) async {
     try {
-      // 1. Đăng nhập Firebase trước (đã ok)
       final userCredential = await _auth.signInWithEmailAndPassword(
         email: email,
         password: password,
@@ -159,28 +133,21 @@ class AuthService {
       final user = userCredential.user;
       if (user == null) throw Exception('Đăng nhập thất bại');
 
-      // 2. Lấy ID token
       final idToken = await user.getIdToken();
       if (idToken == null) throw Exception('Không lấy được token');
 
-      // 3. GỌI BACKEND CHỈ GỬI idToken THÔI (QUAN TRỌNG NHẤT)
-      final response = await http
-          .post(
+      final response = await http.post(
         Uri.parse(ApiRoutes.login),
         headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'idToken': idToken}), // ← CHỈ GỬI CÁI NÀY
-      )
-          .timeout(
-          const Duration(seconds: 20)); // tăng timeout lên 20s cho chắc
-
-      print('Login API Response: ${response.statusCode} - ${response.body}');
+        body: jsonEncode({'idToken': idToken}),
+      ).timeout(const Duration(seconds: 20));
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
 
-        String? avatarBase64 = data['avatarBase64'] as String?;
-        if (avatarBase64 == null || avatarBase64.isEmpty) {
-          avatarBase64 = await fetchAvatarBase64(user.uid, idToken);
+        String? avatarUrl = data['avatarUrl'] as String?;
+        if (avatarUrl == null || avatarUrl.isEmpty) {
+          avatarUrl = await fetchAvatarUrl(user.uid, idToken);
         }
 
         final String userRole = data['role'] as String? ?? 'user';
@@ -192,69 +159,55 @@ class AuthService {
           address: data['address'] as String? ?? '',
           username: data['username'] as String? ?? '',
           createdAt: DateTime.parse(
-              data['createdAt'] as String? ?? DateTime.now().toIso8601String()),
+            data['createdAt'] as String? ?? DateTime.now().toIso8601String(),
+          ),
           token: idToken,
-          avatarBase64: avatarBase64,
+          avatarUrl: avatarUrl,
           role: userRole,
         );
       } else {
         final error = jsonDecode(response.body);
         throw Exception(error['message'] ?? 'Đăng nhập thất bại');
       }
-    } on FirebaseAuthException catch (e) {
-      String msg = 'Đăng nhập thất bại';
-      if (e.code == 'user-not-found') msg = 'Email không tồn tại';
-      if (e.code == 'wrong-password' || e.code == 'invalid-credential')
-        msg = 'Mật khẩu sai';
-      throw Exception(msg);
-    } on TimeoutException catch (_) {
-      throw Exception(
-          'Kết nối server quá lâu. Vui lòng kiểm tra mạng và thử lại.');
     } catch (e) {
-      print('AuthService: Login error: $e');
+      print('❌ Login error: $e');
       rethrow;
     }
   }
 
+  // ============================================
+  // SIGN IN WITH GOOGLE
+  // ============================================
   Future<AppUser?> signInWithGoogle() async {
     try {
       final googleUser = await _googleSignIn.signIn();
       if (googleUser == null) {
-        print('AuthService: Google Sign-In cancelled by user');
+        print('Google Sign-In cancelled');
         return null;
       }
-      print(
-          'AuthService: Google user: ${googleUser.email}, ID: ${googleUser
-              .id}');
+
       final googleAuth = await googleUser.authentication;
       final idToken = googleAuth.idToken;
       final accessToken = googleAuth.accessToken;
+
       if (idToken == null || idToken.isEmpty) {
-        print(
-            'AuthService: No ID token from Google Sign-In, accessToken: ${accessToken
-                ?.substring(0, 10)}...');
         throw Exception('Failed to obtain ID token');
       }
-      print('AuthService: Google ID token: ${idToken.substring(0, 10)}...');
+
       final credential = GoogleAuthProvider.credential(
         accessToken: accessToken,
         idToken: idToken,
       );
+
       final userCredential = await _auth.signInWithCredential(credential);
       final user = userCredential.user;
-      if (user == null) {
-        print('AuthService: No Firebase user from Google Sign-In');
-        throw Exception('Failed to sign in with Google');
-      }
-      print('AuthService: Firebase user: ${user.uid}, email: ${user.email}');
+      if (user == null) throw Exception('Failed to sign in with Google');
+
       final firebaseIdToken = await user.getIdToken(true);
       if (firebaseIdToken == null || firebaseIdToken.isEmpty) {
-        print('AuthService: No Firebase ID token for user: ${user.uid}');
         throw Exception('Failed to obtain Firebase ID token');
       }
-      print(
-          'AuthService: Firebase ID token: ${firebaseIdToken.substring(
-              0, 10)}...');
+
       final response = await http.post(
         Uri.parse(ApiRoutes.login),
         headers: {'Content-Type': 'application/json'},
@@ -266,12 +219,11 @@ class AuthService {
           'idToken': firebaseIdToken,
         }),
       );
-      print(
-          'AuthService: Google Sign-In API response: ${response
-              .statusCode}, body: ${response.body}');
+
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        final avatarBase64 = await fetchAvatarBase64(user.uid, firebaseIdToken);
+        final avatarUrl = await fetchAvatarUrl(user.uid, firebaseIdToken);
+
         return AppUser(
           id: data['id'] as String,
           email: data['email'] as String,
@@ -279,113 +231,24 @@ class AuthService {
           phoneNumber: data['phoneNumber'] as String? ?? '',
           address: data['address'] as String? ?? '',
           createdAt: DateTime.parse(
-              data['createdAt'] as String? ?? DateTime.now().toIso8601String()),
+            data['createdAt'] as String? ?? DateTime.now().toIso8601String(),
+          ),
           token: firebaseIdToken,
-          avatarBase64: avatarBase64,
+          avatarUrl: avatarUrl,
         );
       } else {
         final errorData = jsonDecode(response.body);
-        print(
-            'AuthService: Google Sign-In API error: ${errorData['message'] ??
-                response.body}');
-        throw Exception(
-            'Đăng nhập Google thất bại: ${errorData['message'] ??
-                response.body}');
+        throw Exception('Đăng nhập Google thất bại: ${errorData['message'] ?? response.body}');
       }
     } catch (e) {
-      print('AuthService: Error signing in with Google: $e');
+      print('❌ Google sign in error: $e');
       throw Exception('Đăng nhập Google thất bại: $e');
     }
   }
 
-  Future<AppUser?> signInWithFacebook() async {
-    try {
-      await _facebookAuth.logOut().catchError((e) {
-        print('AuthService: Error logging out Facebook before login: $e');
-      });
-      final LoginResult result = await _facebookAuth.login(
-        permissions: ['email', 'public_profile'],
-        loginBehavior: LoginBehavior.dialogOnly,
-      );
-      if (result.status != LoginStatus.success) {
-        print('AuthService: Facebook login failed: ${result.message}');
-        return null;
-      }
-      final AccessToken? accessToken = result.accessToken;
-      if (accessToken == null) {
-        print('AuthService: Facebook access token is null');
-        throw Exception('Failed to obtain access token');
-      }
-      final facebookAuthCredential =
-      FacebookAuthProvider.credential(accessToken.token);
-      final userCredential =
-      await _auth.signInWithCredential(facebookAuthCredential);
-      final user = userCredential.user;
-      if (user == null) {
-        print('AuthService: No user from Facebook Sign-In');
-        throw Exception('Failed to sign in with Facebook');
-      }
-      final idToken = await user.getIdToken(true);
-      if (idToken == null) {
-        print('AuthService: No ID token from Facebook Sign-In');
-        throw Exception('Failed to obtain ID token');
-      }
-      await _auth.setPersistence(Persistence.NONE).catchError((e) {
-        print(
-            'AuthService: Error setting persistence after Facebook sign-in: $e');
-      });
-      final docRef = _firestore.collection('Users').doc(user.uid);
-      final docSnapshot = await docRef.get();
-      if (!docSnapshot.exists) {
-        await docRef.set({
-          'email': user.email ?? '',
-          'phoneNumber': '',
-          'address': '',
-          'username': user.displayName ?? '',
-          'createdAt': FieldValue.serverTimestamp(),
-        });
-      }
-      final userData = await _facebookAuth.getUserData();
-      final response = await http.post(
-        Uri.parse(ApiRoutes.login),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'email': userData['email'] ?? user.email,
-          'facebookId': userData['id'],
-          'username': userData['name'] ?? user.displayName,
-          'avatar': userData['picture']['data']['url'],
-          'idToken': idToken,
-        }),
-      );
-      print(
-          'AuthService: Facebook Sign-In response: ${response
-              .statusCode}, body: ${response.body}');
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        final avatarBase64 = await fetchAvatarBase64(user.uid, idToken);
-        return AppUser(
-          id: data['id'] as String,
-          email: data['email'] as String,
-          phoneNumber: data['phoneNumber'] as String? ?? '',
-          address: data['address'] as String? ?? '',
-          createdAt: DateTime.parse(
-              data['createdAt'] as String? ?? DateTime.now().toIso8601String()),
-          username: data['username'] as String? ?? user.displayName ?? '',
-          token: idToken,
-          avatarBase64: avatarBase64,
-        );
-      } else {
-        final errorData = jsonDecode(response.body);
-        throw Exception(
-            'Đăng nhập Facebook thất bại: ${errorData['message'] ??
-                response.body}');
-      }
-    } catch (e) {
-      print('AuthService: Error during Facebook sign-in: $e');
-      throw Exception('Đăng nhập Facebook thất bại: $e');
-    }
-  }
-
+  // ============================================
+  // PASSWORD RESET
+  // ============================================
   Future<String> sendPasswordResetEmail(String email) async {
     try {
       final response = await http.post(
@@ -393,18 +256,15 @@ class AuthService {
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({'email': email}),
       );
-      print(
-          'AuthService: Send reset email response: ${response
-              .statusCode}, body: ${response.body}');
+
       if (response.statusCode == 200) {
         return 'Email đặt lại mật khẩu đã được gửi thành công';
       } else {
         final errorData = jsonDecode(response.body);
-        throw Exception(
-            'Gửi email thất bại: ${errorData['message'] ?? response.body}');
+        throw Exception('Gửi email thất bại: ${errorData['message'] ?? response.body}');
       }
     } catch (e) {
-      print('AuthService: Error sending password reset email: $e');
+      print('❌ Send reset email error: $e');
       throw Exception('Gửi email thất bại: $e');
     }
   }
@@ -414,59 +274,52 @@ class AuthService {
       final response = await http.post(
         Uri.parse(ApiRoutes.resetPassword),
         headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'oobCode': oobCode,
-          'newPassword': newPassword,
-        }),
+        body: jsonEncode({'oobCode': oobCode, 'newPassword': newPassword}),
       );
-      print(
-          'AuthService: Reset password response: ${response
-              .statusCode}, body: ${response.body}');
+
       if (response.statusCode != 200) {
         final errorData = jsonDecode(response.body);
-        throw Exception(
-            'Đặt lại mật khẩu thất bại: ${errorData['message'] ??
-                response.body}');
+        throw Exception('Đặt lại mật khẩu thất bại: ${errorData['message'] ?? response.body}');
       }
     } catch (e) {
-      print('AuthService: Error resetting password: $e');
+      print('❌ Reset password error: $e');
       throw Exception('Đặt lại mật khẩu thất bại: $e');
     }
   }
 
+  // ============================================
+  // CHANGE PASSWORD
+  // ============================================
   Future<bool> changePassword({required String newPassword}) async {
     try {
       final user = _auth.currentUser;
-      if (user == null) {
-        return false;
-      }
+      if (user == null) return false;
+
       final idToken = await user.getIdToken(true);
-      if (idToken == null) {
-        return false;
-      }
+      if (idToken == null) return false;
+
       final response = await http.post(
         Uri.parse(ApiRoutes.changePassword),
         headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'idToken': idToken,
-          'newPassword': newPassword,
-        }),
+        body: jsonEncode({'idToken': idToken, 'newPassword': newPassword}),
       );
+
       if (response.statusCode == 200) {
         await user.updatePassword(newPassword);
         return true;
       } else {
         final errorData = jsonDecode(response.body);
-        throw Exception(
-            'Thay đổi mật khẩu thất bại: ${errorData['message'] ??
-                response.body}');
+        throw Exception('Thay đổi mật khẩu thất bại: ${errorData['message'] ?? response.body}');
       }
     } catch (e) {
-      print('AuthService: Error during password change: $e');
+      print('❌ Change password error: $e');
       throw Exception('Thay đổi mật khẩu thất bại: $e');
     }
   }
 
+  // ============================================
+  // UPDATE PROFILE
+  // ============================================
   Future<AppUser?> updateProfile({
     required String phoneNumber,
     required String address,
@@ -474,13 +327,11 @@ class AuthService {
   }) async {
     try {
       final user = _auth.currentUser;
-      if (user == null) {
-        return null;
-      }
+      if (user == null) return null;
+
       final idToken = await user.getIdToken(true);
-      if (idToken == null) {
-        return null;
-      }
+      if (idToken == null) return null;
+
       final response = await http.post(
         Uri.parse(ApiRoutes.updateProfile),
         headers: {'Content-Type': 'application/json'},
@@ -491,65 +342,84 @@ class AuthService {
           'username': username,
         }),
       );
+
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        final avatarBase64 = await fetchAvatarBase64(user.uid, idToken);
+        final avatarUrl = await fetchAvatarUrl(user.uid, idToken);
+
         return AppUser(
           id: data['id'] as String,
           email: data['email'] as String,
           phoneNumber: data['phoneNumber'] as String,
           address: data['address'] as String,
           createdAt: DateTime.parse(
-              data['createdAt'] as String? ?? DateTime.now().toIso8601String()),
+            data['createdAt'] as String? ?? DateTime.now().toIso8601String(),
+          ),
           username: data['username'] as String? ?? '',
           token: idToken,
-          avatarBase64: avatarBase64,
+          avatarUrl: avatarUrl,
         );
       } else {
         final errorData = jsonDecode(response.body);
-        throw Exception(
-            'Cập nhật hồ sơ thất bại: ${errorData['message'] ??
-                response.body}');
+        throw Exception('Cập nhật hồ sơ thất bại: ${errorData['message'] ?? response.body}');
       }
     } catch (e) {
-      print('AuthService: Error during profile update: $e');
+      print('❌ Update profile error: $e');
       throw Exception('Cập nhật hồ sơ thất bại: $e');
     }
   }
 
-  Future<String?> uploadProfileImage({required String imageBase64}) async {
+  // ============================================
+  // UPLOAD PROFILE IMAGE
+  // ============================================
+  Future<String?> uploadProfileImage({required String imagePath}) async {
     try {
       final user = _auth.currentUser;
-      if (user == null) {
-        return null;
-      }
+      if (user == null) return null;
+
       final idToken = await user.getIdToken(true);
-      if (idToken == null) {
-        return null;
-      }
-      final response = await http.post(
-        Uri.parse(ApiRoutes.uploadImage),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'idToken': idToken,
-          'imageBase64': imageBase64,
-        }),
-      );
+      if (idToken == null) return null;
+
+      print('═══════════════════════════════════════════');
+      print('📤 UPLOAD PROFILE IMAGE');
+      print('═══════════════════════════════════════════');
+
+      var request = http.MultipartRequest('POST', Uri.parse(ApiRoutes.uploadImage));
+      request.fields['idToken'] = idToken;
+
+      // ✅ Upload with field 'avatar'
+      request.files.add(await http.MultipartFile.fromPath('avatar', imagePath));
+
+      print('📤 Sending multipart request...');
+      final response = await request.send();
+      final responseBody = await response.stream.bytesToString();
+
+      print('📊 Response: ${response.statusCode}');
+
       if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        return data['avatarBase64'] as String?;
+        final data = jsonDecode(responseBody);
+        final avatarUrl = data['avatarUrl'] as String?;
+
+        if (avatarUrl == null || avatarUrl.isEmpty) {
+          throw Exception('No avatarUrl in response');
+        }
+
+        print('✅ Upload successful');
+        return avatarUrl;
       } else {
-        final errorData = jsonDecode(response.body);
-        throw Exception(
-            'Tải ảnh lên thất bại: ${errorData['message'] ?? response.body}');
+        final errorData = jsonDecode(responseBody);
+        throw Exception('Tải ảnh lên thất bại: ${errorData['message'] ?? responseBody}');
       }
     } catch (e) {
-      print('AuthService: Error during image upload: $e');
+      print('❌ Upload image error: $e');
       throw Exception('Tải ảnh lên thất bại: $e');
     }
   }
 
-  Future<String?> fetchAvatarBase64(String userId, String idToken) async {
+  // ============================================
+  // FETCH AVATAR URL
+  // ============================================
+  Future<String?> fetchAvatarUrl(String userId, String idToken) async {
     try {
       final response = await http.get(
         Uri.parse(ApiRoutes.getAvatar(userId)),
@@ -558,70 +428,69 @@ class AuthService {
           'Authorization': 'Bearer $idToken',
         },
       );
-      print(
-          'AuthService: Fetch avatar response: ${response
-              .statusCode}, body: ${response.body}');
+
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        return data['avatarBase64'] as String?;
+        return data['avatarUrl'] as String?;
       } else {
-        print('AuthService: Failed to fetch avatarBase64: ${response.body}');
+        print('❌ Failed to fetch avatarUrl: ${response.body}');
         return null;
       }
     } catch (e) {
-      print('AuthService: Error fetching avatarBase64: $e');
+      print('❌ Error fetching avatarUrl: $e');
       return null;
     }
   }
 
+  // ============================================
+  // LOGOUT
+  // ============================================
   Future<bool> logout() async {
     try {
       await _googleSignIn.signOut();
-      await _googleSignIn.disconnect().catchError((e) {
-        print('AuthService: Error disconnecting Google: $e');
-      });
-      await _facebookAuth.logOut().catchError((e) {
-        print('AuthService: Error logging out Facebook: $e');
-      });
+      await _googleSignIn.disconnect().catchError((e) => print('❌ Error: $e'));
+      await _facebookAuth.logOut().catchError((e) => print('❌ Error: $e'));
       await _auth.signOut();
-      await _auth.setPersistence(Persistence.NONE).catchError((e) {
-        print('AuthService: Error setting persistence after logout: $e');
-      });
-      print('AuthService: User logged out, currentUser: ${_auth.currentUser}');
+      await _auth.setPersistence(Persistence.NONE).catchError((e) => print('❌ Error: $e'));
+
+      print('✅ User logged out');
       return true;
     } catch (e) {
-      print('AuthService: Error during logout: $e');
+      print('❌ Logout error: $e');
       throw Exception('Đăng xuất thất bại: $e');
     }
   }
 
+  // ============================================
+  // GET ID TOKEN
+  // ============================================
   Future<String?> getIdToken() async {
     try {
       final user = _auth.currentUser;
       if (user == null) {
-        print('AuthService: No user for ID token');
+        print('❌ No user for ID token');
         return null;
       }
       final idToken = await user.getIdToken(true);
-      print('AuthService: Got ID token: ${idToken?.substring(0, 10)}...');
+      print('✅ Got ID token');
       return idToken;
     } catch (e) {
-      print('AuthService: Error getting ID token: $e');
+      print('❌ Error getting ID token: $e');
       return null;
     }
   }
 
-  Future<Map<String, dynamic>> fetchMyPosts(
-      {int page = 1, int limit = 10}) async {
+  // ============================================
+  // FETCH MY POSTS
+  // ============================================
+  Future<Map<String, dynamic>> fetchMyPosts({int page = 1, int limit = 10}) async {
     try {
       final user = _auth.currentUser;
-      if (user == null) {
-        return {'rentals': [], 'total': 0, 'page': page, 'pages': 1};
-      }
+      if (user == null) return {'rentals': [], 'total': 0, 'page': page, 'pages': 1};
+
       final idToken = await user.getIdToken(true);
-      if (idToken == null) {
-        return {'rentals': [], 'total': 0, 'page': page, 'pages': 1};
-      }
+      if (idToken == null) return {'rentals': [], 'total': 0, 'page': page, 'pages': 1};
+
       final response = await http.get(
         Uri.parse('${ApiRoutes.myPosts}?page=$page&limit=$limit'),
         headers: {
@@ -629,11 +498,13 @@ class AuthService {
           'Authorization': 'Bearer $idToken',
         },
       );
+
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         final rentals = (data['rentals'] as List)
             .map((rental) => Rental.fromJson(rental))
             .toList();
+
         return {
           'rentals': rentals,
           'total': data['total'] ?? 0,
@@ -642,26 +513,25 @@ class AuthService {
         };
       } else {
         final errorData = jsonDecode(response.body);
-        throw Exception(
-            'Lấy bài đăng thất bại: ${errorData['message'] ?? response.body}');
+        throw Exception('Lấy bài đăng thất bại: ${errorData['message'] ?? response.body}');
       }
     } catch (e) {
-      print('AuthService: Error fetching posts: $e');
+      print('❌ Fetch posts error: $e');
       throw Exception('Lấy bài đăng thất bại: $e');
     }
   }
 
-  Future<Map<String, dynamic>> fetchRecentComments(
-      {int page = 1, int limit = 10}) async {
+  // ============================================
+  // FETCH RECENT COMMENTS
+  // ============================================
+  Future<Map<String, dynamic>> fetchRecentComments({int page = 1, int limit = 10}) async {
     try {
       final user = _auth.currentUser;
-      if (user == null) {
-        return {'comments': [], 'total': 0, 'page': page, 'pages': 1};
-      }
+      if (user == null) return {'comments': [], 'total': 0, 'page': page, 'pages': 1};
+
       final idToken = await user.getIdToken(true);
-      if (idToken == null) {
-        return {'comments': [], 'total': 0, 'page': page, 'pages': 1};
-      }
+      if (idToken == null) return {'comments': [], 'total': 0, 'page': page, 'pages': 1};
+
       final response = await http.get(
         Uri.parse('${ApiRoutes.recentComments}?page=$page&limit=$limit'),
         headers: {
@@ -669,6 +539,7 @@ class AuthService {
           'Authorization': 'Bearer $idToken',
         },
       );
+
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         final comments = (data['comments'] as List).map((comment) {
@@ -677,30 +548,25 @@ class AuthService {
             final userId = Map<String, dynamic>.from(commentMap['userId']);
             commentMap['userId'] = {
               ...userId,
-              'avatarBytes': userId['avatarBase64'] != null
-                  ? base64Decode(userId['avatarBase64'])
-                  : null,
+              'avatarBytes': userId['avatarBase64'] != null ? base64Decode(userId['avatarBase64']) : null,
             };
           }
           if (commentMap['replies'] != null) {
-            commentMap['replies'] =
-                (commentMap['replies'] as List).map((reply) {
-                  final replyMap = Map<String, dynamic>.from(reply);
-                  if (replyMap['userId'] != null) {
-                    final replyUserId =
-                    Map<String, dynamic>.from(replyMap['userId']);
-                    replyMap['userId'] = {
-                      ...replyUserId,
-                      'avatarBytes': replyUserId['avatarBase64'] != null
-                          ? base64Decode(replyUserId['avatarBase64'])
-                          : null,
-                    };
-                  }
-                  return replyMap;
-                }).toList();
+            commentMap['replies'] = (commentMap['replies'] as List).map((reply) {
+              final replyMap = Map<String, dynamic>.from(reply);
+              if (replyMap['userId'] != null) {
+                final replyUserId = Map<String, dynamic>.from(replyMap['userId']);
+                replyMap['userId'] = {
+                  ...replyUserId,
+                  'avatarBytes': replyUserId['avatarBase64'] != null ? base64Decode(replyUserId['avatarBase64']) : null,
+                };
+              }
+              return replyMap;
+            }).toList();
           }
           return Comment.fromJson(commentMap);
         }).toList();
+
         return {
           'comments': comments,
           'total': data['total'] ?? 0,
@@ -709,55 +575,37 @@ class AuthService {
         };
       } else {
         final errorData = jsonDecode(response.body);
-        throw Exception(
-            'Lấy bình luận thất bại: ${errorData['message'] ?? response.body}');
+        throw Exception('Lấy bình luận thất bại: ${errorData['message'] ?? response.body}');
       }
     } catch (e) {
-      print('AuthService: Error fetching recent comments: $e');
+      print('❌ Fetch comments error: $e');
       throw Exception('Lấy bình luận thất bại: $e');
     }
   }
 
-  Future<Map<String, dynamic>> fetchNotifications(
-      {int page = 1, int limit = 10}) async {
+  // ============================================
+  // FETCH NOTIFICATIONS
+  // ============================================
+  Future<Map<String, dynamic>> fetchNotifications({int page = 1, int limit = 10}) async {
     try {
       final user = _auth.currentUser;
-      if (user == null) {
-        print('AuthService: No user for fetching notifications');
-        return {'notifications': [], 'total': 0, 'page': page, 'pages': 1};
-      }
+      if (user == null) return {'notifications': [], 'total': 0, 'page': page, 'pages': 1};
 
       final idToken = await user.getIdToken(true);
-      if (idToken == null) {
-        print('AuthService: No ID token for fetching notifications');
-        return {'notifications': [], 'total': 0, 'page': page, 'pages': 1};
-      }
+      if (idToken == null) return {'notifications': [], 'total': 0, 'page': page, 'pages': 1};
 
       print('🔵 [FETCH NOTIFICATIONS]');
-      print('   userId: ${user.uid}');
-      print('   page: $page');
-      print('   limit: $limit');
-
-      final Uri url = Uri.parse(
-        '${ApiRoutes.baseUrl}/notifications?page=$page&limit=$limit',
-      );
-
-      print('   URL: $url');
 
       final response = await http.get(
-        url,
+        Uri.parse('${ApiRoutes.baseUrl}/notifications?page=$page&limit=$limit'),
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $idToken',
         },
       ).timeout(const Duration(seconds: 15));
 
-      print('✅ [FETCH NOTIFICATIONS] Response: ${response.statusCode}');
-      print('   Body: ${response.body}');
-
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-
         final notifications = (data['notifications'] as List?)
             ?.map((notification) {
           try {
@@ -768,11 +616,9 @@ class AuthService {
           }
         })
             .whereType<NotificationModel>()
-            .toList() ??
-            [];
+            .toList() ?? [];
 
-        print('✅ [FETCH NOTIFICATIONS] Parsed ${notifications
-            .length} notifications');
+        print('✅ [FETCH NOTIFICATIONS] Parsed ${notifications.length} notifications');
 
         return {
           'notifications': notifications,
@@ -781,25 +627,24 @@ class AuthService {
           'pages': data['pagination']?['pages'] ?? 1,
         };
       } else if (response.statusCode == 401) {
-        print('⚠️ [FETCH NOTIFICATIONS] Unauthorized - Token may be expired');
+        print('⚠️ [FETCH NOTIFICATIONS] Unauthorized');
         return {'notifications': [], 'total': 0, 'page': page, 'pages': 1};
       } else {
         final errorData = jsonDecode(response.body);
-        print('❌ [FETCH NOTIFICATIONS] Error: ${response.statusCode}');
-        print('   Message: ${errorData['message']}');
-        throw Exception(
-          'Lấy thông báo thất bại: ${errorData['message'] ?? response.body}',
-        );
+        throw Exception('Lấy thông báo thất bại: ${errorData['message'] ?? response.body}');
       }
-    } on TimeoutException catch (_) {
+    } on TimeoutException {
       print('❌ [FETCH NOTIFICATIONS] Timeout');
-      throw Exception('Kết nối server quá lâu. Vui lòng kiểm tra mạng.');
+      throw Exception('Kết nối server quá lâu');
     } catch (e) {
       print('❌ [FETCH NOTIFICATIONS] Error: $e');
       throw Exception('Lấy thông báo thất bại: $e');
     }
   }
 
+  // ============================================
+  // MARK NOTIFICATION AS READ
+  // ============================================
   Future<bool> markNotificationAsRead(String notificationId) async {
     try {
       final user = _auth.currentUser;
@@ -807,9 +652,6 @@ class AuthService {
 
       final idToken = await user.getIdToken(true);
       if (idToken == null) return false;
-
-      print('🔵 [MARK AS READ]');
-      print('   notificationId: $notificationId');
 
       final response = await http.patch(
         Uri.parse('${ApiRoutes.baseUrl}/notifications/$notificationId/read'),
@@ -819,19 +661,16 @@ class AuthService {
         },
       ).timeout(const Duration(seconds: 10));
 
-      if (response.statusCode == 200) {
-        print('✅ [MARK AS READ] Success');
-        return true;
-      } else {
-        print('❌ [MARK AS READ] Error: ${response.statusCode}');
-        return false;
-      }
+      return response.statusCode == 200;
     } catch (e) {
-      print('❌ [MARK AS READ] Error: $e');
+      print('❌ Mark as read error: $e');
       return false;
     }
   }
 
+  // ============================================
+  // MARK ALL NOTIFICATIONS AS READ
+  // ============================================
   Future<bool> markAllNotificationsAsRead() async {
     try {
       final user = _auth.currentUser;
@@ -839,8 +678,6 @@ class AuthService {
 
       final idToken = await user.getIdToken(true);
       if (idToken == null) return false;
-
-      print('🔵 [MARK ALL AS READ]');
 
       final response = await http.patch(
         Uri.parse('${ApiRoutes.baseUrl}/notifications/read-all'),
@@ -850,19 +687,16 @@ class AuthService {
         },
       ).timeout(const Duration(seconds: 10));
 
-      if (response.statusCode == 200) {
-        print('✅ [MARK ALL AS READ] Success');
-        return true;
-      } else {
-        print('❌ [MARK ALL AS READ] Error: ${response.statusCode}');
-        return false;
-      }
+      return response.statusCode == 200;
     } catch (e) {
-      print('❌ [MARK ALL AS READ] Error: $e');
+      print('❌ Mark all as read error: $e');
       return false;
     }
   }
 
+  // ============================================
+  // DELETE NOTIFICATION
+  // ============================================
   Future<bool> deleteNotification(String notificationId) async {
     try {
       final user = _auth.currentUser;
@@ -870,9 +704,6 @@ class AuthService {
 
       final idToken = await user.getIdToken(true);
       if (idToken == null) return false;
-
-      print('🔵 [DELETE NOTIFICATION]');
-      print('   notificationId: $notificationId');
 
       final response = await http.delete(
         Uri.parse('${ApiRoutes.baseUrl}/notifications/$notificationId'),
@@ -882,19 +713,16 @@ class AuthService {
         },
       ).timeout(const Duration(seconds: 10));
 
-      if (response.statusCode == 200) {
-        print('✅ [DELETE NOTIFICATION] Success');
-        return true;
-      } else {
-        print('❌ [DELETE NOTIFICATION] Error: ${response.statusCode}');
-        return false;
-      }
+      return response.statusCode == 200;
     } catch (e) {
-      print('❌ [DELETE NOTIFICATION] Error: $e');
+      print('❌ Delete notification error: $e');
       return false;
     }
   }
 
+  // ============================================
+  // GET UNREAD COUNT
+  // ============================================
   Future<int> getUnreadNotificationCount() async {
     try {
       final user = _auth.currentUser;
@@ -917,25 +745,21 @@ class AuthService {
       }
       return 0;
     } catch (e) {
-      print('❌ [GET UNREAD COUNT] Error: $e');
+      print('❌ Get unread count error: $e');
       return 0;
     }
   }
 
-// ✅ Lấy danh sách thông báo đã xóa (Thùng rác)
+  // ============================================
+  // GET DELETED NOTIFICATIONS
+  // ============================================
   Future<Map<String, dynamic>> getDeletedNotifications() async {
     try {
       final user = _auth.currentUser;
-      if (user == null) {
-        return {'count': 0, 'data': []};
-      }
+      if (user == null) return {'count': 0, 'data': []};
 
       final idToken = await user.getIdToken(true);
-      if (idToken == null) {
-        return {'count': 0, 'data': []};
-      }
-
-      print('🔵 [GET DELETED NOTIFICATIONS]');
+      if (idToken == null) return {'count': 0, 'data': []};
 
       final response = await http.get(
         Uri.parse('${ApiRoutes.baseUrl}/notifications/deleted/list'),
@@ -945,23 +769,16 @@ class AuthService {
         },
       ).timeout(const Duration(seconds: 10));
 
-      print('✅ [GET DELETED NOTIFICATIONS] Response: ${response.statusCode}');
-
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        return {
-          'count': data['count'] as int? ?? 0,
-          'data': data['data'] as List? ?? [],
-        };
+        return {'count': data['count'] as int? ?? 0, 'data': data['data'] as List? ?? []};
       }
       return {'count': 0, 'data': []};
     } catch (e) {
-      print('❌ [GET DELETED NOTIFICATIONS] Error: $e');
+      print('❌ Get deleted notifications error: $e');
       return {'count': 0, 'data': []};
     }
   }
-
-// ✅ Hoàn tác xóa thông báo RIÊNG LẺ
   Future<bool> undoDeleteNotificationSingle(String notificationId) async {
     try {
       final user = _auth.currentUser;
@@ -1005,8 +822,9 @@ class AuthService {
       throw Exception('Hoàn tác thất bại: $e');
     }
   }
-
-// ✅ Hoàn tác xóa tất cả thông báo
+  // ============================================
+  // UNDO DELETE NOTIFICATION SINGLE
+  // ============================================
   Future<bool> undoDeleteNotifications() async {
     try {
       final user = _auth.currentUser;
@@ -1014,8 +832,6 @@ class AuthService {
 
       final idToken = await user.getIdToken(true);
       if (idToken == null) return false;
-
-      print('🔵 [UNDO DELETE ALL NOTIFICATIONS]');
 
       final response = await http.post(
         Uri.parse('${ApiRoutes.baseUrl}/notifications/restore'),
@@ -1025,36 +841,16 @@ class AuthService {
         },
       ).timeout(const Duration(seconds: 10));
 
-      print(
-          '✅ [UNDO DELETE ALL NOTIFICATIONS] Response: ${response.statusCode}');
-      print('   Body: ${response.body}');
-
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        print(
-            '✅ [UNDO DELETE ALL NOTIFICATIONS] Restored ${data['restoredCount']} notifications');
-        return true;
-      } else if (response.statusCode == 404) {
-        print('⚠️ [UNDO DELETE ALL NOTIFICATIONS] No undo available');
-        return false;
-      } else {
-        final errorData = jsonDecode(response.body);
-        print(
-            '❌ [UNDO DELETE ALL NOTIFICATIONS] Error: ${errorData['message']}');
-        throw Exception(
-          'Hoàn tác thất bại: ${errorData['message'] ?? response.body}',
-        );
-      }
-    } on TimeoutException catch (_) {
-      print('❌ [UNDO DELETE ALL NOTIFICATIONS] Timeout');
-      throw Exception('Kết nối server quá lâu. Vui lòng kiểm tra mạng.');
+      return response.statusCode == 200;
     } catch (e) {
-      print('❌ [UNDO DELETE ALL NOTIFICATIONS] Error: $e');
+      print('❌ Undo delete all error: $e');
       throw Exception('Hoàn tác thất bại: $e');
     }
   }
 
-// ✅ Xóa vĩnh viễn từ undo stack
+  // ============================================
+  // PERMANENT DELETE FROM UNDO
+  // ============================================
   Future<bool> permanentDeleteFromUndo(String notificationId) async {
     try {
       final user = _auth.currentUser;
@@ -1063,56 +859,31 @@ class AuthService {
       final idToken = await user.getIdToken(true);
       if (idToken == null) return false;
 
-      print('🔵 [PERMANENT DELETE UNDO]');
-      print('   notificationId: $notificationId');
-
       final response = await http.delete(
-        Uri.parse(
-            '${ApiRoutes.baseUrl}/notifications/$notificationId/permanent'),
+        Uri.parse('${ApiRoutes.baseUrl}/notifications/$notificationId/permanent'),
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $idToken',
         },
       ).timeout(const Duration(seconds: 10));
 
-      print('✅ [PERMANENT DELETE UNDO] Response: ${response.statusCode}');
-
-      if (response.statusCode == 200) {
-        print('✅ [PERMANENT DELETE UNDO] Permanently deleted');
-        return true;
-      } else if (response.statusCode == 404) {
-        print('⚠️ [PERMANENT DELETE UNDO] Not found');
-        return false;
-      } else {
-        final errorData = jsonDecode(response.body);
-        print('❌ [PERMANENT DELETE UNDO] Error: ${errorData['message']}');
-        throw Exception(
-          'Xóa vĩnh viễn thất bại: ${errorData['message'] ?? response.body}',
-        );
-      }
-    } on TimeoutException catch (_) {
-      print('❌ [PERMANENT DELETE UNDO] Timeout');
-      throw Exception('Kết nối server quá lâu. Vui lòng kiểm tra mạng.');
+      return response.statusCode == 200;
     } catch (e) {
-      print('❌ [PERMANENT DELETE UNDO] Error: $e');
+      print('❌ Permanent delete error: $e');
       throw Exception('Xóa vĩnh viễn thất bại: $e');
     }
   }
 
-  // ✅ Kiểm tra xem có thông báo hoàn tác không
+  // ============================================
+  // CHECK UNDO STATUS
+  // ============================================
   Future<Map<String, dynamic>> checkUndoStatus() async {
     try {
       final user = _auth.currentUser;
-      if (user == null) {
-        return {'hasUndo': false, 'undoCount': 0};
-      }
+      if (user == null) return {'hasUndo': false, 'undoCount': 0};
 
       final idToken = await user.getIdToken(true);
-      if (idToken == null) {
-        return {'hasUndo': false, 'undoCount': 0};
-      }
-
-      print('🔵 [CHECK UNDO STATUS]');
+      if (idToken == null) return {'hasUndo': false, 'undoCount': 0};
 
       final response = await http.get(
         Uri.parse('${ApiRoutes.baseUrl}/notifications/undo/status'),
@@ -1121,8 +892,6 @@ class AuthService {
           'Authorization': 'Bearer $idToken',
         },
       ).timeout(const Duration(seconds: 10));
-
-      print('✅ [CHECK UNDO STATUS] Response: ${response.statusCode}');
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
@@ -1134,26 +903,22 @@ class AuthService {
       }
       return {'hasUndo': false, 'undoCount': 0};
     } catch (e) {
-      print('❌ [CHECK UNDO STATUS] Error: $e');
+      print('❌ Check undo status error: $e');
       return {'hasUndo': false, 'undoCount': 0};
     }
   }
 
-
+  // ============================================
+  // FETCH RENTAL
+  // ============================================
   Future<Rental> fetchRental(String rentalId) async {
     try {
       final user = _auth.currentUser;
-      if (user == null) {
-        print(
-            'AuthService: No user found for fetching rental (rentalId: $rentalId)');
-        throw Exception('User not found');
-      }
+      if (user == null) throw Exception('User not found');
+
       final idToken = await user.getIdToken(true);
-      if (idToken == null) {
-        print(
-            'AuthService: No ID token for fetching rental (rentalId: $rentalId)');
-        throw Exception('Failed to obtain token');
-      }
+      if (idToken == null) throw Exception('Failed to obtain token');
+
       final response = await http.get(
         Uri.parse('${ApiRoutes.baseUrl}/rentals/$rentalId'),
         headers: {
@@ -1161,34 +926,31 @@ class AuthService {
           'Authorization': 'Bearer $idToken',
         },
       );
-      print(
-          'AuthService: Fetch rental response (rentalId: $rentalId): ${response
-              .statusCode}, body: ${response.body}');
+
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         return Rental.fromJson(data);
       } else {
         final errorData = jsonDecode(response.body);
-        throw Exception(
-            'Failed to fetch rental: ${errorData['message'] ?? response.body}');
+        throw Exception('Failed to fetch rental: ${errorData['message'] ?? response.body}');
       }
     } catch (e) {
-      print('AuthService: Error fetching rental (rentalId: $rentalId): $e');
+      print('❌ Fetch rental error: $e');
       throw Exception('Failed to fetch rental: $e');
     }
   }
 
-
+  // ============================================
+  // DELETE RENTAL
+  // ============================================
   Future<void> deleteRental(String rentalId) async {
     try {
       final user = _auth.currentUser;
-      if (user == null) {
-        return;
-      }
+      if (user == null) return;
+
       final idToken = await user.getIdToken(true);
-      if (idToken == null) {
-        return;
-      }
+      if (idToken == null) return;
+
       final response = await http.delete(
         Uri.parse('${ApiRoutes.baseUrl}/rentals/$rentalId'),
         headers: {
@@ -1196,126 +958,148 @@ class AuthService {
           'Authorization': 'Bearer $idToken',
         },
       );
+
       if (response.statusCode != 200) {
         final errorData = jsonDecode(response.body);
-        throw Exception(
-            'Failed to delete rental: ${errorData['message'] ??
-                response.body}');
+        throw Exception('Failed to delete rental: ${errorData['message'] ?? response.body}');
       }
     } catch (e) {
-      print('AuthService: Error deleting rental (rentalId: $rentalId): $e');
+      print('❌ Delete rental error: $e');
       throw Exception('Failed to delete rental: $e');
     }
   }
 
+  // ============================================
+  // UPDATE RENTAL
+  // ============================================
   Future<Rental> updateRental({
     required String rentalId,
     required Map<String, dynamic> updatedData,
     List<String>? imagePaths,
+    List<String>? videoPaths,
     List<String>? removedImages,
   }) async {
     try {
       final user = _auth.currentUser;
-      if (user == null) {
-        throw Exception('Không tìm thấy người dùng');
-      }
-      final idToken = await user.getIdToken(true);
-      if (idToken == null) {
-        throw Exception('Không lấy được token xác thực');
-      }
+      if (user == null) throw Exception('Không tìm thấy người dùng');
 
-      // Lấy thông tin bài đăng hiện tại để xác thực ảnh cần xóa
+      final idToken = await user.getIdToken(true);
+      if (idToken == null) throw Exception('Không lấy được token');
+
       final currentRental = await fetchRental(rentalId);
 
-      // Lọc ra các ảnh thực sự hợp lệ để xóa
       final validRemovedImages = (removedImages ?? [])
           .where((url) =>
       url.isNotEmpty &&
-          url.startsWith('/uploads/') &&
+          (url.startsWith('http') || url.startsWith('/uploads/')) &&
           currentRental.images.contains(url))
           .toList();
 
-      // Tạo request PATCH dạng multipart
+
       var request = http.MultipartRequest(
         'PATCH',
         Uri.parse('${ApiRoutes.baseUrl}/rentals/$rentalId'),
       );
       request.headers['Authorization'] = 'Bearer $idToken';
+      request.headers['Accept'] = 'application/json';
 
-      // Thêm các trường dữ liệu cập nhật
       updatedData.forEach((key, value) {
         if (value != null) {
           request.fields[key] = value.toString();
         }
       });
 
-      // Thêm danh sách ảnh cần xóa (nếu có)
       if (validRemovedImages.isNotEmpty) {
-        request.fields['removedImages'] = jsonEncode(validRemovedImages);
+        request.fields['removedMedia'] = jsonEncode(validRemovedImages);
+        print('📤 Added removedMedia with ${validRemovedImages.length} URLs');
       }
 
-      // Thêm các file ảnh mới (nếu có)
+      int addedFiles = 0;
       if (imagePaths != null && imagePaths.isNotEmpty) {
         for (var path in imagePaths) {
-          if (path.isNotEmpty) {
-            request.files.add(await http.MultipartFile.fromPath(
-              'images',
-              path,
-              filename: path
-                  .split('/')
-                  .last,
-            ));
+          if (path.isNotEmpty && path.contains('/')) {
+            try {
+              request.files.add(await http.MultipartFile.fromPath(
+                'media',
+                path,
+                filename: path.split('/').last,
+              ));
+              addedFiles++;
+              print('📤 Added file: ${path.split('/').last}');
+            } catch (e) {
+              print('⚠️ Error adding file: $e');
+            }
+          }
+        }
+      }
+      if (videoPaths != null && videoPaths.isNotEmpty) {
+        for (final videoPath in videoPaths) {
+          final videoFile = File(videoPath);
+          if (await videoFile.exists()) {
+            // Kiểm tra kích thước file
+            final fileSize = await videoFile.length();
+            if (fileSize > 100 * 1024 * 1024) {
+              throw Exception('Video $videoPath vượt quá 100MB');
+            }
+            request.files.add(
+              await http.MultipartFile.fromPath(
+                'media',
+                videoPath,
+                contentType: MediaType('video', 'mp4'),
+              ),
+            );
+            print('🎥 Added video: $videoPath (${(fileSize / 1024 / 1024).toStringAsFixed(2)}MB)');
           }
         }
       }
 
-      print(
-          'AuthService: PATCH rental $rentalId, fields: ${request
-              .fields}, files: ${request.files.length}');
+      final response = await request.send().timeout(
+        const Duration(seconds: 30),
+        onTimeout: () {
+          throw Exception('Request timeout');
+        },
+      );
 
-      final response = await request.send();
       final responseBody = await response.stream.bytesToString();
-
-      print(
-          'AuthService: Update rental response ($rentalId): ${response
-              .statusCode}, body: $responseBody');
 
       if (response.statusCode == 200) {
         final data = jsonDecode(responseBody);
 
-        // ✅ FIX: Xử lý cả 'rental' và 'data' trong response
         final rentalData = data['rental'] ?? data['data'] ?? data;
 
         if (rentalData == null) {
-          throw Exception('Không nhận được dữ liệu bài đăng từ server');
+          throw Exception('Không nhận được dữ liệu bài đăng');
         }
 
-        // ✅ FIX: Xác thực ID tồn tại
-        if ((rentalData as Map<String, dynamic>)['id'] == null &&
-            (rentalData as Map<String, dynamic>)['_id'] == null) {
-          print('❌ AuthService: Missing ID in response: $rentalData');
-          throw Exception('RentalID is missing in JSON response');
+        if (rentalData['_id'] != null && rentalData['id'] == null) {
+          rentalData['id'] = rentalData['_id'];
         }
 
         final updatedRental = Rental.fromJson(rentalData);
 
         if (updatedRental.id == null || updatedRental.id!.isEmpty) {
-          throw Exception('Không thể lấy ID bài đăng từ response');
+          throw Exception('RentalID is missing');
         }
-
+        print('✅ Rental updated: ${updatedRental.id}');
         return updatedRental;
       } else {
         final errorData = jsonDecode(responseBody);
-        throw Exception(
-            'Cập nhật bài đăng thất bại: ${errorData['message'] ??
-                responseBody}');
+        print('❌ Update failed: ${response.statusCode}');
+        throw Exception('Cập nhật thất bại: ${errorData['message'] ?? responseBody}');
       }
+    } on TimeoutException {
+      print('❌ Request timeout');
+      throw Exception('Kết nối server quá lâu');
     } catch (e) {
-      print('AuthService: Lỗi cập nhật bài đăng ($rentalId): $e');
+      print('❌ Update rental error: $e');
       throw Exception('Cập nhật bài đăng thất bại: $e');
     }
   }
 }
+
+// ============================================
+// APP USER EXTENSION
+// ============================================
 extension AppUserExtension on AppUser {
   AppUser copyWith({
     String? id,
@@ -1324,8 +1108,9 @@ extension AppUserExtension on AppUser {
     String? address,
     DateTime? createdAt,
     String? token,
-    String? avatarBase64,
+    String? avatarUrl,
     String? username,
+    String? role,
   }) {
     return AppUser(
       id: id ?? this.id,
@@ -1334,8 +1119,9 @@ extension AppUserExtension on AppUser {
       address: address ?? this.address,
       createdAt: createdAt ?? this.createdAt,
       token: token ?? this.token,
-      avatarBase64: avatarBase64 ?? this.avatarBase64,
       username: username ?? this.username,
+      avatarUrl: avatarUrl ?? this.avatarUrl,
+      role: role ?? this.role,
     );
   }
 }

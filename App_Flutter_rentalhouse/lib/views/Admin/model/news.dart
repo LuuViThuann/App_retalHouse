@@ -30,15 +30,26 @@ class NewsModel {
     required this.updatedAt,
   });
 
-  /// Lấy full URL ảnh
+  /// Kiểm tra có phải ảnh Cloudinary không
+  bool get isCloudinaryImage {
+    return imageUrl.contains('cloudinary.com');
+  }
+
+  /// Đếm số ảnh
+  int get imageCount => imageUrls.length;
+
+  /// Lấy full URL ảnh theo index
   String getFullImageUrl(String baseUrl, {int index = 0}) {
     if (imageUrls.isEmpty) return '';
 
     final url = index < imageUrls.length ? imageUrls[index] : imageUrls[0];
 
+    // Nếu đã là full URL (Cloudinary hoặc HTTP), trả về luôn
     if (url.startsWith('http')) {
       return url;
     }
+
+    // Nếu là path local, thêm baseUrl
     if (url.startsWith('/')) {
       return '$baseUrl$url';
     }
@@ -48,7 +59,7 @@ class NewsModel {
   /// Lấy tất cả full URLs
   List<String> getAllFullImageUrls(String baseUrl) {
     return imageUrls.map((url) {
-      if (url.startsWith('http')) return url;
+      if (url.startsWith('http')) return url; // Cloudinary URL
       if (url.startsWith('/')) return '$baseUrl$url';
       return '$baseUrl/$url';
     }).toList();
@@ -56,13 +67,44 @@ class NewsModel {
 
   factory NewsModel.fromJson(Map<String, dynamic> json) {
     try {
-      // Xử lý imageUrls (mảng hoặc string cũ)
+      // Xử lý imageUrls với 3 nguồn: images (mới), imageUrls (cũ), imageUrl (fallback)
       List<String> urls = [];
 
-      if (json['imageUrls'] is List) {
-        urls = List<String>.from(json['imageUrls']);
-      } else if (json['imageUrl'] is String) {
-        urls = [(json['imageUrl'] as String).trim()];
+      // 1. Ưu tiên: Parse từ "images" array (format Cloudinary mới)
+      if (json['images'] != null && json['images'] is List) {
+        final imagesList = json['images'] as List;
+        urls = imagesList
+            .map((img) {
+          if (img is Map<String, dynamic> && img['url'] != null) {
+            return img['url'].toString().trim();
+          } else if (img is String) {
+            return img.trim();
+          }
+          return '';
+        })
+            .where((url) => url.isNotEmpty)
+            .toList();
+      }
+
+      // 2. Fallback: Parse từ "imageUrls" (format cũ)
+      if (urls.isEmpty && json['imageUrls'] != null && json['imageUrls'] is List) {
+        urls = (json['imageUrls'] as List)
+            .map((url) => url.toString().trim())
+            .where((url) => url.isNotEmpty)
+            .toList();
+      }
+
+      // 3. Fallback cuối: Lấy từ "imageUrl" đơn
+      if (urls.isEmpty && json['imageUrl'] != null) {
+        final singleUrl = json['imageUrl'].toString().trim();
+        if (singleUrl.isNotEmpty) {
+          urls = [singleUrl];
+        }
+      }
+
+      // Đảm bảo có ít nhất 1 URL (empty string nếu không có)
+      if (urls.isEmpty) {
+        urls = [''];
       }
 
       return NewsModel(
@@ -75,7 +117,7 @@ class NewsModel {
         author: (json['author'] ?? 'Admin').toString().trim(),
         category: (json['category'] ?? 'Tin tức').toString().trim(),
         isActive: json['isActive'] == true || json['isActive'] == 'true',
-        views: int.tryParse(json['views'].toString()) ?? 0,
+        views: int.tryParse(json['views']?.toString() ?? '0') ?? 0,
         featured: json['featured'] == true || json['featured'] == 'true',
         createdAt: _parseDateTime(json['createdAt']),
         updatedAt: _parseDateTime(json['updatedAt']),
@@ -114,7 +156,40 @@ class NewsModel {
     };
   }
 
+  /// Copy with method (hữu ích khi cập nhật local)
+  NewsModel copyWith({
+    String? id,
+    String? title,
+    String? content,
+    String? summary,
+    List<String>? imageUrls,
+    String? imageUrl,
+    String? author,
+    String? category,
+    bool? isActive,
+    int? views,
+    bool? featured,
+    DateTime? createdAt,
+    DateTime? updatedAt,
+  }) {
+    return NewsModel(
+      id: id ?? this.id,
+      title: title ?? this.title,
+      content: content ?? this.content,
+      summary: summary ?? this.summary,
+      imageUrls: imageUrls ?? this.imageUrls,
+      imageUrl: imageUrl ?? this.imageUrl,
+      author: author ?? this.author,
+      category: category ?? this.category,
+      isActive: isActive ?? this.isActive,
+      views: views ?? this.views,
+      featured: featured ?? this.featured,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+    );
+  }
+
   @override
   String toString() =>
-      'NewsModel(id: $id, title: $title, images: ${imageUrls.length}, featured: $featured)';
+      'NewsModel(id: $id, title: $title, images: ${imageUrls.length}, featured: $featured, cloudinary: $isCloudinaryImage)';
 }

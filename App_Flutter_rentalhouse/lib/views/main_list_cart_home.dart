@@ -31,8 +31,70 @@ class RentalItemWidget extends StatelessWidget {
 
   String formatCurrency(double amount) {
     final formatter =
-        NumberFormat.currency(locale: 'vi_VN', symbol: '₫', decimalDigits: 0);
+    NumberFormat.currency(locale: 'vi_VN', symbol: '₫', decimalDigits: 0);
     return formatter.format(amount);
+  }
+
+  ///  Helper: Kiểm tra xem URL có phải từ Cloudinary không
+  bool _isCloudinaryUrl(String url) {
+    return url.startsWith('http://') || url.startsWith('https://');
+  }
+
+  ///  Helper: Lấy URL hình ảnh đầy đủ
+  String _getImageUrl(String imageUrl) {
+    if (_isCloudinaryUrl(imageUrl)) {
+      // URL đã là Cloudinary URL đầy đủ
+      return imageUrl;
+    }
+    // Legacy: URL cục bộ (fallback cho dữ liệu cũ)
+    return '${ApiRoutes.serverBaseUrl}$imageUrl';
+  }
+
+  ///  Widget hiển thị ảnh với error handling tốt hơn
+  Widget _buildImageWidget(String imageUrl, {double height = 200}) {
+    final fullUrl = _getImageUrl(imageUrl);
+
+    return CachedNetworkImage(
+      imageUrl: fullUrl,
+      height: height,
+      fit: BoxFit.cover,
+      placeholder: (context, url) => Container(
+        height: height,
+        color: Colors.grey[200],
+        child: const Center(
+          child: CircularProgressIndicator(
+            strokeWidth: 2,
+            valueColor: AlwaysStoppedAnimation<Color>(Colors.blue),
+          ),
+        ),
+      ),
+      errorWidget: (context, url, error) {
+        debugPrint('❌ Image load error: $error');
+        debugPrint('   URL: $url');
+        return Container(
+          height: height,
+          color: Colors.grey[300],
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                Icons.broken_image_outlined,
+                size: 50,
+                color: Colors.grey[600],
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Không thể tải ảnh',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Colors.grey[600],
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
   }
 
   Route _createRoute(Widget page) {
@@ -44,7 +106,7 @@ class RentalItemWidget extends StatelessWidget {
         const curve = Curves.easeInOut;
 
         var tween =
-            Tween(begin: begin, end: end).chain(CurveTween(curve: curve));
+        Tween(begin: begin, end: end).chain(CurveTween(curve: curve));
         var offsetAnimation = animation.drive(tween);
 
         return SlideTransition(
@@ -108,83 +170,57 @@ class RentalItemWidget extends StatelessWidget {
                       borderRadius: BorderRadius.circular(8),
                       child: rental.images.isNotEmpty
                           ? Row(
-                              children: [
-                                // First image
-                                Expanded(
-                                  child: ClipRRect(
-                                    borderRadius: const BorderRadius.only(
-                                      topLeft: Radius.circular(8),
-                                      bottomLeft: Radius.circular(8),
-                                    ),
-                                    child: CachedNetworkImage(
-                                      imageUrl:
-                                          '${ApiRoutes.serverBaseUrl}${rental.images[0]}',
-                                      height: 200,
-                                      fit: BoxFit.cover,
-                                      placeholder: (context, url) =>
-                                          const Center(
-                                              child:
-                                                  CircularProgressIndicator()),
-                                      errorWidget: (context, url, error) {
-                                        print(
-                                            'Image load error: $error for URL: $url');
-                                        return const Icon(Icons.error,
-                                            size: 50);
-                                      },
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(width: 4),
-                                // Second image
-                                Expanded(
-                                  child: ClipRRect(
-                                    borderRadius: const BorderRadius.only(
-                                      topRight: Radius.circular(8),
-                                      bottomRight: Radius.circular(8),
-                                    ),
-                                    child: rental.images.length > 1
-                                        ? CachedNetworkImage(
-                                            imageUrl:
-                                                '${ApiRoutes.serverBaseUrl}${rental.images[1]}',
-                                            height: 200,
-                                            fit: BoxFit.cover,
-                                            placeholder: (context, url) =>
-                                                const Center(
-                                                    child:
-                                                        CircularProgressIndicator()),
-                                            errorWidget: (context, url, error) {
-                                              print(
-                                                  'Image load error: $error for URL: $url');
-                                              return const Icon(Icons.error,
-                                                  size: 50);
-                                            },
-                                          )
-                                        : CachedNetworkImage(
-                                            imageUrl:
-                                                '${ApiRoutes.serverBaseUrl}${rental.images[0]}',
-                                            height: 200,
-                                            fit: BoxFit.cover,
-                                            placeholder: (context, url) =>
-                                                const Center(
-                                                    child:
-                                                        CircularProgressIndicator()),
-                                            errorWidget: (context, url, error) {
-                                              print(
-                                                  'Image load error: $error for URL: $url');
-                                              return const Icon(Icons.error,
-                                                  size: 50);
-                                            },
-                                          ),
-                                  ),
-                                ),
-                              ],
-                            )
-                          : Container(
-                              height: 200,
-                              color: Colors.grey[300],
-                              child: const Icon(Icons.image,
-                                  size: 50, color: Colors.grey),
+                        children: [
+                          //  First image with Cloudinary support
+                          Expanded(
+                            child: ClipRRect(
+                              borderRadius: const BorderRadius.only(
+                                topLeft: Radius.circular(8),
+                                bottomLeft: Radius.circular(8),
+                              ),
+                              child: _buildImageWidget(rental.images[0]),
                             ),
+                          ),
+                          const SizedBox(width: 4),
+                          // Second image with Cloudinary support
+                          Expanded(
+                            child: ClipRRect(
+                              borderRadius: const BorderRadius.only(
+                                topRight: Radius.circular(8),
+                                bottomRight: Radius.circular(8),
+                              ),
+                              child: rental.images.length > 1
+                                  ? _buildImageWidget(rental.images[1])
+                                  : _buildImageWidget(rental.images[0]),
+                            ),
+                          ),
+                        ],
+                      )
+                          : Container(
+                        height: 200,
+                        decoration: BoxDecoration(
+                          color: Colors.grey[300],
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.image_not_supported_outlined,
+                              size: 50,
+                              color: Colors.grey[600],
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              'Chưa có ảnh',
+                              style: TextStyle(
+                                color: Colors.grey[600],
+                                fontSize: 14,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
                     ),
                     Positioned(
                       top: 8,
@@ -197,8 +233,8 @@ class RentalItemWidget extends StatelessWidget {
                                 horizontal: 8, vertical: 4),
                             decoration: BoxDecoration(
                               color: (rental.status == 'available'
-                                      ? Colors.green
-                                      : Colors.red)
+                                  ? Colors.green
+                                  : Colors.red)
                                   .withOpacity(0.9),
                               borderRadius: BorderRadius.circular(12),
                             ),
@@ -275,63 +311,62 @@ class RentalItemWidget extends StatelessWidget {
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               if (!isMyPost)
-                                // Nâng cấp Icon Yêu thích (Favorite)
                                 GestureDetector(
                                   onTap: isLoading
                                       ? null
                                       : () async {
-                                          if (authViewModel.currentUser ==
-                                              null) {
-                                            ScaffoldMessenger.of(context)
-                                                .showSnackBar(
-                                              const SnackBar(
-                                                content: Text(
-                                                    'Vui lòng đăng nhập để thêm vào yêu thích!'),
-                                                backgroundColor:
-                                                    Colors.redAccent,
-                                              ),
-                                            );
-                                            return;
-                                          }
+                                    if (authViewModel.currentUser ==
+                                        null) {
+                                      ScaffoldMessenger.of(context)
+                                          .showSnackBar(
+                                        const SnackBar(
+                                          content: Text(
+                                              'Vui lòng đăng nhập để thêm vào yêu thích!'),
+                                          backgroundColor:
+                                          Colors.redAccent,
+                                        ),
+                                      );
+                                      return;
+                                    }
 
-                                          bool success;
-                                          String message;
+                                    bool success;
+                                    String message;
 
-                                          if (isFavorite) {
-                                            success = await favoriteViewModel
-                                                .removeFavorite(
-                                              rentalId,
-                                              authViewModel.currentUser!.token!,
-                                            );
-                                            message = success
-                                                ? 'Đã xóa khỏi yêu thích!'
-                                                : (favoriteViewModel
-                                                        .errorMessage ??
-                                                    'Lỗi khi xóa');
-                                          } else {
-                                            success = await favoriteViewModel
-                                                .addFavorite(
-                                              authViewModel.currentUser!.id,
-                                              rentalId,
-                                              authViewModel.currentUser!.token!,
-                                            );
-                                            message = success
-                                                ? 'Đã thêm vào yêu thích!'
-                                                : (favoriteViewModel
-                                                        .errorMessage ??
-                                                    'Lỗi khi thêm');
-                                          }
+                                    if (isFavorite) {
+                                      success = await favoriteViewModel
+                                          .removeFavorite(
+                                        rentalId,
+                                        authViewModel.currentUser!.token!,
+                                      );
+                                      message = success
+                                          ? 'Đã xóa khỏi yêu thích!'
+                                          : (favoriteViewModel
+                                          .errorMessage ??
+                                          'Lỗi khi xóa');
+                                    } else {
+                                      success = await favoriteViewModel
+                                          .addFavorite(
+                                        authViewModel.currentUser!.id,
+                                        rentalId,
+                                        authViewModel.currentUser!.token!,
+                                      );
+                                      message = success
+                                          ? 'Đã thêm vào yêu thích!'
+                                          : (favoriteViewModel
+                                          .errorMessage ??
+                                          'Lỗi khi thêm');
+                                    }
 
-                                          ScaffoldMessenger.of(context)
-                                              .showSnackBar(
-                                            SnackBar(
-                                              content: Text(message),
-                                              backgroundColor: success
-                                                  ? Colors.green
-                                                  : Colors.redAccent,
-                                            ),
-                                          );
-                                        },
+                                    ScaffoldMessenger.of(context)
+                                        .showSnackBar(
+                                      SnackBar(
+                                        content: Text(message),
+                                        backgroundColor: success
+                                            ? Colors.green
+                                            : Colors.redAccent,
+                                      ),
+                                    );
+                                  },
                                   child: Container(
                                     padding: const EdgeInsets.all(10),
                                     margin: const EdgeInsets.only(right: 16),
@@ -343,33 +378,32 @@ class RentalItemWidget extends StatelessWidget {
                                       border: isFavorite
                                           ? null
                                           : Border.all(
-                                              color: Colors.grey.shade300,
-                                              width: 1),
+                                          color: Colors.grey.shade300,
+                                          width: 1),
                                     ),
                                     child: isLoading
                                         ? const SizedBox(
-                                            height: 24,
-                                            width: 24,
-                                            child: CircularProgressIndicator(
-                                              strokeWidth: 2,
-                                              valueColor:
-                                                  AlwaysStoppedAnimation<Color>(
-                                                      Colors.blueGrey),
-                                            ),
-                                          )
+                                      height: 24,
+                                      width: 24,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        valueColor:
+                                        AlwaysStoppedAnimation<Color>(
+                                            Colors.blueGrey),
+                                      ),
+                                    )
                                         : Icon(
-                                            isFavorite
-                                                ? Icons.favorite
-                                                : Icons.favorite_border,
-                                            color: isFavorite
-                                                ? Colors.white
-                                                : Colors.red.shade700,
-                                            size: 24,
-                                          ),
+                                      isFavorite
+                                          ? Icons.favorite
+                                          : Icons.favorite_border,
+                                      color: isFavorite
+                                          ? Colors.white
+                                          : Colors.red.shade700,
+                                      size: 24,
+                                    ),
                                   ),
                                 ),
                               if (!isMyPost)
-                                // Nâng cấp Icon Nhắn tin (Chat)
                                 GestureDetector(
                                   onTap: () async {
                                     if (authViewModel.currentUser == null) {
@@ -398,7 +432,6 @@ class RentalItemWidget extends StatelessWidget {
                                     }
 
                                     try {
-                                      // Hiển thị dialog loading với text
                                       showDialog(
                                         context: context,
                                         barrierDismissible: false,
@@ -408,7 +441,7 @@ class RentalItemWidget extends StatelessWidget {
                                             height: 140,
                                             child: Column(
                                               mainAxisAlignment:
-                                                  MainAxisAlignment.center,
+                                              MainAxisAlignment.center,
                                               children: [
                                                 Lottie.asset(
                                                   AssetsConfig.loadingLottie,
@@ -431,13 +464,12 @@ class RentalItemWidget extends StatelessWidget {
                                         ),
                                       );
 
-                                      // Tạo hoặc lấy conversation
                                       final conversation = await chatViewModel
                                           .getOrCreateConversation(
                                         rentalId: rental.id!,
                                         landlordId: rental.userId,
                                         token:
-                                            authViewModel.currentUser!.token!,
+                                        authViewModel.currentUser!.token!,
                                       );
 
                                       if (conversation == null) {
@@ -445,14 +477,11 @@ class RentalItemWidget extends StatelessWidget {
                                             'Không thể tạo hoặc lấy cuộc trò chuyện');
                                       }
 
-                                      // Cập nhật danh sách conversations
                                       await chatViewModel.fetchConversations(
                                           authViewModel.currentUser!.token!);
 
-                                      // Ẩn dialog loading
                                       Navigator.of(context).pop();
 
-                                      // Chuyển sang ChatScreen
                                       Navigator.push(
                                         context,
                                         _createRoute(ChatScreen(
@@ -462,8 +491,7 @@ class RentalItemWidget extends StatelessWidget {
                                         )),
                                       );
                                     } catch (e) {
-                                      Navigator.of(context)
-                                          .pop(); // ẩn dialog nếu có lỗi
+                                      Navigator.of(context).pop();
                                       ScaffoldMessenger.of(context)
                                           .showSnackBar(
                                         SnackBar(
@@ -528,19 +556,19 @@ class RentalItemWidget extends StatelessWidget {
                                     builder: (context, count, child) {
                                       return Row(
                                         mainAxisAlignment:
-                                            MainAxisAlignment.spaceBetween,
+                                        MainAxisAlignment.spaceBetween,
                                         children: [
                                           Row(
                                             children:
-                                                List.generate(5, (starIndex) {
+                                            List.generate(5, (starIndex) {
                                               final starValue =
-                                                  (starIndex + 1).toDouble();
+                                              (starIndex + 1).toDouble();
                                               return Icon(
                                                 starValue <= rating
                                                     ? Icons.star
                                                     : starValue - 0.5 <= rating
-                                                        ? Icons.star_half
-                                                        : Icons.star_border,
+                                                    ? Icons.star_half
+                                                    : Icons.star_border,
                                                 color: Colors.amber,
                                                 size: 16,
                                               );
@@ -578,7 +606,7 @@ class RentalItemWidget extends StatelessWidget {
                                   borderRadius: BorderRadius.circular(8),
                                 ),
                                 padding:
-                                    const EdgeInsets.symmetric(horizontal: 20),
+                                const EdgeInsets.symmetric(horizontal: 20),
                               ),
                               child: Row(
                                 mainAxisSize: MainAxisSize.min,

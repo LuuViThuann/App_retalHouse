@@ -12,7 +12,7 @@ const conversationSchema = new mongoose.Schema({
     required: true,
   },
   lastMessage: {
-    type: mongoose.Schema.Types.ObjectId,
+    type: mongoose.Schema.Types.ObjectId, 
     ref: 'Message',
   },
   isPending: {

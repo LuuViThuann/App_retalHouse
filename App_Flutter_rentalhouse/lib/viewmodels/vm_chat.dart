@@ -1,4 +1,6 @@
+import 'dart:async';
 import 'dart:convert';
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_rentalhouse/config/api_routes.dart';
 import 'package:flutter_rentalhouse/models/conversation.dart';
@@ -54,7 +56,7 @@ class ChatViewModel extends ChangeNotifier {
   void _handleTokenExpired(String oldToken) async {
     print('ChatViewModel: Token expired, refreshing...');
     final newToken =
-        await _chatService.refreshGoogleToken(forceInteractive: true);
+    await _chatService.refreshGoogleToken(forceInteractive: true);
     if (newToken != null) {
       setToken(newToken);
       if (_currentConversationId != null) {
@@ -65,7 +67,6 @@ class ChatViewModel extends ChangeNotifier {
     }
   }
 
-// khởi chạy socket -----------------
   void _initializeSocket() {
     if (_socket != null) {
       _socket?.disconnect();
@@ -220,10 +221,9 @@ class ChatViewModel extends ChangeNotifier {
       }
     }
     _hasMoreMessages = true;
-
-    //  Chỉ notify một lần, không gọi nhiều lần
     _notify();
   }
+
   void _updateConversationUnreadCount(String conversationId, String senderId) {
     final index =
     _conversations.indexWhere((conv) => conv.id == conversationId);
@@ -258,7 +258,7 @@ class ChatViewModel extends ChangeNotifier {
 
   void addConversation(Conversation conversation) {
     final index =
-        _conversations.indexWhere((conv) => conv.id == conversation.id);
+    _conversations.indexWhere((conv) => conv.id == conversation.id);
     if (index != -1) {
       _conversations[index] = conversation;
     } else {
@@ -417,7 +417,7 @@ class ChatViewModel extends ChangeNotifier {
       _hasMoreMessages = newMessages.length == limit;
 
       final index =
-          _conversations.indexWhere((conv) => conv.id == conversationId);
+      _conversations.indexWhere((conv) => conv.id == conversationId);
       if (index != -1) {
         _conversations[index] = Conversation(
           id: _conversations[index].id,
@@ -462,7 +462,7 @@ class ChatViewModel extends ChangeNotifier {
         token: token,
       );
       final index =
-          _conversations.indexWhere((conv) => conv.id == conversation.id);
+      _conversations.indexWhere((conv) => conv.id == conversation.id);
       if (index != -1) {
         _conversations[index] = conversation;
       } else {
@@ -478,11 +478,12 @@ class ChatViewModel extends ChangeNotifier {
     }
   }
 
+//
   Future<bool> sendMessage({
     required String conversationId,
     required String content,
     required String token,
-    List<String> imagePaths = const [],
+    List<String> imagePaths = const [], // ✅ Không giới hạn
     required String senderId,
   }) async {
     if (token.isEmpty) {
@@ -490,8 +491,10 @@ class ChatViewModel extends ChangeNotifier {
       _setError('Invalid token');
       return false;
     }
+
     final tempId = 'temp_${DateTime.now().millisecondsSinceEpoch}';
     try {
+      // Add temp message to UI
       if (content.isNotEmpty || imagePaths.isNotEmpty) {
         final tempMessage = Message(
           id: tempId,
@@ -501,13 +504,14 @@ class ChatViewModel extends ChangeNotifier {
           images: imagePaths,
           createdAt: DateTime.now(),
           updatedAt: null,
-          sender: {'id': senderId, 'username': 'You', 'avatarBase64': ''},
+          sender: {'id': senderId, 'username': 'You', 'avatarUrl': ''},
         );
         if (_currentConversationId == conversationId) {
           _addOrUpdateMessage(tempMessage, isTemp: true);
         }
       }
 
+      // Build multipart request
       final request = http.MultipartRequest(
         'POST',
         Uri.parse(ApiRoutes.messages),
@@ -516,25 +520,47 @@ class ChatViewModel extends ChangeNotifier {
       request.fields['conversationId'] = conversationId;
       request.fields['content'] = content;
 
+      print('ChatViewModel: Preparing to send ${imagePaths.length} images...');
+
       for (final path in imagePaths) {
-        request.files.add(await http.MultipartFile.fromPath('images', path));
+        try {
+          final file = await http.MultipartFile.fromPath('images', path);
+          request.files.add(file);
+          print('ChatViewModel: Added image to request: $path');
+        } catch (e) {
+          print('ChatViewModel: Error adding image file: $e');
+          _messages.removeWhere((msg) => msg.id == tempId);
+          _highlightedMessageIds.remove(tempId);
+          _setError('Failed to read image file: $e');
+          _notify();
+          return false;
+        }
       }
 
-      final response = await request.send();
-      final responseBody = await response.stream.bytesToString();
+      // Send request with timeout
+      print('ChatViewModel: Sending message request...');
+      final streamResponse = await request.send().timeout(
+        const Duration(seconds: 60), // ✅ Tăng timeout để upload nhiều ảnh
+        onTimeout: () {
+          throw TimeoutException('Message send request timed out');
+        },
+      );
+
+      final responseBody = await streamResponse.stream.bytesToString();
+
+      print('ChatViewModel: Send message response: ${streamResponse.statusCode}');
+      print('ChatViewModel: Response body: $responseBody');
+
       final responseData = jsonDecode(responseBody);
 
-      print(
-          'ChatViewModel: Send message response: ${response.statusCode}, body: $responseBody');
-
-      if (response.statusCode == 201) {
+      if (streamResponse.statusCode == 201) {
         final message = Message.fromJson(responseData);
         if (_currentConversationId == conversationId) {
           _addOrUpdateMessage(message);
           _clearHighlightsMessages();
         }
-        final index =
-            _conversations.indexWhere((conv) => conv.id == conversationId);
+
+        final index = _conversations.indexWhere((conv) => conv.id == conversationId);
         if (index != -1) {
           _conversations[index] = Conversation(
             id: _conversations[index].id,
@@ -552,14 +578,42 @@ class ChatViewModel extends ChangeNotifier {
           _notify();
         }
         _updateSearchIfNeeded();
+        _setError(null);
+        print('ChatViewModel: Message sent successfully with ${imagePaths.length} images');
         return true;
-      } else {
+      }
+      else if (streamResponse.statusCode == 400) {
         _messages.removeWhere((msg) => msg.id == tempId);
         _highlightedMessageIds.remove(tempId);
-        _setError('Failed to send message: $responseBody');
+        final errorMsg = responseData['message'] ?? 'Invalid request';
+        _setError('Lỗi: $errorMsg');
+        _notify();
+        print('ChatViewModel: Bad request error: $errorMsg');
+        return false;
+      }
+      else if (streamResponse.statusCode == 413) {
+        _messages.removeWhere((msg) => msg.id == tempId);
+        _highlightedMessageIds.remove(tempId);
+        _setError('File quá lớn hoặc vượt quá dung lượng cho phép');
         _notify();
         return false;
       }
+      else {
+        _messages.removeWhere((msg) => msg.id == tempId);
+        _highlightedMessageIds.remove(tempId);
+        final errorMsg = responseData['message'] ?? 'Unknown error';
+        _setError('Failed to send message: $errorMsg');
+        _notify();
+        print('ChatViewModel: Server error: $errorMsg');
+        return false;
+      }
+    } on TimeoutException catch (e) {
+      _messages.removeWhere((msg) => msg.id == tempId);
+      _highlightedMessageIds.remove(tempId);
+      _setError('Request timeout - vui lòng thử lại');
+      _notify();
+      print('ChatViewModel: Timeout error: $e');
+      return false;
     } catch (e) {
       _messages.removeWhere((msg) => msg.id == tempId);
       _highlightedMessageIds.remove(tempId);
@@ -570,6 +624,200 @@ class ChatViewModel extends ChangeNotifier {
     }
   }
 
+  // ==================== EDIT MESSAGE ====================
+
+  Future<bool> editMessage({
+    required String messageId,
+    required String content,
+    required String token,
+    List<String> imagePaths = const [],
+    List<String> removeImages = const [],
+  }) async {
+    if (token.isEmpty) {
+      print('ChatViewModel: Invalid token for editMessage');
+      _setError('Invalid token');
+      return false;
+    }
+
+    // ✅ Find message and create backup
+    int index = _messages.indexWhere((msg) => msg.id == messageId);
+    if (index == -1) {
+      _setError('Message not found');
+      return false;
+    }
+
+    Message backupMessage = _messages[index];
+    print('💾 ========== BACKUP MESSAGE ==========');
+    print('💾 ID: ${backupMessage.id}');
+    print('💾 Content: ${backupMessage.content}');
+    print('💾 Images count: ${backupMessage.images.length}');
+    for (int i = 0; i < backupMessage.images.length; i++) {
+      print('   [$i] ${backupMessage.images[i]}');
+    }
+
+    try {
+      print('🔧 ========== SENDING EDIT REQUEST ==========');
+      print('🔧 MessageId: $messageId');
+      print('📝 Content: $content');
+      print('🗑️ RemoveImages: $removeImages');
+      print('📸 NewImagePaths: $imagePaths');
+
+      final request = http.MultipartRequest(
+        'PATCH',
+        Uri.parse('${ApiRoutes.messages}/$messageId'),
+      );
+      request.headers['Authorization'] = 'Bearer $token';
+      request.fields['content'] = content;
+
+      // ✅ CRITICAL FIX: Ensure removeImages is properly encoded
+      request.fields['removeImages'] = jsonEncode(removeImages);
+
+      print('   - Encoded removeImages: ${request.fields['removeImages']}');
+
+      // ✅ Add new images to request
+      if (imagePaths.isNotEmpty) {
+        print('📸 Adding ${imagePaths.length} new images to request...');
+        for (int i = 0; i < imagePaths.length; i++) {
+          final path = imagePaths[i];
+          try {
+            final file = await http.MultipartFile.fromPath('images', path);
+            request.files.add(file);
+            print('   ✅ [$i] Added: $path');
+          } catch (e) {
+            print('❌ Error adding image $i: $e');
+            // Restore backup on error
+            _messages[index] = backupMessage;
+            _notify();
+            _setError('Failed to read image file: $e');
+            return false;
+          }
+        }
+      }
+
+      print('🚀 Sending PATCH request...');
+      final response = await request.send().timeout(
+        const Duration(seconds: 60),
+        onTimeout: () {
+          throw TimeoutException('Edit message request timed out');
+        },
+      );
+
+      final responseBody = await response.stream.bytesToString();
+
+      print('📥 ========== SERVER RESPONSE ==========');
+      print('📥 Status: ${response.statusCode}');
+      print('📥 Body length: ${responseBody.length} chars');
+      print('📥 First 500 chars: ${responseBody.substring(0, math.min(500, responseBody.length))}');
+
+      if (response.statusCode == 200) {
+        try {
+          final responseData = jsonDecode(responseBody);
+
+          print('✅ Response parsed successfully');
+          print('📥 Response _id: ${responseData['_id']}');
+          print('📥 Response content: ${responseData['content']}');
+          print('📥 Response images: ${responseData['images']}');
+          print('📥 Response images type: ${responseData['images'].runtimeType}');
+          print('📥 Response images is List: ${responseData['images'] is List}');
+
+          // ✅ CRITICAL: Parse message from server response
+          final updatedMessage = Message.fromJson(responseData);
+
+          print('✅ ========== MESSAGE PARSED ==========');
+          print('   - ID: ${updatedMessage.id}');
+          print('   - Content: ${updatedMessage.content}');
+          print('   - Images count: ${updatedMessage.images.length}');
+          for (int i = 0; i < updatedMessage.images.length; i++) {
+            print('      [$i] ${updatedMessage.images[i]}');
+          }
+
+          // ✅ Validate images make sense
+          final expectedImageCount =
+              backupMessage.images.length - removeImages.length + imagePaths.length;
+
+          if (updatedMessage.images.length != expectedImageCount) {
+            print('⚠️ Image count mismatch:');
+            print('   Expected: $expectedImageCount');
+            print('   Got: ${updatedMessage.images.length}');
+            print('   (This might be OK if server validation removed some)');
+          }
+
+          // ✅ Update message in local list
+          final currentIndex = _messages.indexWhere((msg) => msg.id == messageId);
+          if (currentIndex != -1) {
+            print('🔄 Updating message at index $currentIndex...');
+            _messages[currentIndex] = updatedMessage;
+            _notify();
+
+            // ✅ Additional UI refresh after short delay
+            Future.delayed(const Duration(milliseconds: 100), () {
+              if (_currentConversationId != null) {
+                _notify();
+                print('🔄 Additional UI refresh triggered');
+              }
+            });
+
+            print('✅ Local message updated in UI');
+          } else {
+            print('⚠️ Could not find message in local list for update');
+          }
+
+          _updateSearchIfNeeded();
+          _setError(null);
+          print('✅ ========== EDIT COMPLETED SUCCESSFULLY ==========');
+          return true;
+
+        } catch (parseError) {
+          print('❌ ========== PARSE ERROR ==========');
+          print('❌ Error: $parseError');
+          print('❌ Raw response body:');
+          print(responseBody);
+
+          // Restore backup
+          _messages[index] = backupMessage;
+          _notify();
+          _setError('Failed to parse server response: $parseError');
+          return false;
+        }
+      } else {
+        // ❌ Handle error responses
+        print('❌ Error status: ${response.statusCode}');
+        print('❌ Response body: $responseBody');
+
+        // Restore backup
+        _messages[index] = backupMessage;
+        _notify();
+
+        try {
+          final responseData = jsonDecode(responseBody);
+          final errorMsg = responseData['message'] ?? 'Unknown error';
+          _setError('Failed to edit message: $errorMsg');
+        } catch (e) {
+          _setError('Failed to edit message: ${response.statusCode}');
+        }
+        return false;
+      }
+    } on TimeoutException catch (e) {
+      print('❌ Timeout: $e');
+      _messages[index] = backupMessage;
+      _notify();
+      _setError('Request timeout - vui lòng thử lại');
+      return false;
+    } catch (e) {
+      print('❌ ========== UNEXPECTED ERROR ==========');
+      print('❌ Error: $e');
+      print('❌ Stack: ${StackTrace.current}');
+      _messages[index] = backupMessage;
+      _notify();
+      _setError('Error editing message: $e');
+      return false;
+    }
+  }
+
+
+
+
+// ============================================================
   Future<bool> deleteMessage(
       {required String messageId, required String token}) async {
     if (token.isEmpty) {
@@ -613,70 +861,7 @@ class ChatViewModel extends ChangeNotifier {
     }
   }
 
-  Future<bool> editMessage({
-    required String messageId,
-    required String content,
-    required String token,
-    List<String> imagePaths = const [],
-    List<String> removeImages = const [],
-  }) async {
-    if (token.isEmpty) {
-      print('ChatViewModel: Invalid token for editMessage');
-      _setError('Invalid token');
-      return false;
-    }
-    Message? backupMessage;
-    int index = _messages.indexWhere((msg) => msg.id == messageId);
-    if (index != -1 && _currentConversationId != null) {
-      backupMessage = _messages[index];
-    }
-    try {
-      final request = http.MultipartRequest(
-        'PATCH',
-        Uri.parse('${ApiRoutes.messages}/$messageId'),
-      );
-      request.headers['Authorization'] = 'Bearer $token';
-      request.fields['content'] = content;
-      request.fields['removeImages'] = jsonEncode(removeImages);
 
-      for (final path in imagePaths) {
-        request.files.add(await http.MultipartFile.fromPath('images', path));
-      }
-
-      final response = await request.send();
-      final responseBody = await response.stream.bytesToString();
-      final responseData = jsonDecode(responseBody);
-
-      print(
-          'ChatViewModel: Edit message status: ${response.statusCode}, body: $responseBody');
-
-      if (response.statusCode == 200) {
-        final updatedMessage = Message.fromJson(responseData);
-        if (index != -1 && _currentConversationId != null) {
-          _addOrUpdateMessage(updatedMessage);
-          _updateSearchIfNeeded();
-        }
-        return true;
-      } else {
-        if (index != -1 &&
-            backupMessage != null &&
-            _currentConversationId != null) {
-          _addOrUpdateMessage(backupMessage);
-        }
-        _setError('Failed to edit message: $responseBody');
-        return false;
-      }
-    } catch (e) {
-      if (index != -1 &&
-          backupMessage != null &&
-          _currentConversationId != null) {
-        _addOrUpdateMessage(backupMessage);
-      }
-      print('ChatViewModel: Error editing message: $e');
-      _setError('Error editing message: $e');
-      return false;
-    }
-  }
 
   void clearMessages() {
     _messages.clear();
@@ -720,7 +905,6 @@ class ChatViewModel extends ChangeNotifier {
   void _setLoading(bool value) {
     if (_isLoading != value) {
       _isLoading = value;
-      // Không gọi _notify() trực tiếp, để _notify tự xử lý
       _notify();
     }
   }
@@ -777,7 +961,7 @@ class ChatViewModel extends ChangeNotifier {
       _highlightedMessageIds.addAll(ids);
     } else if (_searchQuery != null && _searchQuery!.isNotEmpty) {
       final results =
-          searchMessages(_currentConversationId ?? '', _searchQuery!);
+      searchMessages(_currentConversationId ?? '', _searchQuery!);
       _highlightedMessageIds.addAll(results.map((m) => m.id));
     }
   }
@@ -785,7 +969,7 @@ class ChatViewModel extends ChangeNotifier {
   void _updateSearchIfNeeded() {
     if (_searchQuery != null && _searchQuery!.isNotEmpty) {
       final results =
-          searchMessages(_currentConversationId ?? '', _searchQuery!);
+      searchMessages(_currentConversationId ?? '', _searchQuery!);
       _updateHighlightedMessages(results.map((m) => m.id).toSet());
       _notify();
     }
@@ -802,7 +986,6 @@ class ChatViewModel extends ChangeNotifier {
   void _notify() {
     if (!_isNotifying && hasListeners) {
       _isNotifying = true;
-      // Delay notify để tránh gọi trong build phase
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (hasListeners) {
           notifyListeners();

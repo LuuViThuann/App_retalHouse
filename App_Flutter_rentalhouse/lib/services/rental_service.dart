@@ -1,5 +1,6 @@
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../config/api_routes.dart';
@@ -15,7 +16,7 @@ class RentalService {
   }) async {
     try {
       final uri =
-          Uri.parse('${ApiRoutes.baseUrl}/rentals?page=$page&limit=$limit');
+      Uri.parse('${ApiRoutes.baseUrl}/rentals?page=$page&limit=$limit');
       final headers = {
         'Content-Type': 'application/json',
         if (token != null) 'Authorization': 'Bearer $token',
@@ -164,20 +165,20 @@ class RentalService {
           : '${ApiRoutes.baseUrl}/favorites';
       final response = isFavorite
           ? await http.delete(
-              Uri.parse(url),
-              headers: {
-                'Content-Type': 'application/json',
-                'Authorization': 'Bearer $token',
-              },
-            )
+        Uri.parse(url),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      )
           : await http.post(
-              Uri.parse(url),
-              headers: {
-                'Content-Type': 'application/json',
-                'Authorization': 'Bearer $token',
-              },
-              body: jsonEncode({'rentalId': rental.id}),
-            );
+        Uri.parse(url),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode({'rentalId': rental.id}),
+      );
 
       if (response.statusCode == 200 || response.statusCode == 201) {
         onSuccess(!isFavorite);
@@ -191,30 +192,66 @@ class RentalService {
     }
   }
 
+  // ✅ Cập nhật createRental để gửi ảnh và video
   Future<void> createRental({
     required Rental rental,
     required List<String> imagePaths,
+    required List<String> videoPaths, // ✅ Add video paths
     required String token,
     required Function(Rental) onSuccess,
     required Function(String) onError,
   }) async {
     try {
-      final response = await http.post(
+      var request = http.MultipartRequest(
+        'POST',
         Uri.parse('${ApiRoutes.baseUrl}/rentals'),
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $token',
-        },
-        body: jsonEncode({
-          ...rental.toJson(),
-          'images': imagePaths,
-          'latitude': rental.location['latitude'],
-          'longitude': rental.location['longitude'],
-        }),
       );
 
+      // Add headers
+      request.headers['Authorization'] = 'Bearer $token';
+
+      // Add text fields
+      request.fields['title'] = rental.title;
+      request.fields['price'] = rental.price.toString();
+      request.fields['areaTotal'] = rental.area['total'].toString();
+      request.fields['areaLivingRoom'] = (rental.area['livingRoom'] ?? 0).toString();
+      request.fields['areaBedrooms'] = (rental.area['bedrooms'] ?? 0).toString();
+      request.fields['areaBathrooms'] = (rental.area['bathrooms'] ?? 0).toString();
+      request.fields['locationShort'] = rental.location['short'] ?? '';
+      request.fields['locationFullAddress'] = rental.location['fullAddress'] ?? '';
+      request.fields['latitude'] = (rental.location['latitude'] ?? 0.0).toString();
+      request.fields['longitude'] = (rental.location['longitude'] ?? 0.0).toString();
+      request.fields['propertyType'] = rental.propertyType;
+      request.fields['furniture'] = rental.furniture.join(',');
+      request.fields['amenities'] = rental.amenities.join(',');
+      request.fields['surroundings'] = rental.surroundings.join(',');
+      request.fields['rentalTermsMinimumLease'] = rental.rentalTerms['minimumLease'] ?? '';
+      request.fields['rentalTermsDeposit'] = rental.rentalTerms['deposit'] ?? '';
+      request.fields['rentalTermsPaymentMethod'] = rental.rentalTerms['paymentMethod'] ?? '';
+      request.fields['rentalTermsRenewalTerms'] = rental.rentalTerms['renewalTerms'] ?? '';
+      request.fields['contactInfoName'] = rental.contactInfo['name'] ?? '';
+      request.fields['contactInfoPhone'] = rental.contactInfo['phone'] ?? '';
+      request.fields['contactInfoAvailableHours'] = rental.contactInfo['availableHours'] ?? '';
+      request.fields['status'] = rental.status;
+
+      // ✅ Upload images
+      for (var imagePath in imagePaths) {
+        var file = await http.MultipartFile.fromPath('media', imagePath);
+        request.files.add(file);
+      }
+
+      // ✅ Upload videos
+      for (var videoPath in videoPaths) {
+        var file = await http.MultipartFile.fromPath('media', videoPath);
+        request.files.add(file);
+      }
+
+      var streamedResponse = await request.send();
+      var response = await http.Response.fromStream(streamedResponse);
+
       if (response.statusCode == 201) {
-        final createdRental = Rental.fromJson(jsonDecode(response.body));
+        final responseData = jsonDecode(response.body);
+        final createdRental = Rental.fromJson(responseData['rental']);
         onSuccess(createdRental);
       } else {
         throw Exception(
@@ -226,28 +263,75 @@ class RentalService {
     }
   }
 
+  // ✅ Cập nhật updateRental để gửi ảnh và video
   Future<void> updateRental({
     required Rental rental,
     required String token,
+    List<String>? newImagePaths, // ✅ New images to upload
+    List<String>? newVideoPaths, // ✅ New videos to upload
+    List<String>? removedMediaUrls, // ✅ URLs to remove
     required Function(Rental) onSuccess,
     required Function(String) onError,
   }) async {
     try {
-      final response = await http.patch(
+      var request = http.MultipartRequest(
+        'PATCH',
         Uri.parse('${ApiRoutes.baseUrl}/rentals/${rental.id}'),
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $token',
-        },
-        body: jsonEncode({
-          ...rental.toJson(),
-          'latitude': rental.location['latitude'],
-          'longitude': rental.location['longitude'],
-        }),
       );
 
+      request.headers['Authorization'] = 'Bearer $token';
+
+      // Add text fields
+      request.fields['title'] = rental.title;
+      request.fields['price'] = rental.price.toString();
+      request.fields['areaTotal'] = rental.area['total'].toString();
+      request.fields['areaLivingRoom'] = (rental.area['livingRoom'] ?? 0).toString();
+      request.fields['areaBedrooms'] = (rental.area['bedrooms'] ?? 0).toString();
+      request.fields['areaBathrooms'] = (rental.area['bathrooms'] ?? 0).toString();
+      request.fields['locationShort'] = rental.location['short'] ?? '';
+      request.fields['locationFullAddress'] = rental.location['fullAddress'] ?? '';
+      request.fields['latitude'] = (rental.location['latitude'] ?? 0.0).toString();
+      request.fields['longitude'] = (rental.location['longitude'] ?? 0.0).toString();
+      request.fields['propertyType'] = rental.propertyType;
+      request.fields['furniture'] = rental.furniture.join(',');
+      request.fields['amenities'] = rental.amenities.join(',');
+      request.fields['surroundings'] = rental.surroundings.join(',');
+      request.fields['rentalTermsMinimumLease'] = rental.rentalTerms['minimumLease'] ?? '';
+      request.fields['rentalTermsDeposit'] = rental.rentalTerms['deposit'] ?? '';
+      request.fields['rentalTermsPaymentMethod'] = rental.rentalTerms['paymentMethod'] ?? '';
+      request.fields['rentalTermsRenewalTerms'] = rental.rentalTerms['renewalTerms'] ?? '';
+      request.fields['contactInfoName'] = rental.contactInfo['name'] ?? '';
+      request.fields['contactInfoPhone'] = rental.contactInfo['phone'] ?? '';
+      request.fields['contactInfoAvailableHours'] = rental.contactInfo['availableHours'] ?? '';
+      request.fields['status'] = rental.status;
+
+      // ✅ Add removed media URLs
+      if (removedMediaUrls != null && removedMediaUrls.isNotEmpty) {
+        request.fields['removedMedia'] = jsonEncode(removedMediaUrls);
+      }
+
+      // ✅ Upload new images
+      if (newImagePaths != null) {
+        for (var imagePath in newImagePaths) {
+          var file = await http.MultipartFile.fromPath('media', imagePath);
+          request.files.add(file);
+        }
+      }
+
+      // ✅ Upload new videos
+      if (newVideoPaths != null) {
+        for (var videoPath in newVideoPaths) {
+          var file = await http.MultipartFile.fromPath('media', videoPath);
+          request.files.add(file);
+        }
+      }
+
+      var streamedResponse = await request.send();
+      var response = await http.Response.fromStream(streamedResponse);
+
       if (response.statusCode == 200) {
-        final updatedRental = Rental.fromJson(jsonDecode(response.body));
+        final responseData = jsonDecode(response.body);
+        final updatedRental = Rental.fromJson(responseData['rental']);
         onSuccess(updatedRental);
       } else {
         throw Exception(
@@ -259,7 +343,6 @@ class RentalService {
     }
   }
 
-  // Cập nhật method fetchNearbyRentals trong RentalService
   Future<Map<String, dynamic>> fetchNearbyRentals({
     required String rentalId,
     double radius = 10.0,
@@ -287,9 +370,6 @@ class RentalService {
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
 
-        // Log response để debug
-        debugPrint('Nearby rentals API response: ${response.body}');
-
         final List<dynamic> rentalsData = data['rentals'] ?? [];
         final String? warning = data['warning'];
         final String? searchMethod = data['searchMethod'];
@@ -298,28 +378,25 @@ class RentalService {
           debugPrint('Warning from server: $warning');
         }
 
-        // Xử lý dữ liệu rentals an toàn hơn
         final List<Rental> rentals = rentalsData
             .map((json) {
-              try {
-                // Đảm bảo coordinates được xử lý đúng
-                if (json['coordinates'] != null &&
-                    json['coordinates'] is List) {
-                  final coords = json['coordinates'] as List;
-                  if (coords.length >= 2) {
-                    // Cập nhật location với coordinates
-                    json['location'] = json['location'] ?? {};
-                    json['location']['longitude'] = coords[0];
-                    json['location']['latitude'] = coords[1];
-                  }
-                }
-
-                return Rental.fromJson(json);
-              } catch (e) {
-                debugPrint('Error parsing rental: $e, JSON: $json');
-                return null;
+          try {
+            if (json['coordinates'] != null &&
+                json['coordinates'] is List) {
+              final coords = json['coordinates'] as List;
+              if (coords.length >= 2) {
+                json['location'] = json['location'] ?? {};
+                json['location']['longitude'] = coords[0];
+                json['location']['latitude'] = coords[1];
               }
-            })
+            }
+
+            return Rental.fromJson(json);
+          } catch (e) {
+            debugPrint('Error parsing rental: $e, JSON: $json');
+            return null;
+          }
+        })
             .where((rental) => rental != null)
             .cast<Rental>()
             .toList();

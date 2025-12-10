@@ -4,29 +4,25 @@ const router = express.Router();
 const News = require('../models/news');
 const SavedArticle = require('../models/savedArticle');
 const multer = require('multer');
-const path = require('path');
-const fs = require('fs');
+const cloudinary = require('../config/cloudinary');
+const { CloudinaryStorage } = require('multer-storage-cloudinary');
 
-// Cấu hình multer cho nhiều ảnh
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    const uploadPath = 'Uploads/news/';
-    if (!fs.existsSync(uploadPath)) {
-      fs.mkdirSync(uploadPath, { recursive: true });
-    }
-    cb(null, uploadPath);
-  },
-  filename: (req, file, cb) => {
-    cb(null, 'news_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9) + path.extname(file.originalname));
+// Cấu hình Cloudinary Storage cho multer (nhiều ảnh)
+const storage = new CloudinaryStorage({
+  cloudinary: cloudinary,
+  params: {
+    folder: 'news', // Thư mục trong Cloudinary
+    allowed_formats: ['jpg', 'jpeg', 'png', 'webp'],
+    transformation: [{ width: 1920, height: 1080, crop: 'limit' }], // Resize ảnh
   },
 });
 
 const upload = multer({
   storage,
-  limits: { fileSize: 10 * 1024 * 1024 },
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB
   fileFilter: (req, file, cb) => {
     const allowedExtensions = /\.(jpeg|jpg|png|webp)$/i;
-    const extname = allowedExtensions.test(path.extname(file.originalname));
+    const extname = allowedExtensions.test(file.originalname);
     
     if (extname) {
       return cb(null, true);
@@ -34,6 +30,26 @@ const upload = multer({
     cb(new Error('Chỉ chấp nhận file ảnh (JPEG, JPG, PNG, WebP)'));
   },
 });
+
+// Helper function: Xóa nhiều ảnh trên Cloudinary
+const deleteCloudinaryImages = async (cloudinaryIds) => {
+  if (!cloudinaryIds || cloudinaryIds.length === 0) {
+    return [];
+  }
+  
+  const results = [];
+  for (const publicId of cloudinaryIds) {
+    try {
+      const result = await cloudinary.uploader.destroy(publicId);
+      results.push({ publicId, result });
+      console.log('Cloudinary delete:', publicId, result);
+    } catch (error) {
+      console.error('Error deleting from Cloudinary:', publicId, error);
+      results.push({ publicId, error: error.message });
+    }
+  }
+  return results;
+};
 
 // Middleware kiểm tra admin
 const isAdmin = async (req, res, next) => {
@@ -79,8 +95,7 @@ router.get('/', async (req, res) => {
     const limit = parseInt(req.query.limit) || 10;
     const skip = (page - 1) * limit;
 
-    const news = await News.find({ isActive: true })
-      .sort({ featured: -1, createdAt: -1 })
+    const news = await News.findActive()
       .skip(skip)
       .limit(limit);
 
@@ -105,10 +120,7 @@ router.get('/', async (req, res) => {
 router.get('/featured', async (req, res) => {
   try {
     const limit = parseInt(req.query.limit) || 3;
-    const news = await News.find({ isActive: true, featured: true })
-      .sort({ createdAt: -1 })
-      .limit(limit);
-
+    const news = await News.findFeatured(limit);
     res.json(news);
   } catch (err) {
     console.error('Get featured news error:', err);
@@ -116,9 +128,48 @@ router.get('/featured', async (req, res) => {
   }
 });
 
+// Lấy tin tức phổ biến (most views)
+router.get('/popular', async (req, res) => {
+  try {
+    const limit = parseInt(req.query.limit) || 10;
+    const days = parseInt(req.query.days) || 30;
+    const news = await News.findPopular(limit, days);
+    res.json(news);
+  } catch (err) {
+    console.error('Get popular news error:', err);
+    res.status(500).json({ message: err.message });
+  }
+});
+
+// Lấy tin tức theo category
+router.get('/category/:category', async (req, res) => {
+  try {
+    const { category } = req.params;
+    const limit = parseInt(req.query.limit) || 10;
+    const page = parseInt(req.query.page) || 1;
+    const skip = (page - 1) * limit;
+
+    const news = await News.findByCategory(category, limit + skip).skip(skip);
+    const total = await News.countDocuments({ isActive: true, category });
+
+    res.json({
+      data: news,
+      pagination: {
+        total,
+        page,
+        limit,
+        pages: Math.ceil(total / limit),
+      },
+    });
+  } catch (err) {
+    console.error('Get news by category error:', err);
+    res.status(500).json({ message: err.message });
+  }
+});
+
 // ================== ROUTES CÓ YÊU CẦU ĐĂNG NHẬP ==================
 
-// Lấy tất cả tin tức đã lưu của user (PHẢI TRƯỚC :id)
+// Lấy tất cả tin tức đã lưu của user
 router.get('/user/saved-articles', isAuth, async (req, res) => {
   try {
     const userId = req.user.uid;
@@ -217,8 +268,6 @@ router.get('/:newsId/is-saved', isAuth, async (req, res) => {
     const { newsId } = req.params;
     const userId = req.user.uid;
 
-    console.log('Checking if saved - User:', userId, 'News:', newsId);
-
     const saved = await SavedArticle.findOne({ userId, newsId });
     res.json({ isSaved: !!saved });
   } catch (err) {
@@ -227,20 +276,22 @@ router.get('/:newsId/is-saved', isAuth, async (req, res) => {
   }
 });
 
-// Lấy chi tiết tin tức
+// Lấy chi tiết tin tức (auto increment views)
 router.get('/:id', async (req, res) => {
   try {
-    const news = await News.findByIdAndUpdate(
-      req.params.id,
-      { $inc: { views: 1 } },
-      { new: true }
-    );
+    const news = await News.incrementViews(req.params.id);
 
     if (!news || !news.isActive) {
       return res.status(404).json({ message: 'Không tìm thấy tin tức' });
     }
 
-    res.json(news);
+    // Lấy tin tức liên quan
+    const related = await News.findRelated(news._id, news.category, 5);
+
+    res.json({
+      ...news.toJSON(),
+      related,
+    });
   } catch (err) {
     console.error('Get news detail error:', err);
     res.status(500).json({ message: err.message });
@@ -280,6 +331,8 @@ router.get('/admin/all', isAdmin, async (req, res) => {
 
 // Admin: Thêm tin tức mới (multiple images)
 router.post('/', isAdmin, upload.array('images', 10), async (req, res) => {
+  let uploadedFiles = [];
+  
   try {
     console.log('Create news - Body:', req.body);
     console.log('Create news - Files:', req.files?.length);
@@ -291,18 +344,26 @@ router.post('/', isAdmin, upload.array('images', 10), async (req, res) => {
     }
 
     if (!title || !content) {
+      // Xóa ảnh đã upload nếu validation fail
+      uploadedFiles = req.files.map(f => f.filename);
+      await deleteCloudinaryImages(uploadedFiles);
       return res.status(400).json({ message: 'Tiêu đề và nội dung không được bỏ trống' });
     }
 
-    // Tạo mảng URLs từ các file được upload
-    const imageUrls = req.files.map(file => `/Uploads/news/${file.filename}`);
+    // Tạo mảng image data từ các file Cloudinary
+    const images = req.files.map((file, index) => ({
+      url: file.path, // URL từ Cloudinary
+      cloudinaryId: file.filename, // Public ID
+      order: index,
+    }));
 
     const news = new News({
       title: title.trim(),
-      content: content,
+      content: content, // JSON Delta format từ Quill
       summary: summary ? summary.trim() : title.trim().substring(0, 100),
-      imageUrls: imageUrls,
-      imageUrl: imageUrls[0], // Ảnh đầu tiên
+      images: images,
+      imageUrl: images[0].url, // Ảnh đầu tiên (auto-sync bởi pre-save)
+      imageUrls: images.map(img => img.url), // Auto-sync
       author: author ? author.trim() : 'Admin',
       category: category ? category.trim() : 'Tin tức',
       featured: featured === 'true' || featured === true,
@@ -310,16 +371,25 @@ router.post('/', isAdmin, upload.array('images', 10), async (req, res) => {
     });
 
     await news.save();
-    console.log('News created successfully:', news._id, 'Images:', imageUrls.length);
+    console.log('News created successfully:', news._id, 'Images:', images.length);
     res.status(201).json(news);
   } catch (err) {
     console.error('Create news error:', err);
+    
+    // Nếu lỗi, xóa tất cả ảnh vừa upload
+    if (req.files?.length > 0) {
+      uploadedFiles = req.files.map(f => f.filename);
+      await deleteCloudinaryImages(uploadedFiles);
+    }
+    
     res.status(400).json({ message: err.message });
   }
 });
 
 // Admin: Cập nhật tin tức (multiple images)
 router.put('/:id', isAdmin, upload.array('images', 10), async (req, res) => {
+  let uploadedFiles = [];
+  
   try {
     console.log('Update news - ID:', req.params.id);
     console.log('Update news - Body:', req.body);
@@ -327,28 +397,12 @@ router.put('/:id', isAdmin, upload.array('images', 10), async (req, res) => {
 
     const news = await News.findById(req.params.id);
     if (!news) {
+      // Nếu không tìm thấy, xóa ảnh vừa upload
+      if (req.files?.length > 0) {
+        uploadedFiles = req.files.map(f => f.filename);
+        await deleteCloudinaryImages(uploadedFiles);
+      }
       return res.status(404).json({ message: 'Không tìm thấy tin tức' });
-    }
-
-    let imageUrls = news.imageUrls || [];
-
-    // Nếu có ảnh mới, thay thế tất cả
-    if (req.files && req.files.length > 0) {
-      // Xóa ảnh cũ
-      imageUrls.forEach(oldUrl => {
-        const oldImagePath = '.' + oldUrl;
-        if (fs.existsSync(oldImagePath)) {
-          try {
-            fs.unlinkSync(oldImagePath);
-            console.log('Old image deleted:', oldImagePath);
-          } catch (unlinkErr) {
-            console.warn('Could not delete old image:', unlinkErr.message);
-          }
-        }
-      });
-
-      // Thêm ảnh mới
-      imageUrls = req.files.map(file => `/Uploads/news/${file.filename}`);
     }
 
     const updateData = {
@@ -359,21 +413,47 @@ router.put('/:id', isAdmin, upload.array('images', 10), async (req, res) => {
       category: req.body.category ? req.body.category.trim() : news.category,
       featured: req.body.featured === 'true' || req.body.featured === true,
       isActive: req.body.isActive === 'true' || req.body.isActive === true,
-      imageUrls: imageUrls,
-      imageUrl: imageUrls.length > 0 ? imageUrls[0] : news.imageUrl,
       updatedAt: Date.now(),
     };
+
+    // Lưu cloudinary IDs của ảnh cũ để xóa sau
+    const oldCloudinaryIds = news.getCloudinaryDeleteInfo();
+
+    // Nếu có ảnh mới, thay thế tất cả
+    if (req.files && req.files.length > 0) {
+      const newImages = req.files.map((file, index) => ({
+        url: file.path,
+        cloudinaryId: file.filename,
+        order: index,
+      }));
+      
+      updateData.images = newImages;
+      // imageUrl và imageUrls sẽ auto-sync bởi pre-update middleware
+    }
 
     const updated = await News.findByIdAndUpdate(
       req.params.id,
       updateData,
-      { new: true }
+      { new: true, runValidators: true }
     );
 
-    console.log('News updated successfully:', updated._id, 'Images:', imageUrls.length);
+    // Xóa ảnh cũ sau khi cập nhật thành công
+    if (req.files && req.files.length > 0 && oldCloudinaryIds.length > 0) {
+      await deleteCloudinaryImages(oldCloudinaryIds);
+      console.log('Old images deleted from Cloudinary:', oldCloudinaryIds.length);
+    }
+
+    console.log('News updated successfully:', updated._id);
     res.json(updated);
   } catch (err) {
     console.error('Update news error:', err);
+    
+    // Nếu lỗi, xóa ảnh mới vừa upload
+    if (req.files?.length > 0) {
+      uploadedFiles = req.files.map(f => f.filename);
+      await deleteCloudinaryImages(uploadedFiles);
+    }
+    
     res.status(400).json({ message: err.message });
   }
 });
@@ -388,21 +468,17 @@ router.delete('/:id', isAdmin, async (req, res) => {
       return res.status(404).json({ message: 'Không tìm thấy tin tức' });
     }
 
-    // Xóa tất cả ảnh
-    const imageUrls = news.imageUrls || [];
-    imageUrls.forEach(url => {
-      const imagePath = '.' + url;
-      if (fs.existsSync(imagePath)) {
-        try {
-          fs.unlinkSync(imagePath);
-          console.log('News image deleted:', imagePath);
-        } catch (unlinkErr) {
-          console.warn('Could not delete news image:', unlinkErr.message);
-        }
-      }
-    });
+    // Lấy cloudinary IDs để xóa
+    const cloudinaryIds = news.getCloudinaryDeleteInfo();
 
+    // Xóa document từ database
     await News.findByIdAndDelete(req.params.id);
+
+    // Xóa ảnh trên Cloudinary
+    if (cloudinaryIds.length > 0) {
+      await deleteCloudinaryImages(cloudinaryIds);
+      console.log('Images deleted from Cloudinary:', cloudinaryIds.length);
+    }
     
     console.log('News deleted successfully:', req.params.id);
     res.json({ message: 'Xóa tin tức thành công' });

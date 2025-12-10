@@ -1,5 +1,6 @@
+
 require('dotenv').config();
-const express = require('express');
+const express = require('express'); // đã xóa ESlint
 const router = express.Router();
 const mongoose = require('mongoose');
 const Rental = require('../models/Rental');
@@ -13,6 +14,8 @@ const redis = require('redis');
 const sharp = require('sharp');
 const { Client } = require('@elastic/elasticsearch');
 const fs = require('fs').promises;
+const cloudinary = require('../config/cloudinary');
+const { CloudinaryStorage } = require('multer-storage-cloudinary');
 
 const redisClient = redis.createClient({
   url: process.env.REDIS_URL || 'redis://localhost:6379',
@@ -28,19 +31,75 @@ const elasticClient = new Client({
   sniffOnConnectionFault: false,
 });
 
-const storage = multer.diskStorage({
-  destination: './uploads/',
-  filename: (req, file, cb) => {
-    cb(null, `${Date.now()}-${file.originalname}`);
+// ==================== MULTER CLOUDINARY STORAGE ====================
+const storage = new CloudinaryStorage({
+  cloudinary: cloudinary,
+  params: async (req, file) => {
+    const isVideo = file.mimetype.startsWith('video/');
+    return {
+      folder: 'rentals',
+      allowed_formats: isVideo 
+        ? ['mp4', 'mov', 'avi', 'mkv', 'webm']
+        : ['jpg', 'jpeg', 'png', 'webp'],
+      resource_type: isVideo ? 'video' : 'image',
+      transformation: isVideo 
+        ? [{ width: 1280, height: 720, crop: 'limit', quality: 'auto' }]
+        : [{ width: 1920, height: 1080, crop: 'limit' }],
+    };
   },
-});
+}); 
+
 const upload = multer({
   storage,
-  limits: { fileSize: 100 * 1024 * 1024 },
+  limits: { 
+    fileSize: 100 * 1024 * 1024, // 100MB for videos
+  },
+  fileFilter: (req, file, cb) => {
+    const allowedImageFormats = /\.(jpeg|jpg|png|webp)$/i;
+    const allowedVideoFormats = /\.(mp4|mov|avi|mkv|webm)$/i;
+    
+    const isImage = allowedImageFormats.test(file.originalname);
+    const isVideo = allowedVideoFormats.test(file.originalname);
+    
+    if (isImage || isVideo) {
+      return cb(null, true);
+    }
+    cb(new Error('Chỉ chấp nhận file ảnh (JPEG, JPG, PNG, WEBP) hoặc video (MP4, MOV, AVI, MKV, WEBM)'));
+  },
 });
-router.use('/uploads', express.static(path.join(__dirname, '..', 'uploads')));
 
+// ==================== HELPER FUNCTIONS ====================
+const deleteCloudinaryMedia = async (cloudinaryIds) => {
+  if (!cloudinaryIds || cloudinaryIds.length === 0) {
+    return [];
+  }
+  
+  const results = [];
+  for (const publicId of cloudinaryIds) {
+    try {
+      // Tự động detect resource_type (image hoặc video)
+      let result = await cloudinary.uploader.destroy(publicId, { resource_type: 'image' });
+      
+      // Nếu không tìm thấy image, thử xóa video
+      if (result.result === 'not found') {
+        result = await cloudinary.uploader.destroy(publicId, { resource_type: 'video' });
+      }
+      
+      results.push({ publicId, result });
+      console.log('✅ Cloudinary delete:', publicId, result);
+    } catch (error) {
+      console.error('❌ Error deleting from Cloudinary:', publicId, error);
+      results.push({ publicId, error: error.message });
+    }
+  }
+  return results;
+};
 
+const extractCloudinaryPublicId = (url) => {
+  if (!url) return null;
+  const match = url.match(/\/rentals\/([^/.]+)/);
+  return match ? `rentals/${match[1]}` : null;
+};
 
 //====================
 const _isNewPost = (createdAt) => {
@@ -66,7 +125,8 @@ const verifyAdmin = async (req, res, next) => {
 };
 // ========== ADMIN ROUTES ========================================================
 
-// 👥 Admin: Get Users with Post Count
+// ========== ADMIN ROUTES ========================================================
+
 router.get('/admin/users-with-posts', verifyAdmin, async (req, res) => {
   try {
     const page = Math.max(1, parseInt(req.query.page) || 1);
@@ -155,7 +215,7 @@ router.get('/admin/user-posts/:userId', verifyAdmin, async (req, res) => {
   }
 });
 // ========== ADMIN EDIT RENTAL ==========
-router.patch('/admin/rentals/:rentalId', verifyAdmin, upload.array('images'), async (req, res) => {
+router.patch('/admin/rentals/:rentalId', verifyAdmin, upload.array('media'), async (req, res) => {
   try {
     if (!mongoose.Types.ObjectId.isValid(req.params.rentalId)) {
       return res.status(400).json({ message: 'Invalid rental ID' });
@@ -242,47 +302,72 @@ router.patch('/admin/rentals/:rentalId', verifyAdmin, upload.array('images'), as
     }
     if (req.body.status) updatedData.status = req.body.status;
 
-    let updatedImages = [...rental.images];
-    let removedImages = [];
+    // Handle media removal
+    let updatedImages = [...(rental.images || [])];
+    let updatedVideos = [...(rental.videos || [])];
+    let removedMedia = [];
     
-    if (req.body.removedImages) {
+    if (req.body.removedMedia) {
       try {
-        if (typeof req.body.removedImages === 'string') {
+        if (typeof req.body.removedMedia === 'string') {
           try {
-            removedImages = JSON.parse(req.body.removedImages);
+            removedMedia = JSON.parse(req.body.removedMedia);
           } catch (e) {
-            removedImages = req.body.removedImages.split(',').map(s => s.trim()).filter(Boolean);
+            removedMedia = req.body.removedMedia.split(',').map(s => s.trim()).filter(Boolean);
           }
-        } else if (Array.isArray(req.body.removedImages)) {
-          removedImages = req.body.removedImages;
+        } else if (Array.isArray(req.body.removedMedia)) {
+          removedMedia = req.body.removedMedia;
         }
       } catch (e) {
-        removedImages = [req.body.removedImages].filter(Boolean);
+        removedMedia = [req.body.removedMedia].filter(Boolean);
       }
-      if (!Array.isArray(removedImages)) removedImages = [removedImages];
+      if (!Array.isArray(removedMedia)) removedMedia = [removedMedia];
 
-      for (const image of removedImages) {
-        if (typeof image !== 'string' || !image.startsWith('/uploads/')) continue;
-        if (updatedImages.includes(image)) {
-          updatedImages = updatedImages.filter(img => img !== image);
-          const filePath = path.join(__dirname, '..', 'uploads', image.replace(/^\/uploads\//, ''));
-          try {
-            await fs.unlink(filePath);
-          } catch (err) {
-            if (err.code !== 'ENOENT') {
-              console.warn(`Failed to delete image: ${image}`);
-            }
-          }
+      const cloudinaryIdsToDelete = [];
+      
+      for (const mediaUrl of removedMedia) {
+        if (typeof mediaUrl !== 'string') continue;
+        
+        // Remove from images array
+        if (updatedImages.includes(mediaUrl)) {
+          updatedImages = updatedImages.filter(img => img !== mediaUrl);
+          const publicId = extractCloudinaryPublicId(mediaUrl);
+          if (publicId) cloudinaryIdsToDelete.push(publicId);
         }
+        
+        // Remove from videos array
+        if (updatedVideos.includes(mediaUrl)) {
+          updatedVideos = updatedVideos.filter(vid => vid !== mediaUrl);
+          const publicId = extractCloudinaryPublicId(mediaUrl);
+          if (publicId) cloudinaryIdsToDelete.push(publicId);
+        }
+      }
+
+      // Delete from Cloudinary
+      if (cloudinaryIdsToDelete.length > 0) {
+        await deleteCloudinaryMedia(cloudinaryIdsToDelete);
       }
     }
 
+    // Handle new media uploads
     if (req.files && req.files.length > 0) {
-      const newImages = req.files.map(file => `/uploads/${file.filename}`);
+      const newImages = [];
+      const newVideos = [];
+      
+      req.files.forEach(file => {
+        if (file.mimetype.startsWith('video/')) {
+          newVideos.push(file.path);
+        } else {
+          newImages.push(file.path);
+        }
+      });
+      
       updatedImages = [...new Set([...updatedImages, ...newImages])];
+      updatedVideos = [...new Set([...updatedVideos, ...newVideos])];
     }
 
     updatedData.images = updatedImages;
+    updatedData.videos = updatedVideos;
 
     const updatedRental = await Rental.findByIdAndUpdate(
       req.params.rentalId,
@@ -308,6 +393,7 @@ router.patch('/admin/rentals/:rentalId', verifyAdmin, upload.array('images'), as
   }
 });
 
+
 // ========== ADMIN DELETE RENTAL ==========
 router.delete('/admin/rentals/:rentalId', verifyAdmin, async (req, res) => {
   try {
@@ -327,26 +413,31 @@ router.delete('/admin/rentals/:rentalId', verifyAdmin, async (req, res) => {
       return res.status(404).json({ message: 'Rental not found' });
     }
 
-    // ===== Delete images =====
-    for (const image of rental.images) {
-      if (!image.startsWith('/uploads/')) continue;
-      const filePath = path.join(__dirname, '..', 'uploads', image.replace(/^\/uploads\//, ''));
-      try {
-        await fs.unlink(filePath);
-        console.log('✅ Deleted image: ' + filePath);
-      } catch (err) {
-        console.warn('⚠️ Image not found: ' + filePath);
-      }
+    // Delete images and videos from Cloudinary
+    const cloudinaryIdsToDelete = [];
+    
+    (rental.images || []).forEach(imageUrl => {
+      const publicId = extractCloudinaryPublicId(imageUrl);
+      if (publicId) cloudinaryIdsToDelete.push(publicId);
+    });
+    
+    (rental.videos || []).forEach(videoUrl => {
+      const publicId = extractCloudinaryPublicId(videoUrl);
+      if (publicId) cloudinaryIdsToDelete.push(publicId);
+    });
+
+    if (cloudinaryIdsToDelete.length > 0) {
+      await deleteCloudinaryMedia(cloudinaryIdsToDelete);
     }
 
-    // ===== Delete from DB =====
+    // Delete from DB
     await Comment.deleteMany({ rentalId: req.params.rentalId });
     await Reply.deleteMany({ commentId: { $in: await Comment.find({ rentalId: req.params.rentalId }).distinct('_id') } });
     await LikeComment.deleteMany({ targetId: req.params.rentalId, targetType: 'Comment' });
     await Favorite.deleteMany({ rentalId: req.params.rentalId });
     await Rental.findByIdAndDelete(req.params.rentalId);
 
-    // ===== Delete from Elasticsearch =====
+    // Delete from Elasticsearch
     try {
       await elasticClient.delete({
         index: 'rentals',
@@ -774,11 +865,10 @@ router.get('/rentals/:id', async (req, res) => {
   }
 });
 
-router.post('/rentals', authMiddleware, upload.array('images'), async (req, res) => {
+router.post('/rentals', authMiddleware, upload.array('media'), async (req, res) => {
   try {
-    const imageUrls = req.files.map(file => `/uploads/${file.filename}`);
-    const contactInfoName = req.body.contactInfoName || req.user.displayName || 'Chủ nhà';
-    const contactInfoPhone = req.body.contactInfoPhone || req.user.phoneNumber || 'Không có số điện thoại';
+    const contactInfoName = req.body.contactInfoName || req.user?.displayName || 'Chủ nhà';
+    const contactInfoPhone = req.body.contactInfoPhone || req.user?.phoneNumber || 'Không có số điện thoại';
 
     let coordinates = [
       parseFloat(req.body.longitude) || 0,
@@ -818,6 +908,20 @@ router.post('/rentals', authMiddleware, upload.array('images'), async (req, res)
       return res.status(400).json({ message: 'Invalid coordinate values provided' });
     }
 
+    // Separate images and videos from uploaded files
+    const images = [];
+    const videos = [];
+    
+    if (req.files && req.files.length > 0) {
+      req.files.forEach(file => {
+        if (file.mimetype.startsWith('video/')) {
+          videos.push(file.path); // Cloudinary URL
+        } else {
+          images.push(file.path); // Cloudinary URL
+        }
+      });
+    }
+
     const rental = new Rental({
       title: req.body.title,
       price: req.body.price,
@@ -852,7 +956,8 @@ router.post('/rentals', authMiddleware, upload.array('images'), async (req, res)
         availableHours: req.body.contactInfoAvailableHours,
       },
       userId: req.userId,
-      images: imageUrls,
+      images: images,
+      videos: videos,
       status: req.body.status || 'available',
       geocodingStatus: geocodingStatus,
     });
@@ -874,7 +979,7 @@ router.post('/rentals', authMiddleware, upload.array('images'), async (req, res)
   }
 });
 
-router.patch('/rentals/:id', authMiddleware, upload.array('images'), async (req, res) => {
+router.patch('/rentals/:id', authMiddleware, upload.array('media'), async (req, res) => {
   try {
     if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
       return res.status(400).json({ message: 'Invalid rental ID' });
@@ -965,46 +1070,69 @@ router.patch('/rentals/:id', authMiddleware, upload.array('images'), async (req,
     }
     if (req.body.status) updatedData.status = req.body.status;
 
-    let updatedImages = [...rental.images];
-    let removedImages = [];
-    if (req.body.removedImages) {
+    // Handle media removal
+    let updatedImages = [...(rental.images || [])];
+    let updatedVideos = [...(rental.videos || [])];
+    let removedMedia = [];
+    
+    if (req.body.removedMedia) {
       try {
-        if (typeof req.body.removedImages === 'string') {
+        if (typeof req.body.removedMedia === 'string') {
           try {
-            removedImages = JSON.parse(req.body.removedImages);
+            removedMedia = JSON.parse(req.body.removedMedia);
           } catch (e) {
-            removedImages = req.body.removedImages.split(',').map(s => s.trim()).filter(Boolean);
+            removedMedia = req.body.removedMedia.split(',').map(s => s.trim()).filter(Boolean);
           }
-        } else if (Array.isArray(req.body.removedImages)) {
-          removedImages = req.body.removedImages;
+        } else if (Array.isArray(req.body.removedMedia)) {
+          removedMedia = req.body.removedMedia;
         }
       } catch (e) {
-        removedImages = [req.body.removedImages].filter(Boolean);
+        removedMedia = [req.body.removedMedia].filter(Boolean);
       }
-      if (!Array.isArray(removedImages)) removedImages = [removedImages];
+      if (!Array.isArray(removedMedia)) removedMedia = [removedMedia];
 
-      for (const image of removedImages) {
-        if (typeof image !== 'string' || !image.startsWith('/uploads/')) continue;
-        if (updatedImages.includes(image)) {
-          updatedImages = updatedImages.filter(img => img !== image);
-          const filePath = path.join(__dirname, '..', 'uploads', image.replace(/^\/uploads\//, ''));
-          try {
-            await fs.unlink(filePath);
-          } catch (err) {
-            if (err.code !== 'ENOENT') {
-              return res.status(500).json({ message: `Failed to delete image: ${image}`, error: err.message });
-            }
-          }
+      const cloudinaryIdsToDelete = [];
+      
+      for (const mediaUrl of removedMedia) {
+        if (typeof mediaUrl !== 'string') continue;
+        
+        if (updatedImages.includes(mediaUrl)) {
+          updatedImages = updatedImages.filter(img => img !== mediaUrl);
+          const publicId = extractCloudinaryPublicId(mediaUrl);
+          if (publicId) cloudinaryIdsToDelete.push(publicId);
         }
+        
+        if (updatedVideos.includes(mediaUrl)) {
+          updatedVideos = updatedVideos.filter(vid => vid !== mediaUrl);
+          const publicId = extractCloudinaryPublicId(mediaUrl);
+          if (publicId) cloudinaryIdsToDelete.push(publicId);
+        }
+      }
+
+      if (cloudinaryIdsToDelete.length > 0) {
+        await deleteCloudinaryMedia(cloudinaryIdsToDelete);
       }
     }
 
+    // Handle new media uploads
     if (req.files && req.files.length > 0) {
-      const newImages = req.files.map(file => `/uploads/${file.filename}`);
+      const newImages = [];
+      const newVideos = [];
+      
+      req.files.forEach(file => {
+        if (file.mimetype.startsWith('video/')) {
+          newVideos.push(file.path);
+        } else {
+          newImages.push(file.path);
+        }
+      });
+      
       updatedImages = [...new Set([...updatedImages, ...newImages])];
+      updatedVideos = [...new Set([...updatedVideos, ...newVideos])];
     }
 
     updatedData.images = updatedImages;
+    updatedData.videos = updatedVideos;
 
     const updatedRental = await Rental.findByIdAndUpdate(
       req.params.id,
@@ -1018,14 +1146,13 @@ router.patch('/rentals/:id', authMiddleware, upload.array('images'), async (req,
 
     await syncRentalToElasticsearch(updatedRental);
     
-    // ✅ QUAN TRỌNG: Trả về rental object với tất cả thông tin bao gồm _id
     res.json({
       message: updatedData.location?.coordinates?.coordinates[0] === 0 && updatedData.location?.coordinates?.coordinates[1] === 0 
         ? 'Rental updated successfully, but geocoding failed. Coordinates set to [0, 0]. Please update coordinates using /rentals/fix-coordinates/:id.'
         : 'Rental updated successfully',
       rental: {
-        _id: updatedRental._id.toString(), // ✅ Thêm _id
-        id: updatedRental._id.toString(),  // ✅ Thêm id (alias)
+        _id: updatedRental._id.toString(),
+        id: updatedRental._id.toString(),
         ...updatedRental.toObject(),
       },
     });
@@ -1037,7 +1164,6 @@ router.patch('/rentals/:id', authMiddleware, upload.array('images'), async (req,
     res.status(500).json({ message: 'Failed to update rental', error: err.message });
   }
 });
-
 router.delete('/rentals/:id', authMiddleware, async (req, res) => {
   try {
     if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
@@ -1052,22 +1178,21 @@ router.delete('/rentals/:id', authMiddleware, async (req, res) => {
       return res.status(403).json({ message: 'Unauthorized: You do not own this rental' });
     }
 
-    for (const image of rental.images) {
-      if (!image.startsWith('/uploads/')) {
-        console.warn(`Invalid image path format during deletion: ${image}`);
-        continue;
-      }
-      const filePath = path.join(__dirname, '..', 'Uploads', image.replace(/^\/uploads\//, ''));
-      try {
-        await fs.access(filePath);
-        await fs.unlink(filePath);
-        console.log(`Deleted image: ${filePath}`);
-      } catch (err) {
-        console.error(`Error deleting image ${filePath}: ${err.message}`);
-        if (err.code !== 'ENOENT') {
-          console.warn(`Non-ENOENT error during deletion: ${err.message}`);
-        }
-      }
+    // Delete images and videos from Cloudinary
+    const cloudinaryIdsToDelete = [];
+    
+    (rental.images || []).forEach(imageUrl => {
+      const publicId = extractCloudinaryPublicId(imageUrl);
+      if (publicId) cloudinaryIdsToDelete.push(publicId);
+    });
+    
+    (rental.videos || []).forEach(videoUrl => {
+      const publicId = extractCloudinaryPublicId(videoUrl);
+      if (publicId) cloudinaryIdsToDelete.push(publicId);
+    });
+
+    if (cloudinaryIdsToDelete.length > 0) {
+      await deleteCloudinaryMedia(cloudinaryIdsToDelete);
     }
 
     await Comment.deleteMany({ rentalId: req.params.id });
@@ -1097,7 +1222,6 @@ router.delete('/rentals/:id', authMiddleware, async (req, res) => {
     res.status(500).json({ message: 'Failed to delete rental', error: err.message });
   }
 });
-
 router.post('/rentals/geocode/:id', authMiddleware, async (req, res) => {
   try {
     if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
@@ -1563,5 +1687,215 @@ router.get('/rentals/nearby-fallback/:id', async (req, res) => {
     res.status(500).json({ message: 'Failed to fetch nearby rentals', error: err.message });
   }
 });
+
+// ==================== AI SUGGEST ROUTES ====================
+
+router.get('/ai-suggest', async (req, res) => {
+  try {
+    const { q, minPrice, maxPrice, propertyType, limit = 5 } = req.query;
+
+    // Validate input
+    if (!q || q.toString().trim().length < 3) {
+      return res.status(400).json({
+        success: false,
+        message: 'Search query must be at least 3 characters',
+        data: [],
+      });
+    }
+
+    const limitNum = Math.min(parseInt(limit) || 5, 10);
+    const searchQuery = q.toString().trim();
+
+    // Build MongoDB query
+    const query = {
+      status: 'available',
+      $or: [
+        { title: { $regex: searchQuery, $options: 'i' } },
+        { 'location.short': { $regex: searchQuery, $options: 'i' } },
+        { 'location.fullAddress': { $regex: searchQuery, $options: 'i' } },
+        { propertyType: { $regex: searchQuery, $options: 'i' } },
+        { amenities: { $regex: searchQuery, $options: 'i' } },
+        { furniture: { $regex: searchQuery, $options: 'i' } },
+      ],
+    };
+
+    // Add price filter if provided
+    if (minPrice || maxPrice) {
+      query.price = {};
+      if (minPrice) query.price.$gte = Number(minPrice);
+      if (maxPrice) query.price.$lte = Number(maxPrice);
+    } else {
+      // Default price range: 0 - 20 triệu/tháng
+      query.price = { $lte: 20000000 };
+    }
+
+    // Add property type filter if provided
+    if (propertyType) {
+      query.propertyType = propertyType;
+    }
+
+    // Execute query
+    const results = await Rental.find(query)
+      .select(
+        'title price location propertyType images area amenities createdAt contactInfo'
+      )
+      .limit(limitNum)
+      .sort({ createdAt: -1 })
+      .lean();
+
+    // Transform results
+    const transformedResults = results.map((rental) => ({
+      id: rental._id.toString(),
+      title: rental.title,
+      price: rental.price,
+      location: {
+        short: rental.location?.short || '',
+        fullAddress: rental.location?.fullAddress || '',
+      },
+      propertyType: rental.propertyType,
+      images: rental.images || [],
+      area: rental.area?.total || 0,
+      amenities: (rental.amenities || []).slice(0, 3), // Lấy 3 tiện nghi đầu
+      bedrooms: rental.area?.bedrooms || 0,
+      bathrooms: rental.area?.bathrooms || 0,
+      contactInfo: {
+        name: rental.contactInfo?.name || 'Chủ nhà',
+        phone: rental.contactInfo?.phone || '',
+      },
+      createdAt: rental.createdAt,
+    }));
+
+    res.json({
+      success: true,
+      data: transformedResults,
+      count: transformedResults.length,
+      searchQuery,
+    });
+  } catch (err) {
+    console.error('Error in AI suggest:', err);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch suggestions',
+      error: err.message,
+      data: [],
+    });
+  }
+});
+
+
+router.get('/ai-suggest/advanced', async (req, res) => {
+  try {
+    const { q } = req.query;
+
+    if (!q || q.toString().trim().length < 3) {
+      return res.status(400).json({
+        success: false,
+        message: 'Search query required',
+        data: [],
+      });
+    }
+
+    const searchQuery = q.toString().trim().toLowerCase();
+
+    // Parse natural language query
+    const parsedParams = _parseNaturalLanguageQuery(searchQuery);
+
+    // Build query
+    const query = { status: 'available' };
+
+    // Text search
+    query.$or = [
+      { title: { $regex: searchQuery, $options: 'i' } },
+      { 'location.short': { $regex: searchQuery, $options: 'i' } },
+      { 'location.fullAddress': { $regex: searchQuery, $options: 'i' } },
+      { propertyType: { $regex: searchQuery, $options: 'i' } },
+      { amenities: { $in: parsedParams.amenities.map(a => new RegExp(a, 'i')) } },
+    ];
+
+    // Price filter
+    if (parsedParams.maxPrice) {
+      query.price = { $lte: parsedParams.maxPrice };
+    } else {
+      query.price = { $lte: 20000000 };
+    }
+    if (parsedParams.minPrice) {
+      query.price.$gte = parsedParams.minPrice;
+    }
+
+    // Property type filter
+    if (parsedParams.propertyType) {
+      query.propertyType = {
+        $regex: parsedParams.propertyType,
+        $options: 'i',
+      };
+    }
+
+    // Area filter
+    if (parsedParams.area) {
+      query['area.total'] = { $gte: parsedParams.area - 10 };
+    }
+
+    // Rooms filter
+    if (parsedParams.bedrooms) {
+      query['area.bedrooms'] = parsedParams.bedrooms;
+    }
+
+    // Location filter
+    if (parsedParams.locations.length > 0) {
+      query.$or = query.$or.concat(
+        parsedParams.locations.map((loc) => ({
+          'location.fullAddress': { $regex: loc, $options: 'i' },
+        }))
+      );
+    }
+
+    // Execute query
+    const results = await Rental.find(query)
+      .select(
+        'title price location propertyType images area amenities createdAt contactInfo'
+      )
+      .limit(5)
+      .sort({ createdAt: -1 })
+      .lean();
+
+    // Transform results
+    const transformedResults = results.map((rental) => ({
+      id: rental._id.toString(),
+      title: rental.title,
+      price: rental.price,
+      location: {
+        short: rental.location?.short || '',
+        fullAddress: rental.location?.fullAddress || '',
+      },
+      propertyType: rental.propertyType,
+      images: rental.images || [],
+      area: rental.area?.total || 0,
+      amenities: (rental.amenities || []).slice(0, 3),
+      bedrooms: rental.area?.bedrooms || 0,
+      bathrooms: rental.area?.bathrooms || 0,
+      contactInfo: {
+        name: rental.contactInfo?.name || 'Chủ nhà',
+        phone: rental.contactInfo?.phone || '',
+      },
+    }));
+
+    res.json({
+      success: true,
+      data: transformedResults,
+      count: transformedResults.length,
+      parsedParams, // Debug info
+      searchQuery,
+    });
+  } catch (err) {
+    console.error('Error in advanced AI suggest:', err);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to process request',
+      error: err.message,
+      data: [],
+    });
+  }
+});
+
 
 module.exports = router;

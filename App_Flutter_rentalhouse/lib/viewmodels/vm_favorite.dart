@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../config/api_routes.dart'; // Đảm bảo import này đúng
-import '../models/favorite.dart'; // Đảm bảo import này đúng (model Favorite của bạn)
+import '../models/favorite.dart';
 
 class FavoriteViewModel with ChangeNotifier {
   List<Favorite> _favorites = [];
@@ -11,7 +11,7 @@ class FavoriteViewModel with ChangeNotifier {
   // hoặc một String để theo dõi rentalId đang được xử lý.
   // Nếu bạn muốn loading chung cho cả list thì dùng bool _isLoadingList = false;
   Map<String, bool> _itemLoadingStates = {};
-  bool _isListLoading = false; // Cho fetchFavorites và removeMultipleFavorites
+  bool _isListLoading = false;
 
   String? _errorMessage;
 
@@ -88,7 +88,7 @@ class FavoriteViewModel with ChangeNotifier {
         final List<dynamic> data = jsonDecode(response.body);
         // Ánh xạ dữ liệu từ API của bạn. Giả sử API trả về danh sách các đối tượng Favorite đầy đủ
         // hoặc danh sách các đối tượng có chứa rentalId.
-        // Ví dụ, nếu API trả về [{ "rentalId": { "_id": "someId", ... }, "userId": "userId" }]
+
         _favorites = data
             .map((json) {
               // Kiểm tra cấu trúc JSON trả về từ API của bạn

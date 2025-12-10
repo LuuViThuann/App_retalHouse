@@ -1,14 +1,14 @@
-
 import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_rentalhouse/services/auth_service.dart';
+import 'package:flutter_rentalhouse/utils/Snackbar_process.dart';
 import 'package:flutter_rentalhouse/views/Admin/View/about_us_preview_screen.dart';
+import 'package:http_parser/http_parser.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
 import 'dart:convert';
 import 'package:provider/provider.dart';
-import 'package:flutter_rentalhouse/viewmodels/vm_auth.dart';
 import 'package:http/http.dart' as http;
 import 'package:flutter_rentalhouse/config/api_routes.dart';
 
@@ -23,7 +23,7 @@ class _ManageAboutUsScreenState extends State<ManageAboutUsScreen> {
   final _titleController = TextEditingController();
   final _descriptionController = TextEditingController();
   final List<File> _selectedImages = [];
-  final List<String> _existingImages = [];
+  final List<Map<String, dynamic>> _existingImages = [];
   bool _isLoading = false;
   String? _aboutUsId;
 
@@ -44,22 +44,72 @@ class _ManageAboutUsScreenState extends State<ManageAboutUsScreen> {
         headers: {'Authorization': 'Bearer $token'},
       ).timeout(const Duration(seconds: 15));
 
+      print('📥 Load AboutUs: ${response.statusCode}');
+      print('Body: ${response.body}');
+
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         if (data['data'] != null && data['data'].isNotEmpty) {
           final aboutUs = data['data'][0];
-          _aboutUsId = aboutUs['_id'];
-          _titleController.text = aboutUs['title'] ?? '';
-          _descriptionController.text = aboutUs['description'] ?? '';
-          _existingImages.addAll(List<String>.from(aboutUs['images'] ?? []));
+
+          setState(() {
+            _aboutUsId = aboutUs['_id'];
+            _titleController.text = aboutUs['title'] ?? '';
+            _descriptionController.text = aboutUs['description'] ?? '';
+            _existingImages.clear();
+
+
+            if (aboutUs['images'] != null) {
+              try {
+                final rawImages = aboutUs['images'];
+
+
+                if (rawImages is List) {
+                  for (int i = 0; i < rawImages.length; i++) {
+                    final img = rawImages[i];
+
+                    if (img is Map<String, dynamic>) {
+                      // Format mới: {url, cloudinaryId, order}
+                      _existingImages.add({
+                        'url': img['url'] as String,
+                        'cloudinaryId': img['cloudinaryId'] as String?,
+                        'order': img['order'] as int? ?? i,
+                      });
+                    } else if (img is String) {
+                      // Format cũ: chỉ URL string
+                      _existingImages.add({
+                        'url': img,
+                        'cloudinaryId': null,
+                        'order': i,
+                      });
+                    } else {
+                      print('⚠️ Unknown image format at index $i: ${img.runtimeType}');
+                    }
+                  }
+                }
+
+                print('✅ Loaded ${_existingImages.length} existing images');
+              } catch (parseError) {
+                print('❌ Error parsing images: $parseError');
+                print('   Raw images data: ${aboutUs['images']}');
+              }
+            }
+          });
         }
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Lỗi tải dữ liệu: $e')),
-      );
+      print('❌ Error loading AboutUs: $e');
+      print('   Stack trace: ${StackTrace.current}');
+      if (mounted) {
+        AppSnackBar.show(
+          context,
+          AppSnackBar.error(message: 'Lỗi tải dữ liệu: ${e.toString().split(':').last}'),
+        );
+      }
     } finally {
-      setState(() => _isLoading = false);
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 
@@ -71,13 +121,21 @@ class _ManageAboutUsScreenState extends State<ManageAboutUsScreen> {
       setState(() {
         _selectedImages.addAll(pickedFiles.map((f) => File(f.path)));
       });
+
+      if (mounted) {
+        AppSnackBar.show(
+          context,
+          AppSnackBar.success(message: 'Đã chọn ${pickedFiles.length} ảnh'),
+        );
+      }
     }
   }
 
   Future<void> _submitAboutUs() async {
     if (_titleController.text.isEmpty || _descriptionController.text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Vui lòng điền đầy đủ thông tin')),
+      AppSnackBar.show(
+        context,
+        AppSnackBar.warning(message: 'Vui lòng điền đầy đủ thông tin'),
       );
       return;
     }
@@ -88,11 +146,7 @@ class _ManageAboutUsScreenState extends State<ManageAboutUsScreen> {
       final token = await Provider.of<AuthService>(context, listen: false).getIdToken();
       if (token == null) throw Exception('Không lấy được token');
 
-      final uri = Uri.parse(
-        _aboutUsId != null
-            ? '${ApiRoutes.baseUrl}/admin/aboutus/$_aboutUsId'
-            : '${ApiRoutes.baseUrl}/admin/aboutus',
-      );
+      final uri = Uri.parse('${ApiRoutes.baseUrl}/admin/aboutus');
 
       final request = http.MultipartRequest('POST', uri)
         ..headers['Authorization'] = 'Bearer $token'
@@ -103,41 +157,97 @@ class _ManageAboutUsScreenState extends State<ManageAboutUsScreen> {
         request.fields['id'] = _aboutUsId!;
       }
 
+      // Thêm ảnh mới với MIME type cụ thể
       for (var image in _selectedImages) {
-        request.files.add(await http.MultipartFile.fromPath('images', image.path));
+        String mimeType;
+        final ext = image.path.split('.').last.toLowerCase();
+
+        switch (ext) {
+          case 'jpg':
+          case 'jpeg':
+            mimeType = 'image/jpeg';
+            break;
+          case 'png':
+            mimeType = 'image/png';
+            break;
+          case 'gif':
+            mimeType = 'image/gif';
+            break;
+          case 'webp':
+            mimeType = 'image/webp';
+            break;
+          default:
+            mimeType = 'image/jpeg';
+        }
+
+        request.files.add(await http.MultipartFile.fromPath(
+          'images',
+          image.path,
+          contentType: MediaType.parse(mimeType),
+        ));
       }
+
+      print('📤 Submitting AboutUs...');
+      print('   Title: ${_titleController.text}');
+      print('   ID: $_aboutUsId');
+      print('   New images: ${_selectedImages.length}');
 
       final streamedResponse = await request.send().timeout(const Duration(seconds: 30));
       final response = await http.Response.fromStream(streamedResponse);
 
-      if (response.statusCode == 201 || response.statusCode == 200) {
-        _selectedImages.clear();
-        _titleController.clear();
-        _descriptionController.clear();
-        _existingImages.clear();
-        _aboutUsId = null;
+      print('📥 Response: ${response.statusCode}');
+      print('Body: ${response.body}');
 
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Lưu nội dung About Us thành công')),
-        );
+      if (response.statusCode == 201 || response.statusCode == 200) {
+        setState(() {
+          _selectedImages.clear();
+        });
+
+        if (mounted) {
+          AppSnackBar.show(
+            context,
+            AppSnackBar.success(
+              message: 'Lưu nội dung thông tin thành công',
+              icon: Icons.check_circle,
+            ),
+          );
+        }
+
         await _loadAboutUs();
       } else {
-        throw Exception('Lỗi server: ${response.statusCode}');
+        final errorData = jsonDecode(response.body);
+        throw Exception(errorData['message'] ?? 'Lỗi server: ${response.statusCode}');
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Lỗi: $e')),
-      );
+      print('❌ Error submitting: $e');
+      if (mounted) {
+        AppSnackBar.show(
+          context,
+          AppSnackBar.error(message: 'Lỗi: $e'),
+        );
+      }
     } finally {
-      setState(() => _isLoading = false);
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 
   Future<void> _deleteImage(String imageUrl) async {
+    if (_aboutUsId == null) {
+      AppSnackBar.show(
+        context,
+        AppSnackBar.warning(message: 'Chưa có thông tin để xóa ảnh'),
+      );
+      return;
+    }
+
     setState(() => _isLoading = true);
     try {
       final token = await Provider.of<AuthService>(context, listen: false).getIdToken();
       if (token == null) throw Exception('Không lấy được token');
+
+      print('🗑️ Deleting image: $imageUrl');
 
       final response = await http.delete(
         Uri.parse('${ApiRoutes.baseUrl}/admin/aboutus/$_aboutUsId/image'),
@@ -148,30 +258,44 @@ class _ManageAboutUsScreenState extends State<ManageAboutUsScreen> {
         body: jsonEncode({'imageUrl': imageUrl}),
       );
 
+      print('📥 Delete response: ${response.statusCode}');
+
       if (response.statusCode == 200) {
-        setState(() => _existingImages.remove(imageUrl));
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Xóa ảnh thành công')),
-        );
+        setState(() {
+          _existingImages.removeWhere((img) => img['url'] == imageUrl);
+        });
+
+        if (mounted) {
+          AppSnackBar.show(
+            context,
+            AppSnackBar.success(message: 'Xóa ảnh thành công'),
+          );
+        }
+      } else {
+        final errorData = jsonDecode(response.body);
+        throw Exception(errorData['message'] ?? 'Lỗi xóa ảnh');
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Lỗi xóa ảnh: $e')),
-      );
+      print('❌ Error deleting image: $e');
+      if (mounted) {
+        AppSnackBar.show(
+          context,
+          AppSnackBar.error(message: 'Lỗi xóa ảnh: $e'),
+        );
+      }
     } finally {
-      setState(() => _isLoading = false);
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
-  void _previewAboutUs() {
 
+  void _previewAboutUs() {
     final previewData = {
       'title': _titleController.text.isEmpty ? 'Công ty chúng tôi' : _titleController.text,
       'description': _descriptionController.text,
-      'images': [
-        ..._existingImages,
-      ],
+      'images': _existingImages.map((img) => img['url'] as String).toList(),
     };
-
 
     Navigator.of(context).push(
       MaterialPageRoute(
@@ -179,6 +303,7 @@ class _ManageAboutUsScreenState extends State<ManageAboutUsScreen> {
       ),
     );
   }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -194,7 +319,6 @@ class _ManageAboutUsScreenState extends State<ManageAboutUsScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Tiêu đề
             TextField(
               controller: _titleController,
               decoration: InputDecoration(
@@ -209,7 +333,6 @@ class _ManageAboutUsScreenState extends State<ManageAboutUsScreen> {
             ),
             const SizedBox(height: 16),
 
-            // Mô tả
             TextField(
               controller: _descriptionController,
               decoration: InputDecoration(
@@ -218,27 +341,25 @@ class _ManageAboutUsScreenState extends State<ManageAboutUsScreen> {
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                 ),
-                prefixIcon:
-                const Icon(Icons.description, color: Colors.redAccent),
+                prefixIcon: const Icon(Icons.description, color: Colors.redAccent),
               ),
               maxLines: 8,
             ),
             const SizedBox(height: 20),
 
-            // Chọn ảnh
             ElevatedButton.icon(
               onPressed: _pickImages,
               icon: const Icon(Icons.image_search),
               label: const Text('Chọn ảnh từ thiết bị'),
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.blue,
+                foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(vertical: 12),
                 minimumSize: const Size(double.infinity, 50),
               ),
             ),
             const SizedBox(height: 16),
 
-            // Hiển thị ảnh đã chọn
             if (_selectedImages.isNotEmpty) ...[
               Text(
                 'Ảnh mới (${_selectedImages.length})',
@@ -251,8 +372,7 @@ class _ManageAboutUsScreenState extends State<ManageAboutUsScreen> {
               GridView.builder(
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),
-                gridDelegate:
-                const SliverGridDelegateWithFixedCrossAxisCount(
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                   crossAxisCount: 3,
                   crossAxisSpacing: 8,
                   mainAxisSpacing: 8,
@@ -266,6 +386,8 @@ class _ManageAboutUsScreenState extends State<ManageAboutUsScreen> {
                         child: Image.file(
                           _selectedImages[index],
                           fit: BoxFit.cover,
+                          width: double.infinity,
+                          height: double.infinity,
                         ),
                       ),
                       Positioned(
@@ -273,8 +395,11 @@ class _ManageAboutUsScreenState extends State<ManageAboutUsScreen> {
                         right: 4,
                         child: GestureDetector(
                           onTap: () {
-                            setState(
-                                    () => _selectedImages.removeAt(index));
+                            setState(() => _selectedImages.removeAt(index));
+                            AppSnackBar.show(
+                              context,
+                              AppSnackBar.info(message: 'Đã xóa ảnh mới'),
+                            );
                           },
                           child: Container(
                             decoration: const BoxDecoration(
@@ -297,7 +422,6 @@ class _ManageAboutUsScreenState extends State<ManageAboutUsScreen> {
               const SizedBox(height: 20),
             ],
 
-            // Hiển thị ảnh hiện có
             if (_existingImages.isNotEmpty) ...[
               Text(
                 'Ảnh hiện có (${_existingImages.length})',
@@ -310,21 +434,24 @@ class _ManageAboutUsScreenState extends State<ManageAboutUsScreen> {
               GridView.builder(
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),
-                gridDelegate:
-                const SliverGridDelegateWithFixedCrossAxisCount(
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                   crossAxisCount: 3,
                   crossAxisSpacing: 8,
                   mainAxisSpacing: 8,
                 ),
                 itemCount: _existingImages.length,
                 itemBuilder: (context, index) {
+                  final imageUrl = _existingImages[index]['url'] as String;
+
                   return Stack(
                     children: [
                       ClipRRect(
                         borderRadius: BorderRadius.circular(8),
                         child: Image.network(
-                          '${ApiRoutes.rootUrl}${_existingImages[index]}',
+                          imageUrl, // ✅ FIX: URL đã là full URL từ Cloudinary
                           fit: BoxFit.cover,
+                          width: double.infinity,
+                          height: double.infinity,
                           errorBuilder: (_, __, ___) =>
                           const Icon(Icons.broken_image),
                         ),
@@ -333,8 +460,7 @@ class _ManageAboutUsScreenState extends State<ManageAboutUsScreen> {
                         top: 4,
                         right: 4,
                         child: GestureDetector(
-                          onTap: () =>
-                              _deleteImage(_existingImages[index]),
+                          onTap: () => _deleteImage(imageUrl),
                           child: Container(
                             decoration: const BoxDecoration(
                               color: Colors.red,
@@ -356,7 +482,6 @@ class _ManageAboutUsScreenState extends State<ManageAboutUsScreen> {
               const SizedBox(height: 20),
             ],
 
-            // Nút lưu
             ElevatedButton(
               onPressed: _isLoading ? null : _submitAboutUs,
               style: ElevatedButton.styleFrom(
@@ -369,8 +494,7 @@ class _ManageAboutUsScreenState extends State<ManageAboutUsScreen> {
                 height: 20,
                 width: 20,
                 child: CircularProgressIndicator(
-                  valueColor:
-                  AlwaysStoppedAnimation<Color>(Colors.white),
+                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                 ),
               )
                   : const Text(
@@ -382,10 +506,8 @@ class _ManageAboutUsScreenState extends State<ManageAboutUsScreen> {
                 ),
               ),
             ),
-
             const SizedBox(height: 16),
 
-// Nút Xem trước
             ElevatedButton.icon(
               onPressed: _previewAboutUs,
               icon: const Icon(Icons.visibility),
@@ -410,6 +532,3 @@ class _ManageAboutUsScreenState extends State<ManageAboutUsScreen> {
     super.dispose();
   }
 }
-
-// ==================== MANAGE FEEDBACK SCREEN ====================
-

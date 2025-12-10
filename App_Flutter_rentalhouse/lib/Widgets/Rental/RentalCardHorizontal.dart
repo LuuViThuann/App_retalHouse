@@ -19,7 +19,7 @@ class RentalCardHorizontal extends StatelessWidget {
 
   String formatCurrency(double amount) {
     final formatter =
-        NumberFormat.currency(locale: 'vi_VN', symbol: '₫', decimalDigits: 0);
+    NumberFormat.currency(locale: 'vi_VN', symbol: '₫', decimalDigits: 0);
     return formatter.format(amount);
   }
 
@@ -31,11 +31,31 @@ class RentalCardHorizontal extends StatelessWidget {
         const end = Offset.zero;
         const curve = Curves.easeInOut;
         var tween =
-            Tween(begin: begin, end: end).chain(CurveTween(curve: curve));
+        Tween(begin: begin, end: end).chain(CurveTween(curve: curve));
         return SlideTransition(position: animation.drive(tween), child: child);
       },
       transitionDuration: const Duration(milliseconds: 300),
     );
+  }
+
+  ///  HELPER METHOD: Xác định URL ảnh đúng
+  /// - Nếu URL đã là Cloudinary (https://res.cloudinary.com/...) → dùng trực tiếp
+  /// - Nếu là đường dẫn tương đối (/uploads/...) → ghép với serverBaseUrl
+  String _getImageUrl(String imageUrl) {
+    if (imageUrl.isEmpty) return '';
+
+    // Nếu URL đã là đường dẫn đầy đủ (http:// hoặc https://)
+    if (imageUrl.startsWith('http://') || imageUrl.startsWith('https://')) {
+      return imageUrl;
+    }
+
+    // Nếu là đường dẫn tương đối (ảnh cũ từ server)
+    // Đảm bảo không bị duplicate slash
+    if (imageUrl.startsWith('/')) {
+      return '${ApiRoutes.serverBaseUrl}$imageUrl';
+    }
+
+    return '${ApiRoutes.serverBaseUrl}/$imageUrl';
   }
 
   @override
@@ -72,30 +92,29 @@ class RentalCardHorizontal extends StatelessWidget {
             // ==================== ẢNH + TRẠNG THÁI + NHÃN CHÍNH CHỦ ====================
             Stack(
               children: [
-                // Ảnh chính
+                // ✅ Ảnh chính - SỬ DỤNG _getImageUrl()
                 ClipRRect(
                   borderRadius:
-                      const BorderRadius.vertical(top: Radius.circular(14)),
+                  const BorderRadius.vertical(top: Radius.circular(14)),
                   child: rental.images.isNotEmpty
                       ? CachedNetworkImage(
-                          imageUrl:
-                              '${ApiRoutes.serverBaseUrl}${rental.images[0]}',
-                          height: 150,
-                          width: double.infinity,
-                          fit: BoxFit.cover,
-                          placeholder: (_, __) => Container(
-                              color: Colors.grey[300],
-                              child: const Center(
-                                  child: CircularProgressIndicator())),
-                          errorWidget: (_, __, ___) => Container(
-                              color: Colors.grey[300],
-                              child: const Icon(Icons.image, size: 60)),
-                        )
+                    imageUrl: _getImageUrl(rental.images[0]),
+                    height: 150,
+                    width: double.infinity,
+                    fit: BoxFit.cover,
+                    placeholder: (_, __) => Container(
+                        color: Colors.grey[300],
+                        child: const Center(
+                            child: CircularProgressIndicator())),
+                    errorWidget: (_, __, ___) => Container(
+                        color: Colors.grey[300],
+                        child: const Icon(Icons.image, size: 60)),
+                  )
                       : Container(
-                          height: 150,
-                          color: Colors.grey[300],
-                          child: const Icon(Icons.image, size: 60),
-                        ),
+                    height: 150,
+                    color: Colors.grey[300],
+                    child: const Icon(Icons.image, size: 60),
+                  ),
                 ),
 
                 // Trạng thái bài đăng (Đang hoạt động / Đã cho thuê)
@@ -104,11 +123,11 @@ class RentalCardHorizontal extends StatelessWidget {
                   left: 10,
                   child: Container(
                     padding:
-                        const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                     decoration: BoxDecoration(
                       color: (rental.status == 'available'
-                              ? Colors.green
-                              : Colors.red)
+                          ? Colors.green
+                          : Colors.red)
                           .withOpacity(0.92),
                       borderRadius: BorderRadius.circular(20),
                     ),
@@ -165,38 +184,38 @@ class RentalCardHorizontal extends StatelessWidget {
                           onTap: isLoadingFavorite
                               ? null
                               : () async {
-                                  if (isFavorite) {
-                                    final success =
-                                        await favoriteViewModel.removeFavorite(
-                                            rentalId, currentUser!.token!);
-                                    if (context.mounted) {
-                                      ScaffoldMessenger.of(context)
-                                          .showSnackBar(SnackBar(
-                                        content: Text(success
-                                            ? 'Đã xóa khỏi yêu thích'
-                                            : 'Lỗi khi xóa'),
-                                        backgroundColor:
-                                            success ? Colors.green : Colors.red,
-                                      ));
-                                    }
-                                  } else {
-                                    final success =
-                                        await favoriteViewModel.addFavorite(
-                                            currentUser!.id,
-                                            rentalId,
-                                            currentUser!.token!);
-                                    if (context.mounted) {
-                                      ScaffoldMessenger.of(context)
-                                          .showSnackBar(SnackBar(
-                                        content: Text(success
-                                            ? 'Đã thêm vào yêu thích!'
-                                            : 'Lỗi khi thêm'),
-                                        backgroundColor:
-                                            success ? Colors.green : Colors.red,
-                                      ));
-                                    }
-                                  }
-                                },
+                            if (isFavorite) {
+                              final success =
+                              await favoriteViewModel.removeFavorite(
+                                  rentalId, currentUser.token!);
+                              if (context.mounted) {
+                                ScaffoldMessenger.of(context)
+                                    .showSnackBar(SnackBar(
+                                  content: Text(success
+                                      ? 'Đã xóa khỏi yêu thích'
+                                      : 'Lỗi khi xóa'),
+                                  backgroundColor:
+                                  success ? Colors.green : Colors.red,
+                                ));
+                              }
+                            } else {
+                              final success =
+                              await favoriteViewModel.addFavorite(
+                                  currentUser.id,
+                                  rentalId,
+                                  currentUser.token!);
+                              if (context.mounted) {
+                                ScaffoldMessenger.of(context)
+                                    .showSnackBar(SnackBar(
+                                  content: Text(success
+                                      ? 'Đã thêm vào yêu thích!'
+                                      : 'Lỗi khi thêm'),
+                                  backgroundColor:
+                                  success ? Colors.green : Colors.red,
+                                ));
+                              }
+                            }
+                          },
                           child: Container(
                             padding: const EdgeInsets.all(8),
                             decoration: BoxDecoration(
@@ -211,19 +230,19 @@ class RentalCardHorizontal extends StatelessWidget {
                             ),
                             child: isLoadingFavorite
                                 ? const SizedBox(
-                                    width: 20,
-                                    height: 20,
-                                    child: CircularProgressIndicator(
-                                        strokeWidth: 2))
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                    strokeWidth: 2))
                                 : Icon(
-                                    isFavorite
-                                        ? Icons.favorite
-                                        : Icons.favorite_border,
-                                    color: isFavorite
-                                        ? Colors.red
-                                        : Colors.grey[700],
-                                    size: 22,
-                                  ),
+                              isFavorite
+                                  ? Icons.favorite
+                                  : Icons.favorite_border,
+                              color: isFavorite
+                                  ? Colors.red
+                                  : Colors.grey[700],
+                              size: 22,
+                            ),
                           ),
                         ),
                         const SizedBox(height: 8),
@@ -269,10 +288,10 @@ class RentalCardHorizontal extends StatelessWidget {
 
                             try {
                               final conversation =
-                                  await chatViewModel.getOrCreateConversation(
+                              await chatViewModel.getOrCreateConversation(
                                 rentalId: rental.id!,
                                 landlordId: rental.userId,
-                                token: currentUser!.token!,
+                                token: currentUser.token!,
                               );
 
                               if (!context.mounted) return;
@@ -280,7 +299,7 @@ class RentalCardHorizontal extends StatelessWidget {
 
                               if (conversation != null) {
                                 await chatViewModel
-                                    .fetchConversations(currentUser!.token!);
+                                    .fetchConversations(currentUser.token!);
                                 Navigator.push(
                                   context,
                                   MaterialPageRoute(

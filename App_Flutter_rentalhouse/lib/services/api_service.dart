@@ -1,3 +1,5 @@
+
+
 import 'dart:convert';
 import 'package:firebase_auth/firebase_auth.dart' as auth;
 import 'package:http/http.dart' as http;
@@ -169,7 +171,14 @@ class ApiService {
     }
   }
 
-  Future<void> createRental(Rental rental, List<String> imagePaths) async {
+  // ============================================
+  // ✅ FIX: createRental() - Sửa field name từ 'images' thành 'media'
+  // ============================================
+  Future<void> createRental(
+      Rental rental,
+      List<String> imagePaths, {
+        List<String> videoPaths = const [],
+      }) async {
     final token = await _getIdToken();
     if (token == null) {
       throw Exception('Không tìm thấy token. Vui lòng đăng nhập lại.');
@@ -193,30 +202,47 @@ class ApiService {
     request.fields['amenities'] = rental.amenities.join(',');
     request.fields['surroundings'] = rental.surroundings.join(',');
     request.fields['rentalTermsMinimumLease'] =
-        rental.rentalTerms['minimumLease'];
+    rental.rentalTerms['minimumLease'];
     request.fields['rentalTermsDeposit'] =
         rental.rentalTerms['deposit'].toString();
     request.fields['rentalTermsPaymentMethod'] =
-        rental.rentalTerms['paymentMethod'];
+    rental.rentalTerms['paymentMethod'];
     request.fields['rentalTermsRenewalTerms'] =
-        rental.rentalTerms['renewalTerms'];
+    rental.rentalTerms['renewalTerms'];
     request.fields['contactInfoName'] = rental.contactInfo['name'];
     request.fields['contactInfoPhone'] = rental.contactInfo['phone'];
     request.fields['contactInfoAvailableHours'] =
-        rental.contactInfo['availableHours'];
+    rental.contactInfo['availableHours'];
     request.fields['status'] = rental.status;
 
+    // ✅ FIX: Thay từ 'images' thành 'media'
     for (var imagePath in imagePaths) {
       try {
         request.files.add(await http.MultipartFile.fromPath(
-          'images',
+          'media', // ✅ FIXED: Từ 'images' thành 'media'
           imagePath,
           contentType: MediaType('image', 'jpeg'),
         ));
+        print('📤 Added image file: $imagePath (field: media)');
       } catch (e) {
         throw Exception('Không thể tải ảnh: $e');
       }
     }
+
+    // ✅ FIX: Thay từ 'media' thành 'media' (giữ nguyên)
+    for (var path in videoPaths) {
+      if (path.isNotEmpty) {
+        request.files.add(await http.MultipartFile.fromPath(
+          'media', // ✅ FIXED: Giữ 'media' cho video
+          path,
+          contentType: MediaType('video', 'mp4'),
+        ));
+        print('📹 Added video file: $path (field: media)');
+      }
+    }
+
+    print('📤 Total files to upload: ${request.files.length}');
+    print('📤 File fields: ${request.files.map((f) => f.field).toList()}');
 
     final response = await request.send();
     final responseBody = await http.Response.fromStream(response);

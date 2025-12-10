@@ -44,14 +44,14 @@ class Conversation {
       landlord: {
         'id': json['landlord']?['id']?.toString() ?? '',
         'username': json['landlord']?['username']?.toString() ?? 'Unknown',
-        'avatarBase64': json['landlord']?['avatarBase64']?.toString() ?? '',
+        'avatarUrl': json['landlord']?['avatarUrl']?.toString() ?? '', // Changed from avatarBase64
       },
       rental: json['rental'] != null
           ? {
-              'id': json['rental']?['id']?.toString() ?? '',
-              'title': json['rental']?['title']?.toString() ?? '',
-              'image': json['rental']?['image']?.toString() ?? '',
-            }
+        'id': json['rental']?['id']?.toString() ?? '',
+        'title': json['rental']?['title']?.toString() ?? '',
+        'image': json['rental']?['image']?.toString() ?? '',
+      }
           : null,
       unreadCount: (json['unreadCounts']?[json['user']?['id']] ?? 0) as int,
     );

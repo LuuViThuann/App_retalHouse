@@ -27,11 +27,26 @@ class _AddNewsScreenState extends State<AddNewsScreen> {
   bool featured = false;
   bool isLoading = false;
 
+  // Fix: Thêm ảnh vào danh sách thay vì thay thế
   Future<void> _pickImages() async {
     final picked = await _picker.pickMultiImage(imageQuality: 85);
     if (picked.isNotEmpty) {
       setState(() {
-        selectedImages = picked.map((p) => File(p.path)).toList();
+        // Thêm ảnh mới vào danh sách hiện tại (KHÔNG thay thế)
+        selectedImages.addAll(picked.map((p) => File(p.path)));
+      });
+    }
+  }
+
+  // Option: Chọn ảnh từ camera (thêm 1 ảnh)
+  Future<void> _pickImageFromCamera() async {
+    final picked = await _picker.pickImage(
+      source: ImageSource.camera,
+      imageQuality: 85,
+    );
+    if (picked != null) {
+      setState(() {
+        selectedImages.add(File(picked.path));
       });
     }
   }
@@ -42,15 +57,24 @@ class _AddNewsScreenState extends State<AddNewsScreen> {
     });
   }
 
+  // Clear tất cả ảnh
+  void _clearAllImages() {
+    setState(() {
+      selectedImages.clear();
+    });
+  }
+
   Future<void> _createNews() async {
     final title = titleController.text.trim();
     if (title.isEmpty) {
-      AppSnackBar.show(context, AppSnackBar.error(message: 'Vui lòng nhập tiêu đề'));
+      AppSnackBar.show(
+          context, AppSnackBar.error(message: 'Vui lòng nhập tiêu đề'));
       return;
     }
 
     if (selectedImages.isEmpty) {
-      AppSnackBar.show(context, AppSnackBar.error(message: 'Vui lòng chọn ít nhất 1 ảnh'));
+      AppSnackBar.show(context,
+          AppSnackBar.error(message: 'Vui lòng chọn ít nhất 1 ảnh'));
       return;
     }
 
@@ -59,7 +83,8 @@ class _AddNewsScreenState extends State<AddNewsScreen> {
         html.trim().isEmpty ||
         html == '<br>' ||
         html == '<p><br></p>') {
-      AppSnackBar.show(context, AppSnackBar.error(message: 'Vui lòng nhập nội dung bài viết'));
+      AppSnackBar.show(context,
+          AppSnackBar.error(message: 'Vui lòng nhập nội dung bài viết'));
       return;
     }
 
@@ -82,13 +107,15 @@ class _AddNewsScreenState extends State<AddNewsScreen> {
       );
 
       if (mounted) {
-        AppSnackBar.show(context, AppSnackBar.success(message: 'Thêm tin tức thành công!'));
+        AppSnackBar.show(context,
+            AppSnackBar.success(message: 'Thêm tin tức thành công!'));
         widget.onNewsAdded();
         Navigator.pop(context);
       }
     } catch (e) {
       if (mounted) {
-        AppSnackBar.show(context, AppSnackBar.error(message: 'Lỗi: ${e.toString()}'));
+        AppSnackBar.show(
+            context, AppSnackBar.error(message: 'Lỗi: ${e.toString()}'));
       }
     } finally {
       if (mounted) setState(() => isLoading = false);
@@ -119,38 +146,70 @@ class _AddNewsScreenState extends State<AddNewsScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Chọn ảnh
-            GestureDetector(
-              onTap: _pickImages,
-              child: Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(
-                      color: Colors.blue[300]!,
-                      width: 2,
-                      style: BorderStyle.solid),
-                  color: Colors.blue[50],
-                ),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.add_a_photo,
-                        size: 64, color: Colors.blue[700]),
-                    const SizedBox(height: 16),
-                    Text(
-                      selectedImages.isEmpty
-                          ? 'Chọn ảnh tin tức'
-                          : 'Chọn thêm ảnh',
-                      style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.blue[700]),
+            // Chọn ảnh - UI mới với nhiều options
+            Row(
+              children: [
+                // Chọn từ thư viện
+                Expanded(
+                  child: GestureDetector(
+                    onTap: _pickImages,
+                    child: Container(
+                      padding: const EdgeInsets.all(20),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(color: Colors.blue[300]!, width: 2),
+                        color: Colors.blue[50],
+                      ),
+                      child: Column(
+                        children: [
+                          Icon(Icons.photo_library,
+                              size: 40, color: Colors.blue[700]),
+                          const SizedBox(height: 8),
+                          Text(
+                            'Thư viện',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.blue[700],
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
-                  ],
+                  ),
                 ),
-              ),
+                const SizedBox(width: 12),
+                // Chụp ảnh
+                Expanded(
+                  child: GestureDetector(
+                    onTap: _pickImageFromCamera,
+                    child: Container(
+                      padding: const EdgeInsets.all(20),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(20),
+                        border:
+                        Border.all(color: Colors.green[300]!, width: 2),
+                        color: Colors.green[50],
+                      ),
+                      child: Column(
+                        children: [
+                          Icon(Icons.camera_alt,
+                              size: 40, color: Colors.green[700]),
+                          const SizedBox(height: 8),
+                          Text(
+                            'Chụp ảnh',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.green[700],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             ),
             const SizedBox(height: 16),
 
@@ -159,10 +218,26 @@ class _AddNewsScreenState extends State<AddNewsScreen> {
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    'Ảnh đã chọn (${selectedImages.length})',
-                    style: const TextStyle(
-                        fontSize: 14, fontWeight: FontWeight.w600),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'Ảnh đã chọn (${selectedImages.length})',
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      TextButton.icon(
+                        onPressed: _clearAllImages,
+                        icon: const Icon(Icons.clear_all,
+                            size: 18, color: Colors.red),
+                        label: const Text(
+                          'Xóa tất cả',
+                          style: TextStyle(color: Colors.red),
+                        ),
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 12),
                   SizedBox(
@@ -190,6 +265,28 @@ class _AddNewsScreenState extends State<AddNewsScreen> {
                                 ),
                               ),
                             ),
+                            // Badge số thứ tự
+                            Positioned(
+                              bottom: 4,
+                              left: 4,
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 8, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: Colors.black.withOpacity(0.7),
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Text(
+                                  '${index + 1}',
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                            ),
+                            // Nút xóa
                             Positioned(
                               top: 0,
                               right: 12,

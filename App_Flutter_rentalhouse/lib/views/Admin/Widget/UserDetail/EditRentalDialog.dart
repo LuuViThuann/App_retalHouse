@@ -146,15 +146,15 @@ class _EditRentalDialogCompleteState extends State<EditRentalDialogComplete> {
 
     final updateData = {
       // ===== Basic Info =====
-      'title': _titleController.text,
+      'title': _titleController.text.trim(),
       'price': double.tryParse(_priceController.text) ?? widget.rental.price,
-      'locationShort': _addressController.text,
-      'propertyType': _propertyTypeController.text,
+      'locationShort': _addressController.text.trim(),
+      'propertyType': _propertyTypeController.text.trim(),
       'status': _selectedStatus,
 
       // ===== Area =====
       'areaTotal':
-          double.tryParse(_areaController.text) ?? widget.rental.area['total'],
+      double.tryParse(_areaController.text) ?? widget.rental.area['total'],
       'areaLivingRoom': double.tryParse(_livingRoomController.text) ??
           widget.rental.area['livingRoom'],
       'areaBedrooms': double.tryParse(_bedroomsController.text) ??
@@ -163,25 +163,38 @@ class _EditRentalDialogCompleteState extends State<EditRentalDialogComplete> {
           widget.rental.area['bathrooms'],
 
       // ===== Amenities =====
-      'furniture': _furnitureController.text,
-      'amenities': _amenitiesController.text,
-      'surroundings': _surroundingsController.text,
+      'furniture': _furnitureController.text
+          .split(',')
+          .map((s) => s.trim())
+          .where((s) => s.isNotEmpty)
+          .join(','),
+      'amenities': _amenitiesController.text
+          .split(',')
+          .map((s) => s.trim())
+          .where((s) => s.isNotEmpty)
+          .join(','),
+      'surroundings': _surroundingsController.text
+          .split(',')
+          .map((s) => s.trim())
+          .where((s) => s.isNotEmpty)
+          .join(','),
 
       // ===== Rental Terms =====
-      'rentalTermsMinimumLease': _minimumLeaseController.text,
-      'rentalTermsDeposit': _depositController.text,
-      'rentalTermsPaymentMethod': _paymentMethodController.text,
-      'rentalTermsRenewalTerms': _renewalTermsController.text,
+      'rentalTermsMinimumLease': _minimumLeaseController.text.trim(),
+      'rentalTermsDeposit': _depositController.text
+          .replaceAll(RegExp(r'[^0-9]'), ''), // Bỏ các ký tự không phải số
+      'rentalTermsPaymentMethod': _paymentMethodController.text.trim(),
+      'rentalTermsRenewalTerms': _renewalTermsController.text.trim(),
 
       // ===== Contact Info =====
-      'contactInfoName': _contactNameController.text,
-      'contactInfoPhone': _contactPhoneController.text,
-      'contactInfoAvailableHours': _contactHoursController.text,
+      'contactInfoName': _contactNameController.text.trim(),
+      'contactInfoPhone': _contactPhoneController.text.trim(),
+      'contactInfoAvailableHours': _contactHoursController.text.trim(),
     };
 
     final viewModel = context.read<AdminViewModel>();
     final success =
-        await viewModel.adminEditRental(widget.rental.id, updateData);
+    await viewModel.adminEditRental(widget.rental.id, updateData);
 
     setState(() => _isLoading = false);
 
@@ -194,7 +207,7 @@ class _EditRentalDialogCompleteState extends State<EditRentalDialogComplete> {
             duration: const Duration(seconds: 2),
             behavior: SnackBarBehavior.floating,
             shape:
-                RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
           ),
         );
         widget.onEditSuccess();
@@ -207,7 +220,7 @@ class _EditRentalDialogCompleteState extends State<EditRentalDialogComplete> {
             duration: const Duration(seconds: 3),
             behavior: SnackBarBehavior.floating,
             shape:
-                RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
           ),
         );
       }
@@ -241,16 +254,16 @@ class _EditRentalDialogCompleteState extends State<EditRentalDialogComplete> {
                   Text(
                     'Chỉnh sửa bài viết',
                     style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                          fontWeight: FontWeight.bold,
-                          color: Colors.blue[700],
-                        ),
+                      fontWeight: FontWeight.bold,
+                      color: Colors.blue[700],
+                    ),
                   ),
                   const SizedBox(height: 8),
                   Text(
                     widget.rental.title,
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: Colors.blue[600],
-                        ),
+                      color: Colors.blue[600],
+                    ),
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -356,7 +369,8 @@ class _EditRentalDialogCompleteState extends State<EditRentalDialogComplete> {
                   _buildTextField(
                     controller: _depositController,
                     label: 'Tiền cọc',
-                    hint: 'VD: 1 tháng tiền nhà, 2 triệu đồng',
+                    hint: 'VD: 2000000 (không có VNĐ)',
+                    keyboardType: TextInputType.number,
                   ),
                   const SizedBox(height: 8),
                   _buildTextField(
@@ -405,7 +419,7 @@ class _EditRentalDialogCompleteState extends State<EditRentalDialogComplete> {
                   Expanded(
                     child: OutlinedButton(
                       onPressed:
-                          _isLoading ? null : () => Navigator.pop(context),
+                      _isLoading ? null : () => Navigator.pop(context),
                       style: OutlinedButton.styleFrom(
                         padding: const EdgeInsets.symmetric(vertical: 12),
                         side: BorderSide(color: Colors.grey[400]!),
@@ -429,14 +443,14 @@ class _EditRentalDialogCompleteState extends State<EditRentalDialogComplete> {
                       ),
                       icon: _isLoading
                           ? const SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                valueColor:
-                                    AlwaysStoppedAnimation<Color>(Colors.white),
-                              ),
-                            )
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor:
+                          AlwaysStoppedAnimation<Color>(Colors.white),
+                        ),
+                      )
                           : const Icon(Icons.save),
                       label: Text(_isLoading ? 'Đang lưu...' : 'Lưu'),
                     ),
@@ -485,7 +499,7 @@ class _EditRentalDialogCompleteState extends State<EditRentalDialogComplete> {
           borderSide: const BorderSide(color: Colors.blue, width: 2),
         ),
         contentPadding:
-            const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+        const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
       ),
     );
   }
@@ -515,11 +529,14 @@ class _EditRentalDialogCompleteState extends State<EditRentalDialogComplete> {
               borderSide: const BorderSide(color: Colors.blue, width: 2),
             ),
             contentPadding:
-                const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+            const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
           ),
           items: const [
             DropdownMenuItem(value: 'available', child: Text('✓ Có sẵn')),
             DropdownMenuItem(value: 'rented', child: Text('✗ Đã cho thuê')),
+            DropdownMenuItem(
+                value: 'unavailable',
+                child: Text('⚠️ Không hoạt động')),
           ],
           onChanged: (value) {
             setState(() => _selectedStatus = value ?? 'available');

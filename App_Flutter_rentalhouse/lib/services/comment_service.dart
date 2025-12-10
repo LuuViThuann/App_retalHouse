@@ -16,9 +16,7 @@ class CommentService {
     final user = authViewModel.currentUser;
     if (user != null) {
       final username = user.username.isEmpty ? 'không có' : user.username;
-      final avatar = user.avatarBase64 != null && user.avatarBase64!.isNotEmpty
-          ? 'data:image/jpeg;base64,${user.avatarBase64}'
-          : null;
+      final avatar = user.avatarUrl; // ✅ Trả về URL trực tiếp
       onUserInfoLoaded(username, avatar);
     }
   }

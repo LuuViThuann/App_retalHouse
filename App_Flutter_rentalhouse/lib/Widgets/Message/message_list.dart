@@ -1,15 +1,13 @@
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_rentalhouse/Widgets/Message/chat_image_full_screen.dart';
-import 'package:flutter_rentalhouse/config/api_routes.dart';
 import 'package:flutter_rentalhouse/models/message.dart';
 import 'package:flutter_rentalhouse/viewmodels/vm_auth.dart';
 import 'package:flutter_rentalhouse/viewmodels/vm_chat.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
-import 'dart:convert';
 
-// ✅ ĐỔI TỪ StatelessWidget SANG StatefulWidget
 class ChatMessageList extends StatefulWidget {
   final ScrollController scrollController;
   final bool isFetchingOlderMessages;
@@ -32,7 +30,6 @@ class ChatMessageList extends StatefulWidget {
 
 class _ChatMessageListState extends State<ChatMessageList> {
 
-  // ✅ HÀM HELPER AN TOÀN ĐỂ HIỂN THỊ SNACKBAR
   void _showSnackBarSafe(String message, {bool isSuccess = true}) {
     if (!mounted) return;
 
@@ -49,13 +46,11 @@ class _ChatMessageListState extends State<ChatMessageList> {
     );
   }
 
-  // ✅ HÀM XÓA MESSAGE AN TOÀN (KHÔNG CẦN QUAY LẠI TRANG)
   Future<void> _deleteMessageSafe(
       Message message,
       ChatViewModel chatViewModel,
       AuthViewModel authViewModel,
       ) async {
-    // Lưu references TRƯỚC async
     final messenger = ScaffoldMessenger.of(context);
 
     try {
@@ -64,11 +59,9 @@ class _ChatMessageListState extends State<ChatMessageList> {
         token: authViewModel.currentUser!.token!,
       );
 
-      // ✅ Check mounted SAU async
       if (!mounted) return;
 
       if (success) {
-        // ✅ Chỉ hiển thị thông báo, KHÔNG scroll vì Socket đã tự động cập nhật UI
         messenger.showSnackBar(
           SnackBar(
             content: const Text('Tin nhắn đã được xóa'),
@@ -111,7 +104,6 @@ class _ChatMessageListState extends State<ChatMessageList> {
     }
   }
 
-  // ✅ HIỂN THỊ DIALOG XÓA AN TOÀN (KHÔNG CẦN POP)
   void _showDeleteConfirmDialog(
       Message message,
       ChatViewModel chatViewModel,
@@ -132,9 +124,7 @@ class _ChatMessageListState extends State<ChatMessageList> {
           ),
           TextButton(
             onPressed: () {
-              // Đóng dialog trước
               Navigator.of(dialogContext).pop();
-              // Gọi hàm xóa (không cần truyền dialogContext nữa)
               _deleteMessageSafe(message, chatViewModel, authViewModel);
             },
             child: const Text(
@@ -147,7 +137,6 @@ class _ChatMessageListState extends State<ChatMessageList> {
     );
   }
 
-  // ✅ HIỂN THỊ BOTTOM SHEET ACTIONS
   void _showMessageActions(
       Message message,
       ChatViewModel chatViewModel,
@@ -252,6 +241,56 @@ class _ChatMessageListState extends State<ChatMessageList> {
     }
 
     return matches.isEmpty ? [TextSpan(text: text)] : matches;
+  }
+
+  // ✅ NEW: Build avatar widget with CachedNetworkImage
+  Widget _buildAvatar(Map<String, dynamic> sender, {double radius = 20}) {
+    final avatarUrl = sender['avatarUrl']?.toString() ?? '';
+
+    return Container(
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withOpacity(0.2),
+            spreadRadius: 1,
+            blurRadius: 4,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: CircleAvatar(
+        radius: radius,
+        backgroundColor: Colors.grey[200],
+        child: avatarUrl.isNotEmpty
+            ? ClipOval(
+          child: CachedNetworkImage(
+            imageUrl: avatarUrl,
+            fit: BoxFit.cover,
+            width: radius * 2,
+            height: radius * 2,
+            placeholder: (context, url) => SizedBox(
+              width: radius,
+              height: radius,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                color: Colors.grey[600],
+              ),
+            ),
+            errorWidget: (context, url, error) => Icon(
+              Icons.person,
+              size: radius,
+              color: Colors.grey[600],
+            ),
+          ),
+        )
+            : Icon(
+          Icons.person,
+          size: radius,
+          color: Colors.grey[600],
+        ),
+      ),
+    );
   }
 
   @override
@@ -412,34 +451,7 @@ class _ChatMessageListState extends State<ChatMessageList> {
                           : MainAxisAlignment.start,
                       children: [
                         if (!isMe) ...[
-                          Container(
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.grey.withOpacity(0.2),
-                                  spreadRadius: 1,
-                                  blurRadius: 4,
-                                  offset: const Offset(0, 2),
-                                ),
-                              ],
-                            ),
-                            child: CircleAvatar(
-                              radius: 20,
-                              backgroundColor: Colors.grey[200],
-                              backgroundImage:
-                              message.sender['avatarBase64']?.isNotEmpty ==
-                                  true
-                                  ? MemoryImage(base64Decode(
-                                  message.sender['avatarBase64']))
-                                  : null,
-                              child: message.sender['avatarBase64']?.isEmpty ==
-                                  true
-                                  ? Icon(Icons.person,
-                                  size: 20, color: Colors.grey[600])
-                                  : null,
-                            ),
-                          ),
+                          _buildAvatar(message.sender),
                           const SizedBox(width: 10),
                         ],
                         Flexible(
@@ -484,64 +496,190 @@ class _ChatMessageListState extends State<ChatMessageList> {
                                     ? CrossAxisAlignment.end
                                     : CrossAxisAlignment.start,
                                 children: [
+                                  // ✅ Image display with proper caching
                                   if (message.images.isNotEmpty)
-                                    Wrap(
-                                      spacing: 8,
-                                      runSpacing: 8,
-                                      children: message.images
-                                          .map((img) => GestureDetector(
-                                        onTap: () {
-                                          showDialog(
-                                            context: context,
-                                            builder: (context) =>
-                                                ChatFullImage(
-                                                  imageUrl:
-                                                  '${ApiRoutes.serverBaseUrl}$img',
+                                    Padding(
+                                      padding: const EdgeInsets.only(bottom: 8),
+                                      child: Wrap(
+                                        spacing: 8,
+                                        runSpacing: 8,
+                                        children: [
+                                          // ✅ Filter and display only valid URLs
+                                          ...message.images
+                                              .asMap()
+                                              .entries
+                                              .map((entry) {
+                                            int index = entry.key;
+                                            String imageUrl = entry.value;
+
+                                            // ✅ Validate URL before rendering
+                                            if (imageUrl.isEmpty ||
+                                                (!imageUrl.startsWith('http://') &&
+                                                    !imageUrl.startsWith('https://'))) {
+                                              if (kDebugMode) {
+                                                print('⚠️ Skipping invalid image URL: $imageUrl');
+                                              }
+                                              return const SizedBox.shrink();
+                                            }
+
+                                            // ✅ Show loading placeholder for uploading images
+                                            if (imageUrl.startsWith('uploading_')) {
+                                              if (kDebugMode) {
+                                                print('⏳ Showing placeholder for: $imageUrl');
+                                              }
+                                              return Container(
+                                                width: 120,
+                                                height: 120,
+                                                decoration: BoxDecoration(
+                                                  color: Colors.grey[200],
+                                                  borderRadius: BorderRadius.circular(12),
                                                 ),
-                                          );
-                                        },
-                                        child: ClipRRect(
-                                          borderRadius:
-                                          BorderRadius.circular(12),
-                                          child: CachedNetworkImage(
-                                            imageUrl:
-                                            '${ApiRoutes.serverBaseUrl}$img',
-                                            width: 120,
-                                            height: 120,
-                                            fit: BoxFit.cover,
-                                            memCacheHeight: 240,
-                                            memCacheWidth: 240,
-                                            placeholder:
-                                                (context, url) =>
-                                                Container(
-                                                  width: 120,
-                                                  height: 120,
-                                                  color: Colors.grey[100],
-                                                  child: const Center(
-                                                      child:
-                                                      CircularProgressIndicator(
-                                                          strokeWidth:
-                                                          2)),
+                                                child: const Center(
+                                                  child: CircularProgressIndicator(strokeWidth: 2),
                                                 ),
-                                            errorWidget:
-                                                (context, url, error) =>
-                                                Container(
-                                                  width: 120,
-                                                  height: 120,
-                                                  color: Colors.grey[100],
-                                                  child: const Icon(
-                                                      Icons.error_outline,
-                                                      color: Colors.red),
+                                              );
+                                            }
+
+                                            if (kDebugMode) {
+                                              print('🖼️ [Message: ${message.id}] Rendering image $index: $imageUrl');
+                                            }
+
+                                            return GestureDetector(
+                                              onTap: () {
+                                                if (kDebugMode) {
+                                                  print('🖼️ Tapped image $index: $imageUrl');
+                                                }
+                                                showDialog(
+                                                  context: context,
+                                                  builder: (context) => ChatFullImage(
+                                                    imageUrl: imageUrl,
+                                                  ),
+                                                );
+                                              },
+                                              child: Hero(
+                                                tag: 'message_image_${message.id}_$index',
+                                                child: ClipRRect(
+                                                  borderRadius: BorderRadius.circular(12),
+                                                  child: Stack(
+                                                    children: [
+                                                      // ✅ CachedNetworkImage with proper cache key
+                                                      CachedNetworkImage(
+                                                        imageUrl: imageUrl,
+                                                        width: 120,
+                                                        height: 120,
+                                                        fit: BoxFit.cover,
+                                                        memCacheHeight: 240,
+                                                        memCacheWidth: 240,
+                                                        // ✅ CRITICAL: Cache key includes updatedAt
+                                                        // This forces refresh when message is edited
+                                                        cacheKey: '${imageUrl}_${message.updatedAt?.millisecondsSinceEpoch ?? message.createdAt.millisecondsSinceEpoch}',
+                                                        maxWidthDiskCache: 500,
+                                                        maxHeightDiskCache: 500,
+                                                        placeholder: (context, url) {
+                                                          return Container(
+                                                            width: 120,
+                                                            height: 120,
+                                                            color: Colors.grey[100],
+                                                            child: const Center(
+                                                              child: CircularProgressIndicator(
+                                                                strokeWidth: 2,
+                                                              ),
+                                                            ),
+                                                          );
+                                                        },
+                                                        errorWidget: (context, url, error) {
+                                                          if (kDebugMode) {
+                                                            print('❌ Error loading image: $url');
+                                                            print('   Error: $error');
+                                                          }
+                                                          return Container(
+                                                            width: 120,
+                                                            height: 120,
+                                                            color: Colors.red[100],
+                                                            child: Column(
+                                                              mainAxisAlignment: MainAxisAlignment.center,
+                                                              children: [
+                                                                Icon(
+                                                                  Icons.broken_image,
+                                                                  color: Colors.red[700],
+                                                                  size: 32,
+                                                                ),
+                                                                const SizedBox(height: 4),
+                                                                Text(
+                                                                  'Lỗi tải ảnh',
+                                                                  style: TextStyle(
+                                                                    fontSize: 10,
+                                                                    color: Colors.red[700],
+                                                                  ),
+                                                                  textAlign: TextAlign.center,
+                                                                ),
+                                                              ],
+                                                            ),
+                                                          );
+                                                        },
+                                                      ),
+                                                      // ✅ Image counter badge
+                                                      if (message.images.length > 1)
+                                                        Positioned(
+                                                          top: 4,
+                                                          right: 4,
+                                                          child: Container(
+                                                            decoration: BoxDecoration(
+                                                              color: Colors.black54,
+                                                              borderRadius: BorderRadius.circular(8),
+                                                            ),
+                                                            padding: const EdgeInsets.symmetric(
+                                                              horizontal: 6,
+                                                              vertical: 2,
+                                                            ),
+                                                            child: Text(
+                                                              '${index + 1}/${message.images.length}',
+                                                              style: const TextStyle(
+                                                                color: Colors.white,
+                                                                fontSize: 10,
+                                                                fontWeight: FontWeight.bold,
+                                                              ),
+                                                            ),
+                                                          ),
+                                                        ),
+                                                      // ✅ Edited indicator
+                                                      if (message.updatedAt != null)
+                                                        Positioned(
+                                                          bottom: 4,
+                                                          left: 4,
+                                                          child: Container(
+                                                            decoration: BoxDecoration(
+                                                              color: Colors.black54,
+                                                              borderRadius: BorderRadius.circular(8),
+                                                            ),
+                                                            padding: const EdgeInsets.symmetric(
+                                                              horizontal: 4,
+                                                              vertical: 2,
+                                                            ),
+                                                            child: const Text(
+                                                              'Đã sửa',
+                                                              style: TextStyle(
+                                                                color: Colors.white,
+                                                                fontSize: 9,
+                                                              ),
+                                                            ),
+                                                          ),
+                                                        ),
+                                                    ],
+                                                  ),
                                                 ),
-                                          ),
-                                        ),
-                                      ))
-                                          .toList(),
+                                              ),
+                                            );
+                                          })
+                                              .toList(),
+                                        ],
+                                      ),
                                     ),
+
+                                  // Content text
                                   if (message.content.isNotEmpty)
                                     Padding(
-                                      padding: const EdgeInsets.symmetric(
-                                          vertical: 4),
+                                      padding: const EdgeInsets.symmetric(vertical: 4),
                                       child: RichText(
                                         text: TextSpan(
                                           style: TextStyle(
@@ -557,12 +695,13 @@ class _ChatMessageListState extends State<ChatMessageList> {
                                         ),
                                       ),
                                     ),
+
+                                  // Timestamp
                                   const SizedBox(height: 6),
                                   Text(
                                     message.updatedAt != null
                                         ? 'Đã chỉnh sửa - ${DateFormat('HH:mm, dd/MM').format(message.updatedAt!)}'
-                                        : DateFormat('HH:mm, dd/MM')
-                                        .format(message.createdAt),
+                                        : DateFormat('HH:mm, dd/MM').format(message.createdAt),
                                     style: TextStyle(
                                       fontSize: 12,
                                       color: isMe
@@ -572,40 +711,13 @@ class _ChatMessageListState extends State<ChatMessageList> {
                                     ),
                                   ),
                                 ],
-                              ),
+                              )
                             ),
                           ),
                         ),
                         if (isMe) ...[
                           const SizedBox(width: 10),
-                          Container(
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.grey.withOpacity(0.2),
-                                  spreadRadius: 1,
-                                  blurRadius: 4,
-                                  offset: const Offset(0, 2),
-                                ),
-                              ],
-                            ),
-                            child: CircleAvatar(
-                              radius: 20,
-                              backgroundColor: Colors.grey[200],
-                              backgroundImage:
-                              message.sender['avatarBase64']?.isNotEmpty ==
-                                  true
-                                  ? MemoryImage(base64Decode(
-                                  message.sender['avatarBase64']))
-                                  : null,
-                              child: message.sender['avatarBase64']?.isEmpty ==
-                                  true
-                                  ? Icon(Icons.person,
-                                  size: 20, color: Colors.grey[600])
-                                  : null,
-                            ),
-                          ),
+                          _buildAvatar(message.sender),
                         ],
                       ],
                     ),

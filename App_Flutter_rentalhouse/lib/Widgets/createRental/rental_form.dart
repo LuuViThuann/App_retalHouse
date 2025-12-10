@@ -31,7 +31,7 @@ class FormStateManager {
   }
 
   void initializeControllers() {
-    if (_isInitialized) return; // Prevent reinitialization
+    if (_isInitialized) return;
 
     titleController = TextEditingController();
     priceController = TextEditingController();
@@ -61,15 +61,16 @@ class FormStateManager {
 
   Rental buildRental({
     required List<String> images,
+    List<String>? videos, // ✅ Videos parameter
     required String propertyType,
     required String status,
     required String userId,
-    double? latitude, // Add latitude parameter
-    double? longitude, // Add longitude parameter
+    double? latitude,
+    double? longitude,
   }) {
     final rawPrice = priceController!.text.replaceAll(RegExp(r'[^\d]'), '');
     final rawDeposit =
-        rentalTermsDepositController!.text.replaceAll(RegExp(r'[^\d]'), '');
+    rentalTermsDepositController!.text.replaceAll(RegExp(r'[^\d]'), '');
 
     return Rental(
       id: '',
@@ -122,6 +123,7 @@ class FormStateManager {
       },
       userId: userId,
       images: images,
+      videos: videos ?? [], // ✅ Include videos
       status: status,
       createdAt: DateTime.now(),
       landlord: userId,

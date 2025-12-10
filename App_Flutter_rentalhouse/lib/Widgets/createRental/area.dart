@@ -16,58 +16,54 @@ class AreaForm extends StatelessWidget {
     required this.bathroomsController,
   });
 
-  Widget _buildSectionTitle(BuildContext context, String title) {
-    return Padding(
-      padding: const EdgeInsets.only(top: 24.0, bottom: 8.0),
+  Widget _buildSectionTitle() {
+    return const Padding(
+      padding: EdgeInsets.only(top: 32, bottom: 16),
       child: Text(
-        title,
+        'Diện tích (m²)',
         style: TextStyle(
-          fontSize: 20, // tăng nhẹ font
-          fontWeight: FontWeight.w500, // vừa phải, hiện đại
-          color: Colors.grey[800], // màu xám tối, trung tính
+          fontSize: 22,
+          fontWeight: FontWeight.w600,
+          color: Colors.black87,
         ),
       ),
     );
   }
 
   Widget _buildTextField({
-    required BuildContext context,
     required TextEditingController controller,
-    required String labelText,
-    IconData? prefixIcon,
-    String? Function(String?)? validator,
+    required String label,
+    required IconData icon,
     bool isRequired = false,
+    required String? Function(String?)? validator,
   }) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8.0),
+    return Expanded(
       child: TextFormField(
         controller: controller,
-        decoration: InputDecoration(
-          labelText: isRequired ? '$labelText *' : labelText,
-          labelStyle: TextStyle(color: Colors.grey[700]), // label hiện đại
-          prefixIcon: prefixIcon != null
-              ? Icon(
-                  prefixIcon,
-                  color: Colors.grey[600], // icon màu xám hiện đại
-                  size: 22, // nhỏ vừa phải
-                )
-              : null,
-          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12.0)),
-          focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12.0),
-            borderSide: BorderSide(color: Colors.grey[800]!, width: 1.5),
-          ),
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12.0),
-            borderSide: BorderSide(color: Colors.grey[400]!, width: 1.0),
-          ),
-          contentPadding:
-              const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        ),
         keyboardType: TextInputType.numberWithOptions(decimal: true),
         inputFormatters: [
           FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}')),
         ],
+        decoration: InputDecoration(
+          labelText: isRequired ? '$label *' : label,
+          labelStyle: const TextStyle(fontSize: 15, color: Colors.grey),
+          prefixIcon: Icon(icon, color: Colors.grey[600], size: 22),
+          filled: true,
+          fillColor: Colors.white,
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(14),
+            borderSide: BorderSide.none,
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(14),
+            borderSide: BorderSide(color: Colors.grey[500]!, width: 1),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(14),
+            borderSide: const BorderSide(color: Colors.blueAccent, width: 2),
+          ),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
+        ),
         validator: validator,
       ),
     );
@@ -78,37 +74,50 @@ class AreaForm extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _buildSectionTitle(context, 'Diện tích (m²)'),
-        _buildTextField(
-          context: context,
-          controller: totalController,
-          labelText: 'Tổng diện tích',
-          prefixIcon: Icons.square_foot_outlined,
-          isRequired: true,
-          validator: (value) =>
-              Validators.areaValidator(value, 'tổng diện tích'),
+        _buildSectionTitle(),
+
+        // Hàng 1: Tổng diện tích + Phòng khách
+        Row(
+          children: [
+            _buildTextField(
+              controller: totalController,
+              label: 'Tổng diện tích',
+              icon: Icons.square_foot_outlined,
+              isRequired: true,
+              validator: (value) => Validators.areaValidator(value, 'tổng diện tích'),
+            ),
+            const SizedBox(width: 14),
+            _buildTextField(
+              controller: livingRoomController,
+              label: 'Phòng khách',
+              icon: Icons.living_outlined,
+              validator: Validators.optionalAreaValidator,
+            ),
+          ],
         ),
-        _buildTextField(
-          context: context,
-          controller: livingRoomController,
-          labelText: 'Diện tích phòng khách (nếu có)',
-          prefixIcon: Icons.living_outlined,
-          validator: Validators.optionalAreaValidator,
+
+        const SizedBox(height: 16),
+
+        // Hàng 2: Phòng ngủ + Phòng tắm
+        Row(
+          children: [
+            _buildTextField(
+              controller: bedroomsController,
+              label: 'Phòng ngủ',
+              icon: Icons.bed_outlined,
+              validator: Validators.optionalAreaValidator,
+            ),
+            const SizedBox(width: 14),
+            _buildTextField(
+              controller: bathroomsController,
+              label: 'Phòng tắm',
+              icon: Icons.bathtub_outlined,
+              validator: Validators.optionalAreaValidator,
+            ),
+          ],
         ),
-        _buildTextField(
-          context: context,
-          controller: bedroomsController,
-          labelText: 'Diện tích phòng ngủ (nếu có)',
-          prefixIcon: Icons.bed_outlined,
-          validator: Validators.optionalAreaValidator,
-        ),
-        _buildTextField(
-          context: context,
-          controller: bathroomsController,
-          labelText: 'Diện tích phòng tắm (nếu có)',
-          prefixIcon: Icons.bathtub_outlined,
-          validator: Validators.optionalAreaValidator,
-        ),
+
+        const SizedBox(height: 12),
       ],
     );
   }

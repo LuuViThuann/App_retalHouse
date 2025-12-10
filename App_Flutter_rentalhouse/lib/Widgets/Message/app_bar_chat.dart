@@ -50,13 +50,13 @@ class _ChatAppBarState extends State<ChatAppBar> with TickerProviderStateMixin {
       return {
         'id': widget.landlordId,
         'username': 'Chủ nhà',
-        'avatarBase64': ''
+        'avatarUrl': '' // ✅ Changed from avatarBase64
       };
     }
     final chatViewModel = Provider.of<ChatViewModel>(context, listen: false);
     try {
       final conversation = chatViewModel.conversations.firstWhere(
-        (c) => c.id == widget.conversationId,
+            (c) => c.id == widget.conversationId,
         orElse: () => Conversation(
           id: '',
           rentalId: widget.rentalId,
@@ -66,7 +66,7 @@ class _ChatAppBarState extends State<ChatAppBar> with TickerProviderStateMixin {
           landlord: {
             'id': widget.landlordId,
             'username': 'Chủ nhà',
-            'avatarBase64': ''
+            'avatarUrl': ''
           },
           rental: null,
           unreadCount: 0,
@@ -80,7 +80,7 @@ class _ChatAppBarState extends State<ChatAppBar> with TickerProviderStateMixin {
       return {
         'id': widget.landlordId,
         'username': 'Chủ nhà',
-        'avatarBase64': ''
+        'avatarUrl': '' // ✅ Changed from avatarBase64
       };
     }
   }
@@ -123,7 +123,7 @@ class _ChatAppBarState extends State<ChatAppBar> with TickerProviderStateMixin {
                           decoration: InputDecoration(
                             hintText: 'Tìm kiếm tin nhắn...',
                             prefixIcon:
-                                Icon(Icons.search, color: Colors.blue[700]),
+                            Icon(Icons.search, color: Colors.blue[700]),
                             suffixIcon: IconButton(
                               icon: Icon(Icons.close, color: Colors.blue[700]),
                               onPressed: () {
@@ -148,13 +148,13 @@ class _ChatAppBarState extends State<ChatAppBar> with TickerProviderStateMixin {
                               _debounce?.cancel();
                             _debounce =
                                 Timer(const Duration(milliseconds: 300), () {
-                              chatViewModel.setSearchQuery(value);
-                              final results = chatViewModel.searchMessages(
-                                  widget.conversationId, value);
-                              setState(() {
-                                resultCount = results.length;
-                              });
-                            });
+                                  chatViewModel.setSearchQuery(value);
+                                  final results = chatViewModel.searchMessages(
+                                      widget.conversationId, value);
+                                  setState(() {
+                                    resultCount = results.length;
+                                  });
+                                });
                           },
                           onTap: () => focusNode.requestFocus(),
                         ),
@@ -192,7 +192,7 @@ class _ChatAppBarState extends State<ChatAppBar> with TickerProviderStateMixin {
     return AppBar(
       flexibleSpace: Container(
         decoration: BoxDecoration(
-         color: Colors.blue[700],
+          color: Colors.blue[700],
           boxShadow: [
             BoxShadow(
               color: Colors.black.withOpacity(0.2),
@@ -220,7 +220,7 @@ class _ChatAppBarState extends State<ChatAppBar> with TickerProviderStateMixin {
             );
           }
           final landlord =
-              snapshot.data ?? {'username': 'Chủ nhà', 'avatarBase64': ''};
+              snapshot.data ?? {'username': 'Chủ nhà', 'avatarUrl': ''}; // ✅ Changed
           return Row(
             children: [
               Container(
@@ -238,11 +238,10 @@ class _ChatAppBarState extends State<ChatAppBar> with TickerProviderStateMixin {
                 child: CircleAvatar(
                   radius: 22,
                   backgroundColor: Colors.grey[300],
-                  backgroundImage: landlord['avatarBase64']?.isNotEmpty == true
-                      ? MemoryImage(
-                          base64Decode(landlord['avatarBase64'] as String))
+                  backgroundImage: landlord['avatarUrl']?.isNotEmpty == true // ✅ Changed
+                      ? NetworkImage(landlord['avatarUrl'] as String) // ✅ Use NetworkImage for URL
                       : null,
-                  child: landlord['avatarBase64']?.isEmpty == true
+                  child: landlord['avatarUrl']?.isEmpty == true // ✅ Changed
                       ? Icon(Icons.person, size: 22, color: Colors.grey[600])
                       : null,
                 ),

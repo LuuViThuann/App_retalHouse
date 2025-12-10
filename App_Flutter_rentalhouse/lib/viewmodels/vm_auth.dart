@@ -33,13 +33,14 @@ class AuthViewModel extends ChangeNotifier {
   int get commentsTotalPages => _commentsTotalPages;
   int get notificationsTotalPages => _notificationsTotalPages;
 
+  // ✅ ĐĂNG KÝ - Thay đổi từ avatarBase64 → imagePath
   Future<void> register({
     required String email,
     required String password,
     required String phoneNumber,
     required String address,
     required String username,
-    required String avatarBase64,
+    required String imagePath,
   }) async {
     _isLoading = true;
     _errorMessage = null;
@@ -52,7 +53,7 @@ class AuthViewModel extends ChangeNotifier {
         phoneNumber: phoneNumber,
         address: address,
         username: username,
-        avatarBase64: avatarBase64,
+        imagePath: imagePath,
       );
       if (user != null) {
         _currentUser = user;
@@ -71,8 +72,8 @@ class AuthViewModel extends ChangeNotifier {
         _errorMessage = 'Số điện thoại phải có 10 chữ số';
       } else if (e.toString().contains('Mật khẩu phải có ít nhất 6 ký tự')) {
         _errorMessage = 'Mật khẩu phải có ít nhất 6 ký tự';
-      } else if (e.toString().contains('Ảnh đại diện không hợp lệ')) {
-        _errorMessage = 'Ảnh đại diện không hợp lệ';
+      } else if (e.toString().contains('Vui lòng upload ảnh')) {
+        _errorMessage = 'Vui lòng chọn ảnh đại diện';
       } else {
         _errorMessage = 'Đăng ký thất bại: ${e.toString()}';
       }
@@ -99,7 +100,7 @@ class AuthViewModel extends ChangeNotifier {
         _currentUser = user;
       } else {
         _errorMessage =
-            'Đăng nhập thất bại. Vui lòng kiểm tra email hoặc mật khẩu.';
+        'Đăng nhập thất bại. Vui lòng kiểm tra email hoặc mật khẩu.';
       }
     } catch (e) {
       _errorMessage = e.toString();
@@ -120,26 +121,6 @@ class AuthViewModel extends ChangeNotifier {
         _currentUser = user;
       } else {
         _errorMessage = 'Đăng nhập Google thất bại. Vui lòng thử lại.';
-      }
-    } catch (e) {
-      _errorMessage = e.toString();
-    } finally {
-      _isLoading = false;
-      notifyListeners();
-    }
-  }
-
-  Future<void> signInWithFacebook() async {
-    _isLoading = true;
-    _errorMessage = null;
-    notifyListeners();
-
-    try {
-      AppUser? user = await _authService.signInWithFacebook();
-      if (user != null) {
-        _currentUser = user;
-      } else {
-        _errorMessage = 'Đăng nhập Facebook thất bại. Vui lòng thử lại.';
       }
     } catch (e) {
       _errorMessage = e.toString();
@@ -212,7 +193,7 @@ class AuthViewModel extends ChangeNotifier {
   }) async {
     _isLoading = true;
     _errorMessage = null;
-    notifyListeners(); // Notify ngay khi bắt đầu
+    notifyListeners();
 
     try {
       AppUser? updatedUser = await _authService.updateProfile(
@@ -225,6 +206,7 @@ class AuthViewModel extends ChangeNotifier {
           phoneNumber: phoneNumber,
           address: address,
           username: username,
+          avatarUrl: _currentUser?.avatarUrl,
           role: _currentUser?.role,
         );
         _errorMessage = null;
@@ -235,22 +217,22 @@ class AuthViewModel extends ChangeNotifier {
       _errorMessage = e.toString();
     } finally {
       _isLoading = false;
-      notifyListeners(); // Notify khi hoàn thành
+      notifyListeners();
     }
   }
 
+  // ✅ UPLOAD PROFILE IMAGE - Thay đổi từ imageBase64 → imagePath
   Future<void> uploadProfileImage({
-    required String imageBase64,
+    required String imagePath,
   }) async {
     _isLoading = true;
     _errorMessage = null;
     notifyListeners();
 
     try {
-      final avatarBase64 =
-          await _authService.uploadProfileImage(imageBase64: imageBase64);
-      if (avatarBase64 != null && _currentUser != null) {
-        _currentUser = _currentUser!.copyWith(avatarBase64: avatarBase64);
+      final avatarUrl = await _authService.uploadProfileImage(imagePath: imagePath);
+      if (avatarUrl != null && _currentUser != null) {
+        _currentUser = _currentUser!.copyWith(avatarUrl: avatarUrl);
       } else {
         _errorMessage = 'Tải ảnh lên thất bại. Vui lòng thử lại.';
       }
@@ -295,7 +277,6 @@ class AuthViewModel extends ChangeNotifier {
         _myPosts.addAll(data['rentals'] as List<Rental>);
       }
       _postsPage = data['page'] as int;
-      _postsPage = data['page'] as int;
       _postsTotalPages = data['pages'] as int;
     } catch (e) {
       _errorMessage = 'Failed to fetch posts: $e';
@@ -312,7 +293,7 @@ class AuthViewModel extends ChangeNotifier {
 
     try {
       final data =
-          await _authService.fetchRecentComments(page: page, limit: limit);
+      await _authService.fetchRecentComments(page: page, limit: limit);
       final comments = data['comments'] as List<Comment>;
       if (page == 1) {
         _recentComments = comments;
@@ -361,7 +342,7 @@ class AuthViewModel extends ChangeNotifier {
 
       if (notifications.isEmpty && page == 1) {
         print('⚠️ [FETCH NOTIFICATIONS ViewModel] No notifications found');
-        _errorMessage = null; // Không show error nếu không có thông báo
+        _errorMessage = null;
       }
     } catch (e) {
       print('❌ [FETCH NOTIFICATIONS ViewModel] Error: $e');
@@ -442,7 +423,6 @@ class AuthViewModel extends ChangeNotifier {
     }
   }
 
-// ✅ Lấy danh sách thông báo đã xóa
   Future<Map<String, dynamic>> getDeletedNotifications() async {
     try {
       print('🔵 [GET DELETED NOTIFICATIONS ViewModel]');
@@ -458,7 +438,6 @@ class AuthViewModel extends ChangeNotifier {
     }
   }
 
-// ✅ Hoàn tác thông báo RIÊNG LẺ
   Future<bool> undoDeleteNotificationSingle(String notificationId) async {
     try {
       print('🔵 [UNDO DELETE SINGLE ViewModel]');
@@ -483,7 +462,6 @@ class AuthViewModel extends ChangeNotifier {
     }
   }
 
-// ✅ Hoàn tác xóa tất cả
   Future<bool> undoDeleteNotifications() async {
     try {
       print('🔵 [UNDO DELETE ALL NOTIFICATIONS ViewModel]');
@@ -507,7 +485,6 @@ class AuthViewModel extends ChangeNotifier {
     }
   }
 
-// ✅ Xóa vĩnh viễn
   Future<bool> permanentDeleteFromUndo(String notificationId) async {
     try {
       print('🔵 [PERMANENT DELETE UNDO ViewModel]');
@@ -517,7 +494,6 @@ class AuthViewModel extends ChangeNotifier {
 
       if (success) {
         print('✅ [PERMANENT DELETE UNDO ViewModel] Success');
-        // Reload deleted notifications
         await getDeletedNotifications();
         notifyListeners();
         return true;
@@ -533,8 +509,6 @@ class AuthViewModel extends ChangeNotifier {
     }
   }
 
-
-  // ✅ Kiểm tra xem có thông báo hoàn tác không
   Future<Map<String, dynamic>> checkUndoStatus() async {
     try {
       print('🔵 [CHECK UNDO STATUS ViewModel]');
@@ -549,8 +523,6 @@ class AuthViewModel extends ChangeNotifier {
       return {'hasUndo': false, 'undoCount': 0};
     }
   }
-
-
 
   Future<void> deleteRental(String rentalId) async {
     _isLoading = true;
@@ -574,6 +546,7 @@ class AuthViewModel extends ChangeNotifier {
     required String rentalId,
     required Map<String, dynamic> updatedData,
     List<String>? imagePaths,
+    List<String>? videoPaths,
     List<String>? removedImages,
   }) async {
     _isLoading = true;
@@ -585,6 +558,7 @@ class AuthViewModel extends ChangeNotifier {
         rentalId: rentalId,
         updatedData: updatedData,
         imagePaths: imagePaths,
+        videoPaths: videoPaths,
         removedImages: removedImages,
       );
       final index = _myPosts.indexWhere((rental) => rental.id == rentalId);

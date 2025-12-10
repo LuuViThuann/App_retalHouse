@@ -1,21 +1,10 @@
 
-/***
- * - Đưa các much lưu ảnh sau vòa cloud :
- * - Ảnh đại diện user
- * - Ảnh bài viết
- * - Ảnh about us
- * - Ảnh banner
- * - Ảnh news
- * - Ảnh trong feedback
-
- * **/
-
 
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 class ApiRoutes {
 
   static const String rootUrl =
-      'http://192.168.1.215:3000'; // 192.168.43.168 - mạng dữ liệu
+      'http://192.168.1.88:3000'; // 192.168.43.168 - mạng dữ liệu
   static const String baseUrl = '$rootUrl/api';
   static const String serverBaseUrl = rootUrl;
   static const String socketUrl = serverBaseUrl;
@@ -262,6 +251,41 @@ class ApiRoutes {
       throw Exception('OPENAI_API_KEY không được tìm thấy trong .env');
     }
     return key;
+  }
+
+  // ==================== RENTALS & AI SUGGEST ====================
+  /// GET /api/rentals/ai-suggest?q=keyword
+  static String aiSuggest({
+    required String query,
+    int? minPrice,
+    int? maxPrice,
+    String? propertyType,
+    int limit = 5,
+  }) {
+    final params = <String, String>{
+      'q': query,
+      'limit': limit.toString(),
+    };
+    if (minPrice != null) params['minPrice'] = minPrice.toString();
+    if (maxPrice != null) params['maxPrice'] = maxPrice.toString();
+    if (propertyType != null) params['propertyType'] = propertyType;
+
+    final uri = Uri.parse('$rentals/ai-suggest').replace(queryParameters: params);
+    return uri.toString();
+  }
+
+  /// GET /api/rentals/ai-suggest/advanced?q=query
+  static String aiSuggestAdvanced({required String query}) {
+    final params = <String, String>{'q': query};
+    final uri = Uri.parse('$rentals/ai-suggest/advanced').replace(queryParameters: params);
+    return uri.toString();
+  }
+
+  /// GET /api/rentals/ai-suggest/trending?limit=5
+  static String aiSuggestTrending({int limit = 5}) {
+    final params = <String, String>{'limit': limit.toString()};
+    final uri = Uri.parse('$rentals/ai-suggest/trending').replace(queryParameters: params);
+    return uri.toString();
   }
 
 }

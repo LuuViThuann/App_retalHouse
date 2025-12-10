@@ -1,23 +1,19 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
+import 'package:flutter_rentalhouse/Widgets/createRental/MediaPickerWidget.dart';
 import 'package:flutter_rentalhouse/Widgets/createRental/area.dart';
 import 'package:flutter_rentalhouse/Widgets/createRental/contact_info.dart';
 import 'package:flutter_rentalhouse/Widgets/createRental/detail_create_rental.dart';
-import 'package:flutter_rentalhouse/Widgets/createRental/image_choice.dart';
 import 'package:flutter_rentalhouse/Widgets/createRental/info_basic_rental.dart';
 import 'package:flutter_rentalhouse/Widgets/createRental/location.dart';
 import 'package:flutter_rentalhouse/Widgets/createRental/rental_form.dart';
 import 'package:flutter_rentalhouse/Widgets/createRental/term_rental.dart';
-import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import 'package:lottie/lottie.dart';
 import 'dart:io';
 import '../config/loading.dart';
-import '../models/rental.dart';
 import '../viewmodels/vm_auth.dart';
 import '../viewmodels/vm_rental.dart';
 import '../Widgets/Detail/full_screen_image.dart';
-import '../Widgets/thousand_format.dart';
 
 class CreateRentalScreen extends StatefulWidget {
   const CreateRentalScreen({super.key});
@@ -29,15 +25,15 @@ class CreateRentalScreen extends StatefulWidget {
 class _CreateRentalScreenState extends State<CreateRentalScreen> {
   final _formKey = GlobalKey<FormState>();
   late final FormStateManager _formStateManager;
-  final ValueNotifier<List<File>> _imagesNotifier =
-      ValueNotifier<List<File>>([]);
-  final ValueNotifier<String?> _propertyTypeNotifier =
-      ValueNotifier<String?>(null);
-  final ValueNotifier<String> _statusNotifier =
-      ValueNotifier<String>('Đang hoạt động');
+
+  // ✅ Thêm ValueNotifier cho videos
+  final ValueNotifier<List<File>> _imagesNotifier = ValueNotifier<List<File>>([]);
+  final ValueNotifier<List<File>> _videosNotifier = ValueNotifier<List<File>>([]); // ✅ NEW
+
+  final ValueNotifier<String?> _propertyTypeNotifier = ValueNotifier<String?>(null);
+  final ValueNotifier<String> _statusNotifier = ValueNotifier<String>('Đang hoạt động');
   final ValueNotifier<double?> _latitudeNotifier = ValueNotifier<double?>(null);
-  final ValueNotifier<double?> _longitudeNotifier =
-      ValueNotifier<double?>(null);
+  final ValueNotifier<double?> _longitudeNotifier = ValueNotifier<double?>(null);
 
   @override
   void initState() {
@@ -51,6 +47,7 @@ class _CreateRentalScreenState extends State<CreateRentalScreen> {
   void dispose() {
     _formStateManager.dispose();
     _imagesNotifier.dispose();
+    _videosNotifier.dispose(); // ✅ Dispose videos
     _propertyTypeNotifier.dispose();
     _statusNotifier.dispose();
     _latitudeNotifier.dispose();
@@ -61,8 +58,7 @@ class _CreateRentalScreenState extends State<CreateRentalScreen> {
   Future<void> _submitForm() async {
     if (_formKey.currentState!.validate()) {
       final authViewModel = Provider.of<AuthViewModel>(context, listen: false);
-      final rentalViewModel =
-          Provider.of<RentalViewModel>(context, listen: false);
+      final rentalViewModel = Provider.of<RentalViewModel>(context, listen: false);
 
       if (authViewModel.currentUser == null) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -84,40 +80,46 @@ class _CreateRentalScreenState extends State<CreateRentalScreen> {
         return;
       }
 
-      if (_imagesNotifier.value.isEmpty) {
+      // ✅ Kiểm tra tổng số media
+      final totalMedia = _imagesNotifier.value.length + _videosNotifier.value.length;
+
+      if (totalMedia == 0) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Vui lòng chọn ít nhất một ảnh minh họa.'),
+            content: Text('Vui lòng chọn ít nhất một ảnh hoặc video minh họa.'),
             backgroundColor: Colors.orangeAccent,
           ),
         );
         return;
       }
 
-      if (_imagesNotifier.value.length > 10) {
+      if (totalMedia > 10) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Tối đa 10 ảnh được phép tải lên.'),
+            content: Text('Tối đa 10 ảnh/video được phép tải lên.'),
             backgroundColor: Colors.orangeAccent,
           ),
         );
         return;
       }
 
+      // ✅ Build rental với videos
       final rental = _formStateManager.buildRental(
         images: _imagesNotifier.value.map((file) => file.path).toList(),
+        videos: _videosNotifier.value.map((file) => file.path).toList(), // ✅ Include videos
         propertyType: _propertyTypeNotifier.value ?? 'Khác',
-        status:
-            _statusNotifier.value == 'Đang hoạt động' ? 'available' : 'rented',
+        status: _statusNotifier.value == 'Đang hoạt động' ? 'available' : 'rented',
         userId: authViewModel.currentUser!.id,
         latitude: _latitudeNotifier.value,
         longitude: _longitudeNotifier.value,
       );
 
       try {
+        // ✅ Gọi createRental với cả images và videos
         await rentalViewModel.createRental(
           rental,
           _imagesNotifier.value.map((file) => file.path).toList(),
+          videoPaths: _videosNotifier.value.map((file) => file.path).toList(), // ✅ Pass videos
         );
 
         if (mounted) {
@@ -134,7 +136,7 @@ class _CreateRentalScreenState extends State<CreateRentalScreen> {
             String errorMessage = rentalViewModel.errorMessage!;
             if (errorMessage.contains('Failed to geocode address')) {
               errorMessage =
-                  'Địa chỉ không hợp lệ. Vui lòng kiểm tra lại hoặc chọn từ bản đồ.';
+              'Địa chỉ không hợp lệ. Vui lòng kiểm tra lại hoặc chọn từ bản đồ.';
             }
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
@@ -176,10 +178,13 @@ class _CreateRentalScreenState extends State<CreateRentalScreen> {
       appBar: AppBar(
         backgroundColor: Colors.blue[700],
         elevation: 0,
-        title: Text(
+        title: const Text(
           "Tạo bài đăng mới",
-          style: const TextStyle(
-              fontWeight: FontWeight.bold, color: Colors.white, fontSize: 19),
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            color: Colors.white,
+            fontSize: 19,
+          ),
         ),
         leading: const BackButton(color: Colors.white),
         shape: const RoundedRectangleBorder(
@@ -199,15 +204,13 @@ class _CreateRentalScreenState extends State<CreateRentalScreen> {
               ),
               AreaForm(
                 totalController: _formStateManager.areaTotalController!,
-                livingRoomController:
-                    _formStateManager.areaLivingRoomController!,
+                livingRoomController: _formStateManager.areaLivingRoomController!,
                 bedroomsController: _formStateManager.areaBedroomsController!,
                 bathroomsController: _formStateManager.areaBathroomsController!,
               ),
               LocationForm(
                 shortController: _formStateManager.locationShortController!,
-                fullAddressController:
-                    _formStateManager.locationFullAddressController!,
+                fullAddressController: _formStateManager.locationFullAddressController!,
                 latitudeNotifier: _latitudeNotifier,
                 longitudeNotifier: _longitudeNotifier,
               ),
@@ -215,35 +218,32 @@ class _CreateRentalScreenState extends State<CreateRentalScreen> {
                 propertyTypeNotifier: _propertyTypeNotifier,
                 furnitureController: _formStateManager.furnitureController!,
                 amenitiesController: _formStateManager.amenitiesController!,
-                surroundingsController:
-                    _formStateManager.surroundingsController!,
+                surroundingsController: _formStateManager.surroundingsController!,
               ),
               RentalTermsForm(
-                minimumLeaseController:
-                    _formStateManager.rentalTermsMinimumLeaseController!,
-                depositController:
-                    _formStateManager.rentalTermsDepositController!,
-                paymentMethodController:
-                    _formStateManager.rentalTermsPaymentMethodController!,
-                renewalTermsController:
-                    _formStateManager.rentalTermsRenewalTermsController!,
+                minimumLeaseController: _formStateManager.rentalTermsMinimumLeaseController!,
+                depositController: _formStateManager.rentalTermsDepositController!,
+                paymentMethodController: _formStateManager.rentalTermsPaymentMethodController!,
+                renewalTermsController: _formStateManager.rentalTermsRenewalTermsController!,
               ),
               ContactInfoForm(
                 nameController: _formStateManager.contactInfoNameController!,
                 phoneController: _formStateManager.contactInfoPhoneController!,
-                availableHoursController:
-                    _formStateManager.contactInfoAvailableHoursController!,
+                availableHoursController: _formStateManager.contactInfoAvailableHoursController!,
               ),
-              ImagePickerForm(
+
+              // ✅ Thay thế ImagePickerForm bằng MediaPickerWidget
+              MediaPickerWidget(
                 imagesNotifier: _imagesNotifier,
-                onImageTap: (file) => Navigator.push(
+                videosNotifier: _videosNotifier,
+                onMediaTap: (file) => Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (context) =>
-                        FullScreenImageScreen(imageUrl: file.path),
+                    builder: (context) => FullScreenImageScreen(imageUrl: file.path),
                   ),
                 ),
               ),
+
               const SizedBox(height: 30),
               if (rentalViewModel.isLoading)
                 Center(
@@ -262,11 +262,14 @@ class _CreateRentalScreenState extends State<CreateRentalScreen> {
                     minimumSize: const Size(double.infinity, 52),
                     padding: const EdgeInsets.symmetric(vertical: 14),
                     textStyle: const TextStyle(
-                        fontSize: 17, fontWeight: FontWeight.bold),
-                    backgroundColor: Colors.blue[700], // đổi màu nền
-                    foregroundColor: Colors.white, // text và icon màu trắng
+                      fontSize: 17,
+                      fontWeight: FontWeight.bold,
+                    ),
+                    backgroundColor: Colors.blue[700],
+                    foregroundColor: Colors.white,
                     shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12)),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
                   ),
                   onPressed: _submitForm,
                 ),

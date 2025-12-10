@@ -1,5 +1,5 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_rentalhouse/config/api_routes.dart';
 import 'package:flutter_rentalhouse/config/loading.dart';
 import 'package:flutter_rentalhouse/models/rental.dart';
 import 'package:flutter_rentalhouse/viewmodels/vm_auth.dart';
@@ -7,6 +7,8 @@ import 'package:flutter_rentalhouse/viewmodels/vm_favorite.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:lottie/lottie.dart';
+
+import '../../utils/ImageUrlHelper.dart';
 
 class RentalFavoriteWidget extends StatefulWidget {
   final Rental rental;
@@ -31,9 +33,9 @@ class RentalFavoriteWidget extends StatefulWidget {
 class _RentalFavoriteWidgetState extends State<RentalFavoriteWidget> {
   Future<void> _handleToggleFavorite(String token) async {
     final favoriteViewModel =
-        Provider.of<FavoriteViewModel>(context, listen: false);
+    Provider.of<FavoriteViewModel>(context, listen: false);
     final success =
-        await favoriteViewModel.removeFavorite(widget.rental.id!, token);
+    await favoriteViewModel.removeFavorite(widget.rental.id!, token);
 
     if (mounted) {
       if (success) {
@@ -57,7 +59,7 @@ class _RentalFavoriteWidgetState extends State<RentalFavoriteWidget> {
   Widget build(BuildContext context) {
     final authViewModel = Provider.of<AuthViewModel>(context, listen: false);
     final favoriteViewModel =
-        Provider.of<FavoriteViewModel>(context, listen: false);
+    Provider.of<FavoriteViewModel>(context, listen: false);
 
     final priceVND = NumberFormat.currency(locale: 'vi_VN', symbol: 'VNĐ')
         .format(widget.rental.price);
@@ -65,12 +67,17 @@ class _RentalFavoriteWidgetState extends State<RentalFavoriteWidget> {
         ? widget.rental.location['short']
         : 'Không rõ vị trí';
     final statusText =
-        widget.rental.status == 'available' ? 'Đang cho thuê' : 'Đã cho thuê';
+    widget.rental.status == 'available' ? 'Đang cho thuê' : 'Đã cho thuê';
     final propertyType = widget.rental.propertyType?.isNotEmpty == true
         ? widget.rental.propertyType
         : 'Chưa rõ loại';
 
     bool isLoadingThisItem = favoriteViewModel.isLoading(widget.rental.id!);
+
+    // ✅ Lấy URL ảnh đầu tiên
+    final firstImage = widget.rental.images.isNotEmpty
+        ? widget.rental.images.first
+        : '';
 
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
@@ -78,61 +85,81 @@ class _RentalFavoriteWidgetState extends State<RentalFavoriteWidget> {
       decoration: BoxDecoration(
         color: Colors.white,
         border:
-            Border(bottom: BorderSide(color: Colors.grey[200]!, width: 1.0)),
+        Border(bottom: BorderSide(color: Colors.grey[200]!, width: 1.0)),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // ==================== ẢNH - SỬ DỤNG CachedNetworkImage + ImageUrlHelper ====================
           ClipRRect(
             borderRadius: BorderRadius.circular(8.0),
-            child: Image.network(
-              '${ApiRoutes.baseUrl.replaceAll('/api', '')}${widget.rental.images.firstOrNull ?? ''}',
+            child: firstImage.isNotEmpty
+                ? CachedNetworkImage(
+              // ✅ SỬ DỤNG ImageUrlHelper
+              imageUrl: ImageUrlHelper.getImageUrl(firstImage),
               width: 120,
               height: 130,
               fit: BoxFit.cover,
-              errorBuilder: (context, error, stackTrace) {
-                return Container(
-                  width: 120,
-                  height: 130,
-                  color: Colors.grey[200],
-                  child: Icon(Icons.broken_image_outlined,
-                      color: Colors.grey[400], size: 30),
-                );
-              },
-              loadingBuilder: (BuildContext context, Widget child,
-                  ImageChunkEvent? loadingProgress) {
-                if (loadingProgress == null) return child;
-                return SizedBox(
-                  width: 120,
-                  height: 130,
-                  child: Center(
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2.0,
-                      value: loadingProgress.expectedTotalBytes != null
-                          ? loadingProgress.cumulativeBytesLoaded /
-                              loadingProgress.expectedTotalBytes!
-                          : null,
-                    ),
-                  ),
-                );
-              },
+
+              // Placeholder khi đang load
+              placeholder: (context, url) => Container(
+                width: 120,
+                height: 130,
+                color: Colors.grey[200],
+                child: const Center(
+                  child: CircularProgressIndicator(strokeWidth: 2.0),
+                ),
+              ),
+
+              // Error widget
+              errorWidget: (context, url, error) => Container(
+                width: 120,
+                height: 130,
+                color: Colors.grey[200],
+                child: Icon(
+                  Icons.broken_image_outlined,
+                  color: Colors.grey[400],
+                  size: 30,
+                ),
+              ),
+
+              // Fade in animation
+              fadeInDuration: const Duration(milliseconds: 300),
+              fadeOutDuration: const Duration(milliseconds: 100),
+            )
+                : Container(
+              width: 120,
+              height: 130,
+              color: Colors.grey[200],
+              child: Icon(
+                Icons.image_not_supported_outlined,
+                color: Colors.grey[400],
+                size: 30,
+              ),
             ),
           ),
+
           const SizedBox(width: 12),
+
+          // ==================== NỘI DUNG ====================
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                // Tags (Loại phòng + Trạng thái)
                 Wrap(
                   spacing: 6.0,
                   runSpacing: 4.0,
                   children: [
                     Chip(
-                      label: Text(propertyType!,
-                          style: TextStyle(
-                              fontSize: 10,
-                              color: Colors.blueGrey[700],
-                              fontWeight: FontWeight.w500)),
+                      label: Text(
+                        propertyType!,
+                        style: TextStyle(
+                          fontSize: 10,
+                          color: Colors.blueGrey[700],
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
                       backgroundColor: Colors.blueGrey[50],
                       padding: const EdgeInsets.symmetric(
                           horizontal: 5, vertical: 0),
@@ -162,7 +189,10 @@ class _RentalFavoriteWidgetState extends State<RentalFavoriteWidget> {
                     ),
                   ],
                 ),
+
                 const SizedBox(height: 5),
+
+                // Tiêu đề
                 Text(
                   widget.rental.title ?? 'Chưa có tiêu đề',
                   maxLines: 2,
@@ -173,7 +203,10 @@ class _RentalFavoriteWidgetState extends State<RentalFavoriteWidget> {
                     color: Colors.black87,
                   ),
                 ),
+
                 const SizedBox(height: 3),
+
+                // Địa chỉ
                 Row(
                   children: [
                     Icon(Icons.location_on_outlined,
@@ -189,7 +222,10 @@ class _RentalFavoriteWidgetState extends State<RentalFavoriteWidget> {
                     ),
                   ],
                 ),
+
                 const SizedBox(height: 6),
+
+                // Giá + "Xem ngay"
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
@@ -213,9 +249,9 @@ class _RentalFavoriteWidgetState extends State<RentalFavoriteWidget> {
                         ),
                       ],
                     ),
-                    Row(
+                    const Row(
                       mainAxisSize: MainAxisSize.min,
-                      children: const [
+                      children: [
                         Text('Xem ngay', style: TextStyle(fontSize: 12)),
                         SizedBox(width: 5),
                         Icon(Icons.arrow_forward, size: 18),
@@ -226,60 +262,66 @@ class _RentalFavoriteWidgetState extends State<RentalFavoriteWidget> {
               ],
             ),
           ),
+
+          // ==================== NÚT BÊN PHẢI (Favorite + Checkbox) ====================
           Column(
             mainAxisAlignment: MainAxisAlignment.start,
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
+              // Nút Favorite
               if (widget.showFavoriteButton)
                 isLoadingThisItem
                     ? Container(
-                        width: 32,
-                        height: 32,
-                        padding: const EdgeInsets.all(4.0),
-                        child: Lottie.asset(
-                          AssetsConfig.loadingLottie,
-                          width: 24,
-                          height: 24,
-                          fit: BoxFit.contain,
-                        ),
-                      )
+                  width: 32,
+                  height: 32,
+                  padding: const EdgeInsets.all(4.0),
+                  child: Lottie.asset(
+                    AssetsConfig.loadingLottie,
+                    width: 24,
+                    height: 24,
+                    fit: BoxFit.contain,
+                  ),
+                )
                     : Container(
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            colors: [
-                              Colors.red[400]!.withOpacity(0.9),
-                              Colors.red[600]!.withOpacity(0.9),
-                            ],
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                          ),
-                          shape: BoxShape.circle,
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.red.withOpacity(0.3),
-                              blurRadius: 8,
-                              offset: const Offset(0, 2),
-                            ),
-                          ],
-                        ),
-                        child: InkWell(
-                          onTap: () {
-                            if (authViewModel.currentUser != null &&
-                                authViewModel.currentUser!.token != null &&
-                                !isLoadingThisItem) {
-                              _handleToggleFavorite(
-                                  authViewModel.currentUser!.token!);
-                            }
-                          },
-                          borderRadius: BorderRadius.circular(20),
-                          child: const Padding(
-                            padding: EdgeInsets.all(8.0),
-                            child: Icon(Icons.favorite,
-                                color: Colors.white, size: 24),
-                          ),
-                        ),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        Colors.red[400]!.withOpacity(0.9),
+                        Colors.red[600]!.withOpacity(0.9),
+                      ],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.red.withOpacity(0.3),
+                        blurRadius: 8,
+                        offset: const Offset(0, 2),
                       ),
+                    ],
+                  ),
+                  child: InkWell(
+                    onTap: () {
+                      if (authViewModel.currentUser != null &&
+                          authViewModel.currentUser!.token != null &&
+                          !isLoadingThisItem) {
+                        _handleToggleFavorite(
+                            authViewModel.currentUser!.token!);
+                      }
+                    },
+                    borderRadius: BorderRadius.circular(20),
+                    child: const Padding(
+                      padding: EdgeInsets.all(8.0),
+                      child: Icon(Icons.favorite,
+                          color: Colors.white, size: 24),
+                    ),
+                  ),
+                ),
+
               const SizedBox(height: 12),
+
+              // Checkbox (nếu có)
               if (widget.showCheckbox)
                 Container(
                   decoration: BoxDecoration(

@@ -7,9 +7,9 @@ class AppUser {
   final String address;
   final DateTime createdAt;
   final String? token;
-  final String? avatarBase64;
+  final String? avatarUrl;
   final String username;
-  final String role; // 'user' | 'admin'
+  final String role;
 
   AppUser({
     required this.id,
@@ -18,7 +18,7 @@ class AppUser {
     required this.address,
     required this.createdAt,
     this.token,
-    this.avatarBase64,
+    this.avatarUrl,
     required this.username,
     this.role = 'user',
   });
@@ -32,7 +32,7 @@ class AppUser {
       createdAt: DateTime.parse(
           data['createdAt'] as String? ?? DateTime.now().toIso8601String()),
       token: data['token'] as String?,
-      avatarBase64: data['avatarBase64'] as String?,
+      avatarUrl: data['avatarUrl'] as String?,
       username: data['username'] as String? ?? '',
       role: data['role'] as String? ?? 'user',
     );
@@ -49,17 +49,13 @@ class AppUser {
       address: data['address'] as String? ?? '',
       createdAt: (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
       token: data['token'] as String?,
-      avatarBase64: data['avatarBase64'] as String?,
+      avatarUrl: data['avatarUrl'] as String?,
       username: data['username'] as String? ?? '',
+      role: data['role'] as String? ?? 'user',
     );
   }
 
-  String? get avatarUrl {
-    if (avatarBase64 != null && avatarBase64!.isNotEmpty) {
-      return 'data:image/jpeg;base64,$avatarBase64';
-    }
-    return null;
-  }
+  // ✅ Không cần getter avatarUrl nữa vì đã là URL sẵn
 
   Map<String, dynamic> toFirestore() {
     return {
@@ -68,7 +64,9 @@ class AppUser {
       'address': address,
       'createdAt': Timestamp.fromDate(createdAt),
       'token': token,
-      // Không lưu avatarBase64 vào Firestore
+      'avatarUrl': avatarUrl,
+      'username': username,
+      'role': role,
     };
   }
 
@@ -79,7 +77,7 @@ class AppUser {
     String? address,
     DateTime? createdAt,
     String? token,
-    String? avatarBase64,
+    String? avatarUrl,
     String? username,
     String? role,
   }) {
@@ -90,7 +88,7 @@ class AppUser {
       address: address ?? this.address,
       createdAt: createdAt ?? this.createdAt,
       token: token ?? this.token,
-      avatarBase64: avatarBase64 ?? this.avatarBase64,
+      avatarUrl: avatarUrl ?? this.avatarUrl,
       username: username ?? this.username,
       role: role ?? this.role,
     );

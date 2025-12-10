@@ -5,33 +5,114 @@ const admin = require('firebase-admin');
 const { OAuth2Client } = require('google-auth-library');
 const multer = require('multer');
 const redis = require('redis');
-const { v4: uuidv4 } = require('uuid');
 const Rental = require('../models/Rental');
 const Conversation = require('../models/conversation');
 const Message = require('../models/message');
+const cloudinary = require('../config/cloudinary');
 
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
-const storage = multer.diskStorage({
-  destination: './Uploads/',
-  filename: (req, file, cb) => {
-    cb(null, `${Date.now()}-${file.originalname}`);
+// ===================== MULTER CONFIGURATION =====================
+const storage = multer.memoryStorage();
+const upload = multer({
+  storage,
+  limits: { fileSize: 50 * 1024 * 1024 }, // 50MB per file
+  fileFilter: (req, file, cb) => {
+    // ✅ Simplified validation - chỉ check extension
+    const filename = file.originalname.toLowerCase();
+    const allowedExtensions = /\.(jpeg|jpg|png|webp|gif)$/i;
+    
+    const hasValidExtension = allowedExtensions.test(filename);
+    
+    console.log('📎 File Upload Check:', {
+      filename: file.originalname,
+      extension: filename.match(/\.\w+$/)?.[0] || 'unknown',
+      mimetype: file.mimetype,
+      isValid: hasValidExtension,
+    });
+    
+    if (hasValidExtension) {
+      return cb(null, true);
+    }
+    
+    cb(new Error('Chỉ chấp nhận file ảnh (JPEG, JPG, PNG, WebP, GIF)'));
   },
 });
-const upload = multer({ 
-  storage,
-  limits: { fileSize: 20 * 1024 * 1024 } // 20MB
-});
+// ===================== CLOUDINARY HELPERS =====================
+const uploadImageToCloudinary = async (fileBuffer, originalName) => {
+  try {
+    const base64Image = fileBuffer.toString('base64');
+    
+    let mimeType = 'image/jpeg';
+    const ext = originalName.match(/\.(jpg|jpeg|png|gif|webp)$/i);
+    if (ext) {
+      const extension = ext[1].toLowerCase();
+      const mimeTypeMap = {
+        'jpg': 'image/jpeg',
+        'jpeg': 'image/jpeg',
+        'png': 'image/png',
+        'gif': 'image/gif',
+        'webp': 'image/webp'
+      };
+      mimeType = mimeTypeMap[extension] || 'image/jpeg';
+    }
+    
+    const dataUri = `data:${mimeType};base64,${base64Image}`;
+    
+    console.log('☁️ Uploading to Cloudinary:', {
+      filename: originalName,
+      mimeType: mimeType,
+      size: `${(fileBuffer.length / 1024).toFixed(2)} KB`
+    });
+    
+    const result = await cloudinary.uploader.upload(dataUri, {
+      folder: 'chat_images',
+      resource_type: 'auto',
+      quality: 'auto:good',
+      fetch_format: 'auto',
+    });
+    
+    console.log('✅ Cloudinary upload success:', result.secure_url);
+    
+    // Return full Cloudinary URL
+    return result.secure_url;
+  } catch (error) {
+    console.error('❌ Cloudinary upload error:', error);
+    throw new Error('Failed to upload image to Cloudinary');
+  }
+};
 
+const deleteImagesFromCloudinary = async (imageUrls) => {
+  try {
+    for (const url of imageUrls) {
+      // Extract public_id from Cloudinary URL
+      // Example: https://res.cloudinary.com/demo/image/upload/v1234567890/chat_images/abc123.jpg
+      const matches = url.match(/\/chat_images\/([^/.]+)/);
+      if (matches && matches[1]) {
+        const publicId = `chat_images/${matches[1]}`;
+        console.log('🗑️ Deleting from Cloudinary:', publicId);
+        await cloudinary.uploader.destroy(publicId).catch(err => 
+          console.warn(`⚠️ Failed to delete image ${publicId}:`, err.message)
+        );
+      }
+    }
+  } catch (error) {
+    console.error('❌ Error deleting images from Cloudinary:', error);
+  }
+};
+
+// ===================== REDIS CONFIGURATION =====================
 const redisClient = redis.createClient({
   url: process.env.REDIS_URL || 'redis://localhost:6379',
 });
 redisClient.on('error', (err) => console.log('Redis Client Error', err));
 redisClient.connect().catch((err) => console.error('Redis Connection Error:', err));
 
+// ===================== DATABASE INDEXES =====================
 Conversation.collection.createIndex({ participants: 1, rentalId: 1 });
 Message.collection.createIndex({ conversationId: 1, createdAt: 1 });
 
+// ===================== AUTH MIDDLEWARE =====================
 const authMiddleware = async (req, res, next) => {
   try {
     const authHeader = req.header('Authorization');
@@ -87,7 +168,7 @@ const authMiddleware = async (req, res, next) => {
       userData = userDoc.exists ? userDoc.data() : {
         uid: req.userId,
         username: decodedToken.name || decodedToken.email,
-        avatarBase64: decodedToken.picture || '',
+        avatarUrl: decodedToken.picture || '',
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
       };
 
@@ -111,6 +192,7 @@ const authMiddleware = async (req, res, next) => {
   }
 };
 
+// ===================== UTILITY FUNCTIONS =====================
 const adjustTimestamps = (obj) => {
   const adjusted = { ...obj };
   adjusted.createdAt = new Date(adjusted.createdAt.getTime() + 7 * 60 * 60 * 1000);
@@ -135,8 +217,8 @@ const getUserData = async (userId) => {
   }
   try {
     const userDoc = await admin.firestore().collection('Users').doc(userId).get();
-    userData = userDoc.exists ? userDoc.data() : { username: 'User', avatarBase64: '' };
-    const userMongo = await mongoose.model('User').findOne({ _id: userId }).select('avatarBase64 username').lean();
+    userData = userDoc.exists ? userDoc.data() : { username: 'User', avatarUrl: '' };
+    const userMongo = await mongoose.model('User').findOne({ _id: userId }).select('avatarUrl username').lean();
     if (userMongo) {
       userData = { ...userData, ...userMongo };
     }
@@ -144,11 +226,119 @@ const getUserData = async (userId) => {
     return userData;
   } catch (err) {
     console.error(`Error fetching user data for ${userId}:`, err.message);
-    return { username: 'User', avatarBase64: '' };
+    return { username: 'User', avatarUrl: '' };
   }
 };
 
+// ===================== ROUTES =====================
 module.exports = (io) => {
+  
+  // ==================== GET CONVERSATIONS ====================
+  router.get('/conversations', authMiddleware, async (req, res) => {
+    try {
+      const userId = req.userId;
+      const cached = await redisClient.get(`conversations:${userId}`);
+      if (cached) {
+        return res.json(JSON.parse(cached));
+      }
+      
+      const conversations = await Conversation.find({ participants: userId }).populate('lastMessage').lean();
+      if (!conversations || conversations.length === 0) {
+        return res.status(200).json([]);
+      }
+      
+      const enrichedConversations = await Promise.all(
+        conversations.map(async (conv) => {
+          const otherParticipantId = conv.participants.find((p) => p !== userId) || '';
+          let participantData = { username: 'Chủ nhà', avatarUrl: '' };
+          let userData = { username: 'Chủ nhà', avatarUrl: '' };
+          let rentalData = null;
+          
+          try {
+            const rentalDoc = await Rental.findById(conv.rentalId).select('contactInfo');
+            if (rentalDoc) {
+              participantData.username = rentalDoc.contactInfo?.name || 'Chủ nhà';
+            }
+          } catch (err) {}
+          
+          try {
+            const participantDoc = await admin.firestore().collection('Users').doc(otherParticipantId).get();
+            if (participantDoc.exists) participantData = { ...participantDoc.data(), username: participantDoc.data().username || participantData.username };
+          } catch (err) {}
+          
+          try {
+            const participantMongo = await mongoose.model('User').findOne({ _id: otherParticipantId }).select('avatarUrl username');
+            if (participantMongo) {
+              participantData.avatarUrl = participantMongo.avatarUrl || '';
+              participantData.username = participantMongo.username || participantData.username;
+            }
+          } catch (err) {}
+          
+          try {
+            const userDoc = await admin.firestore().collection('Users').doc(userId).get();
+            if (userDoc.exists) userData = userDoc.data();
+          } catch (err) {}
+          
+          try {
+            const userMongo = await mongoose.model('User').findOne({ _id: userId }).select('avatarUrl username');
+            if (userMongo) {
+              userData.avatarUrl = userMongo.avatarUrl || '';
+              userData.username = userMongo.username || userData.username;
+            }
+          } catch (err) {}
+          
+          try {
+            const rental = await Rental.findById(conv.rentalId).select('title images contactInfo');
+            if (rental) {
+              rentalData = {
+                id: rental._id.toString(),
+                title: rental.title,
+                image: rental.images[0] || '',
+                contactName: rental.contactInfo?.name || 'Chủ nhà',
+              };
+            }
+          } catch (err) {}
+          
+          return {
+            ...adjustTimestamps(conv),
+            _id: conv._id.toString(),
+            unreadCounts: convertUnreadCounts(conv.unreadCounts),
+            lastMessage: conv.lastMessage
+              ? {
+                  ...adjustTimestamps(conv.lastMessage),
+                  _id: conv.lastMessage._id.toString(),
+                  conversationId: conv.lastMessage.conversationId.toString(),
+                  sender: {
+                    id: conv.lastMessage.senderId,
+                    username: conv.lastMessage.senderId === userId ? userData.username : participantData.username,
+                    avatarUrl: conv.lastMessage.senderId === userId ? userData.avatarUrl : participantData.avatarUrl,
+                  }
+                }
+              : null,
+            landlord: {
+              id: otherParticipantId,
+              username: participantData.username,
+              avatarUrl: participantData.avatarUrl,
+            },
+            user: {
+              id: userId,
+              username: userData.username,
+              avatarUrl: userData.avatarUrl,
+            },
+            rental: rentalData,
+          };
+        })
+      );
+      
+      await redisClient.setEx(`conversations:${userId}`, 3600, JSON.stringify(enrichedConversations));
+      res.json(enrichedConversations);
+    } catch (err) {
+      console.error('Error in GET /conversations:', err.message);
+      res.status(500).json({ message: 'Failed to load conversations', error: err.message });
+    }
+  });
+
+  // ==================== CREATE CONVERSATION ====================
   router.post('/conversations', authMiddleware, async (req, res) => {
     try {
       const { rentalId, landlordId } = req.body;
@@ -163,32 +353,37 @@ module.exports = (io) => {
       if (userId === landlordId) {
         return res.status(403).json({ message: 'You cannot start a conversation with yourself' });
       }
+      
       const rental = await Rental.findById(rentalId);
       if (!rental) {
         return res.status(404).json({ message: 'Rental not found' });
       }
 
-      let landlordData = { username: rental.contactInfo?.name || 'Chủ nhà', avatarBase64: '' };
-      let userData = { username: 'Chủ nhà', avatarBase64: '' };
+      let landlordData = { username: rental.contactInfo?.name || 'Chủ nhà', avatarUrl: '' };
+      let userData = { username: 'Chủ nhà', avatarUrl: '' };
+      
       try {
         const landlordDoc = await admin.firestore().collection('Users').doc(landlordId).get();
         if (landlordDoc.exists) landlordData = { ...landlordDoc.data(), username: landlordDoc.data().username || landlordData.username };
       } catch (err) {}
+      
       try {
-        const landlordMongo = await mongoose.model('User').findOne({ _id: landlordId }).select('avatarBase64 username');
+        const landlordMongo = await mongoose.model('User').findOne({ _id: landlordId }).select('avatarUrl username');
         if (landlordMongo) {
-          landlordData.avatarBase64 = landlordMongo.avatarBase64 || '';
+          landlordData.avatarUrl = landlordMongo.avatarUrl || '';
           landlordData.username = landlordMongo.username || landlordData.username;
         }
       } catch (err) {}
+      
       try {
         const userDoc = await admin.firestore().collection('Users').doc(userId).get();
         if (userDoc.exists) userData = userDoc.data();
       } catch (err) {}
+      
       try {
-        const userMongo = await mongoose.model('User').findOne({ _id: userId }).select('avatarBase64 username');
+        const userMongo = await mongoose.model('User').findOne({ _id: userId }).select('avatarUrl username');
         if (userMongo) {
-          userData.avatarBase64 = userMongo.avatarBase64 || '';
+          userData.avatarUrl = userMongo.avatarUrl || '';
           userData.username = userMongo.username || userData.username;
         }
       } catch (err) {}
@@ -200,6 +395,7 @@ module.exports = (io) => {
           { participants: [landlordId, userId] }
         ]
       }).populate('lastMessage');
+      
       if (!conversation) {
         conversation = new Conversation({
           rentalId,
@@ -236,106 +432,25 @@ module.exports = (io) => {
               sender: {
                 id: conversation.lastMessage.senderId,
                 username: conversation.lastMessage.senderId === userId ? userData.username : landlordData.username,
-                avatarBase64: conversation.lastMessage.senderId === userId ? userData.avatarBase64 : landlordData.avatarBase64,
+                avatarUrl: conversation.lastMessage.senderId === userId ? userData.avatarUrl : landlordData.avatarUrl,
               }
             }
           : null,
         landlord: {
           id: landlordId,
           username: landlordData.username,
-          avatarBase64: landlordData.avatarBase64,
+          avatarUrl: landlordData.avatarUrl,
         },
         user: {
           id: userId,
           username: userData.username,
-          avatarBase64: userData.avatarBase64,
+          avatarUrl: userData.avatarUrl,
         },
         rental: rentalData,
       };
 
       await redisClient.del(`conversations:${userId}`);
       await redisClient.del(`conversations:${landlordId}`);
-
-      const userConversations = await Conversation.find({ participants: userId }).populate('lastMessage').lean();
-      const enrichedUserConversations = await Promise.all(
-        userConversations.map(async (conv) => {
-          const otherParticipantId = conv.participants.find((p) => p !== userId) || '';
-          let participantData = { username: 'Chủ nhà', avatarBase64: '' };
-          let userData2 = { username: 'Chủ nhà', avatarBase64: '' };
-          let rentalData = null;
-
-          try {
-            const rentalDoc = await Rental.findById(conv.rentalId).select('contactInfo');
-            if (rentalDoc) {
-              participantData.username = rentalDoc.contactInfo?.name || 'Chủ nhà';
-            }
-          } catch (err) {}
-          try {
-            const participantDoc = await admin.firestore().collection('Users').doc(otherParticipantId).get();
-            if (participantDoc.exists) participantData = { ...participantDoc.data(), username: participantDoc.data().username || participantData.username };
-          } catch (err) {}
-          try {
-            const participantMongo = await mongoose.model('User').findOne({ _id: otherParticipantId }).select('avatarBase64 username');
-            if (participantMongo) {
-              participantData.avatarBase64 = participantMongo.avatarBase64 || '';
-              participantData.username = participantMongo.username || participantData.username;
-            }
-          } catch (err) {}
-          try {
-            const userDoc2 = await admin.firestore().collection('Users').doc(userId).get();
-            if (userDoc2.exists) userData2 = userDoc2.data();
-          } catch (err) {}
-          try {
-            const userMongo2 = await mongoose.model('User').findOne({ _id: userId }).select('avatarBase64 username');
-            if (userMongo2) {
-              userData2.avatarBase64 = userMongo2.avatarBase64 || '';
-              userData2.username = userMongo2.username || userData2.username;
-            }
-          } catch (err) {}
-          try {
-            const rental = await Rental.findById(conv.rentalId).select('title images contactInfo');
-            if (rental) {
-              rentalData = {
-                id: rental._id.toString(),
-                title: rental.title,
-                image: rental.images[0] || '',
-                contactName: rental.contactInfo?.name || 'Chủ nhà',
-              };
-            }
-          } catch (err) {}
-
-          return {
-            ...adjustTimestamps(conv),
-            _id: conv._id.toString(),
-            unreadCounts: convertUnreadCounts(conv.unreadCounts),
-            lastMessage: conv.lastMessage
-              ? {
-                  ...adjustTimestamps(conv.lastMessage),
-                  _id: conv.lastMessage._id.toString(),
-                  conversationId: conv.lastMessage.conversationId.toString(),
-                  sender: {
-                    id: conv.lastMessage.senderId,
-                    username: conv.lastMessage.senderId === userId ? userData2.username : participantData.username,
-                    avatarBase64: conv.lastMessage.senderId === userId ? userData2.avatarBase64 : participantData.avatarBase64,
-                  }
-                }
-              : null,
-            landlord: {
-              id: otherParticipantId,
-              username: participantData.username,
-              avatarBase64: participantData.avatarBase64,
-            },
-            user: {
-              id: userId,
-              username: userData2.username,
-              avatarBase64: userData2.avatarBase64,
-            },
-            rental: rentalData,
-          };
-        })
-      );
-
-      await redisClient.setEx(`conversations:${userId}`, 3600, JSON.stringify(enrichedUserConversations));
 
       res.status(201).json(adjustedConversation);
     } catch (err) {
@@ -344,101 +459,7 @@ module.exports = (io) => {
     }
   });
 
-  router.get('/conversations', authMiddleware, async (req, res) => {
-    try {
-      const userId = req.userId;
-      const cached = await redisClient.get(`conversations:${userId}`);
-      if (cached) {
-        return res.json(JSON.parse(cached));
-      }
-      const conversations = await Conversation.find({ participants: userId }).populate('lastMessage').lean();
-      if (!conversations || conversations.length === 0) {
-        return res.status(200).json([]); // Return empty array if no conversations
-      }
-      const enrichedConversations = await Promise.all(
-        conversations.map(async (conv) => {
-          const otherParticipantId = conv.participants.find((p) => p !== userId) || '';
-          let participantData = { username: 'Chủ nhà', avatarBase64: '' };
-          let userData = { username: 'Chủ nhà', avatarBase64: '' };
-          let rentalData = null;
-          try {
-            const rentalDoc = await Rental.findById(conv.rentalId).select('contactInfo');
-            if (rentalDoc) {
-              participantData.username = rentalDoc.contactInfo?.name || 'Chủ nhà';
-            }
-          } catch (err) {}
-          try {
-            const participantDoc = await admin.firestore().collection('Users').doc(otherParticipantId).get();
-            if (participantDoc.exists) participantData = { ...participantDoc.data(), username: participantDoc.data().username || participantData.username };
-          } catch (err) {}
-          try {
-            const participantMongo = await mongoose.model('User').findOne({ _id: otherParticipantId }).select('avatarBase64 username');
-            if (participantMongo) {
-              participantData.avatarBase64 = participantMongo.avatarBase64 || '';
-              participantData.username = participantMongo.username || participantData.username;
-            }
-          } catch (err) {}
-          try {
-            const userDoc = await admin.firestore().collection('Users').doc(userId).get();
-            if (userDoc.exists) userData = userDoc.data();
-          } catch (err) {}
-          try {
-            const userMongo = await mongoose.model('User').findOne({ _id: userId }).select('avatarBase64 username');
-            if (userMongo) {
-              userData.avatarBase64 = userMongo.avatarBase64 || '';
-              userData.username = userMongo.username || userData.username;
-            }
-          } catch (err) {}
-          try {
-            const rental = await Rental.findById(conv.rentalId).select('title images contactInfo');
-            if (rental) {
-              rentalData = {
-                id: rental._id.toString(),
-                title: rental.title,
-                image: rental.images[0] || '',
-                contactName: rental.contactInfo?.name || 'Chủ nhà',
-              };
-            }
-          } catch (err) {}
-          return {
-            ...adjustTimestamps(conv),
-            _id: conv._id.toString(),
-            unreadCounts: convertUnreadCounts(conv.unreadCounts),
-            lastMessage: conv.lastMessage
-              ? {
-                  ...adjustTimestamps(conv.lastMessage),
-                  _id: conv.lastMessage._id.toString(),
-                  conversationId: conv.lastMessage.conversationId.toString(),
-                  sender: {
-                    id: conv.lastMessage.senderId,
-                    username: conv.lastMessage.senderId === userId ? userData.username : participantData.username,
-                    avatarBase64: conv.lastMessage.senderId === userId ? userData.avatarBase64 : participantData.avatarBase64,
-                  }
-                }
-              : null,
-            landlord: {
-              id: otherParticipantId,
-              username: participantData.username,
-              avatarBase64: participantData.avatarBase64,
-            },
-            user: {
-              id: userId,
-              username: userData.username,
-              avatarBase64: userData.avatarBase64,
-            },
-            rental: rentalData,
-          };
-        })
-      );
-      await redisClient.setEx(`conversations:${userId}`, 3600, JSON.stringify(enrichedConversations));
-      res.json(enrichedConversations);
-    } catch (err) {
-      console.error('Error in GET /conversations:', err.message);
-      res.status(500).json({ message: 'Failed to load conversations', error: err.message });
-    }
-  });
-
-  // Other routes remain unchanged
+  // ==================== DELETE CONVERSATION ====================
   router.delete('/conversations/:conversationId', authMiddleware, async (req, res) => {
     try {
       const { conversationId } = req.params;
@@ -451,6 +472,13 @@ module.exports = (io) => {
       const conversation = await Conversation.findById(conversationId);
       if (!conversation || !conversation.participants.includes(userId)) {
         return res.status(403).json({ message: 'Unauthorized or conversation not found' });
+      }
+
+      const messages = await Message.find({ conversationId }).lean();
+      const allImageUrls = messages.flatMap(msg => msg.images || []);
+      if (allImageUrls.length > 0) {
+        console.log(`🗑️ Deleting ${allImageUrls.length} images from deleted conversation...`);
+        await deleteImagesFromCloudinary(allImageUrls);
       }
 
       await Message.deleteMany({ conversationId });
@@ -472,6 +500,7 @@ module.exports = (io) => {
     }
   });
 
+  // ==================== GET MESSAGES ====================
   router.get('/messages/:conversationId', authMiddleware, async (req, res) => {
     try {
       const { conversationId } = req.params;
@@ -481,6 +510,7 @@ module.exports = (io) => {
       if (!mongoose.Types.ObjectId.isValid(conversationId)) {
         return res.status(400).json({ message: 'Invalid conversationId format' });
       }
+      
       const conversation = await Conversation.findById(conversationId);
       if (!conversation || !conversation.participants.includes(userId)) {
         return res.status(403).json({ message: 'Unauthorized or conversation not found' });
@@ -494,6 +524,7 @@ module.exports = (io) => {
       if (cursor) {
         query._id = { $gt: cursor };
       }
+      
       const messages = await Message.find(query)
         .sort({ createdAt: 1 })
         .limit(parseInt(limit))
@@ -501,33 +532,38 @@ module.exports = (io) => {
 
       const senderIds = [...new Set(messages.map(msg => msg.senderId))];
       const senderAvatars = {};
+      
       for (const senderId of senderIds) {
-        let avatarBase64 = '';
+        let avatarUrl = '';
         let username = 'Chủ nhà';
+        
         try {
           const rentalDoc = await Rental.findOne({ userId: senderId }).select('contactInfo');
           if (rentalDoc) {
             username = rentalDoc.contactInfo?.name || 'Chủ nhà';
           }
         } catch (err) {}
+        
         try {
-          const userMongo = await mongoose.model('User').findOne({ _id: senderId }).select('avatarBase64 username');
+          const userMongo = await mongoose.model('User').findOne({ _id: senderId }).select('avatarUrl username');
           if (userMongo) {
-            avatarBase64 = userMongo.avatarBase64 || '';
+            avatarUrl = userMongo.avatarUrl || '';
             username = userMongo.username || username;
           }
         } catch (err) {}
-        if (!username || !avatarBase64) {
+        
+        if (!username || !avatarUrl) {
           try {
             const userDoc = await admin.firestore().collection('Users').doc(senderId).get();
             if (userDoc.exists) {
               const data = userDoc.data();
-              avatarBase64 = avatarBase64 || data.avatarBase64 || '';
+              avatarUrl = avatarUrl || data.avatarUrl || '';
               username = data.username || username;
             }
           } catch (err) {}
         }
-        senderAvatars[senderId] = { avatarBase64, username };
+        
+        senderAvatars[senderId] = { avatarUrl, username };
       }
 
       const nextCursor = messages.length === parseInt(limit) ? messages[messages.length - 1]._id : null;
@@ -538,7 +574,7 @@ module.exports = (io) => {
         sender: {
           id: msg.senderId,
           username: senderAvatars[msg.senderId]?.username || 'Chủ nhà',
-          avatarBase64: senderAvatars[msg.senderId]?.avatarBase64 || '',
+          avatarUrl: senderAvatars[msg.senderId]?.avatarUrl || '',
         }
       }));
 
@@ -549,10 +585,14 @@ module.exports = (io) => {
     }
   });
 
+  // ==================== SEND MESSAGE ====================
+
   router.post('/messages', authMiddleware, upload.array('images'), async (req, res) => {
     try {
       const { conversationId, content = '' } = req.body;
       const userId = req.userId;
+
+      console.log('📨 POST /messages - Body:', { conversationId, content, filesCount: req.files?.length || 0 });
 
       if (!mongoose.Types.ObjectId.isValid(conversationId)) {
         return res.status(400).json({ message: 'Invalid conversationId' });
@@ -560,6 +600,7 @@ module.exports = (io) => {
       if (!content && (!req.files || req.files.length === 0)) {
         return res.status(400).json({ message: 'Message must have either content or images' });
       }
+      
       const conversation = await Conversation.findById(conversationId);
       if (!conversation || !conversation.participants.includes(userId)) {
         return res.status(403).json({ message: 'Unauthorized or conversation not found' });
@@ -572,7 +613,29 @@ module.exports = (io) => {
         conversation.unreadCounts.set(userId, 0);
       }
 
-      const imageUrls = req.files ? req.files.map(file => `/uploads/${file.filename}`) : [];
+      const imageUrls = [];
+      if (req.files && req.files.length > 0) {
+        console.log(`📤 Uploading ${req.files.length} images to Cloudinary...`);
+        for (const file of req.files) {
+          try {
+            const cloudinaryUrl = await uploadImageToCloudinary(file.buffer, file.originalname);
+            imageUrls.push(cloudinaryUrl);
+            console.log(`✅ Image uploaded: ${file.originalname}`);
+          } catch (uploadError) {
+            console.error('❌ Error uploading image:', uploadError.message);
+            // Delete already uploaded images on error
+            if (imageUrls.length > 0) {
+              await deleteImagesFromCloudinary(imageUrls);
+            }
+            return res.status(500).json({ 
+              message: 'Failed to upload image',
+              error: uploadError.message 
+            });
+          }
+        }
+        console.log(`✅ Successfully uploaded ${imageUrls.length} images`);
+      }
+
       const message = new Message({
         conversationId,
         senderId: userId,
@@ -580,6 +643,7 @@ module.exports = (io) => {
         images: imageUrls,
       });
       await message.save();
+      
       conversation.lastMessage = message._id;
       conversation.isPending = false;
       await conversation.save();
@@ -587,30 +651,39 @@ module.exports = (io) => {
       await redisClient.del(`conversations:${conversation.participants[0]}`);
       await redisClient.del(`conversations:${conversation.participants[1]}`);
 
-      let avatarBase64 = '';
+      let avatarUrl = '';
       let username = 'Chủ nhà';
+      
       try {
         const rentalDoc = await Rental.findOne({ userId }).select('contactInfo');
         if (rentalDoc) {
           username = rentalDoc.contactInfo?.name || 'Chủ nhà';
         }
-      } catch (err) {}
+      } catch (err) {
+        console.warn('⚠️ Could not fetch rental info:', err.message);
+      }
+      
       try {
-        const userMongo = await mongoose.model('User').findOne({ _id: userId }).select('avatarBase64 username');
+        const userMongo = await mongoose.model('User').findOne({ _id: userId }).select('avatarUrl username');
         if (userMongo) {
-          avatarBase64 = userMongo.avatarBase64 || '';
+          avatarUrl = userMongo.avatarUrl || '';
           username = userMongo.username || username;
         }
-      } catch (err) {}
-      if (!avatarBase64 || !username) {
+      } catch (err) {
+        console.warn('⚠️ Could not fetch user from MongoDB:', err.message);
+      }
+      
+      if (!avatarUrl || !username) {
         try {
           const userDoc = await admin.firestore().collection('Users').doc(userId).get();
           if (userDoc.exists) {
             const data = userDoc.data();
-            avatarBase64 = avatarBase64 || data.avatarBase64 || '';
+            avatarUrl = avatarUrl || data.avatarUrl || '';
             username = data.username || username;
           }
-        } catch (err) {}
+        } catch (err) {
+          console.warn('⚠️ Could not fetch user from Firestore:', err.message);
+        }
       }
 
       const messageData = {
@@ -624,7 +697,7 @@ module.exports = (io) => {
         sender: {
           id: userId,
           username: username,
-          avatarBase64: avatarBase64,
+          avatarUrl: avatarUrl,
         }
       };
 
@@ -637,19 +710,236 @@ module.exports = (io) => {
         });
       }
 
+      console.log('✅ Message sent successfully:', messageData._id);
       res.status(201).json(messageData);
     } catch (err) {
-      console.error('Error in POST /messages:', err.message);
-      res.status(500).json({ message: err.message });
+      console.error('❌ Error in POST /messages:', err.message);
+      res.status(500).json({ 
+        message: 'Có lỗi xảy ra từ server!',
+        error: err.message 
+      });
     }
   });
 
+  // ==================== EDIT MESSAGE ====================
+// ✅ FIXED: PATCH /messages/:messageId with proper removeImages handling
+
+router.patch('/messages/:messageId', authMiddleware, upload.array('images'), async (req, res) => {
+  try {
+    const { messageId } = req.params;
+    let { content, removeImages } = req.body;
+    content = content ? content.trim() : '';
+
+    console.log('🔧 ========== EDIT MESSAGE REQUEST ==========');
+    console.log('🔧 MessageId:', messageId);
+    console.log('🔧 Content:', content);
+    console.log('🔧 RemoveImages (raw):', removeImages);
+    console.log('🔧 RemoveImages type:', typeof removeImages);
+
+    // ✅ CRITICAL FIX: Parse removeImages properly
+    let removeImagesList = [];
+    if (removeImages) {
+      try {
+        // Handle both cases: already an array or JSON string
+        if (typeof removeImages === 'string') {
+          removeImagesList = JSON.parse(removeImages);
+        } else if (Array.isArray(removeImages)) {
+          removeImagesList = removeImages;
+        }
+        
+        console.log('✅ Parsed removeImages:', removeImagesList);
+        console.log('✅ RemoveImages count:', removeImagesList.length);
+      } catch (parseErr) {
+        console.warn('⚠️ Failed to parse removeImages, treating as empty:', parseErr.message);
+        removeImagesList = [];
+      }
+    }
+
+    if (!mongoose.Types.ObjectId.isValid(messageId)) {
+      return res.status(400).json({ message: 'Invalid messageId format' });
+    }
+    if (!content && (!req.files || req.files.length === 0) && removeImagesList.length === 0) {
+      return res.status(400).json({ message: 'At least one of content or images must be provided' });
+    }
+    
+    const message = await Message.findById(messageId);
+    if (!message) {
+      return res.status(404).json({ message: 'Message not found' });
+    }
+    if (message.senderId !== req.userId) {
+      return res.status(403).json({ message: 'Unauthorized: You can only edit your own messages' });
+    }
+    
+    const conversation = await Conversation.findById(message.conversationId);
+    if (!conversation || !conversation.participants.includes(req.userId)) {
+      return res.status(403).json({ message: 'Unauthorized or conversation not found' });
+    }
+
+    console.log('📋 Current message state:');
+    console.log('   - Content:', message.content);
+    console.log('   - Images:', message.images.length);
+    for (let i = 0; i < message.images.length; i++) {
+      console.log(`      [${i}] ${message.images[i]}`);
+    }
+
+    // ✅ Update content if provided
+    if (content) {
+      message.content = content;
+      console.log('✅ Content updated');
+    }
+
+    // ✅ Start with existing images
+    let updatedImages = [...message.images];
+    console.log(`📸 Starting with ${updatedImages.length} existing images`);
+
+    // ✅ Remove images from Cloudinary if specified
+    if (removeImagesList.length > 0) {
+      console.log(`🗑️ Removing ${removeImagesList.length} images from Cloudinary...`);
+      
+      // Filter and validate URLs to remove
+      const validRemoveUrls = removeImagesList.filter(url => {
+        const isValid = typeof url === 'string' && url.startsWith('https://');
+        if (!isValid) {
+          console.warn(`⚠️ Skipping invalid URL: ${url}`);
+        }
+        return isValid;
+      });
+
+      if (validRemoveUrls.length > 0) {
+        await deleteImagesFromCloudinary(validRemoveUrls);
+        // Filter out removed images from array
+        updatedImages = updatedImages.filter(url => !validRemoveUrls.includes(url));
+        console.log(`✅ After removal: ${updatedImages.length} images remain`);
+      }
+    }
+
+    // ✅ Upload new images to Cloudinary
+    if (req.files && req.files.length > 0) {
+      console.log(`📤 Uploading ${req.files.length} new images...`);
+      const uploadedUrls = [];
+      
+      for (let i = 0; i < req.files.length; i++) {
+        const file = req.files[i];
+        try {
+          const cloudinaryUrl = await uploadImageToCloudinary(file.buffer, file.originalname);
+          uploadedUrls.push(cloudinaryUrl);
+          updatedImages.push(cloudinaryUrl);
+          console.log(`✅ [${i}] New image uploaded: ${file.originalname}`);
+          console.log(`   URL: ${cloudinaryUrl}`);
+        } catch (uploadError) {
+          console.error(`❌ Error uploading image [${i}]:`, uploadError.message);
+          
+          // ✅ Delete newly uploaded images on error
+          if (uploadedUrls.length > 0) {
+            console.log(`🗑️ Rolling back ${uploadedUrls.length} uploaded images...`);
+            await deleteImagesFromCloudinary(uploadedUrls);
+          }
+          
+          return res.status(500).json({ 
+            message: 'Failed to upload new image',
+            error: uploadError.message 
+          });
+        }
+      }
+      console.log(`✅ Successfully uploaded ${req.files.length} new images`);
+    }
+
+    // ✅ Update message with new images array
+    message.images = updatedImages;
+    message.updatedAt = new Date();
+    await message.save();
+
+    console.log('✅ ========== MESSAGE SAVED ==========');
+    console.log(`   - Content: ${message.content}`);
+    console.log(`   - Total images: ${updatedImages.length}`);
+    for (let i = 0; i < updatedImages.length; i++) {
+      console.log(`      [${i}] ${updatedImages[i]}`);
+    }
+
+    // ✅ Fetch sender info
+    let avatarUrl = '';
+    let username = 'Chủ nhà';
+    
+    try {
+      const rentalDoc = await Rental.findOne({ userId: req.userId }).select('contactInfo');
+      if (rentalDoc) {
+        username = rentalDoc.contactInfo?.name || 'Chủ nhà';
+      }
+    } catch (err) {
+      console.warn('⚠️ Could not fetch rental info:', err.message);
+    }
+    
+    try {
+      const userMongo = await mongoose.model('User').findOne({ _id: req.userId }).select('avatarUrl username');
+      if (userMongo) {
+        avatarUrl = userMongo.avatarUrl || '';
+        username = userMongo.username || username;
+      }
+    } catch (err) {
+      console.warn('⚠️ Could not fetch user from MongoDB:', err.message);
+    }
+    
+    if (!avatarUrl || !username) {
+      try {
+        const userDoc = await admin.firestore().collection('Users').doc(req.userId).get();
+        if (userDoc.exists) {
+          const data = userDoc.data();
+          avatarUrl = avatarUrl || data.avatarUrl || '';
+          username = data.username || username;
+        }
+      } catch (err) {
+        console.warn('⚠️ Could not fetch user from Firestore:', err.message);
+      }
+    }
+
+    // ✅ Return updated message with correct images array
+    const messageData = {
+      _id: message._id.toString(),
+      conversationId: message.conversationId.toString(),
+      senderId: message.senderId,
+      content: message.content,
+      images: message.images, // ✅ ENSURE: This is always an array
+      createdAt: new Date(message.createdAt.getTime() + 7 * 60 * 60 * 1000),
+      updatedAt: new Date(message.updatedAt.getTime() + 7 * 60 * 60 * 1000),
+      sender: {
+        id: req.userId,
+        username: username,
+        avatarUrl: avatarUrl,
+      }
+    };
+
+    console.log('📤 ========== SENDING RESPONSE ==========');
+    console.log('📤 Response images array:', JSON.stringify(messageData.images));
+    console.log('📤 Response images count:', messageData.images.length);
+    console.log('📤 Response images is Array:', Array.isArray(messageData.images));
+
+    if (io) {
+      io.to(conversation._id.toString()).emit('updateMessage', messageData);
+      console.log('🔔 Socket event emitted: updateMessage');
+    }
+
+    console.log('✅ Edit message completed successfully');
+    res.status(200).json(messageData);
+  } catch (err) {
+    console.error('❌ ========== ERROR IN EDIT MESSAGE ==========');
+    console.error('❌ Error:', err.message);
+    console.error('❌ Stack:', err.stack);
+    res.status(500).json({ 
+      message: 'Có lỗi xảy ra từ server!',
+      error: err.message 
+    });
+  }
+});
+
+
+  // ==================== DELETE MESSAGE ====================
   router.delete('/messages/:messageId', authMiddleware, async (req, res) => {
     try {
       const { messageId } = req.params;
       if (!mongoose.Types.ObjectId.isValid(messageId)) {
         return res.status(400).json({ message: 'Invalid messageId format' });
       }
+      
       const message = await Message.findById(messageId);
       if (!message) {
         return res.status(404).json({ message: 'Message not found' });
@@ -657,9 +947,15 @@ module.exports = (io) => {
       if (message.senderId !== req.userId) {
         return res.status(403).json({ message: 'Unauthorized: You can only delete your own messages' });
       }
+      
       const conversation = await Conversation.findById(message.conversationId);
       if (!conversation || !conversation.participants.includes(req.userId)) {
         return res.status(403).json({ message: 'Unauthorized or conversation not found' });
+      }
+
+      if (message.images && message.images.length > 0) {
+        console.log(`🗑️ Deleting ${message.images.length} images from Cloudinary...`);
+        await deleteImagesFromCloudinary(message.images);
       }
 
       await Message.deleteOne({ _id: messageId });
@@ -682,110 +978,12 @@ module.exports = (io) => {
 
       res.status(200).json({ message: 'Message deleted successfully' });
     } catch (err) {
-      console.error('Error in DELETE /messages:', err.message);
+      console.error('❌ Error in DELETE /messages:', err.message);
       res.status(500).json({ message: err.message });
     }
   });
 
-  router.patch('/messages/:messageId', authMiddleware, upload.array('images'), async (req, res) => {
-    try {
-      const { messageId } = req.params;
-      let { content, removeImages } = req.body;
-      content = content ? content.trim() : '';
 
-      if (!mongoose.Types.ObjectId.isValid(messageId)) {
-        return res.status(400).json({ message: 'Invalid messageId format' });
-      }
-      if (!content && (!req.files || req.files.length === 0) && (!removeImages || removeImages.length === 0)) {
-        return res.status(400).json({ message: 'At least one of content or images must be provided' });
-      }
-      const message = await Message.findById(messageId);
-      if (!message) {
-        return res.status(404).json({ message: ' now found' });
-      }
-      if (message.senderId !== req.userId) {
-        return res.status(403).json({ message: 'Unauthorized: You can only edit your own messages' });
-      }
-      const conversation = await Conversation.findById(message.conversationId);
-      if (!conversation || !conversation.participants.includes(req.userId)) {
-        return res.status(403).json({ message: 'Unauthorized or conversation not found' });
-      }
-
-      if (content) {
-        message.content = content;
-      }
-
-      let updatedImages = message.images;
-      if (removeImages) {
-        try {
-          removeImages = JSON.parse(removeImages);
-          if (Array.isArray(removeImages)) {
-            updatedImages = updatedImages.filter(url => !removeImages.includes(url));
-          }
-        } catch (err) {
-          console.warn('Invalid removeImages format:', removeImages);
-        }
-      }
-      if (req.files && req.files.length > 0) {
-        const newImageUrls = req.files.map(file => `/uploads/${file.filename}`);
-        updatedImages = [...updatedImages, ...newImageUrls];
-      }
-      message.images = updatedImages;
-
-      message.updatedAt = new Date();
-      await message.save();
-
-      let avatarBase64 = '';
-      let username = 'Chủ nhà';
-      try {
-        const rentalDoc = await Rental.findOne({ userId: req.userId }).select('contactInfo');
-        if (rentalDoc) {
-          username = rentalDoc.contactInfo?.name || 'Chủ nhà';
-        }
-      } catch (err) {}
-      try {
-        const userMongo = await mongoose.model('User').findOne({ _id: req.userId }).select('avatarBase64 username');
-        if (userMongo) {
-          avatarBase64 = userMongo.avatarBase64 || '';
-          username = userMongo.username || username;
-        }
-      } catch (err) {}
-      if (!avatarBase64 || !username) {
-        try {
-          const userDoc = await admin.firestore().collection('Users').doc(req.userId).get();
-          if (userDoc.exists) {
-            const data = userDoc.data();
-            avatarBase64 = avatarBase64 || data.avatarBase64 || '';
-            username = data.username || username;
-          }
-        } catch (err) {}
-      }
-
-      const messageData = {
-        _id: message._id.toString(),
-        conversationId: message.conversationId.toString(),
-        senderId: message.senderId,
-        content: message.content,
-        images: message.images,
-        createdAt: new Date(message.createdAt.getTime() + 7 * 60 * 60 * 1000),
-        updatedAt: new Date(message.updatedAt.getTime() + 7 * 60 * 60 * 1000),
-        sender: {
-          id: req.userId,
-          username: username,
-          avatarBase64: avatarBase64,
-        }
-      };
-
-      if (io) {
-        io.to(conversation._id.toString()).emit('updateMessage', messageData);
-      }
-
-      res.status(200).json(messageData);
-    } catch (err) {
-      console.error('Error in PATCH /messages:', err.message);
-      res.status(500).json({ message: err.message });
-    }
-  });
 
   return router;
 };

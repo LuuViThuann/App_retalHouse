@@ -3,9 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_rentalhouse/constants/app_color.dart';
 
 class AppSnackBar {
-
-
-
   static SnackBar success({
     required String message,
     IconData icon = Icons.check_circle,

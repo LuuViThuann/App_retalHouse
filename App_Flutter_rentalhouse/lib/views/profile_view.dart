@@ -39,21 +39,9 @@ class _ProfileViewState extends State<ProfileView> {
         }
 
         // Use a default image or avatarBase64 if available
-        ImageProvider avatarImage =
-            const AssetImage('assets/img/imageuser.jpg');
-        if (user.avatarBase64 != null && user.avatarBase64!.isNotEmpty) {
-          try {
-            final bytes = base64Decode(user.avatarBase64!);
-            avatarImage = MemoryImage(bytes);
-          } catch (e) {
-            print('Error decoding avatarBase64: $e');
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('Lỗi tải ảnh đại diện: $e'),
-                backgroundColor: Colors.red,
-              ),
-            );
-          }
+        ImageProvider avatarImage = const AssetImage('assets/img/imageuser.png');
+        if (user.avatarUrl != null && user.avatarUrl!.isNotEmpty) {
+          avatarImage = NetworkImage(user.avatarUrl!);
         }
 
         return Scaffold(

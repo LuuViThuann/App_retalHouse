@@ -61,13 +61,75 @@ class _MyPostsViewState extends State<MyPostsView> {
     }
   }
 
+  ///Helper: Kiểm tra xem URL có phải từ Cloudinary không
+  bool _isCloudinaryUrl(String url) {
+    return url.startsWith('http://') || url.startsWith('https://');
+  }
+
+  ///  Helper: Lấy URL hình ảnh đầy đủ
+  String _getImageUrl(String imageUrl) {
+    if (_isCloudinaryUrl(imageUrl)) {
+      // URL đã là Cloudinary URL đầy đủ
+      return imageUrl;
+    }
+    // Legacy: URL cục bộ (fallback cho dữ liệu cũ)
+    return '${ApiRoutes.serverBaseUrl}$imageUrl';
+  }
+
+  ///  Widget hiển thị ảnh với error handling và shimmer loading
+  Widget _buildImageWidget(String imageUrl, {double height = 180}) {
+    final fullUrl = _getImageUrl(imageUrl);
+
+    return CachedNetworkImage(
+      imageUrl: fullUrl,
+      fit: BoxFit.cover,
+      placeholder: (context, url) => Shimmer.fromColors(
+        baseColor: Colors.grey[300]!,
+        highlightColor: Colors.grey[100]!,
+        child: Container(
+          color: Colors.grey[300],
+          height: height,
+        ),
+      ),
+      errorWidget: (context, url, error) {
+        debugPrint('❌ Image load error: $error');
+        debugPrint('   Full URL: $fullUrl');
+        return Container(
+          height: height,
+          color: Colors.grey[200],
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                Icons.broken_image_outlined,
+                size: 40,
+                color: Colors.grey[400],
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Không thể tải ảnh',
+                style: TextStyle(
+                  fontSize: 11,
+                  color: Colors.grey[500],
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   Future<void> _confirmDelete(BuildContext context, String rentalId) async {
     final authViewModel = Provider.of<AuthViewModel>(context, listen: false);
-    final rentalViewModel = Provider.of<RentalViewModel>(context, listen: false);
+    final rentalViewModel =
+    Provider.of<RentalViewModel>(context, listen: false);
 
     final result = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
+        backgroundColor: Colors.white,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: const Text('Xác nhận xóa',
             style: TextStyle(fontWeight: FontWeight.w600)),
@@ -78,15 +140,14 @@ class _MyPostsViewState extends State<MyPostsView> {
           TextButton(
             onPressed: () => Navigator.pop(context, false),
             child: const Text('Hủy',
-                style: TextStyle(
-                    color: Colors.grey, fontWeight: FontWeight.w500)),
+                style:
+                TextStyle(color: Colors.grey, fontWeight: FontWeight.w500)),
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
             child: const Text('Xóa',
-                style: TextStyle(
-                    color: Colors.red,
-                    fontWeight: FontWeight.w600)),
+                style:
+                TextStyle(color: Colors.red, fontWeight: FontWeight.w600)),
           ),
         ],
       ),
@@ -94,7 +155,7 @@ class _MyPostsViewState extends State<MyPostsView> {
 
     if (result == true) {
       try {
-        print('MyPostsView: Initiating delete for rentalId: $rentalId');
+        debugPrint('MyPostsView: Initiating delete for rentalId: $rentalId');
         await authViewModel.deleteRental(rentalId);
 
         // 🔥 Cập nhật danh sách rental toàn cục
@@ -115,7 +176,7 @@ class _MyPostsViewState extends State<MyPostsView> {
           );
         }
       } catch (e) {
-        print('MyPostsView: Error deleting rentalId: $rentalId: $e');
+        debugPrint('MyPostsView: Error deleting rentalId: $rentalId: $e');
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
@@ -161,7 +222,8 @@ class _MyPostsViewState extends State<MyPostsView> {
                   onPressed: () => Navigator.pop(context),
                 ),
                 shape: const RoundedRectangleBorder(
-                  borderRadius: BorderRadius.vertical(bottom: Radius.circular(20)),
+                  borderRadius:
+                  BorderRadius.vertical(bottom: Radius.circular(20)),
                 ),
               ),
               if (authViewModel.errorMessage != null)
@@ -208,8 +270,8 @@ class _MyPostsViewState extends State<MyPostsView> {
                 )
               else
                 SliverPadding(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 16, vertical: 20),
+                  padding:
+                  const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
                   sliver: SliverList(
                     delegate: SliverChildBuilderDelegate(
                           (context, index) {
@@ -224,8 +286,7 @@ class _MyPostsViewState extends State<MyPostsView> {
                     ),
                   ),
                 ),
-              if (authViewModel.postsPage <
-                  authViewModel.postsTotalPages)
+              if (authViewModel.postsPage < authViewModel.postsTotalPages)
                 SliverToBoxAdapter(
                   child: Padding(
                     padding: const EdgeInsets.all(16),
@@ -380,7 +441,7 @@ class _MyPostsViewState extends State<MyPostsView> {
             children: [
               Column(
                 children: [
-                  // Image Section
+                  // ✅ Image Section - Updated with Cloudinary support
                   SizedBox(
                     height: 180,
                     width: double.infinity,
@@ -388,37 +449,29 @@ class _MyPostsViewState extends State<MyPostsView> {
                       fit: StackFit.expand,
                       children: [
                         if (rental.images.isNotEmpty)
-                          CachedNetworkImage(
-                            imageUrl:
-                            '${ApiRoutes.serverBaseUrl}${rental.images[0]}',
-                            fit: BoxFit.cover,
-                            placeholder: (context, url) =>
-                                Shimmer.fromColors(
-                                  baseColor: Colors.grey[300]!,
-                                  highlightColor: Colors.grey[100]!,
-                                  child:
-                                  Container(color: Colors.grey[300]),
-                                ),
-                            errorWidget: (context, url, error) {
-                              print('Image load error: $error');
-                              return Container(
-                                color: Colors.grey[200],
-                                child: Icon(
-                                  Icons
-                                      .image_not_supported_outlined,
+                          _buildImageWidget(rental.images[0], height: 180)
+                        else
+                          Container(
+                            height: 180,
+                            color: Colors.grey[200],
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  Icons.image_not_supported_outlined,
                                   size: 40,
                                   color: Colors.grey[400],
                                 ),
-                              );
-                            },
-                          )
-                        else
-                          Container(
-                            color: Colors.grey[200],
-                            child: Icon(
-                              Icons.image_not_supported_outlined,
-                              size: 40,
-                              color: Colors.grey[400],
+                                const SizedBox(height: 8),
+                                Text(
+                                  'Chưa có ảnh',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.grey[500],
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
                         // Gradient overlay
@@ -444,8 +497,7 @@ class _MyPostsViewState extends State<MyPostsView> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Row(
-                          crossAxisAlignment:
-                          CrossAxisAlignment.start,
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Expanded(
                               child: Text(
@@ -465,8 +517,7 @@ class _MyPostsViewState extends State<MyPostsView> {
                                   horizontal: 10, vertical: 6),
                               decoration: BoxDecoration(
                                 color: statusColor.withOpacity(0.12),
-                                borderRadius:
-                                BorderRadius.circular(8),
+                                borderRadius: BorderRadius.circular(8),
                               ),
                               child: Text(
                                 formatStatus(rental.status),
@@ -481,8 +532,7 @@ class _MyPostsViewState extends State<MyPostsView> {
                         ),
                         const SizedBox(height: 12),
                         Text(
-                          formatCurrency(rental.price) +
-                              '/tháng',
+                          formatCurrency(rental.price) + '/tháng',
                           style: TextStyle(
                             fontSize: 18,
                             fontWeight: FontWeight.w700,
@@ -492,21 +542,19 @@ class _MyPostsViewState extends State<MyPostsView> {
                         const SizedBox(height: 12),
                         Column(
                           children: [
-                            _buildInfoRow(Icons.location_on,
-                                rental.location['short']),
+                            _buildInfoRow(
+                                Icons.location_on, rental.location['short']),
                             const SizedBox(height: 8),
                             Row(
                               children: [
                                 Expanded(
-                                  child: _buildInfoRow(
-                                      Icons.square_foot,
+                                  child: _buildInfoRow(Icons.square_foot,
                                       '${rental.area['total']} m²'),
                                 ),
                                 const SizedBox(width: 16),
                                 Expanded(
                                   child: _buildInfoRow(
-                                      Icons.home,
-                                      rental.propertyType),
+                                      Icons.home, rental.propertyType),
                                 ),
                               ],
                             ),
@@ -547,13 +595,11 @@ class _MyPostsViewState extends State<MyPostsView> {
                         value: PostAction.edit,
                         child: Row(
                           children: [
-                            Icon(Icons.edit_rounded,
-                                color: Colors.blue[600]),
+                            Icon(Icons.edit_rounded, color: Colors.blue[600]),
                             const SizedBox(width: 10),
                             const Text('Chỉnh sửa',
                                 style: TextStyle(
-                                    fontWeight: FontWeight.w500,
-                                    fontSize: 14)),
+                                    fontWeight: FontWeight.w500, fontSize: 14)),
                           ],
                         ),
                       ),
@@ -566,14 +612,13 @@ class _MyPostsViewState extends State<MyPostsView> {
                             const SizedBox(width: 10),
                             const Text('Xóa',
                                 style: TextStyle(
-                                    fontWeight: FontWeight.w500,
-                                    fontSize: 14)),
+                                    fontWeight: FontWeight.w500, fontSize: 14)),
                           ],
                         ),
                       ),
                     ],
                     onSelected: (value) {
-                      print(
+                      debugPrint(
                           'MyPostsView: Menu action selected: $value for rentalId: ${rental.id}');
                       switch (value) {
                         case PostAction.edit:

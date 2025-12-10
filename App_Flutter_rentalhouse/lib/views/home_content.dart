@@ -213,19 +213,6 @@ class _HomeContentState extends State<HomeContent> {
 
   Widget _buildDrawer(BuildContext context, AuthViewModel authViewModel) {
     final AppUser? user = authViewModel.currentUser;
-
-    ImageProvider avatarImage = const AssetImage('assets/img/imageuser.jpg');
-    if (user != null &&
-        user.avatarBase64 != null &&
-        user.avatarBase64!.isNotEmpty) {
-      try {
-        final bytes = base64Decode(user.avatarBase64!);
-        avatarImage = MemoryImage(bytes);
-      } catch (e) {
-        debugPrint('Error decoding avatar: $e');
-      }
-    }
-
     return Drawer(
       child: Container(
         color: Colors.grey[50],
@@ -257,8 +244,20 @@ class _HomeContentState extends State<HomeContent> {
                     ),
                     child: CircleAvatar(
                       radius: 32,
-                      backgroundImage: avatarImage,
                       backgroundColor: Colors.grey[200],
+                      child: user?.avatarUrl != null && user!.avatarUrl!.isNotEmpty
+                          ? ClipOval(
+                        child: CachedNetworkImage(
+                          imageUrl: user.avatarUrl!,
+                          fit: BoxFit.cover,
+                          width: 64,
+                          height: 64,
+                          placeholder: (context, url) => const CircularProgressIndicator(),
+                          errorWidget: (context, url, error) =>
+                              Image.asset('assets/img/imageuser.png'),
+                        ),
+                      )
+                          : Image.asset('assets/img/imageuser.png'),
                     ),
                   ),
                   const SizedBox(width: 16),
@@ -1172,17 +1171,6 @@ class _HomeContentState extends State<HomeContent> {
 
     final AppUser? user = authViewModel.currentUser;
 
-    ImageProvider avatarImage = const AssetImage('assets/img/imageuser.jpg');
-    if (user != null &&
-        user.avatarBase64 != null &&
-        user.avatarBase64!.isNotEmpty) {
-      try {
-        final bytes = base64Decode(user.avatarBase64!);
-        avatarImage = MemoryImage(bytes);
-      } catch (e) {
-        debugPrint('Error decoding avatar: $e');
-      }
-    }
 
     final location = user?.address ?? 'Nguyễn Văn Cừ nối dài - TP - Cần Thơ';
     final username = user?.username ?? 'Người dùng';
@@ -1249,9 +1237,23 @@ class _HomeContentState extends State<HomeContent> {
                     GestureDetector(
                       onTap: () => _scaffoldKey.currentState?.openDrawer(),
                       child: CircleAvatar(
-                          radius: 24,
-                          backgroundImage: avatarImage,
-                          backgroundColor: Colors.grey[200]),
+                        radius: 24,
+                        backgroundColor: Colors.grey[200],
+                        child: user?.avatarUrl != null && user!.avatarUrl!.isNotEmpty
+                            ? ClipOval(
+                          child: CachedNetworkImage(
+                            imageUrl: user.avatarUrl!,
+                            fit: BoxFit.cover,
+                            width: 48,
+                            height: 48,
+                            placeholder: (context, url) =>
+                            const CircularProgressIndicator(),
+                            errorWidget: (context, url, error) =>
+                                Image.asset('assets/img/imageuser.png'),
+                          ),
+                        )
+                            : Image.asset('assets/img/imageuser.png'),
+                      ),
                     ),
                   ],
                 ),

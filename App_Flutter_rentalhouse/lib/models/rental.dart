@@ -14,6 +14,7 @@ class Rental {
   final Map<String, dynamic> contactInfo;
   final String userId;
   final List<String> images;
+  final List<String> videos; // ✅ Videos field
   final String status;
   final DateTime createdAt;
   final String landlord;
@@ -32,6 +33,7 @@ class Rental {
     required this.contactInfo,
     required this.userId,
     required this.images,
+    required this.videos,
     required this.status,
     required this.createdAt,
     required this.landlord,
@@ -51,6 +53,7 @@ class Rental {
     Map<String, dynamic>? contactInfo,
     String? userId,
     List<String>? images,
+    List<String>? videos,
     String? status,
     DateTime? createdAt,
     String? landlord,
@@ -69,6 +72,7 @@ class Rental {
       contactInfo: contactInfo ?? this.contactInfo,
       userId: userId ?? this.userId,
       images: images ?? this.images,
+      videos: videos ?? this.videos,
       status: status ?? this.status,
       createdAt: createdAt ?? this.createdAt,
       landlord: landlord ?? this.landlord,
@@ -76,60 +80,59 @@ class Rental {
   }
 
   Map<String, dynamic> toJson() => {
-        '_id': id,
-        'title': title,
-        'price': price,
-        'area': {
-          'total': area['total'],
-          'livingRoom': area['livingRoom'],
-          'bedrooms': area['bedrooms'],
-          'bathrooms': area['bathrooms'],
-        },
-        'location': {
-          'short': location['short'],
-          'fullAddress': location['fullAddress'],
-          'latitude': location['latitude'],
-          'longitude': location['longitude'],
-        },
-        'propertyType': propertyType,
-        'furniture': furniture,
-        'amenities': amenities,
-        'surroundings': surroundings,
-        'rentalTerms': {
-          'minimumLease': rentalTerms['minimumLease'],
-          'deposit': rentalTerms['deposit'],
-          'paymentMethod': rentalTerms['paymentMethod'],
-          'renewalTerms': rentalTerms['renewalTerms'],
-        },
-        'contactInfo': {
-          'name': contactInfo['name'],
-          'phone': contactInfo['phone'],
-          'availableHours': contactInfo['availableHours'],
-        },
-        'userId': userId,
-        'images': images,
-        'status': status,
-        'createdAt': createdAt.toIso8601String(),
-        'landlord': landlord,
-      };
+    '_id': id,
+    'title': title,
+    'price': price,
+    'area': {
+      'total': area['total'],
+      'livingRoom': area['livingRoom'],
+      'bedrooms': area['bedrooms'],
+      'bathrooms': area['bathrooms'],
+    },
+    'location': {
+      'short': location['short'],
+      'fullAddress': location['fullAddress'],
+      'latitude': location['latitude'],
+      'longitude': location['longitude'],
+    },
+    'propertyType': propertyType,
+    'furniture': furniture,
+    'amenities': amenities,
+    'surroundings': surroundings,
+    'rentalTerms': {
+      'minimumLease': rentalTerms['minimumLease'],
+      'deposit': rentalTerms['deposit'],
+      'paymentMethod': rentalTerms['paymentMethod'],
+      'renewalTerms': rentalTerms['renewalTerms'],
+    },
+    'contactInfo': {
+      'name': contactInfo['name'],
+      'phone': contactInfo['phone'],
+      'availableHours': contactInfo['availableHours'],
+    },
+    'userId': userId,
+    'images': images,
+    'videos': videos, // ✅ Include videos
+    'status': status,
+    'createdAt': createdAt.toIso8601String(),
+    'landlord': landlord,
+  };
 
   factory Rental.fromJson(Map<String, dynamic> json) {
     try {
-      // Parse area with robust null and type checking
+      // Parse area
       Map<String, dynamic> areaData = {};
       if (json['area'] != null && json['area'] is Map) {
         areaData = {
           'total': _parseDouble(json['area']['total'], 'area.total') ?? 0.0,
           'livingRoom':
-              _parseDouble(json['area']['livingRoom'], 'area.livingRoom') ??
-                  0.0,
+          _parseDouble(json['area']['livingRoom'], 'area.livingRoom') ?? 0.0,
           'bedrooms':
-              _parseDouble(json['area']['bedrooms'], 'area.bedrooms') ?? 0.0,
+          _parseDouble(json['area']['bedrooms'], 'area.bedrooms') ?? 0.0,
           'bathrooms':
-              _parseDouble(json['area']['bathrooms'], 'area.bathrooms') ?? 0.0,
+          _parseDouble(json['area']['bathrooms'], 'area.bathrooms') ?? 0.0,
         };
       } else {
-        debugPrint('Warning: area is null or not a Map in JSON');
         areaData = {
           'total': 0.0,
           'livingRoom': 0.0,
@@ -138,7 +141,7 @@ class Rental {
         };
       }
 
-      // Parse location with robust null and type checking
+      // Parse location
       Map<String, dynamic> locationData = {};
       if (json['location'] != null && json['location'] is Map) {
         locationData['short'] = json['location']['short'] as String? ?? '';
@@ -152,18 +155,9 @@ class Rental {
           if (coords is List && coords.length >= 2) {
             final lat = _parseDouble(coords[1], 'location.coordinates[1]');
             final lng = _parseDouble(coords[0], 'location.coordinates[0]');
-            if (lat == null || lng == null) {
-              debugPrint(
-                  'Warning: Invalid coordinates in JSON, defaulting to [0,0]');
-              locationData['longitude'] = 0.0;
-              locationData['latitude'] = 0.0;
-            } else {
-              locationData['longitude'] = lng;
-              locationData['latitude'] = lat;
-            }
+            locationData['longitude'] = lng ?? 0.0;
+            locationData['latitude'] = lat ?? 0.0;
           } else {
-            debugPrint(
-                'Warning: coordinates array is invalid, defaulting to [0,0]');
             locationData['longitude'] = 0.0;
             locationData['latitude'] = 0.0;
           }
@@ -171,42 +165,22 @@ class Rental {
         // Handle direct latitude/longitude
         else if (json['location']['longitude'] != null &&
             json['location']['latitude'] != null) {
-          final lat =
-              _parseDouble(json['location']['latitude'], 'location.latitude');
-          final lng =
-              _parseDouble(json['location']['longitude'], 'location.longitude');
-          if (lat == null || lng == null) {
-            debugPrint(
-                'Warning: Invalid latitude/longitude in JSON, defaulting to [0,0]');
-            locationData['longitude'] = 0.0;
-            locationData['latitude'] = 0.0;
-          } else {
-            locationData['longitude'] = lng;
-            locationData['latitude'] = lat;
-          }
+          locationData['longitude'] =
+              _parseDouble(json['location']['longitude'], 'location.longitude') ?? 0.0;
+          locationData['latitude'] =
+              _parseDouble(json['location']['latitude'], 'location.latitude') ?? 0.0;
         }
-        // Handle root-level coordinates array
-        else if (json['coordinates'] is List &&
-            json['coordinates'].length >= 2) {
-          final lat = _parseDouble(json['coordinates'][1], 'coordinates[1]');
-          final lng = _parseDouble(json['coordinates'][0], 'coordinates[0]');
-          if (lat == null || lng == null) {
-            debugPrint(
-                'Warning: Invalid root coordinates in JSON, defaulting to [0,0]');
-            locationData['longitude'] = 0.0;
-            locationData['latitude'] = 0.0;
-          } else {
-            locationData['longitude'] = lng;
-            locationData['latitude'] = lat;
-          }
+        // Handle root-level coordinates
+        else if (json['coordinates'] is List && json['coordinates'].length >= 2) {
+          locationData['longitude'] =
+              _parseDouble(json['coordinates'][0], 'coordinates[0]') ?? 0.0;
+          locationData['latitude'] =
+              _parseDouble(json['coordinates'][1], 'coordinates[1]') ?? 0.0;
         } else {
-          debugPrint(
-              'Warning: No valid coordinates found in JSON, defaulting to [0,0]');
           locationData['longitude'] = 0.0;
           locationData['latitude'] = 0.0;
         }
       } else {
-        debugPrint('Warning: location is null or not a Map in JSON');
         locationData = {
           'short': '',
           'fullAddress': '',
@@ -215,18 +189,16 @@ class Rental {
         };
       }
 
-      // Parse rentalTerms with robust null and type checking
+      // Parse rentalTerms
       Map<String, dynamic> rentalTermsData = {};
       if (json['rentalTerms'] != null && json['rentalTerms'] is Map) {
         rentalTermsData = {
           'minimumLease': json['rentalTerms']['minimumLease'] as String? ?? '',
           'deposit': json['rentalTerms']['deposit'] as String? ?? '',
-          'paymentMethod':
-              json['rentalTerms']['paymentMethod'] as String? ?? '',
+          'paymentMethod': json['rentalTerms']['paymentMethod'] as String? ?? '',
           'renewalTerms': json['rentalTerms']['renewalTerms'] as String? ?? '',
         };
       } else {
-        debugPrint('Warning: rentalTerms is null or not a Map in JSON');
         rentalTermsData = {
           'minimumLease': '',
           'deposit': '',
@@ -235,17 +207,15 @@ class Rental {
         };
       }
 
-      // Parse contactInfo with robust null and type checking
+      // Parse contactInfo
       Map<String, dynamic> contactInfoData = {};
       if (json['contactInfo'] != null && json['contactInfo'] is Map) {
         contactInfoData = {
           'name': json['contactInfo']['name'] as String? ?? '',
           'phone': json['contactInfo']['phone'] as String? ?? '',
-          'availableHours':
-              json['contactInfo']['availableHours'] as String? ?? '',
+          'availableHours': json['contactInfo']['availableHours'] as String? ?? '',
         };
       } else {
-        debugPrint('Warning: contactInfo is null or not a Map in JSON');
         contactInfoData = {
           'name': '',
           'phone': '',
@@ -253,17 +223,13 @@ class Rental {
         };
       }
 
-      // Parse price
-      final price = _parseDouble(json['price'], 'price');
-      if (price == null) {
-        debugPrint('Warning: Invalid price in JSON, defaulting to 0.0');
-      }
+      final price = _parseDouble(json['price'], 'price') ?? 0.0;
 
       return Rental(
         id: json['_id'] as String? ??
             (throw Exception('Rental ID is missing in JSON response')),
         title: json['title'] as String? ?? '',
-        price: price ?? 0.0,
+        price: price,
         area: areaData,
         location: locationData,
         propertyType: json['propertyType'] as String? ?? 'Khác',
@@ -274,6 +240,7 @@ class Rental {
         contactInfo: contactInfoData,
         userId: json['userId'] as String? ?? '',
         images: List<String>.from(json['images'] as List? ?? []),
+        videos: List<String>.from(json['videos'] as List? ?? []), // ✅ Parse videos
         status: json['status'] as String? ?? 'available',
         createdAt: DateTime.parse(
             json['createdAt'] as String? ?? DateTime.now().toIso8601String()),
@@ -287,26 +254,14 @@ class Rental {
     }
   }
 
-  // Helper method to safely parse a value to double
   static double? _parseDouble(dynamic value, String fieldName) {
-    if (value == null) {
-      debugPrint('Warning: $fieldName is null');
-      return null;
-    }
+    if (value == null) return null;
     if (value is num) return value.toDouble();
     if (value is String) {
       final trimmed = value.trim().replaceAll(',', '.');
-      if (trimmed.isEmpty) {
-        debugPrint('Warning: $fieldName is empty string');
-        return null;
-      }
-      final result = double.tryParse(trimmed);
-      if (result == null) {
-        debugPrint('Error: Failed to parse $fieldName with value "$value"');
-      }
-      return result;
+      if (trimmed.isEmpty) return null;
+      return double.tryParse(trimmed);
     }
-    debugPrint('Error: $fieldName is of invalid type: ${value.runtimeType}');
     return null;
   }
 }

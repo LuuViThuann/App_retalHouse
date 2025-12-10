@@ -168,40 +168,45 @@ class _UserFeedbackScreenState extends State<UserFeedbackScreen>
   Future<void> _permanentlyDeleteFeedback(String feedbackId) async {
     final confirm = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: Colors.white,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: Colors.red[50],
-                borderRadius: BorderRadius.circular(8),
+      builder: (ctx) =>
+          AlertDialog(
+            backgroundColor: Colors.white,
+            shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16)),
+            title: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.red[50],
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Icon(
+                      Icons.delete_forever, color: Colors.red[700], size: 24),
+                ),
+                const SizedBox(width: 12),
+                const Text('Xóa vĩnh viễn?'),
+              ],
+            ),
+            content: const Text(
+                'Hành động này không thể hoàn tác. Feedback sẽ bị xóa vĩnh viễn khỏi hệ thống.'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: Text('Hủy', style: TextStyle(color: AppColors.grey600)),
               ),
-              child: Icon(Icons.delete_forever, color: Colors.red[700], size: 24),
-            ),
-            const SizedBox(width: 12),
-            const Text('Xóa vĩnh viễn?'),
-          ],
-        ),
-        content: const Text('Hành động này không thể hoàn tác. Feedback sẽ bị xóa vĩnh viễn khỏi hệ thống.'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: Text('Hủy', style: TextStyle(color: AppColors.grey600)),
+              ElevatedButton(
+                onPressed: () => Navigator.pop(ctx, true),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.red[700],
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8)),
+                ),
+                child: const Text('Xóa vĩnh viễn'),
+              ),
+            ],
           ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red[700],
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-            ),
-            child: const Text('Xóa vĩnh viễn'),
-          ),
-        ],
-      ),
     );
 
     if (confirm != true) return;
@@ -324,28 +329,31 @@ class _UserFeedbackScreenState extends State<UserFeedbackScreen>
 
     final confirm = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: Colors.white,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Text('Xóa ${_selectedFeedbackIds.length} mục?'),
-        content: const Text(
-            'Phản hồi sẽ được lưu trong 7 ngày. Bạn có thể hoàn tác trong thời gian này.'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: Text('Hủy', style: TextStyle(color: AppColors.grey600)),
+      builder: (ctx) =>
+          AlertDialog(
+            backgroundColor: Colors.white,
+            shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16)),
+            title: Text('Xóa ${_selectedFeedbackIds.length} mục?'),
+            content: const Text(
+                'Phản hồi sẽ được lưu trong 7 ngày. Bạn có thể hoàn tác trong thời gian này.'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: Text('Hủy', style: TextStyle(color: AppColors.grey600)),
+              ),
+              ElevatedButton(
+                onPressed: () => Navigator.pop(ctx, true),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.red[700],
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8)),
+                ),
+                child: const Text('Xóa'),
+              ),
+            ],
           ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red[700],
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-            ),
-            child: const Text('Xóa'),
-          ),
-        ],
-      ),
     );
 
     if (confirm != true) return;
@@ -396,27 +404,30 @@ class _UserFeedbackScreenState extends State<UserFeedbackScreen>
   Future<void> _confirmDeleteSingle(String feedbackId, int index) async {
     final confirm = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: Colors.white,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('Xóa phản hồi này?'),
-        content: const Text('Bạn có thể hoàn tác trong 7 ngày.'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: Text('Hủy', style: TextStyle(color: AppColors.grey600)),
+      builder: (ctx) =>
+          AlertDialog(
+            backgroundColor: Colors.white,
+            shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16)),
+            title: const Text('Xóa phản hồi này?'),
+            content: const Text('Bạn có thể hoàn tác trong 7 ngày.'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: Text('Hủy', style: TextStyle(color: AppColors.grey600)),
+              ),
+              ElevatedButton(
+                onPressed: () => Navigator.pop(ctx, true),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.red[700],
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8)),
+                ),
+                child: const Text('Xóa'),
+              ),
+            ],
           ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red[700],
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-            ),
-            child: const Text('Xóa'),
-          ),
-        ],
-      ),
     );
 
     if (confirm != true) return;
@@ -812,7 +823,8 @@ class _UserFeedbackScreenState extends State<UserFeedbackScreen>
               ),
               style: OutlinedButton.styleFrom(
                 foregroundColor: AppColors.primaryBlue,
-                side: const BorderSide(color: AppColors.primaryBlue, width: 1.5),
+                side: const BorderSide(
+                    color: AppColors.primaryBlue, width: 1.5),
                 padding: const EdgeInsets.symmetric(vertical: 16),
                 shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12)),
@@ -883,6 +895,31 @@ class _UserFeedbackScreenState extends State<UserFeedbackScreen>
     );
   }
 
+  List<String> _parseAttachments(dynamic attachments) {
+    final List<String> urls = [];
+
+    if (attachments == null) return urls;
+
+    if (attachments is List) {
+      for (var attachment in attachments) {
+        if (attachment is Map<String, dynamic>) {
+          // Format mới: {url, cloudinaryId, filename, uploadedAt}
+          final url = attachment['url'] as String?;
+          if (url != null && url.isNotEmpty) {
+            urls.add(url);
+          }
+        } else if (attachment is String) {
+          // Format cũ: chỉ URL string
+          if (attachment.isNotEmpty) {
+            urls.add(attachment);
+          }
+        }
+      }
+    }
+
+    return urls;
+  }
+
   Widget _buildFeedbackHistory() {
     if (_myFeedbacks.isEmpty) {
       return Center(
@@ -906,7 +943,9 @@ class _UserFeedbackScreenState extends State<UserFeedbackScreen>
         final id = fb['_id'] as String;
         final isSelected = _selectedFeedbackIds.contains(id);
         final statusColor = _getStatusColor(fb['status']);
-        final attachments = List<String>.from(fb['attachments'] ?? []);
+
+        // ✅ FIX: Parse attachments correctly
+        final attachments = _parseAttachments(fb['attachments']);
 
         return GestureDetector(
           onLongPress: () {
@@ -917,10 +956,13 @@ class _UserFeedbackScreenState extends State<UserFeedbackScreen>
           child: Container(
             margin: const EdgeInsets.only(bottom: 12),
             decoration: BoxDecoration(
-              color: isSelected ? AppColors.primaryBlue.withOpacity(0.05) : Colors.white,
+              color: isSelected
+                  ? AppColors.primaryBlue.withOpacity(0.05)
+                  : Colors.white,
               borderRadius: BorderRadius.circular(12),
               border: Border.all(
-                  color: isSelected ? AppColors.primaryBlue : Colors.transparent,
+                  color: isSelected ? AppColors.primaryBlue : Colors
+                      .transparent,
                   width: 1.5
               ),
               boxShadow: isSelected
@@ -951,7 +993,8 @@ class _UserFeedbackScreenState extends State<UserFeedbackScreen>
                 title: Text(
                   fb['title'] ?? 'Không tiêu đề',
                   style: TextStyle(fontWeight: FontWeight.bold,
-                      color: isSelected ? AppColors.primaryBlue : Colors.black87),
+                      color: isSelected ? AppColors.primaryBlue : Colors
+                          .black87),
                 ),
                 subtitle: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -1002,17 +1045,23 @@ class _UserFeedbackScreenState extends State<UserFeedbackScreen>
                               separatorBuilder: (_, __) =>
                               const SizedBox(width: 8),
                               itemBuilder: (_, idx) {
-                                final url = '${ApiRoutes
-                                    .rootUrl}${attachments[idx]}';
+                                final url = attachments[idx];
+
+                                // ✅ FIX: Kiểm tra URL có protocol chưa
+                                final fullUrl = url.startsWith('http')
+                                    ? url
+                                    : '${ApiRoutes.rootUrl}$url';
+
                                 return GestureDetector(
                                   onTap: () =>
                                       Navigator.push(context,
                                           MaterialPageRoute(builder: (_) =>
-                                              FullScreenImage(imageUrl: url))),
+                                              FullScreenImage(
+                                                  imageUrl: fullUrl))),
                                   child: ClipRRect(
                                     borderRadius: BorderRadius.circular(8),
                                     child: Image.network(
-                                      url,
+                                      fullUrl,
                                       width: 80,
                                       height: 80,
                                       fit: BoxFit.cover,
@@ -1116,7 +1165,10 @@ class _UserFeedbackScreenState extends State<UserFeedbackScreen>
           itemBuilder: (_, i) {
             final fb = _deletedFeedbacks[i];
             final feedbackId = fb['id'] as String;
-            final attachments = List<String>.from(fb['attachments'] ?? []);
+
+            // ✅ FIX: Parse attachments correctly
+            final attachments = _parseAttachments(fb['attachments']);
+
             final deletedTime = _formatDeletedTime(fb['deletedAt'] ?? '');
             final feedbackType = fb['feedbackType'] as String? ?? 'other';
             final rating = fb['rating'] as int? ?? 3;
@@ -1232,7 +1284,6 @@ class _UserFeedbackScreenState extends State<UserFeedbackScreen>
                       ),
                     ),
                     const SizedBox(width: 12),
-                    // Restore button
                     Container(
                       height: 36,
                       decoration: BoxDecoration(
@@ -1247,11 +1298,13 @@ class _UserFeedbackScreenState extends State<UserFeedbackScreen>
                         ],
                       ),
                       child: ElevatedButton.icon(
-                        onPressed: _isLoading ? null : () => _restoreFeedback(feedbackId),
+                        onPressed: _isLoading ? null : () =>
+                            _restoreFeedback(feedbackId),
                         icon: const Icon(Icons.restore_rounded, size: 16),
                         label: const Text(
                           'Hoàn tác',
-                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                          style: TextStyle(
+                              fontSize: 12, fontWeight: FontWeight.w600),
                         ),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.transparent,
@@ -1265,7 +1318,6 @@ class _UserFeedbackScreenState extends State<UserFeedbackScreen>
                       ),
                     ),
                     const SizedBox(width: 8),
-                    // Delete forever button
                     Container(
                       width: 36,
                       height: 36,
@@ -1274,7 +1326,8 @@ class _UserFeedbackScreenState extends State<UserFeedbackScreen>
                         borderRadius: BorderRadius.circular(10),
                       ),
                       child: IconButton(
-                        onPressed: _isLoading ? null : () => _permanentlyDeleteFeedback(feedbackId),
+                        onPressed: _isLoading ? null : () =>
+                            _permanentlyDeleteFeedback(feedbackId),
                         icon: Icon(
                           Icons.delete_forever_rounded,
                           size: 20,

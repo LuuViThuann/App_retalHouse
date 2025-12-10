@@ -81,6 +81,30 @@ const rentalSchema = new mongoose.Schema({
   images: {
     type: [String],
     default: [],
+    validate: {
+      validator: function(v) {
+        // Validate Cloudinary URL format
+        return v.every(url => 
+          typeof url === 'string' && 
+          (url.includes('cloudinary.com') || url.startsWith('http'))
+        );
+      },
+      message: 'Invalid image URL format'
+    }
+  },
+  videos: {
+    type: [String],
+    default: [],
+    validate: {
+      validator: function(v) {
+        // Validate Cloudinary URL format for videos
+        return v.every(url => 
+          typeof url === 'string' && 
+          (url.includes('cloudinary.com') || url.startsWith('http'))
+        );
+      },
+      message: 'Invalid video URL format'
+    }
   },
   status: {
     type: String,
@@ -92,7 +116,6 @@ const rentalSchema = new mongoose.Schema({
     enum: ['success', 'failed', 'pending', 'manual'],
     default: 'pending',
   },
-  
   createdAt: {
     type: Date,
     default: Date.now,
@@ -101,5 +124,10 @@ const rentalSchema = new mongoose.Schema({
 
 // Create a 2dsphere index for geospatial queries
 rentalSchema.index({ 'location.coordinates': '2dsphere' });
+
+// Index for better search performance
+rentalSchema.index({ title: 'text', 'location.short': 'text' });
+rentalSchema.index({ status: 1, createdAt: -1 });
+rentalSchema.index({ userId: 1, createdAt: -1 });
 
 module.exports = mongoose.model('Rental', rentalSchema);

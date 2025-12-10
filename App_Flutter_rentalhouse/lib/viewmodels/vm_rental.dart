@@ -109,13 +109,17 @@ class RentalViewModel extends ChangeNotifier {
     }
   }
 
-  Future<void> createRental(Rental rental, List<String> imagePaths) async {
+  Future<void> createRental(
+      Rental rental,
+      List<String> imagePaths, {
+        List<String> videoPaths = const [],
+      }) async {
     _isLoading = true;
     _errorMessage = null;
     notifyListeners();
 
     try {
-      await _apiService.createRental(rental, imagePaths);
+      await _apiService.createRental(rental, imagePaths , videoPaths: videoPaths);
       await fetchAllRentals();
     } catch (e) {
       _errorMessage = e.toString();

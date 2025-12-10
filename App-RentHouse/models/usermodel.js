@@ -1,15 +1,13 @@
 const mongoose = require('mongoose');
-const bcrypt = require('bcrypt');
 
 const userSchema = new mongoose.Schema({
-  _id: { // sử dụng ObjectId tự động
+  _id: {
     type: String, 
     required: true,
   },
   username: {
     type: String,
     required: true,
-    unique: true,
   }, 
   password: {
     type: String,
@@ -19,33 +17,46 @@ const userSchema = new mongoose.Schema({
     type: String,
     required: false, 
     unique: true,
-    sparse: true, // cho phép nhiều bản ghi có giá trị null
+    sparse: true,
   },
   phoneNumber: {
     type: String,
     required: true,
   },
-  avatarBase64: {
+  address: {
     type: String,
-    default: null, // lưu trữ ảnh đại diện dưới dạng base64
+    default: '',
   },
- role: {
+  // ✅ Thay đổi: Lưu URL Cloudinary thay vì base64
+  avatarUrl: {
+    type: String,
+    default: null,
+  },
+  // ✅ Thêm: Lưu publicId để có thể xóa ảnh sau này
+  avatarPublicId: {
+    type: String,
+    default: null,
+  },
+  role: {
     type: String,
     enum: ['user', 'admin'],
     default: 'user',
-    index: true  // Thêm index để query nhanh
+    index: true,
+  },
+  createdAt: {
+    type: Date,
+    default: Date.now,
+  },
+  updatedAt: {
+    type: Date,
+    default: Date.now,
   },
 });
 
-// Không cần mã hóa mật khẩu vì Firebase đã xử lý điều đó
-userSchema.pre('save', async function (next) {
+// Middleware để cập nhật updatedAt
+userSchema.pre('save', function(next) {
+  this.updatedAt = Date.now();
   next();
 });
 
-// Remove comparePassword method since it's not needed with Firebase
-// userSchema.methods.comparePassword = async function (candidatePassword) {
-//   return await bcrypt.compare(candidatePassword, this.password);
-// };
-
-// Tạo model từ schema và xuất nó
 module.exports = mongoose.model('User', userSchema);

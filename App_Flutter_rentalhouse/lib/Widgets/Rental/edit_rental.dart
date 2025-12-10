@@ -8,6 +8,7 @@ import 'package:flutter_rentalhouse/views/change_address_profile.dart';
 import 'package:provider/provider.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
+import '../../utils/ImageUrlHelper.dart';
 import 'image_rental_edit.dart';
 import 'full_image_edit_rental.dart';
 import 'dart:convert';
@@ -25,9 +26,14 @@ class EditRentalScreen extends StatefulWidget {
 class _EditRentalScreenState extends State<EditRentalScreen> {
   final _formKey = GlobalKey<FormState>();
   Map<String, dynamic> _updatedData = {};
+
   List<File> _newImages = [];
-  List<String> _removedImages = [];
+  List<File> _newVideos = [];
+  List<String> _removedMediaUrls = [];
+
   final ValueNotifier<List<File>> _imagesNotifier = ValueNotifier<List<File>>([]);
+  final ValueNotifier<List<File>> _videosNotifier = ValueNotifier<List<File>>([]);
+
   Map<String, bool> _isEditing = {
     'title': false, 'price': false, 'areaTotal': false, 'areaLivingRoom': false,
     'areaBedrooms': false, 'areaBathrooms': false, 'locationShort': false,
@@ -57,6 +63,7 @@ class _EditRentalScreenState extends State<EditRentalScreen> {
     super.initState();
     _initializeControllers();
     _imagesNotifier.addListener(() => _newImages = _imagesNotifier.value);
+    _videosNotifier.addListener(() => _newVideos = _videosNotifier.value);
   }
 
   void _initializeControllers() {
@@ -128,6 +135,7 @@ class _EditRentalScreenState extends State<EditRentalScreen> {
       _contactNameController, _contactPhoneController, _availableHoursController]
         .forEach((controller) => controller.dispose());
     _imagesNotifier.dispose();
+    _videosNotifier.dispose();
     super.dispose();
   }
 
@@ -174,6 +182,53 @@ class _EditRentalScreenState extends State<EditRentalScreen> {
           : field == 'amenities' ? _amenitiesList : _surroundingsList);
     });
   }
+//  Hàm chọn video từ thư viện
+  Future<void> _pickVideosFromGallery() async {
+    try {
+      final XFile? video = await ImagePicker().pickVideo(source: ImageSource.gallery);
+      if (video != null) {
+        // Kiểm tra kích thước file
+        final file = File(video.path);
+        final fileSize = await file.length();
+        if (fileSize > 100 * 1024 * 1024) {
+          _showSnackBar('Video không được vượt quá 100MB', Colors.red);
+          return;
+        }
+
+        setState(() {
+          _newVideos.add(file);
+          _videosNotifier.value = _newVideos;
+        });
+      }
+    } catch (e) {
+      print('Error picking video: $e');
+      _showSnackBar('Lỗi khi chọn video: $e', Colors.red);
+    }
+  }
+
+  //  Hàm quay video từ camera
+  Future<void> _pickVideoFromCamera() async {
+    try {
+      final XFile? video = await ImagePicker().pickVideo(source: ImageSource.camera);
+      if (video != null) {
+        // Kiểm tra kích thước file
+        final file = File(video.path);
+        final fileSize = await file.length();
+        if (fileSize > 100 * 1024 * 1024) {
+          _showSnackBar('Video không được vượt quá 100MB', Colors.red);
+          return;
+        }
+
+        setState(() {
+          _newVideos.add(file);
+          _videosNotifier.value = _newVideos;
+        });
+      }
+    } catch (e) {
+      print('Error picking video from camera: $e');
+      _showSnackBar('Lỗi khi quay video: $e', Colors.red);
+    }
+  }
 
   Future<void> _submitChanges() async {
     if (!_formKey.currentState!.validate()) {
@@ -182,7 +237,8 @@ class _EditRentalScreenState extends State<EditRentalScreen> {
     }
 
     // Kiểm tra xem có thay đổi nào không
-    if (_updatedData.isEmpty && _newImages.isEmpty && _removedImages.isEmpty) {
+
+    if (_updatedData.isEmpty && _newImages.isEmpty && _newVideos.isEmpty && _removedMediaUrls.isEmpty) {
       _showSnackBar('Không có thay đổi để lưu', Colors.orange);
       return;
     }
@@ -197,18 +253,20 @@ class _EditRentalScreenState extends State<EditRentalScreen> {
       print('   rentalId: ${widget.rental.id}');
       print('   updatedData: $updatedData');
       print('   newImages: ${_newImages.length}');
-      print('   removedImages: $_removedImages');
+      print('   newVideos: ${_newVideos.length}');
+      print('   removedMediaUrls: $_removedMediaUrls');
 
-      // Chỉ gửi removedImages nếu có
-      if (_removedImages.isNotEmpty) {
-        updatedData['removedImages'] = jsonEncode(_removedImages);
+// Gửi URLs cần xóa về backend
+      if (_removedMediaUrls.isNotEmpty) {
+        updatedData['removedMedia'] = jsonEncode(_removedMediaUrls);
       }
 
       await authViewModel.updateRental(
         rentalId: widget.rental.id!,
         updatedData: updatedData,
         imagePaths: _newImages.map((file) => file.path).toList(),
-        removedImages: _removedImages,
+        videoPaths: _newVideos.map((file) => file.path).toList(),
+        removedImages: _removedMediaUrls,
       );
 
       // 🔥 Cập nhật danh sách rental toàn cục
@@ -1022,11 +1080,139 @@ class _EditRentalScreenState extends State<EditRentalScreen> {
       print('Error picking image from camera: $e');
     }
   }
+  void _showMediaPickerBottomSheet() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (context) => Container(
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        padding: EdgeInsets.only(
+          left: 20, right: 20, top: 24,
+          bottom: 24 + MediaQuery.of(context).padding.bottom,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 40, height: 4,
+              decoration: BoxDecoration(
+                color: Colors.grey[300],
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(height: 24),
+            const Text(
+              'Chọn ảnh hoặc video',
+              style: TextStyle(
+                fontSize: 20, fontWeight: FontWeight.bold,
+                color: Colors.black87,
+              ),
+            ),
+            const SizedBox(height: 24),
+            _buildMediaPickerOption(
+              icon: Icons.photo_library_outlined,
+              title: 'Chọn ảnh từ thư viện',
+              subtitle: 'Chọn nhiều ảnh từ thiết bị',
+              onTap: () {
+                Navigator.pop(context);
+                _pickImagesFromGallery();
+              },
+            ),
+            const SizedBox(height: 12),
+            _buildMediaPickerOption(
+              icon: Icons.camera_alt_outlined,
+              title: 'Chụp ảnh',
+              subtitle: 'Chụp ảnh mới bằng camera',
+              onTap: () {
+                Navigator.pop(context);
+                _pickImageFromCamera();
+              },
+            ),
+            const SizedBox(height: 12),
+            _buildMediaPickerOption(
+              icon: Icons.videocam_outlined,
+              title: 'Chọn video từ thư viện',
+              subtitle: 'Tối đa 100MB',
+              onTap: () {
+                Navigator.pop(context);
+                _pickVideosFromGallery();
+              },
+            ),
+            const SizedBox(height: 12),
+            _buildMediaPickerOption(
+              icon: Icons.video_call_outlined,
+              title: 'Quay video',
+              subtitle: 'Quay video mới bằng camera',
+              onTap: () {
+                Navigator.pop(context);
+                _pickVideoFromCamera();
+              },
+            ),
+            const SizedBox(height: 16),
+          ],
+        ),
+      ),
+    );
+  }
 
+// 9. Widget option cho media picker
+  Widget _buildMediaPickerOption({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.grey[50],
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: Colors.grey[200]!),
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.blue.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(icon, color: Colors.blue, size: 24),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(title, style: const TextStyle(
+                    fontSize: 16, fontWeight: FontWeight.w600,
+                    color: Colors.black87,
+                  )),
+                  const SizedBox(height: 4),
+                  Text(subtitle, style: TextStyle(
+                    fontSize: 13, color: Colors.grey[600],
+                  )),
+                ],
+              ),
+            ),
+            Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey[400]),
+          ],
+        ),
+      ),
+    );
+  }
   Widget _buildImageSection() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        // ==================== ẢNH HIỆN TẠI ====================
         if (widget.rental.images.isNotEmpty)
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -1041,8 +1227,14 @@ class _EditRentalScreenState extends State<EditRentalScreen> {
                   scrollDirection: Axis.horizontal,
                   itemCount: widget.rental.images.length,
                   itemBuilder: (context, index) {
-                    final image = widget.rental.images[index];
-                    if (_removedImages.contains(image)) return SizedBox.shrink();
+                    final imageUrl = widget.rental.images[index];
+
+                    if (_removedMediaUrls.contains(imageUrl)) {
+                      return const SizedBox.shrink();
+                    }
+
+                    final displayUrl = ImageUrlHelper.getImageUrl(imageUrl);
+
                     return Padding(
                       padding: const EdgeInsets.only(right: 12),
                       child: Stack(
@@ -1051,7 +1243,7 @@ class _EditRentalScreenState extends State<EditRentalScreen> {
                             onTap: () {
                               Navigator.push(context, MaterialPageRoute(
                                 builder: (context) => FullImageEditRental(
-                                  imageUrl: '${ApiRoutes.baseUrl}$image',
+                                  imageUrl: displayUrl,
                                   isNetworkImage: true,
                                 ),
                               ));
@@ -1061,50 +1253,89 @@ class _EditRentalScreenState extends State<EditRentalScreen> {
                                 borderRadius: BorderRadius.circular(12),
                                 boxShadow: [BoxShadow(
                                   color: Colors.grey.withOpacity(0.2),
-                                  blurRadius: 8, offset: const Offset(0, 2),
+                                  blurRadius: 8,
+                                  offset: const Offset(0, 2),
                                 )],
                               ),
                               child: ClipRRect(
                                 borderRadius: BorderRadius.circular(12),
                                 child: Image.network(
-                                  '${ApiRoutes.baseUrl}$image',
-                                  width: 100, height: 100, fit: BoxFit.cover,
+                                  displayUrl,
+                                  width: 100,
+                                  height: 100,
+                                  fit: BoxFit.cover,
                                   loadingBuilder: (context, child, loadingProgress) {
                                     if (loadingProgress == null) return child;
                                     return Container(
+                                      width: 100,
+                                      height: 100,
                                       color: Colors.grey[200],
-                                      child: const Center(
-                                        child: CircularProgressIndicator(strokeWidth: 2),
+                                      child: Center(
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                          value: loadingProgress.expectedTotalBytes != null
+                                              ? loadingProgress.cumulativeBytesLoaded /
+                                              loadingProgress.expectedTotalBytes!
+                                              : null,
+                                        ),
                                       ),
                                     );
                                   },
                                   errorBuilder: (context, error, stackTrace) {
+                                    print('❌ Error loading image:');
+                                    print('   Original URL: $imageUrl');
+                                    print('   Display URL: $displayUrl');
+                                    print('   Error: $error');
+
                                     return Container(
+                                      width: 100,
+                                      height: 100,
                                       color: Colors.grey[200],
-                                      child: Icon(Icons.image_not_supported,
-                                          color: Colors.grey[400], size: 30),
+                                      child: Column(
+                                        mainAxisAlignment: MainAxisAlignment.center,
+                                        children: [
+                                          Icon(Icons.broken_image_outlined,
+                                              color: Colors.grey[400], size: 30),
+                                          const SizedBox(height: 4),
+                                          Text('Lỗi tải ảnh',
+                                              style: TextStyle(
+                                                fontSize: 10,
+                                                color: Colors.grey[600],
+                                              )),
+                                        ],
+                                      ),
                                     );
                                   },
                                 ),
                               ),
                             ),
                           ),
+
                           Positioned(
-                            right: 0, top: 0,
+                            right: 0,
+                            top: 0,
                             child: GestureDetector(
-                              onTap: () => setState(() => _removedImages.add(image)),
+                              onTap: () {
+                                setState(() {
+                                  _removedMediaUrls.add(imageUrl);
+                                  print('🗑️ Marked for removal: $imageUrl');
+                                });
+                              },
                               child: Container(
                                 decoration: BoxDecoration(
                                   color: Colors.red,
                                   shape: BoxShape.circle,
                                   boxShadow: [BoxShadow(
                                     color: Colors.red.withOpacity(0.3),
-                                    blurRadius: 6, offset: const Offset(0, 2),
+                                    blurRadius: 6,
+                                    offset: const Offset(0, 2),
                                   )],
                                 ),
                                 padding: const EdgeInsets.all(6),
                                 child: const Icon(
-                                  Icons.close, color: Colors.white, size: 18,
+                                  Icons.close,
+                                  color: Colors.white,
+                                  size: 18,
                                 ),
                               ),
                             ),
@@ -1118,13 +1349,170 @@ class _EditRentalScreenState extends State<EditRentalScreen> {
               const SizedBox(height: 16),
             ],
           ),
+
+        // ==================== VIDEO HIỆN TẠI ====================
+        if (widget.rental.videos.isNotEmpty)
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('Video hiện tại', style: TextStyle(
+                fontWeight: FontWeight.w600, fontSize: 14, color: Colors.black87,
+              )),
+              const SizedBox(height: 12),
+              SizedBox(
+                height: 110,
+                child: ListView.builder(
+                  scrollDirection: Axis.horizontal,
+                  itemCount: widget.rental.videos.length,
+                  itemBuilder: (context, index) {
+                    final videoUrl = widget.rental.videos[index];
+
+                    if (_removedMediaUrls.contains(videoUrl)) {
+                      return const SizedBox.shrink();
+                    }
+
+                    return Padding(
+                      padding: const EdgeInsets.only(right: 12),
+                      child: Stack(
+                        children: [
+                          Container(
+                            width: 100,
+                            height: 100,
+                            decoration: BoxDecoration(
+                              color: Colors.black87,
+                              borderRadius: BorderRadius.circular(12),
+                              boxShadow: [BoxShadow(
+                                color: Colors.grey.withOpacity(0.2),
+                                blurRadius: 8,
+                                offset: const Offset(0, 2),
+                              )],
+                            ),
+                            child: Stack(
+                              alignment: Alignment.center,
+                              children: [
+                                ClipRRect(
+                                  borderRadius: BorderRadius.circular(12),
+                                  child: Image.network(
+                                    videoUrl,
+                                    width: 100,
+                                    height: 100,
+                                    fit: BoxFit.cover,
+                                    errorBuilder: (context, error, stackTrace) {
+                                      return Container(
+                                        color: Colors.grey[800],
+                                        child: Icon(Icons.video_library,
+                                            color: Colors.grey[400], size: 40),
+                                      );
+                                    },
+                                  ),
+                                ),
+                                Container(
+                                  decoration: BoxDecoration(
+                                    color: Colors.black.withOpacity(0.3),
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                ),
+                                const Icon(
+                                  Icons.play_circle_outline,
+                                  color: Colors.white,
+                                  size: 40,
+                                ),
+                              ],
+                            ),
+                          ),
+                          Positioned(
+                            right: 0,
+                            top: 0,
+                            child: GestureDetector(
+                              onTap: () {
+                                setState(() {
+                                  _removedMediaUrls.add(videoUrl);
+                                  print('🗑️ Marked video for removal: $videoUrl');
+                                });
+                              },
+                              child: Container(
+                                decoration: BoxDecoration(
+                                  color: Colors.red,
+                                  shape: BoxShape.circle,
+                                  boxShadow: [BoxShadow(
+                                    color: Colors.red.withOpacity(0.3),
+                                    blurRadius: 6,
+                                    offset: const Offset(0, 2),
+                                  )],
+                                ),
+                                padding: const EdgeInsets.all(6),
+                                child: const Icon(
+                                  Icons.close,
+                                  color: Colors.white,
+                                  size: 18,
+                                ),
+                              ),
+                            ),
+                          ),
+                          Positioned(
+                            left: 8,
+                            bottom: 8,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: Colors.black.withOpacity(0.7),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: const Row(
+                                children: [
+                                  Icon(Icons.videocam, color: Colors.white, size: 12),
+                                  SizedBox(width: 4),
+                                  Text(
+                                    'VIDEO',
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+              ),
+              const SizedBox(height: 16),
+            ],
+          ),
+
+        // ==================== ẢNH MỚI ====================
         if (_newImages.isNotEmpty)
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text('Ảnh mới', style: TextStyle(
-                fontWeight: FontWeight.w600, fontSize: 14, color: Colors.black87,
-              )),
+              Row(
+                children: [
+                  const Text('Ảnh mới', style: TextStyle(
+                    fontWeight: FontWeight.w600, fontSize: 14, color: Colors.black87,
+                  )),
+                  const SizedBox(width: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: Colors.blue[50],
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.blue[200]!),
+                    ),
+                    child: Text(
+                      '${_newImages.length}',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.blue[700],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
               const SizedBox(height: 12),
               SizedBox(
                 height: 110,
@@ -1151,20 +1539,24 @@ class _EditRentalScreenState extends State<EditRentalScreen> {
                                 borderRadius: BorderRadius.circular(12),
                                 boxShadow: [BoxShadow(
                                   color: Colors.grey.withOpacity(0.2),
-                                  blurRadius: 8, offset: const Offset(0, 2),
+                                  blurRadius: 8,
+                                  offset: const Offset(0, 2),
                                 )],
                               ),
                               child: ClipRRect(
                                 borderRadius: BorderRadius.circular(12),
                                 child: Image.file(
                                   file,
-                                  width: 100, height: 100, fit: BoxFit.cover,
+                                  width: 100,
+                                  height: 100,
+                                  fit: BoxFit.cover,
                                 ),
                               ),
                             ),
                           ),
                           Positioned(
-                            right: 0, top: 0,
+                            right: 0,
+                            top: 0,
                             child: GestureDetector(
                               onTap: () => setState(() => _newImages.removeAt(index)),
                               child: Container(
@@ -1173,12 +1565,15 @@ class _EditRentalScreenState extends State<EditRentalScreen> {
                                   shape: BoxShape.circle,
                                   boxShadow: [BoxShadow(
                                     color: Colors.red.withOpacity(0.3),
-                                    blurRadius: 6, offset: const Offset(0, 2),
+                                    blurRadius: 6,
+                                    offset: const Offset(0, 2),
                                   )],
                                 ),
                                 padding: const EdgeInsets.all(6),
                                 child: const Icon(
-                                  Icons.close, color: Colors.white, size: 18,
+                                  Icons.close,
+                                  color: Colors.white,
+                                  size: 18,
                                 ),
                               ),
                             ),
@@ -1192,8 +1587,143 @@ class _EditRentalScreenState extends State<EditRentalScreen> {
               const SizedBox(height: 16),
             ],
           ),
+
+        // ==================== VIDEO MỚI ====================
+        if (_newVideos.isNotEmpty)
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  const Text('Video mới', style: TextStyle(
+                    fontWeight: FontWeight.w600, fontSize: 14, color: Colors.black87,
+                  )),
+                  const SizedBox(width: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: Colors.amber[50],
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.amber[200]!),
+                    ),
+                    child: Text(
+                      '${_newVideos.length}',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.amber[700],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              SizedBox(
+                height: 110,
+                child: ListView.builder(
+                  scrollDirection: Axis.horizontal,
+                  itemCount: _newVideos.length,
+                  itemBuilder: (context, index) {
+                    return Padding(
+                      padding: const EdgeInsets.only(right: 12),
+                      child: Stack(
+                        children: [
+                          Container(
+                            width: 100,
+                            height: 100,
+                            decoration: BoxDecoration(
+                              color: Colors.black87,
+                              borderRadius: BorderRadius.circular(12),
+                              boxShadow: [BoxShadow(
+                                color: Colors.grey.withOpacity(0.2),
+                                blurRadius: 8,
+                                offset: const Offset(0, 2),
+                              )],
+                            ),
+                            child: Stack(
+                              alignment: Alignment.center,
+                              children: [
+                                ClipRRect(
+                                  borderRadius: BorderRadius.circular(12),
+                                  child: Icon(Icons.videocam_outlined,
+                                      color: Colors.grey[400], size: 40),
+                                ),
+                                Container(
+                                  decoration: BoxDecoration(
+                                    color: Colors.black.withOpacity(0.3),
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                ),
+                                const Icon(
+                                  Icons.play_circle_outline,
+                                  color: Colors.white,
+                                  size: 40,
+                                ),
+                              ],
+                            ),
+                          ),
+                          Positioned(
+                            right: 0,
+                            top: 0,
+                            child: GestureDetector(
+                              onTap: () => setState(() => _newVideos.removeAt(index)),
+                              child: Container(
+                                decoration: BoxDecoration(
+                                  color: Colors.red,
+                                  shape: BoxShape.circle,
+                                  boxShadow: [BoxShadow(
+                                    color: Colors.red.withOpacity(0.3),
+                                    blurRadius: 6,
+                                    offset: const Offset(0, 2),
+                                  )],
+                                ),
+                                padding: const EdgeInsets.all(6),
+                                child: const Icon(
+                                  Icons.close,
+                                  color: Colors.white,
+                                  size: 18,
+                                ),
+                              ),
+                            ),
+                          ),
+                          Positioned(
+                            left: 8,
+                            bottom: 8,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: Colors.black.withOpacity(0.7),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: const Row(
+                                children: [
+                                  Icon(Icons.videocam, color: Colors.white, size: 12),
+                                  SizedBox(width: 4),
+                                  Text(
+                                    'VIDEO',
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+              ),
+              const SizedBox(height: 16),
+            ],
+          ),
+
+        // ==================== NÚT THÊM ẢNH/VIDEO ====================
         GestureDetector(
-          onTap: _showImagePickerBottomSheet,
+          onTap: _showMediaPickerBottomSheet,
           child: Container(
             width: double.infinity,
             padding: const EdgeInsets.symmetric(vertical: 32),
@@ -1201,7 +1731,6 @@ class _EditRentalScreenState extends State<EditRentalScreen> {
               color: Colors.grey[50],
               borderRadius: BorderRadius.circular(12),
               border: Border.all(color: Colors.grey[200]!, width: 1.5),
-
             ),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
@@ -1212,19 +1741,19 @@ class _EditRentalScreenState extends State<EditRentalScreen> {
                     color: Colors.blue.withOpacity(0.1),
                     shape: BoxShape.circle,
                   ),
-                  child: Icon(Icons.add_photo_alternate_outlined,
+                  child: const Icon(Icons.add_photo_alternate_outlined,
                       color: Colors.blue, size: 36),
                 ),
                 const SizedBox(height: 16),
-                const Text('Thêm hình ảnh', style: TextStyle(
+                const Text('Thêm ảnh hoặc video', style: TextStyle(
                   fontWeight: FontWeight.w600, fontSize: 16,
                   color: Colors.black87,
                 )),
                 const SizedBox(height: 6),
-                Text('Chọn ảnh từ thư viện hoặc chụp ảnh mới',
+                Text('Chọn từ thư viện hoặc quay/chụp mới',
                     style: TextStyle(fontSize: 13, color: Colors.grey[600])),
                 const SizedBox(height: 4),
-                Text('Hỗ trợ tải lên nhiều hình ảnh',
+                Text('Hỗ trợ tải lên nhiều ảnh và video (tối đa 100MB/video)',
                     style: TextStyle(fontSize: 12, color: Colors.grey[500],
                         fontStyle: FontStyle.italic)),
               ],
@@ -1517,7 +2046,7 @@ class _EditRentalScreenState extends State<EditRentalScreen> {
               ),
               const SizedBox(height: 16),
               _buildSection(
-                title: 'Hình ảnh',
+                title: 'Hình ảnh & Video',
                 children: [
                   _buildImageSection(),
                 ],

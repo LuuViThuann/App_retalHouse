@@ -81,10 +81,9 @@ class _MyProfileViewState extends State<MyProfileView> with SingleTickerProvider
     try {
       final XFile? image = await _picker.pickImage(source: ImageSource.gallery);
       if (image != null) {
-        final bytes = await image.readAsBytes();
-        final base64Image = base64Encode(bytes);
         final authViewModel = Provider.of<AuthViewModel>(context, listen: false);
-        await authViewModel.uploadProfileImage(imageBase64: base64Image);
+
+        await authViewModel.uploadProfileImage(imagePath: image.path);
         if (authViewModel.errorMessage == null) {
           AppSnackBar.show(
             context,
@@ -184,14 +183,12 @@ class _MyProfileViewState extends State<MyProfileView> with SingleTickerProvider
 
   ImageProvider getImageProvider(String? avatarUrl) {
     if (avatarUrl != null && avatarUrl.isNotEmpty) {
-      if (avatarUrl.startsWith('data:image')) {
-        final base64String = avatarUrl.split(',')[1];
-        final bytes = base64Decode(base64String);
-        return MemoryImage(bytes);
-      } else if (avatarUrl.startsWith('http')) {
+      // ✅ Kiểm tra URL từ Cloudinary
+      if (avatarUrl.startsWith('http')) {
         return NetworkImage(avatarUrl);
       }
     }
+    // ✅ Fallback: Hiển thị icon nếu không có ảnh
     return const AssetImage('assets/img/imageuser.png');
   }
 
