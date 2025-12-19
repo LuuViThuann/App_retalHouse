@@ -17,6 +17,9 @@ const fs = require('fs').promises;
 const cloudinary = require('../config/cloudinary');
 const { CloudinaryStorage } = require('multer-storage-cloudinary');
 
+const Payment = require('../models/Payment');
+const vnpayService = require('../service/vnpayService');
+
 const redisClient = redis.createClient({
   url: process.env.REDIS_URL || 'redis://localhost:6379',
 });
@@ -123,7 +126,82 @@ const verifyAdmin = async (req, res, next) => {
     res.status(401).json({ message: 'Authentication failed', error: err.message });
   }
 };
-// ========== ADMIN ROUTES ========================================================
+/**
+ * Middleware kiểm tra xem user đã thanh toán hay chưa
+ * Nếu chưa, tạo payment request
+ */
+const checkPaymentStatus = async (req, res, next) => {
+  try {
+    const { paymentTransactionCode } = req.body;
+    
+    // ❌ Nếu không có transaction code → YÊU CẦU CLIENT THANH TOÁN TRƯỚC
+    if (!paymentTransactionCode) {
+      return res.status(402).json({
+        success: false,
+        message: 'Vui lòng thanh toán phí đăng bài trước khi đăng bài.',
+        requiresPayment: true,
+        hint: 'Gọi POST /api/vnpay/create-payment để tạo thanh toán trước',
+      });
+    }
+
+    // ✅ Tìm payment trong database
+    const payment = await Payment.findOne({ transactionCode: paymentTransactionCode });
+    
+    if (!payment) {
+      return res.status(404).json({
+        success: false,
+        message: 'Mã thanh toán không hợp lệ hoặc không tồn tại',
+        transactionCode: paymentTransactionCode,
+      });
+    }
+
+    // ✅ Kiểm tra payment có thuộc user này không
+    if (payment.userId !== req.userId) {
+      return res.status(403).json({
+        success: false,
+        message: 'Mã thanh toán không thuộc về bạn',
+      });
+    }
+
+    // 🔥 CRITICAL FIX: Chỉ check completed, không block nếu processing
+    if (payment.status === 'completed') {
+      // ✅ Payment đã hoàn tất → cho phép tạo rental
+      console.log(`✅ Payment verified: ${paymentTransactionCode} (completed)`);
+      req.paymentTransactionCode = paymentTransactionCode;
+      req.payment = payment;
+      next();
+      return;
+    }
+
+    // ⚠️ Payment chưa completed
+    console.warn(`⚠️ Payment not completed yet: ${paymentTransactionCode}`);
+    console.warn(`   Current status: ${payment.status}`);
+    console.warn(`   Created at: ${payment.createdAt}`);
+    console.warn(`   Confirmed via: ${payment.confirmedVia || 'NOT_CONFIRMED'}`);
+
+    // 🔥 FIX: Trả về thông tin chi tiết để client có thể retry
+    return res.status(402).json({
+      success: false,
+      message: 'Thanh toán chưa được xác nhận',
+      paymentStatus: payment.status,
+      transactionCode: paymentTransactionCode,
+      createdAt: payment.createdAt,
+      confirmedVia: payment.confirmedVia,
+      hint: payment.status === 'processing' 
+        ? 'Vui lòng đợi VNPay xác nhận thanh toán (có thể mất vài giây). Sau đó thử lại.'
+        : 'Thanh toán đã thất bại. Vui lòng thanh toán lại.',
+      canRetry: payment.status === 'processing', // Client có thể retry nếu processing
+    });
+
+  } catch (err) {
+    console.error('❌ Error in checkPaymentStatus middleware:', err);
+    res.status(500).json({
+      success: false,
+      message: 'Lỗi kiểm tra trạng thái thanh toán',
+      error: err.message,
+    });
+  }
+};
 
 // ========== ADMIN ROUTES ========================================================
 
@@ -397,12 +475,6 @@ router.patch('/admin/rentals/:rentalId', verifyAdmin, upload.array('media'), asy
 // ========== ADMIN DELETE RENTAL ==========
 router.delete('/admin/rentals/:rentalId', verifyAdmin, async (req, res) => {
   try {
-    console.log('═══════════════════════════════════════════');
-    console.log('🗑️ DELETE REQUEST RECEIVED');
-    console.log('═══════════════════════════════════════════');
-    console.log('📌 Rental ID: ' + req.params.rentalId);
-    console.log('👤 User ID: ' + req.userId);
-    console.log('✅ Admin verified: ' + req.isAdmin);
     
     if (!mongoose.Types.ObjectId.isValid(req.params.rentalId)) {
       return res.status(400).json({ message: 'Invalid rental ID' });
@@ -411,6 +483,11 @@ router.delete('/admin/rentals/:rentalId', verifyAdmin, async (req, res) => {
     const rental = await Rental.findById(req.params.rentalId);
     if (!rental) {
       return res.status(404).json({ message: 'Rental not found' });
+    }
+
+    if (rental.paymentInfo?.paymentId) {
+      await Payment.findByIdAndDelete(rental.paymentInfo.paymentId);
+      console.log(`✅ Deleted payment record for rental ${req.params.rentalId}`);
     }
 
     // Delete images and videos from Cloudinary
@@ -448,9 +525,7 @@ router.delete('/admin/rentals/:rentalId', verifyAdmin, async (req, res) => {
       console.warn('⚠️ Elasticsearch delete failed:', esErr.message);
     }
 
-    console.log('═══════════════════════════════════════════');
     console.log('✅ RENTAL DELETED SUCCESSFULLY');
-    console.log('═══════════════════════════════════════════');
 
     res.json({ 
       message: 'Rental deleted successfully',
@@ -865,11 +940,12 @@ router.get('/rentals/:id', async (req, res) => {
   }
 });
 
-router.post('/rentals', authMiddleware, upload.array('media'), async (req, res) => {
+router.post('/rentals', authMiddleware, upload.array('media'), checkPaymentStatus, async (req, res) => {
   try {
     const contactInfoName = req.body.contactInfoName || req.user?.displayName || 'Chủ nhà';
     const contactInfoPhone = req.body.contactInfoPhone || req.user?.phoneNumber || 'Không có số điện thoại';
 
+    // ... (giữ nguyên logic geocoding như cũ)
     let coordinates = [
       parseFloat(req.body.longitude) || 0,
       parseFloat(req.body.latitude) || 0,
@@ -882,46 +958,39 @@ router.post('/rentals', authMiddleware, upload.array('media'), async (req, res) 
       return res.status(400).json({ message: 'Invalid or missing full address' });
     }
 
-    if (
-      coordinates[0] === 0 && coordinates[1] === 0 || 
-      isNaN(coordinates[0]) || isNaN(coordinates[1])
-    ) {
+    if (coordinates[0] === 0 && coordinates[1] === 0 || isNaN(coordinates[0]) || isNaN(coordinates[1])) {
       try {
-        console.log(`Geocoding address for new rental: ${fullAddress}`);
+        console.log(`Geocoding address: ${fullAddress}`);
         const geocodeResult = await geocodeAddressFree(fullAddress);
         coordinates = [geocodeResult.longitude, geocodeResult.latitude];
         formattedAddress = geocodeResult.formattedAddress;
         geocodingStatus = 'success';
-        console.log('Used Nominatim geocoding service');
       } catch (geocodeError) {
         console.error('Geocoding failed:', geocodeError.message);
         coordinates = [0, 0];
         formattedAddress = fullAddress;
         geocodingStatus = 'failed';
-        console.warn(`Geocoding failed for address: ${fullAddress}. Saving with default coordinates [0, 0].`);
       }
     } else {
       geocodingStatus = 'manual';
     }
 
-    if (Math.abs(coordinates[0]) > 180 || Math.abs(coordinates[1]) > 90) {
-      return res.status(400).json({ message: 'Invalid coordinate values provided' });
-    }
-
-    // Separate images and videos from uploaded files
+    // Phân loại ảnh và video
     const images = [];
     const videos = [];
     
     if (req.files && req.files.length > 0) {
       req.files.forEach(file => {
         if (file.mimetype.startsWith('video/')) {
-          videos.push(file.path); // Cloudinary URL
+          videos.push(file.path);
         } else {
-          images.push(file.path); // Cloudinary URL
+          images.push(file.path);
         }
       });
+      console.log(`📸 Uploaded ${images.length} images, 🎥 ${videos.length} videos`);
     }
 
+    // ✅ Tạo rental với payment info
     const rental = new Rental({
       title: req.body.title,
       price: req.body.price,
@@ -960,22 +1029,54 @@ router.post('/rentals', authMiddleware, upload.array('media'), async (req, res) 
       videos: videos,
       status: req.body.status || 'available',
       geocodingStatus: geocodingStatus,
+
+      // ✅ PAYMENT INFO
+      paymentInfo: {
+        transactionCode: req.paymentTransactionCode,
+        paymentId: req.payment._id,
+        amount: req.payment.amount,
+        status: 'completed',
+        paidAt: req.payment.completedAt,
+      },
+      publishedAt: new Date(),
     });
 
     const newRental = await rental.save();
+    
+    // ✅ Cập nhật payment với rentalId
+    await Payment.updateOne(
+      { _id: req.payment._id },
+      { rentalId: newRental._id }
+    );
+    
+    console.log(`✅ Rental created successfully: ${newRental._id}`);
+    console.log(`✅ Title: ${newRental.title}`);
+    console.log(`✅ Payment linked: ${req.paymentTransactionCode}`);
+    console.log(`✅ Published at: ${newRental.publishedAt}`);
+    
     await syncRentalToElasticsearch(newRental);
+    
     res.status(201).json({
-      message: coordinates[0] === 0 && coordinates[1] === 0 
-        ? 'Rental created successfully, but geocoding failed. Coordinates set to [0, 0]. Please update coordinates using /rentals/fix-coordinates/:id.'
-        : 'Rental created successfully',
+      success: true,
+      message: 'Bài đăng tạo thành công',
       rental: newRental,
+      paymentInfo: {
+        transactionCode: req.paymentTransactionCode,
+        amount: req.payment.amount,
+        status: 'completed',
+        paidAt: req.payment.completedAt,
+      },
     });
   } catch (err) {
-    console.error('Error creating rental:', err);
+    console.error('❌ Error creating rental:', err);
     if (err instanceof multer.MulterError) {
       return res.status(400).json({ message: `File upload error: ${err.message}` });
     }
-    res.status(400).json({ message: 'Failed to create rental', error: err.message });
+    res.status(400).json({ 
+      success: false,
+      message: 'Failed to create rental', 
+      error: err.message 
+    });
   }
 });
 
@@ -989,6 +1090,23 @@ router.patch('/rentals/:id', authMiddleware, upload.array('media'), async (req, 
     if (!rental) {
       return res.status(404).json({ message: 'Rental not found' });
     }
+
+    if (rental.userId !== req.userId) {
+      return res.status(403).json({ 
+        success: false,
+        message: 'Unauthorized: You do not own this rental' 
+      });
+    }
+    
+    // ✨ THÊM: Không cho edit nếu chưa thanh toán
+    if (rental.paymentInfo?.status !== 'completed') {
+      return res.status(402).json({
+        success: false,
+        message: 'Bài đăng chưa được xuất bản (chưa thanh toán)',
+        paymentStatus: rental.paymentInfo?.status || 'pending',
+      });
+    }
+
     if (rental.userId !== req.userId) {
       return res.status(403).json({ message: 'Unauthorized: You do not own this rental' });
     }
@@ -1164,6 +1282,51 @@ router.patch('/rentals/:id', authMiddleware, upload.array('media'), async (req, 
     res.status(500).json({ message: 'Failed to update rental', error: err.message });
   }
 });
+
+
+router.get('/rentals/:id/payment-status', authMiddleware, async (req, res) => {
+  try {
+    const rental = await Rental.findById(req.params.id);
+    
+    if (!rental) {
+      return res.status(404).json({
+        success: false,
+        message: 'Bài đăng không tìm thấy',
+      });
+    }
+
+    if (rental.userId !== req.userId) {
+      return res.status(403).json({
+        success: false,
+        message: 'Bạn không có quyền xem thông tin này',
+      });
+    }
+
+    const payment = rental.paymentInfo?.paymentId 
+      ? await Payment.findById(rental.paymentInfo.paymentId)
+      : null;
+
+    res.json({
+      success: true,
+      rental: {
+        id: rental._id,
+        title: rental.title,
+        paymentStatus: rental.getPaymentStatus(),
+        publishedAt: rental.publishedAt,
+      },
+      payment: payment ? payment.getStatusInfo() : null,
+    });
+  } catch (err) {
+    console.error('Error checking payment status:', err);
+    res.status(500).json({
+      success: false,
+      message: 'Lỗi kiểm tra trạng thái thanh toán',
+      error: err.message,
+    });
+  }
+});
+
+
 router.delete('/rentals/:id', authMiddleware, async (req, res) => {
   try {
     if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
@@ -1174,6 +1337,13 @@ router.delete('/rentals/:id', authMiddleware, async (req, res) => {
     if (!rental) {
       return res.status(404).json({ message: 'Rental not found' });
     }
+
+    // ===
+    if (rental.paymentInfo?.paymentId) {
+      await Payment.findByIdAndDelete(rental.paymentInfo.paymentId);
+      console.log(`✅ Deleted payment record for rental ${req.params.id}`);
+    }
+
     if (rental.userId !== req.userId) {
       return res.status(403).json({ message: 'Unauthorized: You do not own this rental' });
     }

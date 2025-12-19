@@ -1,13 +1,53 @@
-
-
 import 'package:flutter_dotenv/flutter_dotenv.dart';
-class ApiRoutes {
 
+class ApiRoutes {
   static const String rootUrl =
-      'http://192.168.1.88:3000'; // 192.168.43.168 - mạng dữ liệu
+      'https://965ec7eb87bd.ngrok-free.app'; // 192.168.43.168 - mạng dữ liệu
   static const String baseUrl = '$rootUrl/api';
   static const String serverBaseUrl = rootUrl;
   static const String socketUrl = serverBaseUrl;
+
+  // ==================== VNPAY PAYMENT ====================
+  /// POST /api/vnpay/create-payment
+  static const String vnpayCreatePayment = '$baseUrl/vnpay/create-payment';
+
+  /// GET /api/vnpay/check-payment/:transactionCode
+  static String vnpayCheckPayment(String transactionCode) {
+    return '$baseUrl/vnpay/check-payment/$transactionCode';
+  }
+
+  /// GET /api/vnpay/payment-history?page=1&limit=10&status=completed
+  static String vnpayPaymentHistory({
+    int page = 1,
+    int limit = 10,
+    String? status,
+  }) {
+    final params = <String, String>{
+      'page': page.toString(),
+      'limit': limit.toString(),
+    };
+    if (status != null && status.isNotEmpty) {
+      params['status'] = status;
+    }
+    final uri = Uri.parse('$baseUrl/vnpay/payment-history')
+        .replace(queryParameters: params);
+    return uri.toString();
+  }
+
+  /// POST /api/vnpay/verify-and-publish
+  static const String vnpayVerifyAndPublish =
+      '$baseUrl/vnpay/verify-and-publish';
+
+  /// GET /api/rentals/:id/payment-status
+  static String rentalPaymentStatus(String rentalId) {
+    return '$rentals/$rentalId/payment-status';
+  }
+
+  /// GET /api/vnpay/return (VNPay callback URL)
+  static const String vnpayReturn = '$baseUrl/vnpay/return';
+
+  /// POST /api/vnpay/ipn (VNPay IPN URL)
+  static const String vnpayIPN = '$baseUrl/vnpay/ipn';
 
   // ================== ABOUT US  ==================
   static const String aboutUs = '$baseUrl/aboutus';
@@ -33,20 +73,24 @@ class ApiRoutes {
   static const String deletedFeedbackList = '$feedback/deleted/list';
 
   /// POST /api/feedback/{id}/restore - Hoàn tác feedback đã xóa
-  static String restoreFeedback(String feedbackId) => '$feedback/$feedbackId/restore';
+  static String restoreFeedback(String feedbackId) =>
+      '$feedback/$feedbackId/restore';
 
   /// DELETE /api/feedback/{id}/permanent - Xóa vĩnh viễn feedback
-  static String permanentDeleteFeedback(String feedbackId) => '$feedback/$feedbackId/permanent';
+  static String permanentDeleteFeedback(String feedbackId) =>
+      '$feedback/$feedbackId/permanent';
 
   // ================== FEEDBACK - ADMIN UNDO (NEW) ==================
   /// GET /api/admin/feedback/deleted/list - Admin lấy danh sách feedback đã xóa
   static const String adminDeletedFeedbackList = '$adminFeedback/deleted/list';
 
   /// POST /api/admin/feedback/{id}/restore - Admin hoàn tác feedback
-  static String adminRestoreFeedback(String feedbackId) => '$adminFeedback/$feedbackId/restore';
+  static String adminRestoreFeedback(String feedbackId) =>
+      '$adminFeedback/$feedbackId/restore';
 
   /// DELETE /api/admin/feedback/{id}/permanent - Admin xóa vĩnh viễn
-  static String adminPermanentDeleteFeedback(String feedbackId) => '$adminFeedback/$feedbackId/permanent';
+  static String adminPermanentDeleteFeedback(String feedbackId) =>
+      '$adminFeedback/$feedbackId/permanent';
   static String adminFeedbackFiltered({
     String? status,
     String? feedbackType,
@@ -62,6 +106,7 @@ class ApiRoutes {
     final uri = Uri.parse(adminFeedback).replace(queryParameters: params);
     return uri.toString();
   }
+
   // ================== NOTIFICATIONS  ==================
   static const String notifications = '$baseUrl/notifications';
 
@@ -75,19 +120,16 @@ class ApiRoutes {
   static String markNotificationAsRead(String notificationId) =>
       '$notifications/$notificationId/read';
 
-  static const String markAllNotificationsAsRead =
-      '$notifications/read-all';
+  static const String markAllNotificationsAsRead = '$notifications/read-all';
 
   static String deleteNotification(String notificationId) =>
       '$notifications/$notificationId';
 
   static const String deleteAllNotifications = notifications;
 
-  static const String unreadNotificationCount =
-      '$notifications/unread/count';
+  static const String unreadNotificationCount = '$notifications/unread/count';
 
-  static const String notificationStats =
-      '$notifications/stats/overview';
+  static const String notificationStats = '$notifications/stats/overview';
 
   // Lấy danh sách thông báo đã xóa (Thùng rác)
   static const String deletedNotificationsList = '$notifications/deleted/list';
@@ -102,7 +144,6 @@ class ApiRoutes {
   //  Xóa vĩnh viễn thông báo khỏi undo stack
   static String permanentDeleteNotification(String notificationId) =>
       '$notifications/$notificationId/permanent';
-
 
 // ================ ADMIN - QUẢN LÝ BÀI VIẾT =============
   static const String adminUsersWithPosts = '$baseUrl/admin/users-with-posts';
@@ -236,7 +277,6 @@ class ApiRoutes {
   static const String myPosts = '$baseUrl/profile/my-posts';
   static const String recentComments = '$baseUrl/profile/recent-comments';
 
-
   // Gọi các API địa chỉ --------------------
   static const String baseUrlAddress = 'https://provinces.open-api.vn/api';
   static Uri get provinces => Uri.parse('$baseUrlAddress/p/');
@@ -270,22 +310,24 @@ class ApiRoutes {
     if (maxPrice != null) params['maxPrice'] = maxPrice.toString();
     if (propertyType != null) params['propertyType'] = propertyType;
 
-    final uri = Uri.parse('$rentals/ai-suggest').replace(queryParameters: params);
+    final uri =
+        Uri.parse('$rentals/ai-suggest').replace(queryParameters: params);
     return uri.toString();
   }
 
   /// GET /api/rentals/ai-suggest/advanced?q=query
   static String aiSuggestAdvanced({required String query}) {
     final params = <String, String>{'q': query};
-    final uri = Uri.parse('$rentals/ai-suggest/advanced').replace(queryParameters: params);
+    final uri = Uri.parse('$rentals/ai-suggest/advanced')
+        .replace(queryParameters: params);
     return uri.toString();
   }
 
   /// GET /api/rentals/ai-suggest/trending?limit=5
   static String aiSuggestTrending({int limit = 5}) {
     final params = <String, String>{'limit': limit.toString()};
-    final uri = Uri.parse('$rentals/ai-suggest/trending').replace(queryParameters: params);
+    final uri = Uri.parse('$rentals/ai-suggest/trending')
+        .replace(queryParameters: params);
     return uri.toString();
   }
-
 }

@@ -59,14 +59,17 @@ class FormStateManager {
     _isInitialized = true;
   }
 
+  // ========== BUILD RENTAL OBJECT ==========
+
   Rental buildRental({
     required List<String> images,
-    List<String>? videos, // ✅ Videos parameter
+    List<String>? videos,
     required String propertyType,
     required String status,
     required String userId,
     double? latitude,
     double? longitude,
+    String? paymentTransactionCode, // 🔥 THÊM PARAMETER NÀY
   }) {
     final rawPrice = priceController!.text.replaceAll(RegExp(r'[^\d]'), '');
     final rawDeposit =
@@ -123,10 +126,13 @@ class FormStateManager {
       },
       userId: userId,
       images: images,
-      videos: videos ?? [], // ✅ Include videos
+      videos: videos ?? [],
       status: status,
       createdAt: DateTime.now(),
       landlord: userId,
+
+      // 🔥 THÊM PAYMENT TRANSACTION CODE
+      paymentTransactionCode: paymentTransactionCode,
     );
   }
 

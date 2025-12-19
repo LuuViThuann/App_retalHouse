@@ -16,6 +16,7 @@ const favoriteRoutes = require('./routes/favorite');
 const commentRoutes = require('./routes/comment');
 const profileRoutes = require('./routes/profile');
 const bookingRoutes = require('./routes/booking');
+const vnpayRoutes = require('./routes/vnpayRoutes');
 
 const bannerRoutes = require('./routes/banner');
 const newsRoutes = require('./routes/news');
@@ -26,6 +27,7 @@ require('./models/conversation');
 require('./models/message');
 require('./models/news');
 require('./models/savedArticle');
+require('./models/Payment');
 
 // Initialize Firebase Admin SDK
 if (!admin.apps.length) {
@@ -63,8 +65,9 @@ redisClient.connect().catch((err) => {
 });
 
 // ==================== MIDDLEWARE ====================
-app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
+app.use(express.json({ limit: '50mb' }));
+
 
 app.use(cors({
   origin: ['http://localhost:3000', 'http://localhost:8081'],
@@ -72,7 +75,7 @@ app.use(cors({
   credentials: true,
 }));
 
-app.use(express.json());
+//app.use(express.json());
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 app.use('/Uploads', express.static(path.join(__dirname, 'Uploads')));
 
@@ -127,6 +130,8 @@ waitForRedis.then(() => {
 
 app.use('/api/auth', authRoutes);
 app.use('/api', rentalRoutes);
+app.use('/api/vnpay', vnpayRoutes);
+
 app.use('/api', chatRoutes(io));
 app.use('/api', favoriteRoutes);
 app.use('/api', commentRoutes(io));
@@ -153,7 +158,7 @@ io.use(async (socket, next) => {
     socket.userId = decodedToken.uid;
     console.log(`✅ Socket authenticated: User ${socket.userId}, Socket ${socket.id}`);
     next();
-  } catch (err) {
+  } catch (err) { 
     console.error('❌ Socket authentication error:', err.message);
     next(new Error('Authentication error: Invalid token'));
   }

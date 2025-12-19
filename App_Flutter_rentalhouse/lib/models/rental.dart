@@ -14,10 +14,15 @@ class Rental {
   final Map<String, dynamic> contactInfo;
   final String userId;
   final List<String> images;
-  final List<String> videos; // ✅ Videos field
+  final List<String> videos;
   final String status;
   final DateTime createdAt;
   final String landlord;
+
+  // 🔥 PAYMENT FIELDS
+  final String? paymentTransactionCode;
+  final Map<String, dynamic>? paymentInfo;
+  final DateTime? publishedAt;
 
   Rental({
     required this.id,
@@ -37,7 +42,28 @@ class Rental {
     required this.status,
     required this.createdAt,
     required this.landlord,
+    // 🔥 PAYMENT PARAMETERS
+    this.paymentTransactionCode,
+    this.paymentInfo,
+    this.publishedAt,
   });
+
+  // 🔥 PAYMENT HELPER GETTERS
+  bool get isPaid => paymentInfo?['status'] == 'completed';
+  bool get isPublished => publishedAt != null;
+  bool get requiresPayment => !isPaid;
+
+  // 🔥 Get payment status info
+  String get paymentStatus => paymentInfo?['status'] ?? 'pending';
+
+  // 🔥 Get formatted payment amount
+  String get formattedPaymentAmount {
+    final amount = paymentInfo?['amount'] ?? 10000;
+    return '${amount.toString().replaceAllMapped(
+      RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+          (Match m) => '${m[1]},',
+    )} đ';
+  }
 
   Rental copyWith({
     String? id,
@@ -57,6 +83,10 @@ class Rental {
     String? status,
     DateTime? createdAt,
     String? landlord,
+    // 🔥 PAYMENT PARAMETERS
+    String? paymentTransactionCode,
+    Map<String, dynamic>? paymentInfo,
+    DateTime? publishedAt,
   }) {
     return Rental(
       id: id ?? this.id,
@@ -76,6 +106,10 @@ class Rental {
       status: status ?? this.status,
       createdAt: createdAt ?? this.createdAt,
       landlord: landlord ?? this.landlord,
+      // 🔥 PAYMENT FIELDS
+      paymentTransactionCode: paymentTransactionCode ?? this.paymentTransactionCode,
+      paymentInfo: paymentInfo ?? this.paymentInfo,
+      publishedAt: publishedAt ?? this.publishedAt,
     );
   }
 
@@ -99,23 +133,18 @@ class Rental {
     'furniture': furniture,
     'amenities': amenities,
     'surroundings': surroundings,
-    'rentalTerms': {
-      'minimumLease': rentalTerms['minimumLease'],
-      'deposit': rentalTerms['deposit'],
-      'paymentMethod': rentalTerms['paymentMethod'],
-      'renewalTerms': rentalTerms['renewalTerms'],
-    },
-    'contactInfo': {
-      'name': contactInfo['name'],
-      'phone': contactInfo['phone'],
-      'availableHours': contactInfo['availableHours'],
-    },
+    'rentalTerms': rentalTerms,
+    'contactInfo': contactInfo,
     'userId': userId,
     'images': images,
-    'videos': videos, // ✅ Include videos
+    'videos': videos,
     'status': status,
     'createdAt': createdAt.toIso8601String(),
     'landlord': landlord,
+
+    // 🔥 THÊM PAYMENT TRANSACTION CODE KHI TẠO MỚI
+    if (paymentTransactionCode != null && paymentTransactionCode!.isNotEmpty)
+      'paymentTransactionCode': paymentTransactionCode,
   };
 
   factory Rental.fromJson(Map<String, dynamic> json) {
@@ -240,14 +269,23 @@ class Rental {
         contactInfo: contactInfoData,
         userId: json['userId'] as String? ?? '',
         images: List<String>.from(json['images'] as List? ?? []),
-        videos: List<String>.from(json['videos'] as List? ?? []), // ✅ Parse videos
+        videos: List<String>.from(json['videos'] as List? ?? []),
         status: json['status'] as String? ?? 'available',
         createdAt: DateTime.parse(
             json['createdAt'] as String? ?? DateTime.now().toIso8601String()),
         landlord: json['userId'] as String? ?? '',
+
+        // 🔥 PARSE PAYMENT INFO
+        paymentTransactionCode: json['paymentInfo']?['transactionCode'] as String?,
+        paymentInfo: json['paymentInfo'] != null
+            ? Map<String, dynamic>.from(json['paymentInfo'] as Map)
+            : null,
+        publishedAt: json['publishedAt'] != null
+            ? DateTime.parse(json['publishedAt'] as String)
+            : null,
       );
     } catch (e, stackTrace) {
-      debugPrint('Error parsing Rental from JSON: $e');
+      debugPrint('❌ Error parsing Rental from JSON: $e');
       debugPrint('Stack trace: $stackTrace');
       debugPrint('JSON data: $json');
       rethrow;
@@ -264,4 +302,75 @@ class Rental {
     }
     return null;
   }
+
+  // 🔥 ADDITIONAL HELPER METHODS
+
+  /// Check if rental requires payment before publishing
+  bool needsPayment() {
+    return paymentInfo == null || paymentInfo!['status'] != 'completed';
+  }
+
+  /// Get payment info display string
+  String getPaymentInfoDisplay() {
+    if (paymentInfo == null) {
+      return 'Chưa thanh toán';
+    }
+
+    final status = paymentInfo!['status'] as String?;
+    switch (status) {
+      case 'completed':
+        return '✅ Đã thanh toán';
+      case 'pending':
+        return '⏳ Đang chờ thanh toán';
+      case 'processing':
+        return '🔄 Đang xử lý';
+      case 'failed':
+        return '❌ Thanh toán thất bại';
+      case 'cancelled':
+        return '🚫 Đã hủy';
+      default:
+        return 'Không xác định';
+    }
+  }
+
+  /// Get published date formatted
+  String getPublishedDateFormatted() {
+    if (publishedAt == null) return 'Chưa xuất bản';
+
+    final now = DateTime.now();
+    final difference = now.difference(publishedAt!);
+
+    if (difference.inMinutes < 60) {
+      return '${difference.inMinutes} phút trước';
+    } else if (difference.inHours < 24) {
+      return '${difference.inHours} giờ trước';
+    } else if (difference.inDays < 7) {
+      return '${difference.inDays} ngày trước';
+    } else {
+      return '${publishedAt!.day}/${publishedAt!.month}/${publishedAt!.year}';
+    }
+  }
+
+  /// Check if rental is new (published within last 30 minutes)
+  bool isNew() {
+    if (publishedAt == null) return false;
+    final now = DateTime.now();
+    final difference = now.difference(publishedAt!);
+    return difference.inMinutes < 30;
+  }
+
+  @override
+  String toString() {
+    return 'Rental(id: $id, title: $title, price: $price, status: $status, '
+        'paymentStatus: $paymentStatus, isPublished: $isPublished)';
+  }
+
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) return true;
+    return other is Rental && other.id == id;
+  }
+
+  @override
+  int get hashCode => id.hashCode;
 }

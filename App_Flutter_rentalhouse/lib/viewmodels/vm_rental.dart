@@ -109,6 +109,9 @@ class RentalViewModel extends ChangeNotifier {
     }
   }
 
+  // ============================================
+  // 🔥 CREATE RENTAL WITH PAYMENT INTEGRATION
+  // ============================================
   Future<void> createRental(
       Rental rental,
       List<String> imagePaths, {
@@ -119,10 +122,67 @@ class RentalViewModel extends ChangeNotifier {
     notifyListeners();
 
     try {
-      await _apiService.createRental(rental, imagePaths , videoPaths: videoPaths);
+      debugPrint('🚀 RentalViewModel: Creating rental...');
+
+      // 🔥 Kiểm tra payment transaction code
+      if (rental.paymentTransactionCode == null ||
+          rental.paymentTransactionCode!.isEmpty) {
+        throw Exception('Thiếu mã thanh toán. Vui lòng thanh toán trước khi đăng bài.');
+      }
+
+      debugPrint('💳 Payment transaction code: ${rental.paymentTransactionCode}');
+      debugPrint('📤 Uploading ${imagePaths.length} images and ${videoPaths.length} videos');
+
+      // Call API service - giờ trả về Rental object
+      final createdRental = await _apiService.createRental(
+        rental,
+        imagePaths,
+        videoPaths: videoPaths,
+      );
+
+      debugPrint('✅ Rental created successfully');
+      debugPrint('✅ Rental ID: ${createdRental.id}');
+      debugPrint('✅ Title: ${createdRental.title}');
+      debugPrint('✅ Published at: ${createdRental.publishedAt}');
+      debugPrint('✅ Payment status: ${createdRental.paymentStatus}');
+      debugPrint('✅ Is paid: ${createdRental.isPaid}');
+      debugPrint('✅ Is published: ${createdRental.isPublished}');
+
+      // Refresh all rentals để cập nhật danh sách
       await fetchAllRentals();
+
+      _errorMessage = null;
+
+      debugPrint('✅ RentalViewModel: Create rental completed successfully');
+    } on PaymentRequiredException catch (e) {
+      // 🔥 Xử lý trường hợp chưa thanh toán
+      debugPrint('⚠️ Payment required: ${e.message}');
+      _errorMessage = e.message;
+
+      // Log payment info nếu có
+      if (e.paymentInfo != null) {
+        debugPrint('📋 Payment info: ${e.paymentInfo}');
+      }
     } catch (e) {
-      _errorMessage = e.toString();
+      debugPrint('❌ Error creating rental: $e');
+
+      // Parse error message để hiển thị user-friendly
+      String errorMsg = e.toString();
+
+      // Xử lý các loại lỗi cụ thể
+      if (errorMsg.contains('Failed to geocode address')) {
+        _errorMessage = 'Địa chỉ không hợp lệ. Vui lòng kiểm tra lại hoặc chọn từ bản đồ.';
+      } else if (errorMsg.contains('thanh toán') || errorMsg.contains('payment')) {
+        _errorMessage = errorMsg.replaceAll('Exception: ', '');
+      } else if (errorMsg.contains('token')) {
+        _errorMessage = 'Phiên đăng nhập hết hạn. Vui lòng đăng nhập lại.';
+      } else if (errorMsg.contains('network') || errorMsg.contains('connection')) {
+        _errorMessage = 'Lỗi kết nối mạng. Vui lòng kiểm tra kết nối internet.';
+      } else {
+        _errorMessage = errorMsg.replaceAll('Exception: ', '');
+      }
+
+      debugPrint('📝 User-friendly error message: $_errorMessage');
     } finally {
       _isLoading = false;
       notifyListeners();
@@ -182,21 +242,21 @@ class RentalViewModel extends ChangeNotifier {
       _nearbyRentals = result['rentals'] ?? [];
       _warningMessage = result['warning'];
 
-      debugPrint('Fetched ${_nearbyRentals.length} nearby rentals');
-      debugPrint('Search method: ${result['searchMethod']}');
+      debugPrint('✅ Fetched ${_nearbyRentals.length} nearby rentals');
+      debugPrint('📍 Search method: ${result['searchMethod']}');
       if (_warningMessage != null) {
-        debugPrint('Warning: $_warningMessage');
+        debugPrint('⚠️ Warning: $_warningMessage');
       }
     } catch (e) {
       _errorMessage = e.toString();
-      debugPrint('Error in fetchNearbyRentals: $e');
+      debugPrint('❌ Error in fetchNearbyRentals: $e');
     } finally {
       _isLoading = false;
       notifyListeners();
     }
   }
 
-  ///  Refresh tất cả dữ liệu rental (gọi khi có cập nhật từ MyPostsView/EditRentalScreen)
+  /// 🔥 Refresh tất cả dữ liệu rental (gọi khi có cập nhật từ MyPostsView/EditRentalScreen)
   Future<void> refreshAllRentals() async {
     try {
       debugPrint('🔄 RentalViewModel: Refreshing all rentals...');
@@ -219,7 +279,7 @@ class RentalViewModel extends ChangeNotifier {
     }
   }
 
-  ///  Xóa bài đăng khỏi danh sách cục bộ (cập nhật UI ngay lập tức)
+  /// 🔥 Xóa bài đăng khỏi danh sách cục bộ (cập nhật UI ngay lập tức)
   void removeRentalLocally(String rentalId) {
     try {
       _rentals.removeWhere((rental) => rental.id == rentalId);
@@ -230,7 +290,7 @@ class RentalViewModel extends ChangeNotifier {
     }
   }
 
-  ///  Cập nhật bài đăng trong danh sách cục bộ
+  /// 🔥 Cập nhật bài đăng trong danh sách cục bộ
   void updateRentalLocally(String rentalId, Rental updatedRental) {
     try {
       final index = _rentals.indexWhere((rental) => rental.id == rentalId);
@@ -244,7 +304,7 @@ class RentalViewModel extends ChangeNotifier {
     }
   }
 
-  ///  Xóa bài đăng khỏi danh sách nearby rentals
+  /// 🔥 Xóa bài đăng khỏi danh sách nearby rentals
   void removeNearbyRentalLocally(String rentalId) {
     try {
       _nearbyRentals.removeWhere((rental) => rental.id == rentalId);
@@ -255,7 +315,7 @@ class RentalViewModel extends ChangeNotifier {
     }
   }
 
-  ///  Cập nhật bài đăng trong danh sách nearby rentals
+  /// 🔥 Cập nhật bài đăng trong danh sách nearby rentals
   void updateNearbyRentalLocally(String rentalId, Rental updatedRental) {
     try {
       final index = _nearbyRentals.indexWhere((rental) => rental.id == rentalId);
@@ -269,7 +329,7 @@ class RentalViewModel extends ChangeNotifier {
     }
   }
 
-  ///  Cập nhật search results (sau khi edit/delete)
+  /// 🔥 Cập nhật search results (sau khi edit/delete)
   void removeFromSearchResults(String rentalId) {
     try {
       _searchResults.removeWhere((rental) => rental.id == rentalId);
@@ -307,5 +367,55 @@ class RentalViewModel extends ChangeNotifier {
     _errorMessage = null;
     _warningMessage = null;
     notifyListeners();
+  }
+
+  // ============================================
+  // 🔥 PAYMENT HELPER METHODS
+  // ============================================
+
+  /// Check if a rental requires payment
+  bool rentalRequiresPayment(Rental rental) {
+    return rental.requiresPayment;
+  }
+
+  /// Get payment display info for a rental
+  String getRentalPaymentDisplay(Rental rental) {
+    return rental.getPaymentInfoDisplay();
+  }
+
+  /// Check if rental is newly published
+  bool isRentalNew(Rental rental) {
+    return rental.isNew();
+  }
+
+  /// Get formatted published date
+  String getRentalPublishedDate(Rental rental) {
+    return rental.getPublishedDateFormatted();
+  }
+
+  /// Get all unpaid rentals
+  List<Rental> getUnpaidRentals() {
+    return _rentals.where((rental) => rental.requiresPayment).toList();
+  }
+
+  /// Get all published rentals
+  List<Rental> getPublishedRentals() {
+    return _rentals.where((rental) => rental.isPublished).toList();
+  }
+
+  /// Get rental statistics
+  Map<String, dynamic> getRentalStats() {
+    final total = _rentals.length;
+    final published = _rentals.where((r) => r.isPublished).length;
+    final unpaid = _rentals.where((r) => r.requiresPayment).length;
+    final newRentals = _rentals.where((r) => r.isNew()).length;
+
+    return {
+      'total': total,
+      'published': published,
+      'unpaid': unpaid,
+      'new': newRentals,
+      'publishedRate': total > 0 ? (published / total * 100).toStringAsFixed(1) : '0.0',
+    };
   }
 }
