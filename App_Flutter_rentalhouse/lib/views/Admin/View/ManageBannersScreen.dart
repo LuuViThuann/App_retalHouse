@@ -138,7 +138,7 @@ class _ManageBannersScreenState extends State<ManageBannersScreen> {
           );
         },
         backgroundColor: Colors.blue[700],
-        child: const Icon(Icons.add),
+        child: const Icon(Icons.add , color: Colors.white,),
       ),
     );
   }

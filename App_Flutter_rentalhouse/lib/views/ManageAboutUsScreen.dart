@@ -1,5 +1,4 @@
 import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_rentalhouse/services/auth_service.dart';
 import 'package:flutter_rentalhouse/utils/Snackbar_process.dart';
@@ -58,25 +57,21 @@ class _ManageAboutUsScreenState extends State<ManageAboutUsScreen> {
             _descriptionController.text = aboutUs['description'] ?? '';
             _existingImages.clear();
 
-
             if (aboutUs['images'] != null) {
               try {
                 final rawImages = aboutUs['images'];
-
 
                 if (rawImages is List) {
                   for (int i = 0; i < rawImages.length; i++) {
                     final img = rawImages[i];
 
                     if (img is Map<String, dynamic>) {
-                      // Format mới: {url, cloudinaryId, order}
                       _existingImages.add({
                         'url': img['url'] as String,
                         'cloudinaryId': img['cloudinaryId'] as String?,
                         'order': img['order'] as int? ?? i,
                       });
                     } else if (img is String) {
-                      // Format cũ: chỉ URL string
                       _existingImages.add({
                         'url': img,
                         'cloudinaryId': null,
@@ -157,7 +152,6 @@ class _ManageAboutUsScreenState extends State<ManageAboutUsScreen> {
         request.fields['id'] = _aboutUsId!;
       }
 
-      // Thêm ảnh mới với MIME type cụ thể
       for (var image in _selectedImages) {
         String mimeType;
         final ext = image.path.split('.').last.toLowerCase();
@@ -307,11 +301,8 @@ class _ManageAboutUsScreenState extends State<ManageAboutUsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Viết nội dung giới thiệu'),
-        backgroundColor: Colors.redAccent,
-        foregroundColor: Colors.white,
-      ),
+      backgroundColor: const Color(0xFFF5F7FA),
+      appBar: _buildAppBar(),
       body: _isLoading && _existingImages.isEmpty
           ? const Center(child: CircularProgressIndicator())
           : SingleChildScrollView(
@@ -319,209 +310,365 @@ class _ManageAboutUsScreenState extends State<ManageAboutUsScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            TextField(
-              controller: _titleController,
-              decoration: InputDecoration(
-                labelText: 'Tiêu đề',
-                hintText: 'Nhập tiêu đề về công ty...',
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                prefixIcon: const Icon(Icons.title, color: Colors.redAccent),
-              ),
-              maxLines: 1,
-            ),
+            _buildSectionHeader('Thông tin cơ bản'),
             const SizedBox(height: 16),
-
-            TextField(
-              controller: _descriptionController,
-              decoration: InputDecoration(
-                labelText: 'Nội dung giới thiệu',
-                hintText: 'Viết nội dung chi tiết về công ty, sứ mệnh, tầm nhìn...',
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                prefixIcon: const Icon(Icons.description, color: Colors.redAccent),
-              ),
-              maxLines: 8,
-            ),
+            _buildTitleField(),
+            const SizedBox(height: 16),
+            _buildDescriptionField(),
+            const SizedBox(height: 28),
+            _buildSectionHeader('Hình ảnh giới thiệu'),
+            const SizedBox(height: 12),
+            _buildPickImageButton(),
             const SizedBox(height: 20),
-
-            ElevatedButton.icon(
-              onPressed: _pickImages,
-              icon: const Icon(Icons.image_search),
-              label: const Text('Chọn ảnh từ thiết bị'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.blue,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 12),
-                minimumSize: const Size(double.infinity, 50),
-              ),
-            ),
-            const SizedBox(height: 16),
-
             if (_selectedImages.isNotEmpty) ...[
-              Text(
-                'Ảnh mới (${_selectedImages.length})',
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 12),
-              GridView.builder(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 3,
-                  crossAxisSpacing: 8,
-                  mainAxisSpacing: 8,
-                ),
-                itemCount: _selectedImages.length,
-                itemBuilder: (context, index) {
-                  return Stack(
-                    children: [
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(8),
-                        child: Image.file(
-                          _selectedImages[index],
-                          fit: BoxFit.cover,
-                          width: double.infinity,
-                          height: double.infinity,
-                        ),
-                      ),
-                      Positioned(
-                        top: 4,
-                        right: 4,
-                        child: GestureDetector(
-                          onTap: () {
-                            setState(() => _selectedImages.removeAt(index));
-                            AppSnackBar.show(
-                              context,
-                              AppSnackBar.info(message: 'Đã xóa ảnh mới'),
-                            );
-                          },
-                          child: Container(
-                            decoration: const BoxDecoration(
-                              color: Colors.red,
-                              shape: BoxShape.circle,
-                            ),
-                            padding: const EdgeInsets.all(4),
-                            child: const Icon(
-                              Icons.close,
-                              color: Colors.white,
-                              size: 16,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  );
-                },
+              _buildImageSection(
+                'Ảnh mới',
+                _selectedImages.length,
+                _selectedImages,
+                isNew: true,
               ),
               const SizedBox(height: 20),
             ],
-
             if (_existingImages.isNotEmpty) ...[
-              Text(
-                'Ảnh hiện có (${_existingImages.length})',
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 12),
-              GridView.builder(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 3,
-                  crossAxisSpacing: 8,
-                  mainAxisSpacing: 8,
-                ),
-                itemCount: _existingImages.length,
-                itemBuilder: (context, index) {
-                  final imageUrl = _existingImages[index]['url'] as String;
-
-                  return Stack(
-                    children: [
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(8),
-                        child: Image.network(
-                          imageUrl, // ✅ FIX: URL đã là full URL từ Cloudinary
-                          fit: BoxFit.cover,
-                          width: double.infinity,
-                          height: double.infinity,
-                          errorBuilder: (_, __, ___) =>
-                          const Icon(Icons.broken_image),
-                        ),
-                      ),
-                      Positioned(
-                        top: 4,
-                        right: 4,
-                        child: GestureDetector(
-                          onTap: () => _deleteImage(imageUrl),
-                          child: Container(
-                            decoration: const BoxDecoration(
-                              color: Colors.red,
-                              shape: BoxShape.circle,
-                            ),
-                            padding: const EdgeInsets.all(4),
-                            child: const Icon(
-                              Icons.close,
-                              color: Colors.white,
-                              size: 16,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  );
-                },
+              _buildImageSection(
+                'Ảnh hiện có',
+                _existingImages.length,
+                _existingImages.map((img) => img['url'] as String).toList(),
+                isNew: false,
               ),
               const SizedBox(height: 20),
             ],
+            _buildActionButtons(),
+            const SizedBox(height: 32),
+          ],
+        ),
+      ),
+    );
+  }
 
-            ElevatedButton(
-              onPressed: _isLoading ? null : _submitAboutUs,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.redAccent,
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                minimumSize: const Size(double.infinity, 50),
-              ),
-              child: _isLoading
-                  ? const SizedBox(
-                height: 20,
-                width: 20,
-                child: CircularProgressIndicator(
-                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                ),
-              )
-                  : const Text(
-                'Lưu nội dung',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
-                ),
-              ),
-            ),
-            const SizedBox(height: 16),
+  AppBar _buildAppBar() {
+    return AppBar(
+      title: const Text(
+        'Viết nội dung giới thiệu',
+        style: TextStyle(
+          fontWeight: FontWeight.w600,
+          fontSize: 18,
+          color: Colors.white,
+        ),
+      ),
+      centerTitle: false,
+      backgroundColor: Colors.blue[700],
+      elevation: 0,
+      iconTheme: const IconThemeData(color: Colors.white),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.only(
+          bottomLeft: Radius.circular(0),
+          bottomRight: Radius.circular(0),
+        ),
+      ),
+    );
+  }
 
-            ElevatedButton.icon(
-              onPressed: _previewAboutUs,
-              icon: const Icon(Icons.visibility),
-              label: const Text('Xem trước trang Giới thiệu'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.green,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                minimumSize: const Size(double.infinity, 50),
-              ),
+  Widget _buildSectionHeader(String title) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title,
+          style: const TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+            color: Colors.black87,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Container(
+          height: 3,
+          width: 40,
+          decoration: BoxDecoration(
+            color: Colors.blue[700],
+            borderRadius: BorderRadius.circular(2),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildTitleField() {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: TextField(
+        controller: _titleController,
+        style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w500),
+        decoration: InputDecoration(
+          labelText: 'Tiêu đề',
+          hintText: 'Nhập tiêu đề về công ty...',
+          labelStyle: TextStyle(color: Colors.blue[700], fontWeight: FontWeight.w500),
+          hintStyle: TextStyle(color: Colors.grey[400], fontSize: 14),
+          border: InputBorder.none,
+          prefixIcon: Icon(Icons.title, color: Colors.blue[700], size: 22),
+          contentPadding: const EdgeInsets.symmetric(vertical: 14),
+          floatingLabelBehavior: FloatingLabelBehavior.auto,
+        ),
+        maxLines: 1,
+      ),
+    );
+  }
+
+  Widget _buildDescriptionField() {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: TextField(
+        controller: _descriptionController,
+        style: const TextStyle(fontSize: 15),
+        decoration: InputDecoration(
+          labelText: 'Nội dung giới thiệu',
+          hintText: 'Viết nội dung chi tiết về công ty, sứ mệnh, tầm nhìn...',
+          labelStyle: TextStyle(color: Colors.blue[700], fontWeight: FontWeight.w500),
+          hintStyle: TextStyle(color: Colors.grey[400], fontSize: 14),
+          border: InputBorder.none,
+          prefixIcon: Padding(
+            padding: const EdgeInsets.only(top: 12),
+            child: Icon(Icons.description, color: Colors.blue[700], size: 22),
+          ),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          floatingLabelBehavior: FloatingLabelBehavior.auto,
+        ),
+        maxLines: 8,
+      ),
+    );
+  }
+
+  Widget _buildPickImageButton() {
+    return GestureDetector(
+      onTap: _pickImages,
+      child: Container(
+        decoration: BoxDecoration(
+          border: Border.all(color: Colors.blue[700]!, width: 2, style: BorderStyle.solid),
+          borderRadius: BorderRadius.circular(12),
+          color: Colors.blue[50],
+        ),
+        padding: const EdgeInsets.symmetric(vertical: 20),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.image_search, color: Colors.blue[700], size: 28),
+            const SizedBox(width: 12),
+            Column(
+              children: [
+                Text(
+                  'Chọn ảnh từ thiết bị',
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.blue[700],
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Hỗ trợ JPG, PNG, GIF, WebP',
+                  style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                ),
+              ],
             ),
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildImageSection(String title, int count, dynamic images, {required bool isNew}) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              '$title ($count)',
+              style: const TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w600,
+                color: Colors.black87,
+              ),
+            ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: isNew ? Colors.blue[100] : Colors.green[100],
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text(
+                isNew ? 'Chưa lưu' : 'Đã lưu',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
+                  color: isNew ? Colors.blue[700] : Colors.green[700],
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        GridView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 3,
+            crossAxisSpacing: 10,
+            mainAxisSpacing: 10,
+          ),
+          itemCount: images.length,
+          itemBuilder: (context, index) {
+            return _buildImageCard(index, images[index], isNew);
+          },
+        ),
+      ],
+    );
+  }
+
+  Widget _buildImageCard(int index, dynamic imageData, bool isNew) {
+    return Stack(
+      children: [
+        Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(12),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.08),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(12),
+            child: isNew
+                ? Image.file(
+              imageData as File,
+              fit: BoxFit.cover,
+              width: double.infinity,
+              height: double.infinity,
+            )
+                : Image.network(
+              imageData as String,
+              fit: BoxFit.cover,
+              width: double.infinity,
+              height: double.infinity,
+              errorBuilder: (_, __, ___) => Container(
+                color: Colors.grey[300],
+                child: const Icon(Icons.broken_image, color: Colors.grey),
+              ),
+            ),
+          ),
+        ),
+        Positioned(
+          top: 6,
+          right: 6,
+          child: GestureDetector(
+            onTap: () {
+              setState(() {
+                if (isNew) {
+                  _selectedImages.removeAt(index);
+                  AppSnackBar.show(
+                    context,
+                    AppSnackBar.info(message: 'Đã xóa ảnh mới'),
+                  );
+                } else {
+                  _deleteImage(imageData as String);
+                }
+              });
+            },
+            child: Container(
+              decoration: BoxDecoration(
+                color: Colors.red,
+                shape: BoxShape.circle,
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.2),
+                    blurRadius: 4,
+                  ),
+                ],
+              ),
+              padding: const EdgeInsets.all(6),
+              child: const Icon(Icons.close, color: Colors.white, size: 16),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildActionButtons() {
+    return Column(
+      children: [
+        ElevatedButton(
+          onPressed: _isLoading ? null : _submitAboutUs,
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.blue[700],
+            disabledBackgroundColor: Colors.grey[300],
+            foregroundColor: Colors.white,
+            padding: const EdgeInsets.symmetric(vertical: 14),
+            minimumSize: const Size(double.infinity, 50),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            elevation: 4,
+          ),
+          child: _isLoading
+              ? SizedBox(
+            height: 20,
+            width: 20,
+            child: CircularProgressIndicator(
+              valueColor: AlwaysStoppedAnimation<Color>(Colors.blue[700]!),
+              strokeWidth: 2.5,
+            ),
+          )
+              : Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.save, size: 20),
+              const SizedBox(width: 8),
+              const Text(
+                'Lưu nội dung',
+                style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 12),
+        ElevatedButton.icon(
+          onPressed: _previewAboutUs,
+          icon: const Icon(Icons.visibility, size: 20),
+          label: const Text('Xem trước trang Giới thiệu'),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.green[600],
+            foregroundColor: Colors.white,
+            padding: const EdgeInsets.symmetric(vertical: 14),
+            minimumSize: const Size(double.infinity, 50),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            elevation: 4,
+          ),
+        ),
+      ],
     );
   }
 

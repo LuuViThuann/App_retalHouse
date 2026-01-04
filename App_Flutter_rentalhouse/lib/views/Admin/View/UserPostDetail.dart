@@ -28,15 +28,12 @@ class UserPostDetailScreen extends StatefulWidget {
 class _UserPostDetailScreenState extends State<UserPostDetailScreen> {
   late PageController _imageController;
   int _currentImageIndex = 0;
-
-  //  STATE: Lưu trữ rental hiện tại (có thể được cập nhật)
   late Rental _currentRental;
 
   @override
   void initState() {
     super.initState();
     _imageController = PageController();
-    //  Khởi tạo _currentRental từ widget.post
     _currentRental = widget.post;
   }
 
@@ -52,36 +49,49 @@ class _UserPostDetailScreenState extends State<UserPostDetailScreen> {
   }
 
   String _formatPrice(double price) {
-    if (price >= 1000000) {
-      return '${(price / 1000000).toStringAsFixed(1)}M đ';
-    } else if (price >= 1000) {
-      return '${(price / 1000).toStringAsFixed(0)}K đ';
-    }
-    return '${price.toStringAsFixed(0)} đ';
+    final formatter = NumberFormat('#,###', 'vi_VN');
+    return '${formatter.format(price)} ₫';
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.grey[50],
+      backgroundColor: const Color(0xFFF8F9FE),
       body: CustomScrollView(
         slivers: [
-          // 🔝 HEADER
+          // 🔝 MODERN HEADER
           SliverAppBar(
             expandedHeight: 0,
             floating: true,
             pinned: true,
             elevation: 0,
             backgroundColor: Colors.white,
-            leading: IconButton(
-              icon: const Icon(Icons.arrow_back, color: Colors.black87),
-              onPressed: () => Navigator.pop(context),
+            leading: Container(
+              margin: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                shape: BoxShape.circle,
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.1),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: IconButton(
+                icon: const Icon(Icons.arrow_back_ios_new,
+                    color: Color(0xFF2D3142), size: 20),
+                onPressed: () => Navigator.pop(context),
+              ),
             ),
             title: const Text(
               'Chi tiết bài đăng',
               style: TextStyle(
-                color: Colors.black87,
-                fontWeight: FontWeight.bold,
+                color: Color(0xFF2D3142),
+                fontWeight: FontWeight.w700,
+                fontSize: 18,
+                letterSpacing: -0.5,
               ),
             ),
             centerTitle: true,
@@ -96,57 +106,43 @@ class _UserPostDetailScreenState extends State<UserPostDetailScreen> {
 
                 // 📄 Post Information
                 Padding(
-                  padding: const EdgeInsets.all(16),
+                  padding: const EdgeInsets.all(20),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Title & Status
                       _buildTitleSection(),
-                      const SizedBox(height: 16),
-
-                      // Price Section
+                      const SizedBox(height: 20),
                       _buildPriceSection(),
-                      const SizedBox(height: 16),
-
-                      // Key Information
+                      const SizedBox(height: 20),
                       _buildKeyInfoSection(),
-                      const SizedBox(height: 16),
-
-                      // Location Section
+                      const SizedBox(height: 20),
                       _buildLocationSection(),
-                      const SizedBox(height: 16),
-
-                      // Posted Date
+                      const SizedBox(height: 20),
                       _buildPostedDateSection(),
-                      const SizedBox(height: 16),
+                      const SizedBox(height: 20),
 
-                      // Property Details
                       if (_currentRental.furniture.isNotEmpty ||
                           _currentRental.amenities.isNotEmpty)
                         _buildPropertyDetailsSection(),
 
                       if (_currentRental.surroundings.isNotEmpty) ...[
-                        const SizedBox(height: 16),
+                        const SizedBox(height: 20),
                         _buildSurroundingsSection(),
                       ],
 
                       if (_currentRental.rentalTerms != null) ...[
-                        const SizedBox(height: 16),
+                        const SizedBox(height: 20),
                         _buildRentalTermsSection(),
                       ],
 
-                      // Contact Info
                       if (_currentRental.contactInfo != null) ...[
-                        const SizedBox(height: 16),
+                        const SizedBox(height: 20),
                         _buildContactInfoSection(),
                       ],
 
-                      const SizedBox(height: 16),
-
-                      // Action Buttons
+                      const SizedBox(height: 24),
                       _buildActionButtons(),
-
-                      const SizedBox(height: 20),
+                      const SizedBox(height: 32),
                     ],
                   ),
                 ),
@@ -162,14 +158,25 @@ class _UserPostDetailScreenState extends State<UserPostDetailScreen> {
   Widget _buildImageGallery() {
     if (_currentRental.images.isEmpty) {
       return Container(
-        height: 250,
+        height: 280,
         width: double.infinity,
-        color: Colors.grey[200],
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [Colors.grey[200]!, Colors.grey[300]!],
+          ),
+        ),
         child: Center(
-          child: Icon(
-            Icons.image_not_supported,
-            size: 64,
-            color: Colors.grey[400],
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.image_not_supported,
+                  size: 64, color: Colors.grey[400]),
+              const SizedBox(height: 12),
+              Text('Không có hình ảnh',
+                  style: TextStyle(color: Colors.grey[600], fontSize: 14)),
+            ],
           ),
         ),
       );
@@ -179,7 +186,7 @@ class _UserPostDetailScreenState extends State<UserPostDetailScreen> {
       children: [
         // Image Carousel
         SizedBox(
-          height: 300,
+          height: 320,
           child: PageView.builder(
             controller: _imageController,
             onPageChanged: (index) {
@@ -196,13 +203,16 @@ class _UserPostDetailScreenState extends State<UserPostDetailScreen> {
                 fit: BoxFit.cover,
                 errorBuilder: (context, error, stackTrace) {
                   return Container(
-                    color: Colors.grey[200],
-                    child: Center(
-                      child: Icon(
-                        Icons.broken_image,
-                        size: 64,
-                        color: Colors.grey[400],
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [Colors.grey[200]!, Colors.grey[300]!],
                       ),
+                    ),
+                    child: Center(
+                      child: Icon(Icons.broken_image,
+                          size: 64, color: Colors.grey[400]),
                     ),
                   );
                 },
@@ -211,71 +221,139 @@ class _UserPostDetailScreenState extends State<UserPostDetailScreen> {
           ),
         ),
 
+        // Gradient Overlay
+        Positioned(
+          top: 0,
+          left: 0,
+          right: 0,
+          height: 100,
+          child: Container(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  Colors.black.withOpacity(0.4),
+                  Colors.transparent,
+                ],
+              ),
+            ),
+          ),
+        ),
+
         // Image Counter
         Positioned(
-          top: 12,
-          right: 12,
+          top: 16,
+          right: 16,
           child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
             decoration: BoxDecoration(
-              color: Colors.black54,
+              color: Colors.black.withOpacity(0.7),
               borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: Colors.white.withOpacity(0.3)),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.2),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ],
             ),
-            child: Text(
-              '${_currentImageIndex + 1}/${_currentRental.images.length}',
-              style: const TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.bold,
-                fontSize: 14,
-              ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.image, color: Colors.white, size: 16),
+                const SizedBox(width: 6),
+                Text(
+                  '${_currentImageIndex + 1}/${_currentRental.images.length}',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 13,
+                    letterSpacing: 0.5,
+                  ),
+                ),
+              ],
             ),
           ),
         ),
 
         // Status Badge
         Positioned(
-          bottom: 12,
-          left: 12,
+          top: 16,
+          left: 16,
           child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
             decoration: BoxDecoration(
-              color: _currentRental.status == 'available'
-                  ? Colors.green
-                  : Colors.grey[700],
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: Text(
-              _currentRental.status == 'available'
-                  ? '✓ Còn trống'
-                  : '✗ Đã thuê',
-              style: const TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.bold,
-                fontSize: 12,
+              gradient: LinearGradient(
+                colors: _currentRental.status == 'available'
+                    ? [const Color(0xFF11998E), const Color(0xFF38EF7D)]
+                    : [Colors.grey[600]!, Colors.grey[800]!],
               ),
+              borderRadius: BorderRadius.circular(20),
+              boxShadow: [
+                BoxShadow(
+                  color: (_currentRental.status == 'available'
+                      ? const Color(0xFF11998E)
+                      : Colors.grey[600]!).withOpacity(0.4),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  _currentRental.status == 'available'
+                      ? Icons.check_circle
+                      : Icons.cancel,
+                  color: Colors.white,
+                  size: 16,
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  _currentRental.status == 'available'
+                      ? 'Còn trống'
+                      : 'Đã thuê',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 13,
+                  ),
+                ),
+              ],
             ),
           ),
         ),
 
         // Image Indicators
         Positioned(
-          bottom: 12,
+          bottom: 20,
           left: 0,
           right: 0,
           child: Center(
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: List.generate(
-                _currentRental.images.length,
-                (index) => Container(
-                  margin: const EdgeInsets.symmetric(horizontal: 4),
-                  width: 8,
-                  height: 8,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: index == _currentImageIndex
-                        ? Colors.white
-                        : Colors.white54,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: Colors.black.withOpacity(0.5),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: List.generate(
+                  _currentRental.images.length,
+                      (index) => Container(
+                    margin: const EdgeInsets.symmetric(horizontal: 4),
+                    width: index == _currentImageIndex ? 24 : 8,
+                    height: 8,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(4),
+                      color: index == _currentImageIndex
+                          ? Colors.white
+                          : Colors.white.withOpacity(0.4),
+                    ),
                   ),
                 ),
               ),
@@ -294,17 +372,35 @@ class _UserPostDetailScreenState extends State<UserPostDetailScreen> {
         Text(
           _currentRental.title,
           style: const TextStyle(
-            fontSize: 22,
-            fontWeight: FontWeight.bold,
-            color: Colors.black87,
+            fontSize: 24,
+            fontWeight: FontWeight.w800,
+            color: Color(0xFF2D3142),
+            height: 1.3,
+            letterSpacing: -0.5,
           ),
         ),
-        const SizedBox(height: 8),
-        Text(
-          'Đăng bởi: ${widget.userName}',
-          style: TextStyle(
-            fontSize: 14,
-            color: Colors.grey[600],
+        const SizedBox(height: 12),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          decoration: BoxDecoration(
+            color: const Color(0xFFEEF2FF),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.person_outline,
+                  size: 16, color: Color(0xFF6366F1)),
+              const SizedBox(width: 6),
+              Text(
+                'Đăng bởi: ${widget.userName}',
+                style: const TextStyle(
+                  fontSize: 13,
+                  color: Color(0xFF6366F1),
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
           ),
         ),
       ],
@@ -314,37 +410,57 @@ class _UserPostDetailScreenState extends State<UserPostDetailScreen> {
   // ========== PRICE SECTION ==========
   Widget _buildPriceSection() {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [Colors.blue[400]!, Colors.blue[600]!],
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFF667EEA), Color(0xFF764BA2)],
         ),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: Colors.blue.withOpacity(0.3),
-            blurRadius: 8,
-            offset: const Offset(0, 4),
+            color: const Color(0xFF667EEA).withOpacity(0.4),
+            blurRadius: 20,
+            offset: const Offset(0, 8),
           ),
         ],
       ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'Giá thuê:',
-            style: TextStyle(
-              color: Colors.white70,
-              fontSize: 14,
-              fontWeight: FontWeight.w500,
-            ),
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(Icons.payments_outlined,
+                    color: Colors.white, size: 20),
+              ),
+              const SizedBox(width: 12),
+              const Text(
+                'Giá thuê / tháng',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                  letterSpacing: 0.5,
+                ),
+              ),
+            ],
           ),
+          const SizedBox(height: 16),
           Text(
             _formatPrice(_currentRental.price),
             style: const TextStyle(
               color: Colors.white,
-              fontSize: 28,
-              fontWeight: FontWeight.bold,
+              fontSize: 32,
+              fontWeight: FontWeight.w800,
+              letterSpacing: -1,
+              height: 1.2,
             ),
           ),
         ],
@@ -354,68 +470,45 @@ class _UserPostDetailScreenState extends State<UserPostDetailScreen> {
 
   // ========== KEY INFO SECTION ==========
   Widget _buildKeyInfoSection() {
-    return Row(
-      children: [
-        Expanded(
-          child: _buildInfoCard(
-            icon: '📐',
-            label: 'Diện tích',
-            value:
-                '${_currentRental.area['total']?.toStringAsFixed(0) ?? '0'}m²',
-          ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: _buildInfoCard(
-            icon: '🏠',
-            label: 'Loại BĐS',
-            value: _currentRental.propertyType ?? 'N/A',
-          ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: _buildInfoCard(
-            icon: '🛏️',
-            label: 'Phòng ngủ',
-            value:
-                '${_currentRental.area['bedrooms']?.toStringAsFixed(0) ?? '0'}',
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildInfoCard({
-    required String icon,
-    required String label,
-    required String value,
-  }) {
     return Container(
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.blue[50],
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: Colors.blue[100]!),
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 20,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
-      child: Column(
+      child: Row(
         children: [
-          Text(icon, style: const TextStyle(fontSize: 24)),
-          const SizedBox(height: 4),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 12,
-              color: Colors.grey[600],
-              fontWeight: FontWeight.w500,
+          Expanded(
+            child: _buildInfoCard(
+              icon: Icons.straighten_outlined,
+              label: 'Diện tích',
+              value: '${_currentRental.area['total']?.toStringAsFixed(0) ?? '0'}m²',
+              color: const Color(0xFF3B82F6),
             ),
           ),
-          const SizedBox(height: 4),
-          Text(
-            value,
-            style: const TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.bold,
-              color: Colors.blue,
+          const SizedBox(width: 16),
+          Expanded(
+            child: _buildInfoCard(
+              icon: Icons.home_outlined,
+              label: 'Loại BĐS',
+              value: _currentRental.propertyType ?? 'N/A',
+              color: const Color(0xFF8B5CF6),
+            ),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: _buildInfoCard(
+              icon: Icons.bed_outlined,
+              label: 'Phòng ngủ',
+              value: '${_currentRental.area['bedrooms']?.toStringAsFixed(0) ?? '0'}',
+              color: const Color(0xFFEC4899),
             ),
           ),
         ],
@@ -423,40 +516,95 @@ class _UserPostDetailScreenState extends State<UserPostDetailScreen> {
     );
   }
 
+  Widget _buildInfoCard({
+    required IconData icon,
+    required String label,
+    required String value,
+    required Color color,
+  }) {
+    return Column(
+      children: [
+        Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: color.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Icon(icon, color: color, size: 28),
+        ),
+        const SizedBox(height: 10),
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 12,
+            color: Color(0xFF9CA3AF),
+            fontWeight: FontWeight.w500,
+          ),
+          textAlign: TextAlign.center,
+        ),
+        const SizedBox(height: 4),
+        Text(
+          value,
+          style: TextStyle(
+            fontSize: 15,
+            fontWeight: FontWeight.w700,
+            color: color,
+          ),
+          textAlign: TextAlign.center,
+        ),
+      ],
+    );
+  }
+
   // ========== LOCATION SECTION ==========
   Widget _buildLocationSection() {
     return Container(
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: Colors.amber[50],
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: Colors.amber[100]!),
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 20,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       child: Row(
         children: [
-          Icon(
-            Icons.location_on,
-            color: Colors.amber[700],
-            size: 20,
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [Color(0xFFF59E0B), Color(0xFFEF4444)],
+              ),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: const Icon(Icons.location_on,
+                color: Colors.white, size: 24),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 16),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
+                const Text(
                   'Địa chỉ',
                   style: TextStyle(
                     fontSize: 12,
-                    color: Colors.grey[600],
+                    color: Color(0xFF9CA3AF),
+                    fontWeight: FontWeight.w500,
                   ),
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(height: 6),
                 Text(
                   _currentRental.location['short'] ?? 'Chưa cập nhật',
                   style: const TextStyle(
-                    fontSize: 14,
+                    fontSize: 15,
                     fontWeight: FontWeight.w600,
+                    color: Color(0xFF2D3142),
+                    height: 1.4,
                   ),
                 ),
               ],
@@ -470,37 +618,51 @@ class _UserPostDetailScreenState extends State<UserPostDetailScreen> {
   // ========== POSTED DATE SECTION ==========
   Widget _buildPostedDateSection() {
     return Container(
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: Colors.purple[50],
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: Colors.purple[100]!),
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 20,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       child: Row(
         children: [
-          Icon(
-            Icons.calendar_today,
-            color: Colors.purple[700],
-            size: 20,
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [Color(0xFF06B6D4), Color(0xFF3B82F6)],
+              ),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: const Icon(Icons.calendar_today,
+                color: Colors.white, size: 22),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 16),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
+                const Text(
                   'Ngày đăng',
                   style: TextStyle(
                     fontSize: 12,
-                    color: Colors.grey[600],
+                    color: Color(0xFF9CA3AF),
+                    fontWeight: FontWeight.w500,
                   ),
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(height: 6),
                 Text(
                   _formatDate(_currentRental.createdAt),
                   style: const TextStyle(
-                    fontSize: 14,
+                    fontSize: 15,
                     fontWeight: FontWeight.w600,
+                    color: Color(0xFF2D3142),
                   ),
                 ),
               ],
@@ -513,137 +675,298 @@ class _UserPostDetailScreenState extends State<UserPostDetailScreen> {
 
   // ========== PROPERTY DETAILS SECTION ==========
   Widget _buildPropertyDetailsSection() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          '🏠 Chi tiết tài sản',
-          style: TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        const SizedBox(height: 12),
-        if (_currentRental.furniture.isNotEmpty) ...[
-          const Text(
-            'Nội thất:',
-            style: TextStyle(fontWeight: FontWeight.w600),
-          ),
-          const SizedBox(height: 8),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: _currentRental.furniture
-                .map(
-                  (item) => Chip(
-                    label: Text(item),
-                    backgroundColor: Colors.blue[100],
-                    labelStyle: const TextStyle(fontSize: 12),
-                  ),
-                )
-                .toList(),
-          ),
-          const SizedBox(height: 12),
-        ],
-        if (_currentRental.amenities.isNotEmpty) ...[
-          const Text(
-            'Tiện ích:',
-            style: TextStyle(fontWeight: FontWeight.w600),
-          ),
-          const SizedBox(height: 8),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: _currentRental.amenities
-                .map(
-                  (item) => Chip(
-                    label: Text(item),
-                    backgroundColor: Colors.green[100],
-                    labelStyle: const TextStyle(fontSize: 12),
-                  ),
-                )
-                .toList(),
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 20,
+            offset: const Offset(0, 4),
           ),
         ],
-      ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF3B82F6).withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(Icons.home_work_outlined,
+                    color: Color(0xFF3B82F6), size: 20),
+              ),
+              const SizedBox(width: 12),
+              const Text(
+                'Chi tiết tài sản',
+                style: TextStyle(
+                  fontSize: 17,
+                  fontWeight: FontWeight.w700,
+                  color: Color(0xFF2D3142),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+
+          if (_currentRental.furniture.isNotEmpty) ...[
+            const Text(
+              'Nội thất',
+              style: TextStyle(
+                fontWeight: FontWeight.w600,
+                color: Color(0xFF6B7280),
+                fontSize: 13,
+              ),
+            ),
+            const SizedBox(height: 10),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: _currentRental.furniture.map((item) =>
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [
+                          const Color(0xFF3B82F6).withOpacity(0.1),
+                          const Color(0xFF8B5CF6).withOpacity(0.1),
+                        ],
+                      ),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(
+                        color: const Color(0xFF3B82F6).withOpacity(0.2),
+                      ),
+                    ),
+                    child: Text(
+                      item,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF3B82F6),
+                      ),
+                    ),
+                  ),
+              ).toList(),
+            ),
+            const SizedBox(height: 16),
+          ],
+
+          if (_currentRental.amenities.isNotEmpty) ...[
+            const Text(
+              'Tiện ích',
+              style: TextStyle(
+                fontWeight: FontWeight.w600,
+                color: Color(0xFF6B7280),
+                fontSize: 13,
+              ),
+            ),
+            const SizedBox(height: 10),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: _currentRental.amenities.map((item) =>
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [
+                          const Color(0xFF10B981).withOpacity(0.1),
+                          const Color(0xFF06B6D4).withOpacity(0.1),
+                        ],
+                      ),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(
+                        color: const Color(0xFF10B981).withOpacity(0.2),
+                      ),
+                    ),
+                    child: Text(
+                      item,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF10B981),
+                      ),
+                    ),
+                  ),
+              ).toList(),
+            ),
+          ],
+        ],
+      ),
     );
   }
 
   // ========== SURROUNDINGS SECTION ==========
   Widget _buildSurroundingsSection() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          '🌆 Xung quanh',
-          style: TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.bold,
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 20,
+            offset: const Offset(0, 4),
           ),
-        ),
-        const SizedBox(height: 12),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: _currentRental.surroundings
-              .map(
-                (item) => Chip(
-                  label: Text(item),
-                  backgroundColor: Colors.orange[100],
-                  labelStyle: const TextStyle(fontSize: 12),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF59E0B).withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(10),
                 ),
-              )
-              .toList(),
-        ),
-      ],
+                child: const Icon(Icons.location_city,
+                    color: Color(0xFFF59E0B), size: 20),
+              ),
+              const SizedBox(width: 12),
+              const Text(
+                'Xung quanh',
+                style: TextStyle(
+                  fontSize: 17,
+                  fontWeight: FontWeight.w700,
+                  color: Color(0xFF2D3142),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: _currentRental.surroundings.map((item) =>
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        const Color(0xFFF59E0B).withOpacity(0.1),
+                        const Color(0xFFEF4444).withOpacity(0.1),
+                      ],
+                    ),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                      color: const Color(0xFFF59E0B).withOpacity(0.2),
+                    ),
+                  ),
+                  child: Text(
+                    item,
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFFF59E0B),
+                    ),
+                  ),
+                ),
+            ).toList(),
+          ),
+        ],
+      ),
     );
   }
 
   // ========== RENTAL TERMS SECTION ==========
   Widget _buildRentalTermsSection() {
     final terms = _currentRental.rentalTerms;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          '📋 Điều kiện thuê',
-          style: TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        const SizedBox(height: 12),
-        _buildTermRow('Thời hạn tối thiểu:', terms?['minimumLease'] ?? 'N/A'),
-        _buildTermRow('Tiền cọc:', terms?['deposit'] ?? 'N/A'),
-        _buildTermRow(
-            'Phương thức thanh toán:', terms?['paymentMethod'] ?? 'N/A'),
-        _buildTermRow('Điều kiện gia hạn:', terms?['renewalTerms'] ?? 'N/A'),
-      ],
-    );
-  }
-
-  Widget _buildTermRow(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(
-            label,
-            style: const TextStyle(fontWeight: FontWeight.w500),
-          ),
-          Expanded(
-            child: Text(
-              value,
-              textAlign: TextAlign.right,
-              style: TextStyle(
-                color: Colors.grey[700],
-                fontWeight: FontWeight.w600,
-              ),
-            ),
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 20,
+            offset: const Offset(0, 4),
           ),
         ],
       ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF8B5CF6).withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(Icons.description_outlined,
+                    color: Color(0xFF8B5CF6), size: 20),
+              ),
+              const SizedBox(width: 12),
+              const Text(
+                'Điều kiện thuê',
+                style: TextStyle(
+                  fontSize: 17,
+                  fontWeight: FontWeight.w700,
+                  color: Color(0xFF2D3142),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          _buildTermRow('Thời hạn tối thiểu', terms?['minimumLease'] ?? 'N/A', Icons.schedule),
+          _buildTermRow('Tiền cọc', terms?['deposit'] ?? 'N/A', Icons.account_balance_wallet_outlined),
+          _buildTermRow('Phương thức thanh toán', terms?['paymentMethod'] ?? 'N/A', Icons.payment),
+          _buildTermRow('Điều kiện gia hạn', terms?['renewalTerms'] ?? 'N/A', Icons.autorenew, isLast: true),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTermRow(String label, String value, IconData icon, {bool isLast = false}) {
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          child: Row(
+            children: [
+              Icon(icon, size: 20, color: const Color(0xFF8B5CF6)),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      label,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        color: Color(0xFF6B7280),
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      value,
+                      style: const TextStyle(
+                        fontSize: 14,
+                        color: Color(0xFF2D3142),
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+        if (!isLast)
+          Divider(color: Colors.grey[200], height: 1),
+      ],
     );
   }
 
@@ -651,72 +974,107 @@ class _UserPostDetailScreenState extends State<UserPostDetailScreen> {
   Widget _buildContactInfoSection() {
     final contact = _currentRental.contactInfo;
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.green[50],
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.green[200]!),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            const Color(0xFF10B981).withOpacity(0.1),
+            const Color(0xFF06B6D4).withOpacity(0.1),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: const Color(0xFF10B981).withOpacity(0.3),
+          width: 1.5,
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            '📞 Thông tin liên hệ',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-            ),
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFF10B981), Color(0xFF06B6D4)],
+                  ),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(Icons.contact_phone,
+                    color: Colors.white, size: 20),
+              ),
+              const SizedBox(width: 12),
+              const Text(
+                'Thông tin liên hệ',
+                style: TextStyle(
+                  fontSize: 17,
+                  fontWeight: FontWeight.w700,
+                  color: Color(0xFF2D3142),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          _buildContactRow(
+            Icons.person_outline,
+            'Người liên hệ',
+            contact?['name'] ?? 'Chủ nhà',
           ),
           const SizedBox(height: 12),
-          Row(
-            children: [
-              const Icon(Icons.person, size: 20, color: Colors.green),
-              const SizedBox(width: 12),
-              Text(
-                contact?['name'] ?? 'Chủ nhà',
-                style: const TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              const Icon(Icons.phone, size: 20, color: Colors.green),
-              const SizedBox(width: 12),
-              Text(
-                contact?['phone'] ?? 'Không có',
-                style: const TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.blue,
-                ),
-              ),
-            ],
+          _buildContactRow(
+            Icons.phone_outlined,
+            'Số điện thoại',
+            contact?['phone'] ?? 'Không có',
+            isPhone: true,
           ),
           if (contact?['availableHours'] != null &&
               (contact!['availableHours'] as String).isNotEmpty) ...[
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                const Icon(Icons.access_time, size: 20, color: Colors.green),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    contact['availableHours'],
-                    style: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-              ],
+            const SizedBox(height: 12),
+            _buildContactRow(
+              Icons.access_time_outlined,
+              'Thời gian liên hệ',
+              contact['availableHours'],
             ),
           ],
         ],
       ),
+    );
+  }
+
+  Widget _buildContactRow(IconData icon, String label, String value, {bool isPhone = false}) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(icon, size: 20, color: const Color(0xFF10B981)),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label,
+                style: const TextStyle(
+                  fontSize: 12,
+                  color: Color(0xFF6B7280),
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                value,
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                  color: isPhone ? const Color(0xFF10B981) : const Color(0xFF2D3142),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 
@@ -727,32 +1085,71 @@ class _UserPostDetailScreenState extends State<UserPostDetailScreen> {
         Row(
           children: [
             Expanded(
-              child: ElevatedButton.icon(
-                onPressed: () => Navigator.pop(context),
-                icon: const Icon(Icons.arrow_back, size: 18),
-                label: const Text('Quay lại'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.grey[600],
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
+              child: Container(
+                height: 52,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(12),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.grey.withOpacity(0.2),
+                      blurRadius: 12,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: ElevatedButton.icon(
+                  onPressed: () => Navigator.pop(context),
+                  icon: const Icon(Icons.arrow_back_ios_new, size: 18),
+                  label: const Text('Quay lại'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.white,
+                    foregroundColor: const Color(0xFF6B7280),
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      side: BorderSide(color: Colors.grey[300]!),
+                    ),
+                    textStyle: const TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                 ),
               ),
             ),
             const SizedBox(width: 12),
             Expanded(
-              child: ElevatedButton.icon(
-                onPressed: () => _showEditDialog(),
-                icon: const Icon(Icons.edit, size: 18),
-                label: const Text('Chỉnh sửa'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.blue,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
+              child: Container(
+                height: 52,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(12),
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFF3B82F6), Color(0xFF8B5CF6)],
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFF3B82F6).withOpacity(0.4),
+                      blurRadius: 12,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: ElevatedButton.icon(
+                  onPressed: () => _showEditDialog(),
+                  icon: const Icon(Icons.edit_outlined, size: 18),
+                  label: const Text('Chỉnh sửa'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.transparent,
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    shadowColor: Colors.transparent,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    textStyle: const TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                 ),
               ),
@@ -760,18 +1157,37 @@ class _UserPostDetailScreenState extends State<UserPostDetailScreen> {
           ],
         ),
         const SizedBox(height: 12),
-        SizedBox(
+        Container(
           width: double.infinity,
+          height: 52,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(12),
+            gradient: const LinearGradient(
+              colors: [Color(0xFFEF4444), Color(0xFFDC2626)],
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFFEF4444).withOpacity(0.4),
+                blurRadius: 12,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
           child: ElevatedButton.icon(
             onPressed: () => _showDeleteReasonDialog(),
-            icon: const Icon(Icons.delete, size: 18),
+            icon: const Icon(Icons.delete_outline, size: 20),
             label: const Text('Xóa bài đăng'),
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red,
+              backgroundColor: Colors.transparent,
               foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(vertical: 12),
+              elevation: 0,
+              shadowColor: Colors.transparent,
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              textStyle: const TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w600,
               ),
             ),
           ),
@@ -790,17 +1206,14 @@ class _UserPostDetailScreenState extends State<UserPostDetailScreen> {
         onEditSuccess: () async {
           debugPrint('✅ Edit dialog: Edit successful');
 
-          // Đóng dialog
           if (mounted && Navigator.canPop(dialogContext)) {
             Navigator.pop(dialogContext);
           }
 
-          //  Chờ một chút để dialog đóng hoàn toàn
           await Future.delayed(const Duration(milliseconds: 300));
 
-          //  Lấy dữ liệu mới từ server
           if (mounted) {
-            debugPrint(' Fetching updated rental data from server...');
+            debugPrint('🔄 Fetching updated rental data from server...');
             final updatedRental = await context
                 .read<AdminViewModel>()
                 .fetchRentalForEdit(_currentRental.id);
@@ -810,35 +1223,68 @@ class _UserPostDetailScreenState extends State<UserPostDetailScreen> {
                 _currentRental = updatedRental;
               });
 
-              //  Hiển thị snackbar thành công
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
-                  content: const Text('✅ Cập nhật thông tin thành công'),
-                  backgroundColor: Colors.green[600],
+                  content: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(6),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.2),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: const Icon(Icons.check_circle,
+                            color: Colors.white, size: 20),
+                      ),
+                      const SizedBox(width: 12),
+                      const Text(
+                        'Cập nhật thông tin thành công',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w600,
+                          fontSize: 14,
+                        ),
+                      ),
+                    ],
+                  ),
+                  backgroundColor: const Color(0xFF10B981),
                   duration: const Duration(seconds: 2),
                   behavior: SnackBarBehavior.floating,
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
+                    borderRadius: BorderRadius.circular(12),
                   ),
+                  margin: const EdgeInsets.all(16),
                 ),
               );
             } else {
               debugPrint('❌ Failed to fetch updated rental data');
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
-                  content: const Text('⚠️ Không thể lấy dữ liệu cập nhật'),
-                  backgroundColor: Colors.orange[600],
+                  content: Row(
+                    children: [
+                      const Icon(Icons.warning_amber_rounded,
+                          color: Colors.white, size: 20),
+                      const SizedBox(width: 12),
+                      const Text(
+                        'Không thể lấy dữ liệu cập nhật',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w600,
+                          fontSize: 14,
+                        ),
+                      ),
+                    ],
+                  ),
+                  backgroundColor: const Color(0xFFF59E0B),
                   duration: const Duration(seconds: 2),
                   behavior: SnackBarBehavior.floating,
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
+                    borderRadius: BorderRadius.circular(12),
                   ),
+                  margin: const EdgeInsets.all(16),
                 ),
               );
             }
           }
 
-          // ✅ Gọi callback để cập nhật danh sách cha
           widget.onPostUpdated?.call();
         },
       ),
@@ -864,7 +1310,7 @@ class _UserPostDetailScreenState extends State<UserPostDetailScreen> {
   Future<void> _performDelete() async {
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
+        SnackBar(
           content: Row(
             children: [
               SizedBox(
@@ -875,17 +1321,29 @@ class _UserPostDetailScreenState extends State<UserPostDetailScreen> {
                   valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                 ),
               ),
-              SizedBox(width: 12),
-              Text('Đang xóa bài viết...'),
+              const SizedBox(width: 12),
+              const Text(
+                'Đang xóa bài viết...',
+                style: TextStyle(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 14,
+                ),
+              ),
             ],
           ),
-          duration: Duration(seconds: 30),
+          duration: const Duration(seconds: 30),
+          backgroundColor: const Color(0xFF6B7280),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          margin: const EdgeInsets.all(16),
         ),
       );
     }
 
     final success =
-        await context.read<AdminViewModel>().deleteUserPost(_currentRental.id);
+    await context.read<AdminViewModel>().deleteUserPost(_currentRental.id);
 
     if (mounted) {
       ScaffoldMessenger.of(context).hideCurrentSnackBar();
@@ -893,13 +1351,34 @@ class _UserPostDetailScreenState extends State<UserPostDetailScreen> {
       if (success) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: const Text('✅ Xóa bài viết thành công'),
-            backgroundColor: Colors.green[600],
+            content: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Icon(Icons.check_circle,
+                      color: Colors.white, size: 20),
+                ),
+                const SizedBox(width: 12),
+                const Text(
+                  'Xóa bài viết thành công',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 14,
+                  ),
+                ),
+              ],
+            ),
+            backgroundColor: const Color(0xFF10B981),
             duration: const Duration(seconds: 2),
             behavior: SnackBarBehavior.floating,
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: BorderRadius.circular(12),
             ),
+            margin: const EdgeInsets.all(16),
           ),
         );
 
@@ -914,19 +1393,35 @@ class _UserPostDetailScreenState extends State<UserPostDetailScreen> {
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(
-              context.read<AdminViewModel>().error ?? '❌ Xóa bài viết thất bại',
-              style: const TextStyle(color: Colors.white),
+            content: Row(
+              children: [
+                const Icon(Icons.error_outline,
+                    color: Colors.white, size: 20),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    context
+                        .read<AdminViewModel>()
+                        .error ?? 'Xóa bài viết thất bại',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 14,
+                    ),
+                  ),
+                ),
+              ],
             ),
-            backgroundColor: Colors.red[600],
+            backgroundColor: const Color(0xFFEF4444),
             duration: const Duration(seconds: 3),
             behavior: SnackBarBehavior.floating,
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: BorderRadius.circular(12),
             ),
+            margin: const EdgeInsets.all(16),
           ),
         );
       }
     }
   }
-}
+  }

@@ -6,6 +6,7 @@ const mongoose = require('mongoose');
 const Rental = require('../models/Rental');
 const Favorite = require('../models/favorite');
 const { Comment, Reply, LikeComment } = require('../models/comments');
+const Feedback = require('../models/feedback');
 const User = require('../models/usermodel');
 const admin = require('firebase-admin');
 const multer = require('multer');
@@ -2067,5 +2068,237 @@ router.get('/ai-suggest/advanced', async (req, res) => {
   }
 });
 
+// Thêm vào file routes/rentals.js
+
+// ========== ADMIN DASHBOARD STATISTICS ========================================
+router.get('/admin/dashboard', verifyAdmin, async (req, res) => {
+  try {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+
+    console.log('📊 [DASHBOARD] Fetching stats...');
+    console.log('📅 Today:', today.toISOString());
+    console.log('📅 Tomorrow:', tomorrow.toISOString());
+
+    // Thực hiện các query song song
+    const [
+      totalPosts,
+      postsToday,
+      newUsers,
+      totalNews,
+      revenueToday,
+      totalRevenue,
+      feedbackToday
+    ] = await Promise.all([
+      // Tổng số bài đăng
+      Rental.countDocuments(),
+
+      // Bài đăng hôm nay
+      Rental.countDocuments({
+        createdAt: { $gte: today, $lt: tomorrow }
+      }),
+
+      // Người đăng ký mới hôm nay
+      User.countDocuments({
+        createdAt: { $gte: today, $lt: tomorrow }
+      }),
+
+      // Tổng tin tức
+      require('../models/news').countDocuments(),
+
+      // Doanh thu hôm nay
+      Payment.aggregate([
+        {
+          $match: {
+            status: 'completed',
+            completedAt: { $gte: today, $lt: tomorrow }
+          }
+        },
+        {
+          $group: {
+            _id: null,
+            total: { $sum: '$amount' }
+          }
+        }
+      ]).then(result => result.length > 0 ? result[0].total : 0),
+
+      // Tổng doanh thu
+      Payment.aggregate([
+        {
+          $match: {
+            status: 'completed'
+          }
+        },
+        {
+          $group: {
+            _id: null,
+            total: { $sum: '$amount' }
+          }
+        }
+      ]).then(result => result.length > 0 ? result[0].total : 0),
+
+      // 🔥 FIX: Feedback hôm nay - PHẢI DÙNG MODEL FEEDBACK
+      Feedback.countDocuments({
+        createdAt: { $gte: today, $lt: tomorrow }
+      })
+    ]);
+
+    console.log('✅ [DASHBOARD] Stats fetched:');
+    console.log('   Total Posts:', totalPosts);
+    console.log('   Posts Today:', postsToday);
+    console.log('   New Users:', newUsers);
+    console.log('   Total News:', totalNews);
+    console.log('   Revenue Today:', revenueToday);
+    console.log('   Total Revenue:', totalRevenue);
+    console.log('   🔥 Feedback Today:', feedbackToday); // ← QUAN TRỌNG
+
+    res.json({
+      totalPosts,
+      postsToday,
+      newUsers,
+      totalNews,
+      revenueToday,
+      totalRevenue,
+      feedbackToday, // ← QUAN TRỌNG
+      lastUpdated: new Date().toISOString()
+    });
+
+  } catch (err) {
+    console.error('❌ [DASHBOARD] Error:', err);
+    res.status(500).json({
+      message: 'Failed to fetch dashboard statistics',
+      error: err.message
+    });
+  }
+});
+
+
+// ========== ADMIN DASHBOARD CHARTS DATA ========================================
+
+// Doanh thu theo ngày (7 ngày gần nhất)
+router.get('/admin/dashboard/revenue-chart', verifyAdmin, async (req, res) => {
+  try {
+    const days = parseInt(req.query.days) || 7;
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - days);
+    startDate.setHours(0, 0, 0, 0);
+
+    const revenueData = await Payment.aggregate([
+      {
+        $match: {
+          status: 'completed',
+          completedAt: { $gte: startDate }
+        }
+      },
+      {
+        $group: {
+          _id: {
+            $dateToString: { format: '%Y-%m-%d', date: '$completedAt' }
+          },
+          total: { $sum: '$amount' },
+          count: { $sum: 1 }
+        }
+      },
+      {
+        $sort: { _id: 1 }
+      }
+    ]);
+
+    res.json(revenueData);
+  } catch (err) {
+    console.error('Error fetching revenue chart:', err);
+    res.status(500).json({
+      message: 'Failed to fetch revenue chart',
+      error: err.message
+    });
+  }
+});
+
+// Thống kê bài đăng theo loại nhà
+router.get('/admin/dashboard/property-types', verifyAdmin, async (req, res) => {
+  try {
+    const propertyTypes = await Rental.aggregate([
+      {
+        $group: {
+          _id: '$propertyType',
+          count: { $sum: 1 },
+          avgPrice: { $avg: '$price' }
+        }
+      },
+      {
+        $sort: { count: -1 }
+      }
+    ]);
+
+    res.json(propertyTypes);
+  } catch (err) {
+    console.error('Error fetching property types:', err);
+    res.status(500).json({
+      message: 'Failed to fetch property types',
+      error: err.message
+    });
+  }
+});
+
+// Thống kê người dùng mới theo tháng
+router.get('/admin/dashboard/user-growth', verifyAdmin, async (req, res) => {
+  try {
+    const months = parseInt(req.query.months) || 6;
+    const startDate = new Date();
+    startDate.setMonth(startDate.getMonth() - months);
+    startDate.setDate(1);
+    startDate.setHours(0, 0, 0, 0);
+
+    const userGrowth = await User.aggregate([
+      {
+        $match: {
+          createdAt: { $gte: startDate }
+        }
+      },
+      {
+        $group: {
+          _id: {
+            $dateToString: { format: '%Y-%m', date: '$createdAt' }
+          },
+          count: { $sum: 1 }
+        }
+      },
+      {
+        $sort: { _id: 1 }
+      }
+    ]);
+
+    res.json(userGrowth);
+  } catch (err) {
+    console.error('Error fetching user growth:', err);
+    res.status(500).json({
+      message: 'Failed to fetch user growth',
+      error: err.message
+    });
+  }
+});
+
+// Top 5 bài đăng có nhiều lượt xem nhất
+router.get('/admin/dashboard/top-posts', verifyAdmin, async (req, res) => {
+  try {
+    const limit = parseInt(req.query.limit) || 5;
+    
+    const topPosts = await Rental.find()
+      .select('title price location views images createdAt')
+      .sort({ views: -1 })
+      .limit(limit)
+      .lean();
+
+    res.json(topPosts);
+  } catch (err) {
+    console.error('Error fetching top posts:', err);
+    res.status(500).json({
+      message: 'Failed to fetch top posts',
+      error: err.message
+    });
+  }
+});
 
 module.exports = router;

@@ -1,3 +1,5 @@
+import 'dart:convert';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_rentalhouse/config/loading.dart';
 import 'package:flutter_rentalhouse/models/comments.dart';
@@ -9,7 +11,6 @@ import 'package:flutter_rentalhouse/models/rental.dart';
 import 'package:flutter_rentalhouse/services/rental_service.dart';
 import 'package:flutter_rentalhouse/views/rental_detail_view.dart';
 import 'package:flutter_rentalhouse/services/comment_service.dart';
-
 
 class RecentCommentsView extends StatefulWidget {
   @override
@@ -29,6 +30,31 @@ class _RecentCommentsViewState extends State<RecentCommentsView> {
       Provider.of<AuthViewModel>(context, listen: false)
           .fetchRecentComments(page: 1);
     });
+  }
+
+  // ✅ Helper function: Xử lý avatar - Hỗ trợ cả Cloudinary URL và Base64
+  ImageProvider _getAvatarImageProvider(String? avatarUrl) {
+    // Ưu tiên 1: URL đầy đủ từ Cloudinary
+    if (avatarUrl != null &&
+        (avatarUrl.startsWith('http://') || avatarUrl.startsWith('https://'))) {
+      return CachedNetworkImageProvider(avatarUrl);
+    }
+
+    // Ưu tiên 2: Base64 (backward compatible)
+    if (avatarUrl != null && avatarUrl.isNotEmpty) {
+      try {
+        final data = avatarUrl.contains(',')
+            ? avatarUrl.split(',')[1]
+            : avatarUrl;
+        final bytes = base64Decode(data);
+        return MemoryImage(bytes);
+      } catch (e) {
+        print('Error decoding avatar: $e');
+      }
+    }
+
+    // Ưu tiên 3: Avatar mặc định
+    return const AssetImage('assets/img/imageuser.png');
   }
 
   void _toggleSelectionMode() {
@@ -318,7 +344,8 @@ class _RecentCommentsViewState extends State<RecentCommentsView> {
               ]
                   : [
                 IconButton(
-                  icon: const Icon(Icons.check_circle_outline, color: Colors.white),
+                  icon: const Icon(Icons.check_circle_outline,
+                      color: Colors.white),
                   onPressed: _toggleSelectionMode,
                   tooltip: 'Chọn nhiều',
                 ),
@@ -348,7 +375,6 @@ class _RecentCommentsViewState extends State<RecentCommentsView> {
                       margin: const EdgeInsets.all(20),
                       padding: const EdgeInsets.all(24),
                       decoration: BoxDecoration(
-
                         borderRadius: BorderRadius.circular(16),
                         boxShadow: [
                           BoxShadow(
@@ -391,8 +417,7 @@ class _RecentCommentsViewState extends State<RecentCommentsView> {
                       final isReply = comment.type == 'Reply';
                       final isSelected =
                       _selectedForDeletion.contains(comment.id);
-                      final isLoading =
-                          comment.id == _loadingCommentId;
+                      final isLoading = comment.id == _loadingCommentId;
 
                       return GestureDetector(
                         onLongPress: () {
@@ -464,7 +489,8 @@ class _RecentCommentsViewState extends State<RecentCommentsView> {
                                                 border: Border.all(
                                                   color: isSelected
                                                       ? Colors.blue
-                                                      : Colors.grey[300]!,
+                                                      : Colors
+                                                      .grey[300]!,
                                                   width: 2,
                                                 ),
                                                 color: isSelected
@@ -481,6 +507,7 @@ class _RecentCommentsViewState extends State<RecentCommentsView> {
                                                   : null,
                                             ),
                                           ),
+                                        // ✅ AVATAR CẬP NHẬT - Hỗ trợ Cloudinary
                                         Container(
                                           decoration: BoxDecoration(
                                             shape: BoxShape.circle,
@@ -491,8 +518,8 @@ class _RecentCommentsViewState extends State<RecentCommentsView> {
                                             ),
                                             boxShadow: [
                                               BoxShadow(
-                                                color:
-                                                Colors.blueAccent
+                                                color: Colors
+                                                    .blueAccent
                                                     .withOpacity(
                                                   0.1,
                                                 ),
@@ -506,16 +533,10 @@ class _RecentCommentsViewState extends State<RecentCommentsView> {
                                             radius: 20,
                                             backgroundColor:
                                             Colors.blue[100],
-                                            backgroundImage: comment
-                                                .userId
-                                                .avatarBytes !=
-                                                null
-                                                ? MemoryImage(comment
-                                                .userId
-                                                .avatarBytes!)
-                                                : const AssetImage(
-                                                'assets/img/imageuser.png')
-                                            as ImageProvider,
+                                            backgroundImage:
+                                            _getAvatarImageProvider(
+                                                comment.userId
+                                                    .avatarUrl),
                                           ),
                                         ),
                                         const SizedBox(width: 12),
@@ -590,8 +611,7 @@ class _RecentCommentsViewState extends State<RecentCommentsView> {
                                         height: 1.5,
                                       ),
                                       maxLines: 3,
-                                      overflow:
-                                      TextOverflow.ellipsis,
+                                      overflow: TextOverflow.ellipsis,
                                     ),
                                     const SizedBox(height: 12),
                                     Row(
@@ -602,18 +622,15 @@ class _RecentCommentsViewState extends State<RecentCommentsView> {
                                         if (!isReply &&
                                             comment.rating > 0)
                                           Row(
-                                            children:
-                                            List.generate(
+                                            children: List.generate(
                                               5,
                                                   (i) => Icon(
-                                                i <
-                                                    comment
-                                                        .rating
+                                                i < comment.rating
                                                     ? Icons.star
                                                     : Icons
                                                     .star_border,
-                                                color: Colors
-                                                    .amber[600],
+                                                color:
+                                                Colors.amber[600],
                                                 size: 16,
                                               ),
                                             ),
@@ -641,8 +658,8 @@ class _RecentCommentsViewState extends State<RecentCommentsView> {
                               Positioned.fill(
                                 child: Container(
                                   decoration: BoxDecoration(
-                                    color: Colors.white
-                                        .withOpacity(0.8),
+                                    color:
+                                    Colors.white.withOpacity(0.8),
                                     borderRadius:
                                     BorderRadius.circular(12),
                                   ),

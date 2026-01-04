@@ -12,7 +12,7 @@ const storage = new CloudinaryStorage({
   params: {
     folder: 'banners', // Thư mục trong Cloudinary
     allowed_formats: ['jpg', 'jpeg', 'png', 'webp'],
-    transformation: [{ width: 1920, height: 600, crop: 'limit' }], // Tùy chọn: resize ảnh
+    transformation: [{ width: 1920, height: 600, crop: 'limit' }], // Tùy chọn: resize ảnh 
   },
 });
 

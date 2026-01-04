@@ -24,6 +24,7 @@ import 'package:flutter_rentalhouse/views/rental_detail_view.dart';
 import 'package:flutter_rentalhouse/views/search_rental.dart';
 import 'package:provider/provider.dart';
 import 'package:shimmer/shimmer.dart';
+import '../Widgets/Profile/PaymentHistoryView.dart';
 import '../models/user.dart';
 import 'package:intl/intl.dart';
 import '../config/api_routes.dart';
@@ -336,6 +337,19 @@ class _HomeContentState extends State<HomeContent> {
                       Future.delayed(const Duration(milliseconds: 500), () {
                         if (mounted) _loadUnreadCount();
                       });
+                    },
+                  ),
+                  _buildModernMenuItem(
+                    icon: Icons.receipt_long,
+                    text: 'Lịch sử giao dịch',
+                    iconColor: Colors.blueGrey[700]!,
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const PaymentHistoryView(),
+                        ),
+                      );
                     },
                   ),
                   _buildModernMenuItem(
@@ -1326,32 +1340,51 @@ class _HomeContentState extends State<HomeContent> {
                 ),
                 const SizedBox(height: 25),
                 _buildBannerSlider(),
-                const SizedBox(height: 35),
-                SizedBox(
-                  height: 155,
-                  child: SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    padding: const EdgeInsets.symmetric(horizontal: 4),
-                    child: Column(
-                      children: [
-                        Row(
+                const SizedBox(height: 20),
+                Container(
+
+                  decoration: BoxDecoration(
+                    border: Border.all(
+                      color: Colors.grey.withOpacity(0.2),
+                      width: 1.2,
+                    ),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  margin: const EdgeInsets.symmetric(horizontal: 1, vertical: 5),
+                  child: SizedBox(
+                    height: 155,
+                    child: SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Row(
                             children: List.generate(
-                                3,
-                                    (i) => _buildCategoryItem(
-                                    propertyIcons[i],
-                                    propertyTypes[i],
-                                    context,
-                                    propertyTypes[i]))),
-                        const SizedBox(height: 14),
-                        Row(
+                              3,
+                                  (i) => _buildCategoryItem(
+                                propertyIcons[i],
+                                propertyTypes[i],
+                                context,
+                                propertyTypes[i],
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                          Row(
                             children: List.generate(
-                                3,
-                                    (i) => _buildCategoryItem(
-                                    propertyIcons[i + 3],
-                                    propertyTypes[i + 3],
-                                    context,
-                                    propertyTypes[i + 3]))),
-                      ],
+                              3,
+                                  (i) => _buildCategoryItem(
+                                propertyIcons[i + 3],
+                                propertyTypes[i + 3],
+                                context,
+                                propertyTypes[i + 3],
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ),

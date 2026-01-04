@@ -23,38 +23,15 @@ const authMiddleware = async (req, res, next) => {
   }
 };
 
-const verifyAdmin = async (req, res, next) => {
-  try {
-    const token = req.header('Authorization')?.replace('Bearer ', '');
-    if (!token) return res.status(401).json({ message: 'Không có token' });
-
-    const decodedToken = await admin.auth().verifyIdToken(token);
-    const uid = decodedToken.uid;
-
-    const User = require('../models/usermodel');
-    const mongoUser = await User.findOne({ _id: uid });
-    if (!mongoUser || mongoUser.role !== 'admin') {
-      return res.status(403).json({ message: 'Chỉ admin mới có quyền' });
-    }
-
-    req.userId = uid;
-    req.isAdmin = true;
-    next();
-  } catch (err) {
-    res.status(401).json({ message: 'Token không hợp lệ' });
-  }
-};
-
 // ==================== REDIS HELPER FUNCTIONS ====================
 
 let redisClient = null;
 
-// Hàm khởi tạo Redis client từ server.js
 const setRedisClient = (client) => {
   redisClient = client;
 };
 
-// ✅ Lưu từng thông báo vào Redis (mỗi cái riêng biệt)
+// ✅ Save notification to undo stack
 const saveNotificationToUndoStack = async (userId, notification) => {
   try {
     if (!redisClient) {
@@ -62,7 +39,6 @@ const saveNotificationToUndoStack = async (userId, notification) => {
       return;
     }
 
-    // Mỗi notification được lưu riêng với key unique
     const undoKey = `undo:notification:${userId}:${notification._id.toString()}`;
     const undoData = JSON.stringify({
       timestamp: Date.now(),
@@ -73,13 +49,14 @@ const saveNotificationToUndoStack = async (userId, notification) => {
         title: notification.title,
         message: notification.message,
         rentalId: notification.rentalId,
+        commentId: notification.commentId,
+        replyId: notification.replyId,
         details: notification.details,
         read: notification.read,
         createdAt: notification.createdAt,
       },
     });
 
-    // Lưu vào Redis với TTL 30 phút
     await redisClient.setEx(undoKey, 1800, undoData);
     console.log(`✅ [SAVE UNDO] Saved notification ${notification._id} for user ${userId}`);
   } catch (err) {
@@ -87,7 +64,7 @@ const saveNotificationToUndoStack = async (userId, notification) => {
   }
 };
 
-// ✅ Lấy tất cả thông báo đã xóa từ Redis
+// ✅ Get deleted notifications from Redis
 const getDeletedNotifications = async (userId) => {
   try {
     if (!redisClient) {
@@ -95,7 +72,6 @@ const getDeletedNotifications = async (userId) => {
       return [];
     }
 
-    // Tìm tất cả key có pattern undo:notification:userId:*
     const pattern = `undo:notification:${userId}:*`;
     const keys = await redisClient.keys(pattern);
 
@@ -128,7 +104,6 @@ const getDeletedNotifications = async (userId) => {
   }
 };
 
-// ✅ Xóa 1 notification khỏi undo stack
 const deleteFromUndoStack = async (userId, notificationId) => {
   try {
     if (!redisClient) return;
@@ -143,42 +118,56 @@ const deleteFromUndoStack = async (userId, notificationId) => {
 
 // ==================== USER ROUTES ====================
 
-// ✅ GET: Lấy thông báo của user hiện tại (có phân trang)
+// ✅ GET: Lấy thông báo của user (support Comment & Reply)
 router.get('/notifications', authMiddleware, async (req, res) => {
   try {
-    const { page = 1, limit = 20 } = req.query;
+    const { page = 1, limit = 20, type } = req.query;
     const skip = (parseInt(page) - 1) * parseInt(limit);
 
     console.log('🔵 [GET NOTIFICATIONS]');
     console.log('   userId:', req.userId);
     console.log('   page:', page);
     console.log('   limit:', limit);
+    console.log('   type:', type);
+
+    let query = { userId: req.userId };
+    
+    // ✅ Filter by type if specified
+    if (type && type !== 'all') {
+      query.type = type;
+    }
 
     const [notifications, total] = await Promise.all([
-      Notification.find({ userId: req.userId })
+      Notification.find(query)
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(parseInt(limit))
         .lean(),
-      Notification.countDocuments({ userId: req.userId }),
+      Notification.countDocuments(query),
     ]);
 
     console.log('✅ [GET NOTIFICATIONS] Found', notifications.length, 'notifications');
     console.log('   Total:', total);
 
+    // ✅ Adjust timestamps for +7 timezone
+    const adjustedNotifications = notifications.map(n => ({
+      id: n._id.toString(),
+      _id: n._id.toString(),
+      userId: n.userId,
+      type: n.type,
+      title: n.title,
+      message: n.message,
+      rentalId: n.rentalId?.toString(),
+      commentId: n.commentId?.toString(),
+      replyId: n.replyId?.toString(),
+      details: n.details,
+      read: n.read,
+      createdAt: new Date(n.createdAt.getTime() + 7 * 60 * 60 * 1000),
+    }));
+
     res.json({
       message: 'Lấy danh sách thông báo thành công',
-      notifications: notifications.map(n => ({
-        _id: n._id.toString(),
-        userId: n.userId,
-        type: n.type,
-        title: n.title,
-        message: n.message,
-        rentalId: n.rentalId,
-        details: n.details,
-        read: n.read,
-        createdAt: n.createdAt,
-      })),
+      notifications: adjustedNotifications,
       pagination: {
         page: parseInt(page),
         limit: parseInt(limit),
@@ -188,6 +177,31 @@ router.get('/notifications', authMiddleware, async (req, res) => {
     });
   } catch (err) {
     console.error('❌ [GET NOTIFICATIONS] ERROR:', err);
+    res.status(500).json({ 
+      message: 'Lỗi server', 
+      error: err.message 
+    });
+  }
+});
+
+// ✅ GET: Get unread notifications count
+router.get('/notifications/unread/count', authMiddleware, async (req, res) => {
+  try {
+    const unreadCount = await Notification.countDocuments({
+      userId: req.userId,
+      read: false,
+    });
+
+    console.log('✅ [GET UNREAD COUNT]');
+    console.log('   userId:', req.userId);
+    console.log('   unreadCount:', unreadCount);
+
+    res.json({
+      message: 'Thành công',
+      unreadCount,
+    });
+  } catch (err) {
+    console.error('❌ [GET UNREAD COUNT] ERROR:', err);
     res.status(500).json({ 
       message: 'Lỗi server', 
       error: err.message 
@@ -211,15 +225,18 @@ router.get('/notifications/:id', authMiddleware, async (req, res) => {
     res.json({
       message: 'Thành công',
       data: {
+        id: notification._id.toString(),
         _id: notification._id.toString(),
         userId: notification.userId,
         type: notification.type,
         title: notification.title,
         message: notification.message,
-        rentalId: notification.rentalId,
+        rentalId: notification.rentalId?.toString(),
+        commentId: notification.commentId?.toString(),
+        replyId: notification.replyId?.toString(),
         details: notification.details,
         read: notification.read,
-        createdAt: notification.createdAt,
+        createdAt: new Date(notification.createdAt.getTime() + 7 * 60 * 60 * 1000),
       },
     });
   } catch (err) {
@@ -231,7 +248,7 @@ router.get('/notifications/:id', authMiddleware, async (req, res) => {
   }
 });
 
-// ✅ PATCH: Đánh dấu thông báo là đã đọc
+// ✅ PATCH: Mark notification as read
 router.patch('/notifications/:id/read', authMiddleware, async (req, res) => {
   try {
     const notification = await Notification.findById(req.params.id);
@@ -254,13 +271,14 @@ router.patch('/notifications/:id/read', authMiddleware, async (req, res) => {
     res.json({
       message: 'Đã đánh dấu là đã đọc',
       data: {
+        id: notification._id.toString(),
         _id: notification._id.toString(),
         userId: notification.userId,
         type: notification.type,
         title: notification.title,
         message: notification.message,
         read: notification.read,
-        createdAt: notification.createdAt,
+        createdAt: new Date(notification.createdAt.getTime() + 7 * 60 * 60 * 1000),
       },
     });
   } catch (err) {
@@ -272,7 +290,7 @@ router.patch('/notifications/:id/read', authMiddleware, async (req, res) => {
   }
 });
 
-// ✅ PATCH: Đánh dấu tất cả thông báo là đã đọc
+// ✅ PATCH: Mark all notifications as read
 router.patch('/notifications/read-all', authMiddleware, async (req, res) => {
   try {
     console.log('🔵 [MARK ALL AS READ]');
@@ -298,7 +316,7 @@ router.patch('/notifications/read-all', authMiddleware, async (req, res) => {
   }
 });
 
-// ✅ DELETE: Xóa một thông báo (CÓ BACKUP)
+// ✅ DELETE: Delete single notification (with backup to Redis)
 router.delete('/notifications/:id', authMiddleware, async (req, res) => {
   try {
     const notification = await Notification.findById(req.params.id);
@@ -312,8 +330,6 @@ router.delete('/notifications/:id', authMiddleware, async (req, res) => {
     }
 
     await Notification.findByIdAndDelete(req.params.id);
-
-    // Lưu vào undo stack - TỪNG cái riêng biệt
     await saveNotificationToUndoStack(req.userId, notification);
 
     console.log('✅ [DELETE NOTIFICATION]');
@@ -334,18 +350,15 @@ router.delete('/notifications/:id', authMiddleware, async (req, res) => {
   }
 });
 
-// ✅ DELETE: Xóa tất cả thông báo (CÓ BACKUP)
+// ✅ DELETE: Delete all notifications (with backup to Redis)
 router.delete('/notifications', authMiddleware, async (req, res) => {
   try {
     console.log('🔵 [DELETE ALL NOTIFICATIONS]');
     console.log('   userId:', req.userId);
 
-    // Lấy thông báo trước khi xóa để lưu undo
     const deletedNotifications = await Notification.find({ userId: req.userId });
-    
     const result = await Notification.deleteMany({ userId: req.userId });
 
-    // Lưu vào undo stack - TỪNG cái riêng biệt
     if (deletedNotifications.length > 0) {
       for (const notification of deletedNotifications) {
         await saveNotificationToUndoStack(req.userId, notification);
@@ -368,7 +381,7 @@ router.delete('/notifications', authMiddleware, async (req, res) => {
   }
 });
 
-// ✅ GET: Lấy danh sách thông báo đã xóa (THÙNG RÁC)
+// ✅ GET: Get deleted notifications (trash)
 router.get('/notifications/deleted/list', authMiddleware, async (req, res) => {
   try {
     console.log('🔵 [GET DELETED NOTIFICATIONS]');
@@ -385,7 +398,7 @@ router.get('/notifications/deleted/list', authMiddleware, async (req, res) => {
         message: item.notification.message,
         type: item.notification.type,
         timestamp: item.timestamp,
-        createdAt: item.notification.createdAt,
+        createdAt: new Date(item.notification.createdAt.getTime() + 7 * 60 * 60 * 1000),
       }))
     });
   } catch (err) {
@@ -397,7 +410,7 @@ router.get('/notifications/deleted/list', authMiddleware, async (req, res) => {
   }
 });
 
-// ✅ POST: Hoàn tác xóa thông báo RIÊNG LẺ
+// ✅ POST: Restore single notification
 router.post('/notifications/:id/restore', authMiddleware, async (req, res) => {
   try {
     const notificationId = req.params.id;
@@ -407,8 +420,6 @@ router.post('/notifications/:id/restore', authMiddleware, async (req, res) => {
     console.log('   notificationId:', notificationId);
 
     const undoKey = `undo:notification:${req.userId}:${notificationId}`;
-
-    // Lấy từng notification từ Redis
     const data = await redisClient.get(undoKey);
 
     if (!data) {
@@ -421,7 +432,6 @@ router.post('/notifications/:id/restore', authMiddleware, async (req, res) => {
     const parsed = JSON.parse(data);
     const notifData = parsed.notification;
 
-    // Khôi phục thông báo
     const restored = await Notification.create({
       _id: notifData._id,
       userId: notifData.userId,
@@ -429,12 +439,13 @@ router.post('/notifications/:id/restore', authMiddleware, async (req, res) => {
       title: notifData.title,
       message: notifData.message,
       rentalId: notifData.rentalId,
+      commentId: notifData.commentId,
+      replyId: notifData.replyId,
       details: notifData.details,
       read: notifData.read,
       createdAt: notifData.createdAt,
     });
 
-    // Xóa từ undo stack
     await deleteFromUndoStack(req.userId, notificationId);
 
     console.log('✅ [UNDO SINGLE NOTIFICATION] Restored notification', notificationId);
@@ -442,15 +453,18 @@ router.post('/notifications/:id/restore', authMiddleware, async (req, res) => {
     res.json({
       message: 'Hoàn tác thành công',
       data: {
+        id: restored._id.toString(),
         _id: restored._id.toString(),
         userId: restored.userId,
         type: restored.type,
         title: restored.title,
         message: restored.message,
-        rentalId: restored.rentalId,
+        rentalId: restored.rentalId?.toString(),
+        commentId: restored.commentId?.toString(),
+        replyId: restored.replyId?.toString(),
         details: restored.details,
         read: restored.read,
-        createdAt: restored.createdAt,
+        createdAt: new Date(restored.createdAt.getTime() + 7 * 60 * 60 * 1000),
       },
     });
   } catch (err) {
@@ -462,8 +476,8 @@ router.post('/notifications/:id/restore', authMiddleware, async (req, res) => {
   }
 });
 
-// ✅ POST: Hoàn tác xóa tất cả thông báo
-router.post('/notifications/restore', authMiddleware, async (req, res) => {
+// ✅ POST: Restore all notifications
+router.post('/notifications/restore-all', authMiddleware, async (req, res) => {
   try {
     console.log('🔵 [UNDO ALL NOTIFICATIONS]');
     console.log('   userId:', req.userId);
@@ -479,7 +493,6 @@ router.post('/notifications/restore', authMiddleware, async (req, res) => {
 
     console.log('   Restoring', deletedNotifications.length, 'notifications');
 
-    // Khôi phục tất cả thông báo
     const restoredNotifications = [];
     for (const item of deletedNotifications) {
       const notifData = item.notification;
@@ -491,14 +504,14 @@ router.post('/notifications/restore', authMiddleware, async (req, res) => {
         title: notifData.title,
         message: notifData.message,
         rentalId: notifData.rentalId,
+        commentId: notifData.commentId,
+        replyId: notifData.replyId,
         details: notifData.details,
         read: notifData.read,
         createdAt: notifData.createdAt,
       });
       
       restoredNotifications.push(restored);
-
-      // Xóa từ undo stack
       await deleteFromUndoStack(req.userId, notifData._id);
     }
 
@@ -508,15 +521,18 @@ router.post('/notifications/restore', authMiddleware, async (req, res) => {
       message: 'Hoàn tác thành công',
       restoredCount: restoredNotifications.length,
       notifications: restoredNotifications.map(n => ({
+        id: n._id.toString(),
         _id: n._id.toString(),
         userId: n.userId,
         type: n.type,
         title: n.title,
         message: n.message,
-        rentalId: n.rentalId,
+        rentalId: n.rentalId?.toString(),
+        commentId: n.commentId?.toString(),
+        replyId: n.replyId?.toString(),
         details: n.details,
         read: n.read,
-        createdAt: n.createdAt,
+        createdAt: new Date(n.createdAt.getTime() + 7 * 60 * 60 * 1000),
       })),
     });
   } catch (err) {
@@ -528,7 +544,7 @@ router.post('/notifications/restore', authMiddleware, async (req, res) => {
   }
 });
 
-// ✅ DELETE: Xóa vĩnh viễn notification từ undo stack
+// ✅ DELETE: Permanently delete notification
 router.delete('/notifications/:id/permanent', authMiddleware, async (req, res) => {
   try {
     const notificationId = req.params.id;
@@ -538,8 +554,6 @@ router.delete('/notifications/:id/permanent', authMiddleware, async (req, res) =
     console.log('   notificationId:', notificationId);
 
     const undoKey = `undo:notification:${req.userId}:${notificationId}`;
-
-    // Kiểm tra notification tồn tại
     const data = await redisClient.get(undoKey);
 
     if (!data) {
@@ -549,7 +563,6 @@ router.delete('/notifications/:id/permanent', authMiddleware, async (req, res) =
       });
     }
 
-    // Xóa vĩnh viễn
     await redisClient.del(undoKey);
 
     console.log('✅ [PERMANENT DELETE UNDO] Permanently deleted', notificationId);
@@ -567,32 +580,7 @@ router.delete('/notifications/:id/permanent', authMiddleware, async (req, res) =
   }
 });
 
-// ✅ GET: Lấy số lượng thông báo chưa đọc
-router.get('/notifications/unread/count', authMiddleware, async (req, res) => {
-  try {
-    const unreadCount = await Notification.countDocuments({
-      userId: req.userId,
-      read: false,
-    });
-
-    console.log('✅ [GET UNREAD COUNT]');
-    console.log('   userId:', req.userId);
-    console.log('   unreadCount:', unreadCount);
-
-    res.json({
-      message: 'Thành công',
-      unreadCount,
-    });
-  } catch (err) {
-    console.error('❌ [GET UNREAD COUNT] ERROR:', err);
-    res.status(500).json({ 
-      message: 'Lỗi server', 
-      error: err.message 
-    });
-  }
-});
-
-// ✅ GET: Thống kê thông báo
+// ✅ GET: Notification statistics
 router.get('/notifications/stats/overview', authMiddleware, async (req, res) => {
   try {
     const stats = await Notification.aggregate([
@@ -636,6 +624,5 @@ router.get('/notifications/stats/overview', authMiddleware, async (req, res) => 
   }
 });
 
-// Export hàm để gọi từ server.js
 module.exports = router;
 module.exports.setRedisClient = setRedisClient;

@@ -108,16 +108,49 @@ router.get('/admin/users', verifyAdmin, async (req, res) => {
   }
 });
 
-// ✅ Lấy chi tiết người dùng
+// ✅ Lấy chi tiết người dùng - COMPLETELY FIXED
 router.get('/admin/users/:id', verifyAdmin, async (req, res) => {
   try {
-    const user = await User.findById(req.params.id)
+    const userId = req.params.id;
+    console.log('═══════════════════════════════════════════');
+    console.log('🔍 FETCH USER DETAIL');
+    console.log('═══════════════════════════════════════════');
+    console.log('📌 User ID:', userId);
+    console.log('📌 Type:', typeof userId);
+
+    // ✅ Method 1: Try findById first (for Firebase UID)
+    let user = await User.findById(userId)
       .select('username email phoneNumber role createdAt address avatarUrl')
       .lean();
 
-    if (!user) return res.status(404).json({ message: 'Không tìm thấy' });
+    console.log('📊 findById result:', user ? '✅ Found' : '❌ Not found');
 
-    res.json({
+    // ✅ Method 2: If not found, try findOne with _id
+    if (!user) {
+      console.log('🔄 Trying findOne...');
+      user = await User.findOne({ _id: userId })
+        .select('username email phoneNumber role createdAt address avatarUrl')
+        .lean();
+      console.log('📊 findOne result:', user ? '✅ Found' : '❌ Not found');
+    }
+
+    // ✅ If still not found, check all users
+    if (!user) {
+      console.log('🔄 Checking all users in database...');
+      const allUsers = await User.find({}).select('_id username').limit(5).lean();
+      console.log('📊 Sample users:', allUsers.map(u => ({ id: u._id.toString(), name: u.username })));
+    }
+
+    if (!user) {
+      console.log('❌ User not found');
+      return res.status(404).json({ 
+        message: 'Không tìm thấy người dùng',
+        userId: userId
+      });
+    }
+
+    // ✅ Format response
+    const response = {
       id: user._id.toString(),
       username: user.username || 'Chưa đặt tên',
       email: user.email || 'Chưa có email',
@@ -126,10 +159,31 @@ router.get('/admin/users/:id', verifyAdmin, async (req, res) => {
       role: user.role || 'user',
       createdAt: user.createdAt,
       avatarUrl: user.avatarUrl || null,
-      hasAvatar: !!u.avatarUrl
+      hasAvatar: user.avatarUrl ? true : false
+    };
+
+    console.log('✅ User detail response:', {
+      id: response.id,
+      username: response.username,
+      email: response.email,
+      avatarUrl: response.avatarUrl
     });
+    console.log('═══════════════════════════════════════════');
+
+    res.json(response);
+    
   } catch (err) {
-    res.status(500).json({ message: 'Lỗi server' });
+    console.error('❌ ERROR in GET /admin/users/:id');
+    console.error('Error name:', err.name);
+    console.error('Error message:', err.message);
+    console.error('Error stack:', err.stack);
+    console.log('═══════════════════════════════════════════');
+    
+    res.status(500).json({ 
+      message: 'Lỗi server',
+      error: err.message,
+      errorName: err.name
+    });
   }
 });
 
@@ -190,58 +244,92 @@ router.put('/admin/users/:id/avatar', verifyAdmin, upload.single('avatar'), asyn
   }
 });
 
-// ✅ Cập nhật thông tin người dùng
+// ✅ Cập nhật thông tin người dùng - FIXED (Include address)
 router.put('/admin/users/:id', verifyAdmin, async (req, res) => {
   try {
-    const { username, email, phoneNumber, role } = req.body;
+    const userId = req.params.id;
+    const { username, email, phoneNumber, address, role } = req.body;
+
+    console.log('═══════════════════════════════════════════');
+    console.log('✏️ UPDATE USER INFO');
+    console.log('═══════════════════════════════════════════');
+    console.log('📌 User ID:', userId);
+    console.log('📝 Received data:', { username, email, phoneNumber, address, role });
 
     const updateFields = {};
+    
+    // ✅ FIX: Thêm xử lý address
     if (username !== undefined) updateFields.username = username;
     if (email !== undefined) updateFields.email = email;
     if (phoneNumber !== undefined) updateFields.phoneNumber = phoneNumber;
+    if (address !== undefined) updateFields.address = address;  // ✅ THÊM
     if (role && ['user', 'admin'].includes(role)) {
       updateFields.role = role;
     }
 
+    console.log('📊 Fields to update:', updateFields);
+
     if (Object.keys(updateFields).length === 0) {
+      console.log('❌ No data to update');
       return res.status(400).json({ message: 'Không có dữ liệu để cập nhật' });
     }
 
+    // ✅ Cập nhật MongoDB
     const updatedUser = await User.findByIdAndUpdate(
-      req.params.id,
+      userId,
       updateFields,
       { new: true, runValidators: true }
-    ).select('-avatarPublicId');
+    ).select('-avatarPublicId').lean();
+
+    console.log('📊 MongoDB update result:', updatedUser ? '✅ Updated' : '❌ Not found');
 
     if (!updatedUser) {
+      console.log('❌ User not found');
       return res.status(404).json({ message: 'Không tìm thấy người dùng' });
     }
 
-    // Cập nhật Firestore
+    // ✅ Cập nhật Firestore
     const firestoreUpdateData = { ...updateFields };
     firestoreUpdateData.updatedAt = admin.firestore.FieldValue.serverTimestamp();
 
+    console.log('🔄 Updating Firestore...');
     await admin.firestore()
       .collection('Users')
-      .doc(req.params.id)
+      .doc(userId)
       .update(firestoreUpdateData)
       .catch(err => {
-        console.log(`Firestore user không tồn tại: ${req.params.id}`, err.message);
+        console.log(`⚠️ Firestore user không tồn tại: ${userId}`, err.message);
       });
 
-    res.json({
+    // ✅ Format response
+    const response = {
       message: 'Cập nhật thành công',
       user: {
         id: updatedUser._id.toString(),
         username: updatedUser.username,
         email: updatedUser.email,
         phoneNumber: updatedUser.phoneNumber,
-        role: updatedUser.role
+        address: updatedUser.address,  // ✅ THÊM
+        role: updatedUser.role,
+        avatarUrl: updatedUser.avatarUrl
       }
+    };
+
+    console.log('✅ Response sent:', {
+      username: response.user.username,
+      email: response.user.email,
+      address: response.user.address
     });
+    console.log('═══════════════════════════════════════════');
+
+    res.json(response);
   } catch (err) {
-    console.error('Lỗi cập nhật người dùng:', err.message);
-    res.status(500).json({ message: 'Cập nhật thất bại' });
+    console.error('❌ Lỗi cập nhật người dùng:', err.message);
+    console.error('Stack:', err.stack);
+    res.status(500).json({ 
+      message: 'Cập nhật thất bại',
+      error: err.message
+    });
   }
 });
 

@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_rentalhouse/config/api_routes.dart';
+import 'package:flutter_rentalhouse/config/loading.dart';
 import 'package:flutter_rentalhouse/models/rental.dart';
 import 'package:flutter_rentalhouse/views/Admin/View/UserPostDetail.dart';
 import 'package:flutter_rentalhouse/views/Admin/ViewModel/admin_viewmodel.dart';
 import 'package:flutter_rentalhouse/views/Admin/Widget/UserDetail/DeleteReasonDialog.dart';
 import 'package:flutter_rentalhouse/views/Admin/Widget/UserDetail/EditRentalDialog.dart';
+import 'package:lottie/lottie.dart';
 import 'package:provider/provider.dart';
 
 class ManagePostsScreen extends StatefulWidget {
@@ -35,35 +37,36 @@ class _ManagePostsScreenState extends State<ManagePostsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: const Color(0xFFF8FAFB),
       appBar: AppBar(
         elevation: 0,
         backgroundColor: Colors.white,
         leading: !_showUsersList
             ? IconButton(
-                icon: const Icon(Icons.arrow_back, color: Colors.black87),
-                onPressed: () {
-                  setState(() {
-                    _showUsersList = true;
-                    _selectedUserId = null;
-                    _selectedUserName = null;
-                  });
-                },
-              )
+          icon: const Icon(Icons.arrow_back, color: Color(0xFF1F2937)),
+          onPressed: () {
+            setState(() {
+              _showUsersList = true;
+              _selectedUserId = null;
+              _selectedUserName = null;
+            });
+          },
+        )
             : null,
         title: Text(
           _showUsersList
               ? 'Quản lý bài đăng'
               : 'Bài đăng của $_selectedUserName',
           style: const TextStyle(
-            color: Colors.black87,
-            fontWeight: FontWeight.bold,
-            fontSize: 18,
+            color: Color(0xFF1F2937),
+            fontWeight: FontWeight.w700,
+            fontSize: 20,
           ),
         ),
-        centerTitle: true,
+        centerTitle: false,
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(1),
-          child: Container(height: 1, color: Colors.grey[200]),
+          child: Container(height: 1, color: Colors.grey.shade200),
         ),
       ),
       body: _showUsersList ? _buildUsersList() : _buildPostsList(),
@@ -80,8 +83,25 @@ class _ManagePostsScreenState extends State<ManagePostsScreen> {
 
         // Loading state
         if (viewModel.isLoading && viewModel.users.isEmpty) {
-          return const Center(
-            child: CircularProgressIndicator(color: Colors.blue),
+          return  Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Lottie.asset(
+                    AssetsConfig.loadingLottie,
+                    width: 80,
+                    height: 80,
+                    fit: BoxFit.fill,
+                  ),
+                  SizedBox(height: 16),
+                  Text(
+                    'Đang tải dữ liệu...',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Colors.grey,
+                    ),)
+                ],
+              )
           );
         }
 
@@ -91,21 +111,21 @@ class _ManagePostsScreenState extends State<ManagePostsScreen> {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(Icons.error_outline, size: 48, color: Colors.red[400]),
-                const SizedBox(height: 12),
+                Icon(Icons.error_outline, size: 64, color: Colors.grey[400]),
+                const SizedBox(height: 16),
                 Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  padding: const EdgeInsets.symmetric(horizontal: 24),
                   child: Text(
                     viewModel.error ?? 'Có lỗi xảy ra',
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       color: Colors.grey[600],
-                      fontSize: 14,
+                      fontSize: 15,
                       fontWeight: FontWeight.w500,
                     ),
                   ),
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 24),
                 ElevatedButton.icon(
                   onPressed: () {
                     viewModel.resetUsersList();
@@ -114,21 +134,17 @@ class _ManagePostsScreenState extends State<ManagePostsScreen> {
                   icon: const Icon(Icons.refresh),
                   label: const Text('Thử lại'),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.blue,
+                    backgroundColor: const Color(0xFF4F46E5),
                     foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 24,
+                      vertical: 12,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
                   ),
                 ),
-                const SizedBox(height: 8),
-                TextButton.icon(
-                  onPressed: () {
-                    debugPrint('Error details: ${viewModel.error}');
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text(viewModel.error ?? '')),
-                    );
-                  },
-                  icon: const Icon(Icons.info),
-                  label: const Text('Chi tiết lỗi'),
-                )
               ],
             ),
           );
@@ -146,35 +162,41 @@ class _ManagePostsScreenState extends State<ManagePostsScreen> {
           children: [
             // 🔍 Search Bar
             Padding(
-              padding: const EdgeInsets.all(12),
+              padding: const EdgeInsets.all(16),
               child: TextField(
                 onChanged: (value) => setState(() => _searchTerm = value),
                 decoration: InputDecoration(
                   hintText: 'Tìm kiếm theo tên hoặc email...',
-                  prefixIcon: const Icon(Icons.search, color: Colors.grey),
+                  hintStyle: TextStyle(color: Colors.grey[500]),
+                  prefixIcon: Icon(Icons.search, color: Colors.grey[600]),
                   suffixIcon: _searchTerm.isNotEmpty
                       ? IconButton(
-                          icon: const Icon(Icons.clear, color: Colors.grey),
-                          onPressed: () {
-                            setState(() => _searchTerm = '');
-                          },
-                        )
+                    icon: Icon(Icons.clear, color: Colors.grey[600]),
+                    onPressed: () {
+                      setState(() => _searchTerm = '');
+                    },
+                  )
                       : null,
                   border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
-                    borderSide: BorderSide(color: Colors.grey[300]!),
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(color: Colors.grey.shade200),
                   ),
                   enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
-                    borderSide: BorderSide(color: Colors.grey[300]!),
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(color: Colors.grey.shade200),
                   ),
                   focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
-                    borderSide: const BorderSide(color: Colors.blue, width: 2),
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(
+                      color: Color(0xFF4F46E5),
+                      width: 2,
+                    ),
                   ),
+                  filled: true,
+                  fillColor: Colors.white,
                   contentPadding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 10,
+                    horizontal: 16,
+                    vertical: 12,
                   ),
                 ),
               ),
@@ -184,113 +206,157 @@ class _ManagePostsScreenState extends State<ManagePostsScreen> {
             Expanded(
               child: viewModel.users.isEmpty
                   ? Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(Icons.person_off,
-                              size: 48, color: Colors.grey[400]),
-                          const SizedBox(height: 12),
-                          Text(
-                            _searchTerm.isEmpty
-                                ? 'Không có người dùng nào'
-                                : 'Không tìm thấy người dùng',
-                            style: TextStyle(
-                              color: Colors.grey[600],
-                              fontSize: 16,
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.person_off,
+                        size: 64, color: Colors.grey[400]),
+                    const SizedBox(height: 16),
+                    Text(
+                      _searchTerm.isEmpty
+                          ? 'Không có người dùng nào'
+                          : 'Không tìm thấy người dùng',
+                      style: TextStyle(
+                        color: Colors.grey[600],
+                        fontSize: 16,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+              )
+                  : filteredUsers.isEmpty
+                  ? Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.search_off,
+                        size: 64, color: Colors.grey[400]),
+                    const SizedBox(height: 16),
+                    Text(
+                      'Không tìm thấy "$_searchTerm"',
+                      style: TextStyle(
+                        color: Colors.grey[600],
+                        fontSize: 16,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+              )
+                  : RefreshIndicator(
+                onRefresh: () async {
+                  viewModel.resetUsersList();
+                  await viewModel.fetchUsersWithPostCount(page: 1);
+                },
+                color: const Color(0xFF4F46E5),
+                child: ListView.builder(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  itemCount: filteredUsers.length,
+                  itemBuilder: (context, index) {
+                    final user = filteredUsers[index];
+                    final postsCount = user['postsCount'] ?? 0;
+                    final username = user['username'] ?? 'Chưa đặt tên';
+                    final email = user['email'] ?? '';
+                    final avatarUrl = user['avatar'] as String?;
+
+                    return Container(
+                      margin: const EdgeInsets.only(bottom: 12),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: Colors.grey.shade200,
+                          width: 1,
+                        ),
+                      ),
+                      child: Material(
+                        color: Colors.transparent,
+                        child: InkWell(
+                          onTap: () {
+                            _selectUserAndFetchPosts(context, user);
+                          },
+                          borderRadius: BorderRadius.circular(12),
+                          child: Padding(
+                            padding: const EdgeInsets.all(14),
+                            child: Row(
+                              children: [
+                                // Avatar với Cloudinary
+                                _buildUserAvatar(avatarUrl, username),
+                                const SizedBox(width: 14),
+
+                                // User Info
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                    CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        username,
+                                        style: const TextStyle(
+                                          fontSize: 15,
+                                          fontWeight: FontWeight.w700,
+                                          color: Color(0xFF1F2937),
+                                        ),
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        email,
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          color: Colors.grey[600],
+                                        ),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+
+                                // Post Count Badge
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 12,
+                                    vertical: 6,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF4F46E5)
+                                        .withOpacity(0.1),
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(
+                                      color: const Color(0xFF4F46E5)
+                                          .withOpacity(0.3),
+                                      width: 1,
+                                    ),
+                                  ),
+                                  child: Text(
+                                    '$postsCount',
+                                    style: const TextStyle(
+                                      color: Color(0xFF4F46E5),
+                                      fontWeight: FontWeight.w700,
+                                      fontSize: 14,
+                                    ),
+                                  ),
+                                ),
+
+                                const SizedBox(width: 8),
+
+                                // Arrow
+                                Icon(
+                                  Icons.arrow_forward_ios_rounded,
+                                  size: 16,
+                                  color: Colors.grey[400],
+                                ),
+                              ],
                             ),
                           ),
-                        ],
-                      ),
-                    )
-                  : filteredUsers.isEmpty
-                      ? Center(
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(Icons.search_off,
-                                  size: 48, color: Colors.grey[400]),
-                              const SizedBox(height: 12),
-                              Text(
-                                'Không tìm thấy "$_searchTerm"',
-                                style: TextStyle(
-                                  color: Colors.grey[600],
-                                  fontSize: 16,
-                                ),
-                              ),
-                            ],
-                          ),
-                        )
-                      : RefreshIndicator(
-                          onRefresh: () async {
-                            viewModel.resetUsersList();
-                            await viewModel.fetchUsersWithPostCount(page: 1);
-                          },
-                          child: ListView.builder(
-                            itemCount: filteredUsers.length,
-                            itemBuilder: (context, index) {
-                              final user = filteredUsers[index];
-                              final postsCount = user['postsCount'] ?? 0;
-                              final username =
-                                  user['username'] ?? 'Chưa đặt tên';
-                              final email = user['email'] ?? '';
-
-                              return Card(
-                                margin: const EdgeInsets.symmetric(
-                                  horizontal: 12,
-                                  vertical: 6,
-                                ),
-                                child: ListTile(
-                                  leading: CircleAvatar(
-                                    radius: 24,
-                                    backgroundColor: Colors.blue[100],
-                                    child: Text(
-                                      username.isNotEmpty
-                                          ? username[0].toUpperCase()
-                                          : '?',
-                                      style: const TextStyle(
-                                        color: Colors.blue,
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 18,
-                                      ),
-                                    ),
-                                  ),
-                                  title: Text(
-                                    username,
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                  subtitle: Text(
-                                    email,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                  trailing: Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 12,
-                                      vertical: 6,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: Colors.blue[100],
-                                      borderRadius: BorderRadius.circular(20),
-                                    ),
-                                    child: Text(
-                                      '$postsCount bài',
-                                      style: const TextStyle(
-                                        color: Colors.blue,
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 12,
-                                      ),
-                                    ),
-                                  ),
-                                  onTap: () {
-                                    _selectUserAndFetchPosts(context, user);
-                                  },
-                                ),
-                              );
-                            },
-                          ),
                         ),
+                      ),
+                    );
+                  },
+                ),
+              ),
             ),
           ],
         );
@@ -298,11 +364,70 @@ class _ManagePostsScreenState extends State<ManagePostsScreen> {
     );
   }
 
+  // ========== BUILD USER AVATAR ==========
+  Widget _buildUserAvatar(String? avatarUrl, String username) {
+    return Container(
+      width: 48,
+      height: 48,
+      decoration: BoxDecoration(
+        color: const Color(0xFF4F46E5).withOpacity(0.1),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(
+          color: const Color(0xFF4F46E5).withOpacity(0.2),
+          width: 2,
+        ),
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(22),
+        child: avatarUrl != null && avatarUrl.isNotEmpty
+            ? Image.network(
+          avatarUrl,
+          fit: BoxFit.cover,
+          errorBuilder: (context, error, stackTrace) {
+            return _buildDefaultAvatar(username);
+          },
+          loadingBuilder: (context, child, loadingProgress) {
+            if (loadingProgress == null) return child;
+            return Center(
+              child: SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: const Color(0xFF4F46E5),
+                  value: loadingProgress.expectedTotalBytes != null
+                      ? loadingProgress.cumulativeBytesLoaded /
+                      loadingProgress.expectedTotalBytes!
+                      : null,
+                ),
+              ),
+            );
+          },
+        )
+            : _buildDefaultAvatar(username),
+      ),
+    );
+  }
+
+  // ========== BUILD DEFAULT AVATAR ==========
+  Widget _buildDefaultAvatar(String username) {
+    return Center(
+      child: Text(
+        username.isNotEmpty ? username[0].toUpperCase() : '?',
+        style: const TextStyle(
+          color: Color(0xFF4F46E5),
+          fontWeight: FontWeight.w700,
+          fontSize: 20,
+        ),
+      ),
+    );
+  }
+
   // ========== SELECT USER & FETCH POSTS ==========
   void _selectUserAndFetchPosts(
-    BuildContext context,
-    Map<String, dynamic> user,
-  ) {
+      BuildContext context,
+      Map<String, dynamic> user,
+      ) {
     final userId = user['id'] as String;
     final username = user['username'] ?? 'Người dùng';
 
@@ -312,7 +437,6 @@ class _ManagePostsScreenState extends State<ManagePostsScreen> {
       _showUsersList = false;
     });
 
-    // Fetch posts for this user
     context.read<AdminViewModel>().fetchUserPosts(userId);
   }
 
@@ -323,7 +447,7 @@ class _ManagePostsScreenState extends State<ManagePostsScreen> {
         // Loading state
         if (viewModel.isLoading && viewModel.userPosts.isEmpty) {
           return const Center(
-            child: CircularProgressIndicator(color: Colors.blue),
+            child: CircularProgressIndicator(color: Color(0xFF4F46E5)),
           );
         }
 
@@ -337,15 +461,16 @@ class _ManagePostsScreenState extends State<ManagePostsScreen> {
               children: [
                 Icon(
                   Icons.article_outlined,
-                  size: 48,
+                  size: 64,
                   color: Colors.grey[400],
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 16),
                 Text(
                   'Người dùng này chưa có bài đăng nào',
                   style: TextStyle(
                     color: Colors.grey[600],
                     fontSize: 16,
+                    fontWeight: FontWeight.w500,
                   ),
                 ),
               ],
@@ -354,7 +479,7 @@ class _ManagePostsScreenState extends State<ManagePostsScreen> {
         }
 
         return ListView.builder(
-          padding: const EdgeInsets.all(12),
+          padding: const EdgeInsets.all(16),
           itemCount: posts.length,
           itemBuilder: (context, index) {
             final post = posts[index];
@@ -369,11 +494,12 @@ class _ManagePostsScreenState extends State<ManagePostsScreen> {
 
   // ========== BUILD POST CARD ==========
   Widget _buildPostCard(BuildContext context, Rental post, bool isNew) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: 12),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: BorderSide(color: Colors.grey[200]!),
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: Colors.grey.shade200, width: 1),
       ),
       child: Column(
         children: [
@@ -382,19 +508,19 @@ class _ManagePostsScreenState extends State<ManagePostsScreen> {
             _buildImageSection(post, isNew)
           else
             Container(
-              height: 150,
+              height: 180,
               width: double.infinity,
               decoration: BoxDecoration(
                 color: Colors.grey[200],
                 borderRadius: const BorderRadius.only(
-                  topLeft: Radius.circular(12),
-                  topRight: Radius.circular(12),
+                  topLeft: Radius.circular(14),
+                  topRight: Radius.circular(14),
                 ),
               ),
               child: Center(
                 child: Icon(
                   Icons.image_not_supported,
-                  size: 48,
+                  size: 56,
                   color: Colors.grey[400],
                 ),
               ),
@@ -402,11 +528,11 @@ class _ManagePostsScreenState extends State<ManagePostsScreen> {
 
           // 📄 Post Details Section
           Padding(
-            padding: const EdgeInsets.all(12),
+            padding: const EdgeInsets.all(16),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Title with New Badge
+                // Title
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -415,7 +541,8 @@ class _ManagePostsScreenState extends State<ManagePostsScreen> {
                         post.title,
                         style: const TextStyle(
                           fontSize: 16,
-                          fontWeight: FontWeight.w600,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFF1F2937),
                         ),
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
@@ -429,54 +556,61 @@ class _ManagePostsScreenState extends State<ManagePostsScreen> {
                           vertical: 4,
                         ),
                         decoration: BoxDecoration(
-                          color: Colors.red,
-                          borderRadius: BorderRadius.circular(12),
+                          color: Colors.red.shade400,
+                          borderRadius: BorderRadius.circular(6),
                         ),
                         child: const Text(
-                          '🔥',
-                          style: TextStyle(fontSize: 10),
+                          'MỚI',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 10,
+                            fontWeight: FontWeight.w700,
+                          ),
                         ),
                       ),
                   ],
                 ),
 
-                const SizedBox(height: 8),
+                const SizedBox(height: 12),
 
-                // Price, Area
+                // Info Row: Price, Area
                 Row(
                   children: [
                     Expanded(
                       child: _buildInfoItem(
-                        '💰',
-                        '${(post.price / 1000000).toStringAsFixed(1)}M',
+                        Icons.payments_rounded,
+                        _formatPrice(post.price),
+                        const Color(0xFF10B981),
                       ),
                     ),
+                    const SizedBox(width: 12),
                     Expanded(
                       child: _buildInfoItem(
-                        '📐',
+                        Icons.aspect_ratio_rounded,
                         '${post.area['total']?.toStringAsFixed(0) ?? '0'}m²',
+                        const Color(0xFF3B82F6),
                       ),
                     ),
                   ],
                 ),
 
-                const SizedBox(height: 8),
+                const SizedBox(height: 10),
 
                 // Location
                 Row(
                   children: [
-                    const Icon(
-                      Icons.location_on,
+                    Icon(
+                      Icons.location_on_rounded,
                       size: 14,
-                      color: Colors.grey,
+                      color: Colors.grey[600],
                     ),
-                    const SizedBox(width: 4),
+                    const SizedBox(width: 6),
                     Expanded(
                       child: Text(
                         post.location['short'] ?? 'Chưa cập nhật',
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 12,
-                          color: Colors.grey,
+                          color: Colors.grey[600],
                         ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
@@ -491,73 +625,41 @@ class _ManagePostsScreenState extends State<ManagePostsScreen> {
                 Text(
                   'Đăng ${_getTimeAgo(post.createdAt)}',
                   style: TextStyle(
-                    fontSize: 12,
-                    color: Colors.grey[600],
+                    fontSize: 11,
+                    color: Colors.grey[500],
                   ),
                 ),
 
-                const SizedBox(height: 12),
+                const SizedBox(height: 14),
 
-                // ✅ ACTION BUTTONS - 3 BUTTONS (View, Edit, Delete)
-                Column(
+                // ACTION BUTTONS - Updated với icon đẹp hơn
+                Row(
                   children: [
-                    // Row 1: Xem & Chỉnh sửa
-                    Row(
-                      children: [
-                        Expanded(
-                          child: ElevatedButton.icon(
-                            onPressed: () {
-                              _showPostDetailDialog(context, post);
-                            },
-                            icon: const Icon(Icons.visibility, size: 16),
-                            label: const Text('Xem'),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.blue,
-                              foregroundColor: Colors.white,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(6),
-                              ),
-                              padding: const EdgeInsets.symmetric(vertical: 10),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: ElevatedButton.icon(
-                            onPressed: () {
-                              _showEditDialog(context, post);
-                            },
-                            icon: const Icon(Icons.edit, size: 16),
-                            label: const Text('Sửa'),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.amber,
-                              foregroundColor: Colors.white,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(6),
-                              ),
-                              padding: const EdgeInsets.symmetric(vertical: 10),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: ElevatedButton.icon(
-                            onPressed: () {
-                              _showDeleteConfirmDialog(context, post);
-                            },
-                            icon: const Icon(Icons.delete, size: 16),
-                            label: const Text('Xóa'),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.red,
-                              foregroundColor: Colors.white,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(6),
-                              ),
-                              padding: const EdgeInsets.symmetric(vertical: 10),
-                            ),
-                          ),
-                        ),
-                      ],
+                    Expanded(
+                      child: _actionButton(
+                        Icons.visibility_rounded,
+                        'Xem',
+                        const Color(0xFF3B82F6),
+                            () => _showPostDetailDialog(context, post),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: _actionButton(
+                        Icons.edit_rounded,
+                        'Sửa',
+                        const Color(0xFFF59E0B),
+                            () => _showEditDialog(context, post),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: _actionButton(
+                        Icons.delete_rounded,
+                        'Xóa',
+                        Colors.red.shade400,
+                            () => _showDeleteConfirmDialog(context, post),
+                      ),
                     ),
                   ],
                 ),
@@ -569,6 +671,37 @@ class _ManagePostsScreenState extends State<ManagePostsScreen> {
     );
   }
 
+  // ========== ACTION BUTTON HELPER - Updated ==========
+  Widget _actionButton(
+      IconData icon,
+      String label,
+      Color color,
+      VoidCallback onPressed,
+      ) {
+    return ElevatedButton.icon(
+      onPressed: onPressed,
+      icon: Icon(icon, size: 16),
+      label: Text(
+        label,
+        style: const TextStyle(
+          fontWeight: FontWeight.w600,
+          fontSize: 13,
+        ),
+      ),
+      style: ElevatedButton.styleFrom(
+        backgroundColor: color.withOpacity(0.1),
+        foregroundColor: color,
+        elevation: 0,
+        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(8),
+          side: BorderSide(color: color.withOpacity(0.3), width: 1),
+        ),
+      ),
+    );
+  }
+
+  // ========== SHOW EDIT DIALOG ==========
   void _showEditDialog(BuildContext context, Rental post) {
     showDialog(
       context: context,
@@ -576,7 +709,6 @@ class _ManagePostsScreenState extends State<ManagePostsScreen> {
         rental: post,
         onEditSuccess: () {
           debugPrint('✅ Post edited successfully');
-          // ✅ Refresh danh sách bài đăng
           if (_selectedUserId != null) {
             context.read<AdminViewModel>().fetchUserPosts(_selectedUserId!);
           }
@@ -593,8 +725,8 @@ class _ManagePostsScreenState extends State<ManagePostsScreen> {
       decoration: BoxDecoration(
         color: Colors.grey[200],
         borderRadius: const BorderRadius.only(
-          topLeft: Radius.circular(12),
-          topRight: Radius.circular(12),
+          topLeft: Radius.circular(14),
+          topRight: Radius.circular(14),
         ),
       ),
       child: Stack(
@@ -610,7 +742,7 @@ class _ManagePostsScreenState extends State<ManagePostsScreen> {
               return Center(
                 child: Icon(
                   Icons.image_not_supported,
-                  size: 48,
+                  size: 56,
                   color: Colors.grey[400],
                 ),
               );
@@ -620,20 +752,21 @@ class _ManagePostsScreenState extends State<ManagePostsScreen> {
           // 🔥 New Badge
           if (isNew)
             Positioned(
-              top: 8,
-              right: 8,
+              top: 10,
+              right: 10,
               child: Container(
                 padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
+                  horizontal: 12,
                   vertical: 6,
                 ),
                 decoration: BoxDecoration(
-                  color: Colors.red,
-                  borderRadius: BorderRadius.circular(20),
+                  color: Colors.red.shade400,
+                  borderRadius: BorderRadius.circular(6),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.red.withOpacity(0.5),
+                      color: Colors.red.withOpacity(0.4),
                       blurRadius: 8,
+                      offset: const Offset(0, 2),
                     ),
                   ],
                 ),
@@ -641,8 +774,8 @@ class _ManagePostsScreenState extends State<ManagePostsScreen> {
                   '🔥 MỚI',
                   style: TextStyle(
                     color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 11,
                   ),
                 ),
               ),
@@ -650,25 +783,32 @@ class _ManagePostsScreenState extends State<ManagePostsScreen> {
 
           // Status Badge
           Positioned(
-            bottom: 8,
-            left: 8,
+            bottom: 10,
+            left: 10,
             child: Container(
               padding: const EdgeInsets.symmetric(
-                horizontal: 10,
+                horizontal: 12,
                 vertical: 6,
               ),
               decoration: BoxDecoration(
                 color: post.status == 'available'
-                    ? Colors.green
-                    : Colors.grey[700],
-                borderRadius: BorderRadius.circular(20),
+                    ? Colors.green.shade500
+                    : Colors.grey[600],
+                borderRadius: BorderRadius.circular(6),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.2),
+                    blurRadius: 4,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
               ),
               child: Text(
                 post.status == 'available' ? 'Còn trống' : 'Đã thuê',
                 style: const TextStyle(
                   color: Colors.white,
-                  fontSize: 12,
-                  fontWeight: FontWeight.bold,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
                 ),
               ),
             ),
@@ -688,16 +828,12 @@ class _ManagePostsScreenState extends State<ManagePostsScreen> {
           userName: _selectedUserName ?? 'Người dùng',
           onPostDeleted: () {
             debugPrint('🔄 Post deleted! Refreshing list...');
-
-            // ✅ Cập nhật danh sách bài đăng
             if (_selectedUserId != null) {
               context.read<AdminViewModel>().fetchUserPosts(_selectedUserId!);
             }
           },
           onPostUpdated: () {
             debugPrint('🔄 Post updated! Refreshing list...');
-
-            // ✅ Cập nhật danh sách bài đăng
             if (_selectedUserId != null) {
               context.read<AdminViewModel>().fetchUserPosts(_selectedUserId!);
             }
@@ -726,7 +862,6 @@ class _ManagePostsScreenState extends State<ManagePostsScreen> {
   Future<void> _deletePost(BuildContext context, String rentalId) async {
     final adminVM = context.read<AdminViewModel>();
 
-    // Show loading indicator
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -760,7 +895,7 @@ class _ManagePostsScreenState extends State<ManagePostsScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: const Text('✅ Xóa bài viết thành công'),
-            backgroundColor: Colors.green[600],
+            backgroundColor: Colors.green.shade600,
             duration: const Duration(seconds: 2),
             behavior: SnackBarBehavior.floating,
             shape: RoundedRectangleBorder(
@@ -768,8 +903,6 @@ class _ManagePostsScreenState extends State<ManagePostsScreen> {
             ),
           ),
         );
-
-        // trong deleteUserPost() của AdminViewModel
       } else {
         debugPrint('❌ Delete failed');
 
@@ -779,7 +912,7 @@ class _ManagePostsScreenState extends State<ManagePostsScreen> {
               adminVM.error ?? '❌ Xóa bài viết thất bại',
               style: const TextStyle(color: Colors.white),
             ),
-            backgroundColor: Colors.red[600],
+            backgroundColor: Colors.red.shade600,
             duration: const Duration(seconds: 3),
             behavior: SnackBarBehavior.floating,
             shape: RoundedRectangleBorder(
@@ -793,39 +926,62 @@ class _ManagePostsScreenState extends State<ManagePostsScreen> {
 
   // ========== HELPER METHODS ==========
 
-  /// Check if post is new (within 30 minutes)
+  // Format giá tiền theo chuẩn Việt Nam
+  String _formatPrice(double price) {
+    if (price >= 1000000000) {
+      // Tỷ
+      final ty = price / 1000000000;
+      return '${ty.toStringAsFixed(ty % 1 == 0 ? 0 : 1)} tỷ/tháng';
+    } else if (price >= 1000000) {
+      // Triệu
+      final trieu = price / 1000000;
+      return '${trieu.toStringAsFixed(trieu % 1 == 0 ? 0 : 1)} triệu/tháng';
+    } else if (price >= 1000) {
+      // Nghìn
+      final nghin = price / 1000;
+      return '${nghin.toStringAsFixed(nghin % 1 == 0 ? 0 : 1)} nghìn/tháng';
+    } else {
+      return '${price.toStringAsFixed(0)}đ/tháng';
+    }
+  }
+
   bool _isNewPost(DateTime createdAt) {
     final difference = DateTime.now().difference(createdAt);
     return difference.inMinutes < 30;
   }
 
-  /// Format time ago
   String _getTimeAgo(DateTime date) {
     final difference = DateTime.now().difference(date);
 
     if (difference.inSeconds < 60) return 'vừa xong';
-    if (difference.inMinutes < 60) return '${difference.inMinutes}m trước';
-    if (difference.inHours < 24) return '${difference.inHours}h trước';
-    if (difference.inDays < 7) return '${difference.inDays}d trước';
-    if (difference.inDays < 30)
-      return '${(difference.inDays / 7).floor()}w trước';
+    if (difference.inMinutes < 60) return '${difference.inMinutes} phút trước';
+    if (difference.inHours < 24) return '${difference.inHours} giờ trước';
+    if (difference.inDays < 7) return '${difference.inDays} ngày trước';
+    if (difference.inDays < 30) {
+      final weeks = (difference.inDays / 7).floor();
+      return '$weeks tuần trước';
+    }
+    if (difference.inDays < 365) {
+      final months = (difference.inDays / 30).floor();
+      return '$months tháng trước';
+    }
 
-    return '${(difference.inDays / 30).floor()}mo trước';
+    final years = (difference.inDays / 365).floor();
+    return '$years năm trước';
   }
 
-  /// Build info item (icon + text)
-  Widget _buildInfoItem(String icon, String text) {
+  Widget _buildInfoItem(IconData icon, String text, Color color) {
     return Row(
       children: [
-        Text(icon, style: const TextStyle(fontSize: 14)),
-        const SizedBox(width: 4),
+        Icon(icon, size: 14, color: color),
+        const SizedBox(width: 6),
         Expanded(
           child: Text(
             text,
-            style: const TextStyle(
-              fontSize: 13,
+            style: TextStyle(
+              fontSize: 12,
               fontWeight: FontWeight.w600,
-              color: Colors.grey,
+              color: Colors.grey[700],
             ),
             overflow: TextOverflow.ellipsis,
           ),

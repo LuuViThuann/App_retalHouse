@@ -1,4 +1,3 @@
-// views/create_rental_screen.dart - FINAL FIX
 import 'package:flutter/material.dart';
 import 'package:flutter_rentalhouse/Widgets/createRental/MediaPickerWidget.dart';
 import 'package:flutter_rentalhouse/Widgets/createRental/area.dart';
@@ -8,6 +7,7 @@ import 'package:flutter_rentalhouse/Widgets/createRental/info_basic_rental.dart'
 import 'package:flutter_rentalhouse/Widgets/createRental/location.dart';
 import 'package:flutter_rentalhouse/Widgets/createRental/rental_form.dart';
 import 'package:flutter_rentalhouse/Widgets/createRental/term_rental.dart';
+import 'package:flutter_rentalhouse/utils/Snackbar_process.dart';
 import 'package:flutter_rentalhouse/views/PaymentScreen.dart';
 import 'package:provider/provider.dart';
 import 'dart:io';
@@ -62,21 +62,30 @@ class _CreateRentalScreenState extends State<CreateRentalScreen> {
     super.dispose();
   }
 
-  /// Handle payment với polling logic mới
+  /// Handle payment với polling logic
   Future<void> _handlePaymentFirst() async {
     if (!_formKey.currentState!.validate()) {
-      _showErrorSnackBar('Vui lòng điền đầy đủ thông tin bài đăng');
+      AppSnackBar.show(
+        context,
+        AppSnackBar.warning(message: 'Vui lòng điền đầy đủ thông tin bài đăng'),
+      );
       return;
     }
 
     final totalMedia = _imagesNotifier.value.length + _videosNotifier.value.length;
     if (totalMedia == 0) {
-      _showErrorSnackBar('Vui lòng chọn ít nhất một ảnh hoặc video');
+      AppSnackBar.show(
+        context,
+        AppSnackBar.warning(message: 'Vui lòng chọn ít nhất một ảnh hoặc video'),
+      );
       return;
     }
 
     if (totalMedia > 10) {
-      _showErrorSnackBar('Tối đa 10 ảnh/video được phép');
+      AppSnackBar.show(
+        context,
+        AppSnackBar.error(message: 'Tối đa 10 ảnh/video được phép'),
+      );
       return;
     }
 
@@ -91,7 +100,6 @@ class _CreateRentalScreenState extends State<CreateRentalScreen> {
       debugPrint('🚀 STARTING PAYMENT FLOW');
       debugPrint('=' * 60);
 
-      // Step 1: Create payment
       final payment = await _paymentService.createPaymentTransaction(
         amount: 10000,
         description: 'Phí đăng bài bất động sản',
@@ -102,7 +110,6 @@ class _CreateRentalScreenState extends State<CreateRentalScreen> {
 
       if (!mounted) return;
 
-      // Step 2: Show WebView
       debugPrint('\n📱 Opening payment WebView...');
       final result = await Navigator.push<Map<String, dynamic>>(
         context,
@@ -120,20 +127,21 @@ class _CreateRentalScreenState extends State<CreateRentalScreen> {
       debugPrint('\n🔙 WebView closed');
       debugPrint('   Result: $result');
 
-      // Step 3: Đợi một chút để VNPay callback xử lý
       debugPrint('\n⏰ Waiting 4 seconds for VNPay callback processing...');
       await Future.delayed(const Duration(seconds: 4));
 
       if (!mounted) return;
 
-      // Step 4: Poll payment status với logic mới
       debugPrint('\n🔍 Starting payment status polling...');
       await _pollAndProcessPayment(payment.transactionCode);
 
     } catch (e) {
       debugPrint('\n❌ Payment error: $e');
       if (mounted) {
-        _showErrorSnackBar('Lỗi thanh toán: ${e.toString()}');
+        AppSnackBar.show(
+          context,
+          AppSnackBar.error(message: 'Lỗi thanh toán: ${e.toString()}'),
+        );
       }
     } finally {
       if (mounted) {
@@ -147,7 +155,6 @@ class _CreateRentalScreenState extends State<CreateRentalScreen> {
     if (!mounted) return;
 
     try {
-      // Sử dụng pollPaymentStatus từ PaymentService
       final status = await _paymentService.pollPaymentStatus(
         transactionCode: transactionCode,
         maxAttempts: 15,
@@ -162,14 +169,9 @@ class _CreateRentalScreenState extends State<CreateRentalScreen> {
       debugPrint('\n📊 Final payment status:');
       debugPrint('   Status: $paymentStatus');
       debugPrint('   Is completed: $isCompleted');
-      debugPrint('   Response code: ${status['responseCode']}');
-      debugPrint('   Bank: ${status['bankCode']}');
 
       if (paymentStatus == 'completed' || isCompleted == true) {
-        // ✅ THANH TOÁN THÀNH CÔNG
-        debugPrint('\n' + '🎉' * 20);
-        debugPrint('✅ PAYMENT CONFIRMED SUCCESSFULLY!');
-        debugPrint('🎉' * 20 + '\n');
+        debugPrint('\n✅ PAYMENT CONFIRMED SUCCESSFULLY!\n');
 
         if (mounted) {
           setState(() {
@@ -184,7 +186,14 @@ class _CreateRentalScreenState extends State<CreateRentalScreen> {
           });
         }
 
-        _showSuccessSnackBar('✅ Thanh toán thành công! Đang đăng bài...');
+        AppSnackBar.show(
+          context,
+          AppSnackBar.success(
+            message: 'Thanh toán thành công! Đang đăng bài...',
+            icon: Icons.check_circle_rounded,
+            seconds: 3,
+          ),
+        );
 
         await Future.delayed(const Duration(milliseconds: 500));
 
@@ -192,11 +201,12 @@ class _CreateRentalScreenState extends State<CreateRentalScreen> {
           await _submitFormWithPayment();
         }
       } else if (paymentStatus == 'failed' || paymentStatus == 'cancelled') {
-        // ❌ THANH TOÁN THẤT BẠI
         debugPrint('\n❌ Payment failed or cancelled');
-        _showErrorSnackBar('Thanh toán thất bại hoặc đã bị hủy.');
+        AppSnackBar.show(
+          context,
+          AppSnackBar.error(message: 'Thanh toán thất bại hoặc đã bị hủy'),
+        );
       } else {
-        // ⚠️ Trạng thái không xác định
         debugPrint('\n⚠️ Unexpected payment status: $paymentStatus');
         await _showManualCheckDialog(transactionCode);
       }
@@ -204,7 +214,6 @@ class _CreateRentalScreenState extends State<CreateRentalScreen> {
       debugPrint('\n❌ Polling error: $e');
 
       if (e.toString().contains('Timeout')) {
-        // Timeout - cho phép retry
         if (mounted) {
           final shouldRetry = await _showTimeoutDialog(transactionCode);
           if (shouldRetry == true && mounted) {
@@ -212,113 +221,274 @@ class _CreateRentalScreenState extends State<CreateRentalScreen> {
           }
         }
       } else {
-        // Lỗi khác
         if (mounted) {
-          _showErrorSnackBar('Lỗi kiểm tra thanh toán: ${e.toString()}');
+          AppSnackBar.show(
+            context,
+            AppSnackBar.error(message: 'Lỗi kiểm tra thanh toán: ${e.toString()}'),
+          );
         }
       }
     }
   }
 
-  /// Dialog khi timeout
+  /// Dialog khi timeout - Modern Banking Style
   Future<bool?> _showTimeoutDialog(String transactionCode) async {
     return showDialog<bool>(
       context: context,
       barrierDismissible: false,
-      builder: (context) => AlertDialog(
-        title: Row(
-          children: [
-            Icon(Icons.access_time, color: Colors.orange[700], size: 24),
-            const SizedBox(width: 8),
-            const Text('Hết thời gian chờ'),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Không thể xác nhận trạng thái thanh toán.\n\n'
-                  'Bạn muốn thử kiểm tra lại?',
-            ),
-            const SizedBox(height: 12),
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.grey[100],
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.grey[300]!),
-              ),
-              child: SelectableText(
-                'Mã GD: $transactionCode',
-                style: const TextStyle(
-                  fontSize: 12,
-                  fontFamily: 'monospace',
-                  fontWeight: FontWeight.bold,
+      builder: (context) => Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        child: Container(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Icon
+              Container(
+                width: 64,
+                height: 64,
+                decoration: BoxDecoration(
+                  color: Colors.orange[50],
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  Icons.access_time_rounded,
+                  color: Colors.orange[700],
+                  size: 32,
                 ),
               ),
-            ),
-          ],
+              const SizedBox(height: 20),
+
+              // Title
+              const Text(
+                'Hết thời gian chờ',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 12),
+
+              // Message
+              Text(
+                'Không thể xác nhận trạng thái thanh toán.\nBạn muốn thử kiểm tra lại?',
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Colors.grey[600],
+                  height: 1.5,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 20),
+
+              // Transaction Code
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                decoration: BoxDecoration(
+                  color: Colors.grey[100],
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.grey[300]!),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.tag, size: 16, color: Colors.grey[600]),
+                    const SizedBox(width: 8),
+                    Flexible(
+                      child: SelectableText(
+                        transactionCode,
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontFamily: 'monospace',
+                          fontWeight: FontWeight.w600,
+                          color: Colors.grey[800],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 24),
+
+              // Actions
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () => Navigator.pop(context, false),
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        side: BorderSide(color: Colors.grey[300]!),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      child: const Text(
+                        'Đóng',
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: () => Navigator.pop(context, true),
+                      style: ElevatedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        backgroundColor: Colors.blue[700],
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      child: const Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.refresh_rounded, size: 18),
+                          SizedBox(width: 6),
+                          Text(
+                            'Thử lại',
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Đóng'),
-          ),
-          ElevatedButton.icon(
-            onPressed: () => Navigator.pop(context, true),
-            icon: const Icon(Icons.refresh, size: 18),
-            label: const Text('Thử lại'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.blue[700],
-            ),
-          ),
-        ],
       ),
     );
   }
 
-  /// Dialog yêu cầu check thủ công
+  /// Dialog yêu cầu check thủ công - Modern Banking Style
   Future<void> _showManualCheckDialog(String transactionCode) async {
     return showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) => AlertDialog(
-        title: const Text('Cần kiểm tra thủ công'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Không thể tự động xác nhận thanh toán.\n\n'
-                  'Vui lòng kiểm tra trạng thái giao dịch trong lịch sử thanh toán.',
-            ),
-            const SizedBox(height: 12),
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.blue[50],
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.blue[200]!),
-              ),
-              child: SelectableText(
-                'Mã GD: $transactionCode',
-                style: TextStyle(
-                  fontSize: 12,
-                  fontFamily: 'monospace',
-                  color: Colors.blue[900],
-                  fontWeight: FontWeight.bold,
+      builder: (context) => Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        child: Container(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Icon
+              Container(
+                width: 64,
+                height: 64,
+                decoration: BoxDecoration(
+                  color: Colors.blue[50],
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  Icons.info_outline_rounded,
+                  color: Colors.blue[700],
+                  size: 32,
                 ),
               ),
-            ),
-          ],
-        ),
-        actions: [
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Đã hiểu'),
+              const SizedBox(height: 20),
+
+              // Title
+              const Text(
+                'Cần kiểm tra thủ công',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 12),
+
+              // Message
+              Text(
+                'Không thể tự động xác nhận thanh toán.\n\nVui lòng kiểm tra trạng thái giao dịch trong lịch sử thanh toán.',
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Colors.grey[600],
+                  height: 1.5,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 20),
+
+              // Transaction Code
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.blue[50],
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.blue[200]!),
+                ),
+                child: Column(
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.receipt_long_rounded,
+                            size: 16,
+                            color: Colors.blue[700]),
+                        const SizedBox(width: 6),
+                        Text(
+                          'Mã giao dịch',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.blue[700],
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    SelectableText(
+                      transactionCode,
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontFamily: 'monospace',
+                        color: Colors.blue[900],
+                        fontWeight: FontWeight.bold,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 24),
+
+              // Action
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: () => Navigator.pop(context),
+                  style: ElevatedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    backgroundColor: Colors.blue[700],
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  child: const Text(
+                    'Đã hiểu',
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
@@ -326,7 +496,10 @@ class _CreateRentalScreenState extends State<CreateRentalScreen> {
   /// Submit form with payment
   Future<void> _submitFormWithPayment() async {
     if (_completedPayment == null) {
-      _showErrorSnackBar('Vui lòng thanh toán trước');
+      AppSnackBar.show(
+        context,
+        AppSnackBar.warning(message: 'Vui lòng thanh toán trước'),
+      );
       return;
     }
 
@@ -334,16 +507,12 @@ class _CreateRentalScreenState extends State<CreateRentalScreen> {
     final rentalViewModel = Provider.of<RentalViewModel>(context, listen: false);
 
     if (authViewModel.currentUser == null) {
-      _showErrorSnackBar('Vui lòng đăng nhập');
+      AppSnackBar.show(
+        context,
+        AppSnackBar.error(message: 'Vui lòng đăng nhập'),
+      );
       return;
     }
-
-    debugPrint('\n' + '🏠' * 20);
-    debugPrint('🚀 SUBMITTING RENTAL POST');
-    debugPrint('🏠' * 20);
-    debugPrint('Payment Code: ${_completedPayment!.transactionCode}');
-    debugPrint('Payment Status: ${_completedPayment!.status}');
-    debugPrint('User: ${authViewModel.currentUser!.id}');
 
     final rental = _formStateManager.buildRental(
       images: _imagesNotifier.value.map((file) => file.path).toList(),
@@ -361,8 +530,6 @@ class _CreateRentalScreenState extends State<CreateRentalScreen> {
         setState(() => _isProcessingPayment = true);
       }
 
-      debugPrint('\n📤 Calling createRental API...');
-
       await rentalViewModel.createRental(
         rental,
         _imagesNotifier.value.map((file) => file.path).toList(),
@@ -372,27 +539,32 @@ class _CreateRentalScreenState extends State<CreateRentalScreen> {
       if (!mounted) return;
 
       if (rentalViewModel.errorMessage == null) {
-        debugPrint('\n' + '✅' * 20);
-        debugPrint('🎉 RENTAL POSTED SUCCESSFULLY!');
-        debugPrint('✅' * 20 + '\n');
-
-        _showSuccessSnackBar('✅ Bài đăng đã được xuất bản thành công!');
+        AppSnackBar.show(
+          context,
+          AppSnackBar.success(
+            message: 'Bài đăng đã được xuất bản thành công!',
+            icon: Icons.celebration_rounded,
+            seconds: 2,
+          ),
+        );
 
         await Future.delayed(const Duration(seconds: 2));
         if (mounted) {
           Navigator.pop(context, true);
         }
       } else {
-        debugPrint('\n❌ Rental creation failed:');
-        debugPrint('   Error: ${rentalViewModel.errorMessage}');
-
-        _showErrorSnackBar(
-          rentalViewModel.errorMessage ?? 'Lỗi tạo bài đăng',
+        AppSnackBar.show(
+          context,
+          AppSnackBar.error(
+            message: rentalViewModel.errorMessage ?? 'Lỗi tạo bài đăng',
+          ),
         );
       }
     } catch (e) {
-      debugPrint('\n❌ Exception creating rental: $e');
-      _showErrorSnackBar('Lỗi: $e');
+      AppSnackBar.show(
+        context,
+        AppSnackBar.error(message: 'Lỗi: $e'),
+      );
     } finally {
       if (mounted) {
         setState(() => _isProcessingPayment = false);
@@ -400,136 +572,245 @@ class _CreateRentalScreenState extends State<CreateRentalScreen> {
     }
   }
 
+  /// Modern Banking Style Payment Confirmation Dialog
   Future<bool?> _showPaymentConfirmDialog() {
     return showDialog<bool>(
       context: context,
       barrierDismissible: false,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: Colors.blue[50],
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Icon(Icons.payment, color: Colors.blue[700], size: 24),
-            ),
-            const SizedBox(width: 12),
-            const Expanded(
-              child: Text(
-                'Thanh toán phí đăng bài',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-              ),
-            ),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text('Để đăng bài, bạn cần thanh toán:'),
-            const SizedBox(height: 16),
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [Colors.blue[50]!, Colors.blue[100]!],
-                ),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.blue[200]!, width: 1),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text('Phí đăng bài:'),
-                      Text(
-                        '10,000 đ',
-                        style: TextStyle(
-                          fontSize: 24,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.blue[700],
-                        ),
+      builder: (context) => Dialog(
+        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        child: SingleChildScrollView(
+          child: Container(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Icon Header
+                Container(
+                  width: 72,
+                  height: 72,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [Colors.blue[400]!, Colors.blue[700]!],
+                    ),
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.blue.withOpacity(0.3),
+                        blurRadius: 12,
+                        offset: const Offset(0, 4),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 12),
-                  const Divider(),
-                  const SizedBox(height: 8),
-                  _buildInfoRow(Icons.access_time, 'Thời hạn: 15 phút'),
-                  const SizedBox(height: 6),
-                  _buildInfoRow(Icons.payment, 'Phương thức: VNPay'),
-                  const SizedBox(height: 6),
-                  _buildInfoRow(Icons.check_circle, 'Bài đăng tự động xuất bản'),
-                ],
+                  child: const Icon(
+                    Icons.payment_rounded,
+                    color: Colors.white,
+                    size: 36,
+                  ),
+                ),
+                const SizedBox(height: 20),
+
+                // Title
+                const Text(
+                  'Xác nhận thanh toán',
+                  style: TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: -0.5,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 8),
+
+                Text(
+                  'Để đăng bài, bạn cần thanh toán phí dịch vụ',
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: Colors.grey[600],
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 24),
+
+                // Amount Card
+                Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [Colors.blue[50]!, Colors.blue[100]!],
+                    ),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: Colors.blue[200]!, width: 1.5),
+                  ),
+                  child: Column(
+                    children: [
+                      Text(
+                        'Số tiền thanh toán',
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: Colors.grey[700],
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            '10,000',
+                            style: TextStyle(
+                              fontSize: 36,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.blue[900],
+                              height: 1,
+                            ),
+                          ),
+                          const SizedBox(width: 4),
+                          Padding(
+                            padding: const EdgeInsets.only(top: 8),
+                            child: Text(
+                              'đ',
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.blue[700],
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 20),
+
+                // Info List
+                _buildModernInfoRow(
+                  Icons.schedule_rounded,
+                  'Thời hạn',
+                  '15 phút',
+                ),
+                const SizedBox(height: 12),
+                _buildModernInfoRow(
+                  Icons.account_balance_wallet_rounded,
+                  'Phương thức',
+                  'VNPay',
+                ),
+                const SizedBox(height: 12),
+                _buildModernInfoRow(
+                  Icons.check_circle_rounded,
+                  'Kết quả',
+                  'Tự động xuất bản',
+                ),
+                const SizedBox(height: 28),
+
+                // Actions
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () => Navigator.pop(context, false),
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          side: BorderSide(color: Colors.grey[300]!),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        child: const Text(
+                          'Hủy',
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      flex: 2,
+                      child: ElevatedButton(
+                        onPressed: () => Navigator.pop(context, true),
+                        style: ElevatedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          backgroundColor: Colors.blue[700],
+                          elevation: 0,
+                          shadowColor: Colors.blue.withOpacity(0.3),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        child: const Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.lock_rounded, size: 18 ,  color: Colors.white),
+                            SizedBox(width: 8),
+                            Text(
+                              'Thanh toán',
+                              style: TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildModernInfoRow(IconData icon, String label, String value) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: Colors.grey[50],
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: Colors.grey[200]!),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Icon(icon, size: 18, color: Colors.blue[700]),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              label,
+              style: TextStyle(
+                fontSize: 14,
+                color: Colors.grey[700],
+                fontWeight: FontWeight.w500,
               ),
             ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Hủy'),
           ),
-          ElevatedButton.icon(
-            onPressed: () => Navigator.pop(context, true),
-            icon: const Icon(Icons.payment, size: 20),
-            label: const Text('Thanh toán'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.blue[700],
+          Text(
+            value,
+            style: const TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              color: Colors.black87,
             ),
           ),
         ],
-      ),
-    );
-  }
-
-  Widget _buildInfoRow(IconData icon, String text) {
-    return Row(
-      children: [
-        Icon(icon, size: 16, color: Colors.blue[700]),
-        const SizedBox(width: 8),
-        Expanded(child: Text(text, style: const TextStyle(fontSize: 13))),
-      ],
-    );
-  }
-
-  void _showSuccessSnackBar(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Row(
-          children: [
-            const Icon(Icons.check_circle, color: Colors.white),
-            const SizedBox(width: 12),
-            Expanded(child: Text(message)),
-          ],
-        ),
-        backgroundColor: Colors.green,
-        duration: const Duration(seconds: 3),
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-      ),
-    );
-  }
-
-  void _showErrorSnackBar(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Row(
-          children: [
-            const Icon(Icons.error_outline, color: Colors.white),
-            const SizedBox(width: 12),
-            Expanded(child: Text(message)),
-          ],
-        ),
-        backgroundColor: Colors.red,
-        duration: const Duration(seconds: 4),
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
       ),
     );
   }
@@ -608,48 +889,93 @@ class _CreateRentalScreenState extends State<CreateRentalScreen> {
               ),
               const SizedBox(height: 24),
 
+              // Payment Success Badge (Modern Banking Style)
               if (_completedPayment != null)
                 Container(
-                  padding: const EdgeInsets.all(16),
+                  padding: const EdgeInsets.all(20),
                   margin: const EdgeInsets.only(bottom: 16),
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
                       colors: [Colors.green[50]!, Colors.green[100]!],
                     ),
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(16),
                     border: Border.all(color: Colors.green[300]!, width: 2),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.green.withOpacity(0.1),
+                        blurRadius: 8,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
                   ),
                   child: Row(
                     children: [
                       Container(
-                        padding: const EdgeInsets.all(8),
+                        padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
                           color: Colors.green,
-                          borderRadius: BorderRadius.circular(8),
+                          borderRadius: BorderRadius.circular(12),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.green.withOpacity(0.3),
+                              blurRadius: 8,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
                         ),
-                        child: const Icon(Icons.check_circle, color: Colors.white),
+                        child: const Icon(
+                          Icons.check_circle_rounded,
+                          color: Colors.white,
+                          size: 24,
+                        ),
                       ),
-                      const SizedBox(width: 12),
+                      const SizedBox(width: 16),
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Text(
-                              '✅ Đã thanh toán',
-                              style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                color: Colors.green,
-                                fontSize: 16,
-                              ),
+                            const Row(
+                              children: [
+                                Text(
+                                  'Thanh toán thành công',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.green,
+                                    fontSize: 16,
+                                  ),
+                                ),
+                                SizedBox(width: 6),
+                                Icon(
+                                  Icons.verified_rounded,
+                                  color: Colors.green,
+                                  size: 18,
+                                ),
+                              ],
                             ),
-                            const SizedBox(height: 4),
-                            Text(
-                              'Mã: ${_completedPayment!.transactionCode}',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: Colors.green[800],
-                                fontFamily: 'monospace',
-                              ),
+                            const SizedBox(height: 6),
+                            Row(
+                              children: [
+                                Icon(
+                                  Icons.receipt_long_rounded,
+                                  size: 14,
+                                  color: Colors.green[700],
+                                ),
+                                const SizedBox(width: 6),
+                                Expanded(
+                                  child: Text(
+                                    _completedPayment!.transactionCode,
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: Colors.green[800],
+                                      fontFamily: 'monospace',
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              ],
                             ),
                           ],
                         ),
@@ -658,55 +984,187 @@ class _CreateRentalScreenState extends State<CreateRentalScreen> {
                   ),
                 ),
 
+              // Loading State (Modern Banking Style)
               if (_isProcessingPayment || rentalViewModel.isLoading)
-                Center(
+                Container(
+                  padding: const EdgeInsets.symmetric(vertical: 32),
                   child: Column(
                     children: [
-                      const CircularProgressIndicator(),
-                      const SizedBox(height: 12),
+                      Stack(
+                        alignment: Alignment.center,
+                        children: [
+                          SizedBox(
+                            width: 56,
+                            height: 56,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 3,
+                              valueColor: AlwaysStoppedAnimation<Color>(
+                                Colors.blue[700]!,
+                              ),
+                            ),
+                          ),
+                          Icon(
+                            _isProcessingPayment
+                                ? Icons.payment_rounded
+                                : Icons.cloud_upload_rounded,
+                            color: Colors.blue[700],
+                            size: 24,
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 20),
                       Text(
                         _isProcessingPayment
                             ? 'Đang xử lý thanh toán...'
                             : 'Đang tạo bài đăng...',
                         style: TextStyle(
-                          color: Colors.grey[600],
-                          fontWeight: FontWeight.w500,
+                          color: Colors.grey[700],
+                          fontWeight: FontWeight.w600,
+                          fontSize: 15,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Vui lòng không tắt ứng dụng',
+                        style: TextStyle(
+                          color: Colors.grey[500],
+                          fontSize: 13,
                         ),
                       ),
                     ],
                   ),
                 )
+              // Payment Button (Modern Banking Style)
               else if (_completedPayment == null)
-                ElevatedButton.icon(
-                  icon: const Icon(Icons.payment),
-                  label: const Text(
-                    'Thanh toán và đăng bài',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                Container(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.blue.withOpacity(0.3),
+                        blurRadius: 12,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
                   ),
-                  style: ElevatedButton.styleFrom(
-                    minimumSize: const Size(double.infinity, 56),
-                    backgroundColor: Colors.blue[700],
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
+                  child: ElevatedButton(
+                    onPressed: _handlePaymentFirst,
+                    style: ElevatedButton.styleFrom(
+                      minimumSize: const Size(double.infinity, 58),
+                      backgroundColor: Colors.blue[700],
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.2),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: const Icon(
+                            Icons.payment_rounded,
+                            size: 20,
+                            color: Colors.white,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        const Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Thanh toán và đăng bài',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                height: 1.2,
+                                color: Colors.white,
+                              ),
+                            ),
+                            Text(
+                              'Phí 10,000đ',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w500,
+                                color: Colors.white70,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
                     ),
                   ),
-                  onPressed: _handlePaymentFirst,
                 )
+              // Submit Button (Modern Banking Style)
               else
-                ElevatedButton.icon(
-                  icon: const Icon(Icons.cloud_upload_outlined),
-                  label: const Text(
-                    'Hoàn tất đăng bài',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                Container(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.green.withOpacity(0.3),
+                        blurRadius: 12,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
                   ),
-                  style: ElevatedButton.styleFrom(
-                    minimumSize: const Size(double.infinity, 56),
-                    backgroundColor: Colors.green,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
+                  child: ElevatedButton(
+                    onPressed: _submitFormWithPayment,
+                    style: ElevatedButton.styleFrom(
+                      minimumSize: const Size(double.infinity, 58),
+                      backgroundColor: Colors.green,
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.2),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: const Icon(
+                            Icons.cloud_upload_rounded,
+                            size: 20,
+                            color: Colors.white,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        const Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Hoàn tất đăng bài',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                                height: 1.2,
+                              ),
+                            ),
+                            Text(
+                              'Xuất bản ngay',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w500,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
                     ),
                   ),
-                  onPressed: _submitFormWithPayment,
                 ),
               const SizedBox(height: 24),
             ],

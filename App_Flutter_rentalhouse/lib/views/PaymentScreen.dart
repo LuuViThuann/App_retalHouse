@@ -138,6 +138,7 @@ class _PaymentWebViewScreenState extends State<PaymentWebViewScreen> {
         appBar: AppBar(
           title: const Text('Thanh toán VNPay'),
           backgroundColor: Colors.blue[700],
+          foregroundColor: Colors.white,
           automaticallyImplyLeading: false,
           leading: IconButton(
             icon: const Icon(Icons.close),

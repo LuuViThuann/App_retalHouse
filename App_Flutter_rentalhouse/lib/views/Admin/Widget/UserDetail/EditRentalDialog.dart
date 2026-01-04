@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_rentalhouse/models/rental.dart';
+import 'package:flutter_rentalhouse/utils/Snackbar_process.dart';
 import 'package:flutter_rentalhouse/views/Admin/ViewModel/admin_viewmodel.dart';
 import 'package:provider/provider.dart';
+import 'package:intl/intl.dart';
 
 class EditRentalDialogComplete extends StatefulWidget {
   final Rental rental;
@@ -41,21 +44,21 @@ class _EditRentalDialogCompleteState extends State<EditRentalDialogComplete> {
   String _selectedStatus = 'available';
   bool _isLoading = false;
 
+  final _currencyFormatter = NumberFormat('#,###', 'vi_VN');
+
   @override
   void initState() {
     super.initState();
-    // ===== Basic Info =====
     _titleController = TextEditingController(text: widget.rental.title);
-    _priceController =
-        TextEditingController(text: widget.rental.price.toString());
+    _priceController = TextEditingController(
+      text: _currencyFormatter.format(widget.rental.price),
+    );
     _addressController = TextEditingController(
       text: widget.rental.location['short'] ?? '',
     );
     _propertyTypeController = TextEditingController(
       text: widget.rental.propertyType ?? '',
     );
-
-    // ===== Area =====
     _areaController = TextEditingController(
       text: widget.rental.area['total']?.toString() ?? '',
     );
@@ -68,8 +71,6 @@ class _EditRentalDialogCompleteState extends State<EditRentalDialogComplete> {
     _bathroomsController = TextEditingController(
       text: widget.rental.area['bathrooms']?.toString() ?? '',
     );
-
-    // ===== Amenities =====
     _furnitureController = TextEditingController(
       text: widget.rental.furniture.join(', '),
     );
@@ -79,22 +80,23 @@ class _EditRentalDialogCompleteState extends State<EditRentalDialogComplete> {
     _surroundingsController = TextEditingController(
       text: widget.rental.surroundings.join(', '),
     );
-
-    // ===== Rental Terms =====
     _minimumLeaseController = TextEditingController(
       text: widget.rental.rentalTerms?['minimumLease'] ?? '',
     );
+
+    // Format deposit with currency
+    final depositValue = widget.rental.rentalTerms?['deposit'] ?? '';
+    final depositNumber = double.tryParse(depositValue.toString().replaceAll(RegExp(r'[^0-9]'), ''));
     _depositController = TextEditingController(
-      text: widget.rental.rentalTerms?['deposit'] ?? '',
+      text: depositNumber != null ? _currencyFormatter.format(depositNumber) : '',
     );
+
     _paymentMethodController = TextEditingController(
       text: widget.rental.rentalTerms?['paymentMethod'] ?? '',
     );
     _renewalTermsController = TextEditingController(
       text: widget.rental.rentalTerms?['renewalTerms'] ?? '',
     );
-
-    // ===== Contact Info =====
     _contactNameController = TextEditingController(
       text: widget.rental.contactInfo?['name'] ?? '',
     );
@@ -104,8 +106,27 @@ class _EditRentalDialogCompleteState extends State<EditRentalDialogComplete> {
     _contactHoursController = TextEditingController(
       text: widget.rental.contactInfo?['availableHours'] ?? '',
     );
-
     _selectedStatus = widget.rental.status;
+
+    // Add listeners for currency formatting
+    _priceController.addListener(() => _formatCurrency(_priceController));
+    _depositController.addListener(() => _formatCurrency(_depositController));
+  }
+
+  void _formatCurrency(TextEditingController controller) {
+    String text = controller.text.replaceAll(RegExp(r'[^0-9]'), '');
+    if (text.isEmpty) return;
+
+    final number = int.tryParse(text);
+    if (number != null) {
+      final formatted = _currencyFormatter.format(number);
+      if (controller.text != formatted) {
+        controller.value = TextEditingValue(
+          text: formatted,
+          selection: TextSelection.collapsed(offset: formatted.length),
+        );
+      }
+    }
   }
 
   @override
@@ -131,13 +152,16 @@ class _EditRentalDialogCompleteState extends State<EditRentalDialogComplete> {
     super.dispose();
   }
 
+  double? _parseCurrency(String text) {
+    final cleanText = text.replaceAll(RegExp(r'[^0-9]'), '');
+    return cleanText.isEmpty ? null : double.tryParse(cleanText);
+  }
+
   Future<void> _saveChanges() async {
     if (_titleController.text.isEmpty || _priceController.text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Vui lòng nhập tiêu đề và giá'),
-          backgroundColor: Colors.orange,
-        ),
+      AppSnackBar.show(
+        context,
+        AppSnackBar.warning(message: 'Vui lòng nhập tiêu đề và giá'),
       );
       return;
     }
@@ -145,14 +169,11 @@ class _EditRentalDialogCompleteState extends State<EditRentalDialogComplete> {
     setState(() => _isLoading = true);
 
     final updateData = {
-      // ===== Basic Info =====
       'title': _titleController.text.trim(),
-      'price': double.tryParse(_priceController.text) ?? widget.rental.price,
+      'price': _parseCurrency(_priceController.text) ?? widget.rental.price,
       'locationShort': _addressController.text.trim(),
       'propertyType': _propertyTypeController.text.trim(),
       'status': _selectedStatus,
-
-      // ===== Area =====
       'areaTotal':
       double.tryParse(_areaController.text) ?? widget.rental.area['total'],
       'areaLivingRoom': double.tryParse(_livingRoomController.text) ??
@@ -161,8 +182,6 @@ class _EditRentalDialogCompleteState extends State<EditRentalDialogComplete> {
           widget.rental.area['bedrooms'],
       'areaBathrooms': double.tryParse(_bathroomsController.text) ??
           widget.rental.area['bathrooms'],
-
-      // ===== Amenities =====
       'furniture': _furnitureController.text
           .split(',')
           .map((s) => s.trim())
@@ -178,49 +197,33 @@ class _EditRentalDialogCompleteState extends State<EditRentalDialogComplete> {
           .map((s) => s.trim())
           .where((s) => s.isNotEmpty)
           .join(','),
-
-      // ===== Rental Terms =====
       'rentalTermsMinimumLease': _minimumLeaseController.text.trim(),
-      'rentalTermsDeposit': _depositController.text
-          .replaceAll(RegExp(r'[^0-9]'), ''), // Bỏ các ký tự không phải số
+      'rentalTermsDeposit': _depositController.text.replaceAll(RegExp(r'[^0-9]'), ''),
       'rentalTermsPaymentMethod': _paymentMethodController.text.trim(),
       'rentalTermsRenewalTerms': _renewalTermsController.text.trim(),
-
-      // ===== Contact Info =====
       'contactInfoName': _contactNameController.text.trim(),
       'contactInfoPhone': _contactPhoneController.text.trim(),
       'contactInfoAvailableHours': _contactHoursController.text.trim(),
     };
 
     final viewModel = context.read<AdminViewModel>();
-    final success =
-    await viewModel.adminEditRental(widget.rental.id, updateData);
+    final success = await viewModel.adminEditRental(widget.rental.id, updateData);
 
     setState(() => _isLoading = false);
 
     if (mounted) {
       if (success) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Text('✅ Cập nhật bài viết thành công'),
-            backgroundColor: Colors.green[600],
-            duration: const Duration(seconds: 2),
-            behavior: SnackBarBehavior.floating,
-            shape:
-            RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-          ),
+        AppSnackBar.show(
+          context,
+          AppSnackBar.success(message: 'Cập nhật bài viết thành công'),
         );
         widget.onEditSuccess();
         Navigator.pop(context);
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('❌ ${viewModel.error ?? "Cập nhật thất bại"}'),
-            backgroundColor: Colors.red[600],
-            duration: const Duration(seconds: 3),
-            behavior: SnackBarBehavior.floating,
-            shape:
-            RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        AppSnackBar.show(
+          context,
+          AppSnackBar.error(
+            message: viewModel.error ?? 'Cập nhật thất bại',
           ),
         );
       }
@@ -230,229 +233,350 @@ class _EditRentalDialogCompleteState extends State<EditRentalDialogComplete> {
   @override
   Widget build(BuildContext context) {
     return Dialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: SingleChildScrollView(
+      backgroundColor: Colors.white,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 40),
+      child: Container(
+        constraints: const BoxConstraints(maxWidth: 600),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // ===== HEADER =====
+            // Header
             Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.blue[50],
-                borderRadius: const BorderRadius.only(
-                  topLeft: Radius.circular(16),
-                  topRight: Radius.circular(16),
-                ),
+              padding: const EdgeInsets.all(24),
+              decoration: const BoxDecoration(
+                color: Colors.white,
                 border: Border(
-                    bottom: BorderSide(color: Colors.blue[200]!, width: 1)),
+                  bottom: BorderSide(color: Color(0xFFF1F5F9), width: 1),
+                ),
               ),
-              child: Column(
+              child: Row(
                 children: [
-                  Icon(Icons.edit, size: 40, color: Colors.blue[600]),
-                  const SizedBox(height: 12),
-                  Text(
-                    'Chỉnh sửa bài viết',
-                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.bold,
-                      color: Colors.blue[700],
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF8FAFC),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Icon(
+                      Icons.edit_outlined,
+                      size: 24,
+                      color: Color(0xFF64748B),
                     ),
                   ),
-                  const SizedBox(height: 8),
-                  Text(
-                    widget.rental.title,
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: Colors.blue[600],
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Chỉnh sửa bài viết',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFF0F172A),
+                            letterSpacing: -0.3,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          widget.rental.title,
+                          style: const TextStyle(
+                            fontSize: 13,
+                            color: Color(0xFF64748B),
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
                     ),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
+                  ),
+                  IconButton(
+                    onPressed: () => Navigator.pop(context),
+                    icon: const Icon(Icons.close, color: Color(0xFF64748B)),
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
                   ),
                 ],
               ),
             ),
 
-            // ===== CONTENT =====
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // ===== SECTION 1: Thông tin cơ bản =====
-                  _buildSectionTitle('📝 Thông tin cơ bản'),
-                  _buildTextField(
-                    controller: _titleController,
-                    label: 'Tiêu đề',
-                    hint: 'Nhập tiêu đề',
-                  ),
-                  const SizedBox(height: 8),
-                  _buildTextField(
-                    controller: _priceController,
-                    label: 'Giá (VNĐ)',
-                    hint: 'Nhập giá',
-                    keyboardType: TextInputType.number,
-                  ),
-                  const SizedBox(height: 8),
-                  _buildTextField(
-                    controller: _addressController,
-                    label: 'Địa chỉ',
-                    hint: 'Nhập địa chỉ',
-                  ),
-                  const SizedBox(height: 8),
-                  _buildTextField(
-                    controller: _propertyTypeController,
-                    label: 'Loại bất động sản',
-                    hint: 'VD: Nhà, Chung cư, Phòng trọ',
-                  ),
-                  const SizedBox(height: 8),
-                  _buildStatusDropdown(),
-                  const SizedBox(height: 16),
+            // Content
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildSection(
+                      title: 'Thông tin cơ bản',
+                      children: [
+                        _buildTextField(
+                          controller: _titleController,
+                          label: 'Tiêu đề',
+                          hint: 'Nhập tiêu đề bài viết',
+                        ),
+                        const SizedBox(height: 16),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: _buildTextField(
+                                controller: _priceController,
+                                label: 'Giá thuê',
+                                hint: '0',
+                                keyboardType: TextInputType.number,
+                                suffix: 'VNĐ',
+                                inputFormatters: [
+                                  FilteringTextInputFormatter.digitsOnly,
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: _buildStatusDropdown(),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 16),
+                        _buildTextField(
+                          controller: _addressController,
+                          label: 'Địa chỉ',
+                          hint: 'Nhập địa chỉ',
+                        ),
+                        const SizedBox(height: 16),
+                        _buildTextField(
+                          controller: _propertyTypeController,
+                          label: 'Loại hình',
+                          hint: 'Nhà riêng, Chung cư, Phòng trọ...',
+                        ),
+                      ],
+                    ),
 
-                  // ===== SECTION 2: Diện tích =====
-                  _buildSectionTitle('📐 Diện tích'),
-                  _buildTextField(
-                    controller: _areaController,
-                    label: 'Diện tích tổng (m²)',
-                    keyboardType: TextInputType.number,
-                  ),
-                  const SizedBox(height: 8),
-                  _buildTextField(
-                    controller: _livingRoomController,
-                    label: 'Phòng khách (m²)',
-                    keyboardType: TextInputType.number,
-                  ),
-                  const SizedBox(height: 8),
-                  _buildTextField(
-                    controller: _bedroomsController,
-                    label: 'Phòng ngủ',
-                    keyboardType: TextInputType.number,
-                  ),
-                  const SizedBox(height: 8),
-                  _buildTextField(
-                    controller: _bathroomsController,
-                    label: 'Phòng tắm',
-                    keyboardType: TextInputType.number,
-                  ),
-                  const SizedBox(height: 16),
+                    const SizedBox(height: 24),
 
-                  // ===== SECTION 3: Tiện nghi =====
-                  _buildSectionTitle('🏠 Tiện nghi'),
-                  _buildTextField(
-                    controller: _furnitureController,
-                    label: 'Nội thất (cách nhau bằng dấu phẩy)',
-                    hint: 'VD: Giường, Tủ quần áo, Bàn',
-                    maxLines: 2,
-                  ),
-                  const SizedBox(height: 8),
-                  _buildTextField(
-                    controller: _amenitiesController,
-                    label: 'Tiện ích (cách nhau bằng dấu phẩy)',
-                    hint: 'VD: Wifi, Điều hòa, Nước nóng',
-                    maxLines: 2,
-                  ),
-                  const SizedBox(height: 8),
-                  _buildTextField(
-                    controller: _surroundingsController,
-                    label: 'Xung quanh (cách nhau bằng dấu phẩy)',
-                    hint: 'VD: Gần trường học, Gần chợ, Gần bến xe',
-                    maxLines: 2,
-                  ),
-                  const SizedBox(height: 16),
+                    _buildSection(
+                      title: 'Diện tích & Phòng',
+                      children: [
+                        Row(
+                          children: [
+                            Expanded(
+                              child: _buildTextField(
+                                controller: _areaController,
+                                label: 'Tổng diện tích',
+                                hint: '0',
+                                keyboardType: TextInputType.number,
+                                suffix: 'm²',
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: _buildTextField(
+                                controller: _livingRoomController,
+                                label: 'Phòng khách',
+                                hint: '0',
+                                keyboardType: TextInputType.number,
+                                suffix: 'm²',
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 16),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: _buildTextField(
+                                controller: _bedroomsController,
+                                label: 'Phòng ngủ',
+                                hint: '0',
+                                keyboardType: TextInputType.number,
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: _buildTextField(
+                                controller: _bathroomsController,
+                                label: 'Phòng tắm',
+                                hint: '0',
+                                keyboardType: TextInputType.number,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
 
-                  // ===== SECTION 4: Điều kiện thuê =====
-                  _buildSectionTitle('📋 Điều kiện thuê'),
-                  _buildTextField(
-                    controller: _minimumLeaseController,
-                    label: 'Thời hạn tối thiểu',
-                    hint: 'VD: 3 tháng, 6 tháng, 1 năm',
-                  ),
-                  const SizedBox(height: 8),
-                  _buildTextField(
-                    controller: _depositController,
-                    label: 'Tiền cọc',
-                    hint: 'VD: 2000000 (không có VNĐ)',
-                    keyboardType: TextInputType.number,
-                  ),
-                  const SizedBox(height: 8),
-                  _buildTextField(
-                    controller: _paymentMethodController,
-                    label: 'Phương thức thanh toán',
-                    hint: 'VD: Chuyển khoản, Tiền mặt',
-                  ),
-                  const SizedBox(height: 8),
-                  _buildTextField(
-                    controller: _renewalTermsController,
-                    label: 'Điều kiện gia hạn',
-                    hint: 'VD: Có thể gia hạn hàng năm',
-                    maxLines: 2,
-                  ),
-                  const SizedBox(height: 16),
+                    const SizedBox(height: 24),
 
-                  // ===== SECTION 5: Thông tin liên hệ =====
-                  _buildSectionTitle('📞 Thông tin liên hệ'),
-                  _buildTextField(
-                    controller: _contactNameController,
-                    label: 'Tên liên hệ',
-                    hint: 'Nhập tên chủ nhà/người quản lý',
-                  ),
-                  const SizedBox(height: 8),
-                  _buildTextField(
-                    controller: _contactPhoneController,
-                    label: 'Số điện thoại',
-                    hint: 'VD: 0123456789',
-                    keyboardType: TextInputType.phone,
-                  ),
-                  const SizedBox(height: 8),
-                  _buildTextField(
-                    controller: _contactHoursController,
-                    label: 'Giờ liên hệ',
-                    hint: 'VD: 8:00 - 17:00, Thứ 2-6',
-                  ),
-                ],
+                    _buildSection(
+                      title: 'Tiện nghi',
+                      children: [
+                        _buildTextField(
+                          controller: _furnitureController,
+                          label: 'Nội thất',
+                          hint: 'Giường, Tủ, Bàn (phân cách bằng dấu phẩy)',
+                          maxLines: 2,
+                        ),
+                        const SizedBox(height: 16),
+                        _buildTextField(
+                          controller: _amenitiesController,
+                          label: 'Tiện ích',
+                          hint: 'Wifi, Điều hòa, Nước nóng...',
+                          maxLines: 2,
+                        ),
+                        const SizedBox(height: 16),
+                        _buildTextField(
+                          controller: _surroundingsController,
+                          label: 'Xung quanh',
+                          hint: 'Gần trường, Gần chợ...',
+                          maxLines: 2,
+                        ),
+                      ],
+                    ),
+
+                    const SizedBox(height: 24),
+
+                    _buildSection(
+                      title: 'Điều kiện thuê',
+                      children: [
+                        Row(
+                          children: [
+                            Expanded(
+                              child: _buildTextField(
+                                controller: _minimumLeaseController,
+                                label: 'Thời hạn tối thiểu',
+                                hint: '3 tháng',
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: _buildTextField(
+                                controller: _depositController,
+                                label: 'Tiền cọc',
+                                hint: '0',
+                                keyboardType: TextInputType.number,
+                                suffix: 'VNĐ',
+                                inputFormatters: [
+                                  FilteringTextInputFormatter.digitsOnly,
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 16),
+                        _buildTextField(
+                          controller: _paymentMethodController,
+                          label: 'Phương thức thanh toán',
+                          hint: 'Chuyển khoản, Tiền mặt...',
+                        ),
+                        const SizedBox(height: 16),
+                        _buildTextField(
+                          controller: _renewalTermsController,
+                          label: 'Điều kiện gia hạn',
+                          hint: 'Có thể gia hạn hàng năm',
+                          maxLines: 2,
+                        ),
+                      ],
+                    ),
+
+                    const SizedBox(height: 24),
+
+                    _buildSection(
+                      title: 'Thông tin liên hệ',
+                      children: [
+                        _buildTextField(
+                          controller: _contactNameController,
+                          label: 'Tên liên hệ',
+                          hint: 'Tên chủ nhà',
+                        ),
+                        const SizedBox(height: 16),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: _buildTextField(
+                                controller: _contactPhoneController,
+                                label: 'Số điện thoại',
+                                hint: '0123456789',
+                                keyboardType: TextInputType.phone,
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: _buildTextField(
+                                controller: _contactHoursController,
+                                label: 'Giờ liên hệ',
+                                hint: '8:00 - 17:00',
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
               ),
             ),
 
-            // ===== FOOTER BUTTONS =====
-            Padding(
-              padding: const EdgeInsets.all(16),
+            // Footer
+            Container(
+              padding: const EdgeInsets.all(24),
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                border: Border(
+                  top: BorderSide(color: Color(0xFFF1F5F9), width: 1),
+                ),
+              ),
               child: Row(
                 children: [
                   Expanded(
                     child: OutlinedButton(
-                      onPressed:
-                      _isLoading ? null : () => Navigator.pop(context),
+                      onPressed: _isLoading ? null : () => Navigator.pop(context),
                       style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                        side: BorderSide(color: Colors.grey[400]!),
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        side: const BorderSide(color: Color(0xFFE2E8F0)),
                         shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8)),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        foregroundColor: const Color(0xFF64748B),
                       ),
-                      child: const Text('Hủy',
-                          style: TextStyle(fontWeight: FontWeight.w600)),
+                      child: const Text(
+                        'Hủy',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w500,
+                          fontSize: 15,
+                        ),
+                      ),
                     ),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
-                    child: ElevatedButton.icon(
+                    child: ElevatedButton(
                       onPressed: _isLoading ? null : _saveChanges,
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.blue,
+                        backgroundColor: const Color(0xFF0F172A),
                         foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        padding: const EdgeInsets.symmetric(vertical: 16),
                         shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8)),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        elevation: 0,
+                        disabledBackgroundColor: const Color(0xFFCBD5E1),
                       ),
-                      icon: _isLoading
+                      child: _isLoading
                           ? const SizedBox(
                         width: 20,
                         height: 20,
                         child: CircularProgressIndicator(
                           strokeWidth: 2,
-                          valueColor:
-                          AlwaysStoppedAnimation<Color>(Colors.white),
+                          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                         ),
                       )
-                          : const Icon(Icons.save),
-                      label: Text(_isLoading ? 'Đang lưu...' : 'Lưu'),
+                          : const Text(
+                        'Lưu thay đổi',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w600,
+                          fontSize: 15,
+                        ),
+                      ),
                     ),
                   ),
                 ],
@@ -464,14 +588,22 @@ class _EditRentalDialogCompleteState extends State<EditRentalDialogComplete> {
     );
   }
 
-  Widget _buildSectionTitle(String title) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: Text(
-        title,
-        style: const TextStyle(
-            fontSize: 16, fontWeight: FontWeight.bold, color: Colors.black87),
-      ),
+  Widget _buildSection({required String title, required List<Widget> children}) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title,
+          style: const TextStyle(
+            fontSize: 15,
+            fontWeight: FontWeight.w600,
+            color: Color(0xFF0F172A),
+            letterSpacing: -0.2,
+          ),
+        ),
+        const SizedBox(height: 16),
+        ...children,
+      ],
     );
   }
 
@@ -481,26 +613,60 @@ class _EditRentalDialogCompleteState extends State<EditRentalDialogComplete> {
     String? hint,
     TextInputType keyboardType = TextInputType.text,
     int maxLines = 1,
+    String? suffix,
+    List<TextInputFormatter>? inputFormatters,
   }) {
-    return TextField(
-      controller: controller,
-      keyboardType: keyboardType,
-      maxLines: maxLines,
-      decoration: InputDecoration(
-        labelText: label,
-        hintText: hint,
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
-          borderSide: BorderSide(color: Colors.grey[300]!),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w500,
+            color: Color(0xFF475569),
+          ),
         ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
-          borderSide: const BorderSide(color: Colors.blue, width: 2),
+        const SizedBox(height: 8),
+        TextField(
+          controller: controller,
+          keyboardType: keyboardType,
+          maxLines: maxLines,
+          inputFormatters: inputFormatters,
+          style: const TextStyle(
+            fontSize: 15,
+            color: Color(0xFF0F172A),
+          ),
+          decoration: InputDecoration(
+            hintText: hint,
+            hintStyle: const TextStyle(
+              color: Color(0xFFCBD5E1),
+              fontSize: 15,
+            ),
+            suffixText: suffix,
+            suffixStyle: const TextStyle(
+              color: Color(0xFF64748B),
+              fontSize: 14,
+              fontWeight: FontWeight.w500,
+            ),
+            filled: true,
+            fillColor: const Color(0xFFF8FAFC),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: Color(0xFF0F172A), width: 2),
+            ),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          ),
         ),
-        contentPadding:
-        const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-      ),
+      ],
     );
   }
 
@@ -508,35 +674,42 @@ class _EditRentalDialogCompleteState extends State<EditRentalDialogComplete> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
+        const Text(
           'Trạng thái',
           style: TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
-              color: Colors.grey[700]),
+            fontSize: 13,
+            fontWeight: FontWeight.w500,
+            color: Color(0xFF475569),
+          ),
         ),
         const SizedBox(height: 8),
         DropdownButtonFormField<String>(
           value: _selectedStatus,
+          style: const TextStyle(
+            fontSize: 15,
+            color: Color(0xFF0F172A),
+          ),
           decoration: InputDecoration(
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+            filled: true,
+            fillColor: const Color(0xFFF8FAFC),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+            ),
             enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: BorderSide(color: Colors.grey[300]!),
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
             ),
             focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: const BorderSide(color: Colors.blue, width: 2),
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: Color(0xFF0F172A), width: 2),
             ),
-            contentPadding:
-            const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
           ),
           items: const [
-            DropdownMenuItem(value: 'available', child: Text('✓ Có sẵn')),
-            DropdownMenuItem(value: 'rented', child: Text('✗ Đã cho thuê')),
-            DropdownMenuItem(
-                value: 'unavailable',
-                child: Text('⚠️ Không hoạt động')),
+            DropdownMenuItem(value: 'available', child: Text('Có sẵn')),
+            DropdownMenuItem(value: 'rented', child: Text('Đã thuê')),
+            DropdownMenuItem(value: 'unavailable', child: Text('Không khả dụng')),
           ],
           onChanged: (value) {
             setState(() => _selectedStatus = value ?? 'available');

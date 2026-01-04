@@ -2,7 +2,7 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 class ApiRoutes {
   static const String rootUrl =
-      'https://965ec7eb87bd.ngrok-free.app'; // 192.168.43.168 - mạng dữ liệu
+      'http://192.168.1.71:3000'; // http://192.168.43.168:3000 - mạng dữ liệu
   static const String baseUrl = '$rootUrl/api';
   static const String serverBaseUrl = rootUrl;
   static const String socketUrl = serverBaseUrl;
@@ -68,6 +68,18 @@ class ApiRoutes {
   static String adminFeedbackDelete(String id) => '$adminFeedback/$id';
   static String deleteMyFeedback(String feedbackId) => '$feedback/$feedbackId';
 
+
+  // Hoàn tác feedback (Admin)
+  static String adminFeedbackRestore(String id) => '$adminFeedback/$id/restore';
+
+  // Xóa vĩnh viễn feedback (Admin)
+  static String adminFeedbackPermanentDelete(String id) => '$adminFeedback/$id/permanent';
+
+  //  Hoàn tác feedback của user
+  static String restoreMyFeedback(String feedbackId) => '$feedback/$feedbackId/restore';
+
+  //  Xóa vĩnh viễn feedback của user
+  static String permanentDeleteMyFeedback(String feedbackId) => '$feedback/$feedbackId/permanent';
   // ================== FEEDBACK - DELETED/UNDO (NEW) ==================
   /// GET /api/feedback/deleted/list - Lấy danh sách feedback đã xóa
   static const String deletedFeedbackList = '$feedback/deleted/list';
@@ -291,6 +303,30 @@ class ApiRoutes {
       throw Exception('OPENAI_API_KEY không được tìm thấy trong .env');
     }
     return key;
+  }
+
+  // ==================== ADMIN DASHBOARD ====================
+
+  /// GET /api/admin/dashboard - Lấy thống kê tổng quan
+  static const String adminDashboard = '$baseUrl/admin/dashboard';
+
+  /// GET /api/admin/dashboard/revenue-chart?days=7
+  static String adminDashboardRevenueChart({int days = 7}) {
+    return '$baseUrl/admin/dashboard/revenue-chart?days=$days';
+  }
+
+  /// GET /api/admin/dashboard/property-types
+  static const String adminDashboardPropertyTypes =
+      '$baseUrl/admin/dashboard/property-types';
+
+  /// GET /api/admin/dashboard/user-growth?months=6
+  static String adminDashboardUserGrowth({int months = 6}) {
+    return '$baseUrl/admin/dashboard/user-growth?months=$months';
+  }
+
+  /// GET /api/admin/dashboard/top-posts?limit=5
+  static String adminDashboardTopPosts({int limit = 5}) {
+    return '$baseUrl/admin/dashboard/top-posts?limit=$limit';
   }
 
   // ==================== RENTALS & AI SUGGEST ====================

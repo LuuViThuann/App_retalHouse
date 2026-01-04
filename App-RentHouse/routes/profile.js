@@ -6,7 +6,6 @@ const admin = require('firebase-admin');
 const Rental = require('../models/Rental');
 const { Comment, Reply } = require('../models/comments');
 
-
 // Authentication middleware
 const authMiddleware = async (req, res, next) => {
   const token = req.header('Authorization')?.replace('Bearer ', '');
@@ -148,12 +147,13 @@ router.get('/my-posts', authMiddleware, async (req, res) => {
   }
 });
 
-// Get user's recent comments and replies
+// ✅ FIX: Get user's recent comments and replies
 router.get('/recent-comments', authMiddleware, async (req, res) => {
   try {
     const { page = 1, limit = 10 } = req.query;
     const skip = (Number(page) - 1) * Number(limit);
 
+    // ✅ THÊM avatarUrl vào populate
     const comments = await Comment.find({ userId: req.userId })
       .populate({
         path: 'rentalId',
@@ -161,7 +161,7 @@ router.get('/recent-comments', authMiddleware, async (req, res) => {
       })
       .populate({
         path: 'userId',
-        select: 'avatarBase64 username',
+        select: 'username avatarBase64 avatarUrl', // ✅ THÊM avatarUrl
       })
       .sort({ createdAt: -1 })
       .skip(skip)
@@ -178,7 +178,7 @@ router.get('/recent-comments', authMiddleware, async (req, res) => {
       })
       .populate({
         path: 'userId',
-        select: 'avatarBase64 username',
+        select: 'username avatarBase64 avatarUrl', // ✅ THÊM avatarUrl
       })
       .sort({ createdAt: -1 })
       .skip(skip)
@@ -194,7 +194,8 @@ router.get('/recent-comments', authMiddleware, async (req, res) => {
         userId: {
           _id: comment.userId?._id?.toString() || req.userId,
           username: comment.userId?.username || 'Unknown User',
-          avatarBase64: comment.userId?.avatarBase64 || '',
+          avatarBase64: comment.userId?.avatarBase64 || '', // Backward compatible
+          avatarUrl: comment.userId?.avatarUrl || null, // ✅ THÊM avatarUrl
         },
         content: comment.content || '',
         rating: comment.rating || 0,
@@ -213,7 +214,8 @@ router.get('/recent-comments', authMiddleware, async (req, res) => {
         userId: {
           _id: reply.userId?._id?.toString() || req.userId,
           username: reply.userId?.username || 'Unknown User',
-          avatarBase64: reply.userId?.avatarBase64 || '',
+          avatarBase64: reply.userId?.avatarBase64 || '', // Backward compatible
+          avatarUrl: reply.userId?.avatarUrl || null, // ✅ THÊM avatarUrl
         },
         content: reply.content || '',
         images: reply.images || [],
@@ -266,7 +268,8 @@ router.delete('/reply/:id', authMiddleware, async (req, res) => {
     res.status(500).json({ message: 'Failed to delete reply', error: err.message });
   }
 });
-// Lấy tất cả comment và reply trên các bài đăng của user hiện tại
+
+// ✅ FIX: Lấy tất cả comment và reply trên các bài đăng của user hiện tại
 router.get('/my-posts-comments', authMiddleware, async (req, res) => {
   try {
     const { page = 1, limit = 10 } = req.query;
@@ -276,25 +279,25 @@ router.get('/my-posts-comments', authMiddleware, async (req, res) => {
     const myRentals = await Rental.find({ userId: req.userId }).select('_id');
     const myRentalIds = myRentals.map(r => r._id);
 
-    // Lấy comment trên các bài đăng đó (không phải của user hiện tại)
+    // ✅ THÊM avatarUrl vào populate
     const comments = await Comment.find({
       rentalId: { $in: myRentalIds },
       userId: { $ne: req.userId }
     })
-      .populate('userId', 'avatarBase64 username')
+      .populate('userId', 'username avatarBase64 avatarUrl') // ✅ THÊM avatarUrl
       .populate('rentalId', 'title')
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(Number(limit))
       .lean();
 
-    // Lấy reply trên các comment của các bài đăng đó (không phải của user hiện tại)
+    // Lấy reply trên các comment của các bài đăng đó
     const commentIds = comments.map(c => c._id);
     const replies = await Reply.find({
       commentId: { $in: commentIds },
       userId: { $ne: req.userId }
     })
-      .populate('userId', 'avatarBase64 username')
+      .populate('userId', 'username avatarBase64 avatarUrl') // ✅ THÊM avatarUrl
       .populate({
         path: 'commentId',
         populate: { path: 'rentalId', select: 'title' }
@@ -314,7 +317,8 @@ router.get('/my-posts-comments', authMiddleware, async (req, res) => {
         userId: {
           _id: comment.userId?._id?.toString() || '',
           username: comment.userId?.username || 'Unknown User',
-          avatarBase64: comment.userId?.avatarBase64 || '',
+          avatarBase64: comment.userId?.avatarBase64 || '', // Backward compatible
+          avatarUrl: comment.userId?.avatarUrl || null, // ✅ THÊM avatarUrl
         },
         content: comment.content || '',
         rating: comment.rating || 0,
@@ -333,7 +337,8 @@ router.get('/my-posts-comments', authMiddleware, async (req, res) => {
         userId: {
           _id: reply.userId?._id?.toString() || '',
           username: reply.userId?.username || 'Unknown User',
-          avatarBase64: reply.userId?.avatarBase64 || '',
+          avatarBase64: reply.userId?.avatarBase64 || '', // Backward compatible
+          avatarUrl: reply.userId?.avatarUrl || null, // ✅ THÊM avatarUrl
         },
         content: reply.content || '',
         images: reply.images || [],
@@ -359,8 +364,5 @@ router.get('/my-posts-comments', authMiddleware, async (req, res) => {
     res.status(500).json({ message: 'Failed to fetch comments on my posts', error: err.message });
   }
 });
-
-
-
 
 module.exports = router;

@@ -6,7 +6,7 @@ class Reply {
   final String? parentReplyId;
   final User userId;
   final String content;
-  final List<String> images;
+  final List<String> images; // ✅ Đã là URL từ Cloudinary
   final String icon;
   final DateTime createdAt;
   final List<Like> likes;
@@ -35,19 +35,19 @@ class Reply {
           : (json['userId'] ?? {})),
       content: json['content']?.toString() ?? '',
       images: (json['images'] as List<dynamic>?)
-              ?.map((e) => e.toString())
-              .toList() ??
+          ?.map((e) => e.toString())
+          .toList() ??
           [],
       icon: json['icon']?.toString() ?? '/assets/img/arr.jpg',
       createdAt: DateTime.tryParse(json['createdAt']?.toString() ?? '') ??
           DateTime.now(),
       likes: (json['likes'] as List<dynamic>?)
-              ?.map((like) => Like.fromJson(like))
-              .toList() ??
+          ?.map((like) => Like.fromJson(like))
+          .toList() ??
           [],
       replies: (json['replies'] as List<dynamic>?)
-              ?.map((reply) => Reply.fromJson(reply))
-              .toList() ??
+          ?.map((reply) => Reply.fromJson(reply))
+          .toList() ??
           [],
     );
   }

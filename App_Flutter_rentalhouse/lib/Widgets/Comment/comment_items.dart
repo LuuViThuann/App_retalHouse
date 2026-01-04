@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
@@ -92,7 +93,7 @@ class CommentItem extends StatelessWidget {
 
   void _showCommentDropdownMenu(BuildContext context, GlobalKey iconKey) {
     final RenderBox renderBox =
-        iconKey.currentContext!.findRenderObject() as RenderBox;
+    iconKey.currentContext!.findRenderObject() as RenderBox;
     final position = renderBox.localToGlobal(Offset.zero);
     final size = renderBox.size;
 
@@ -110,7 +111,7 @@ class CommentItem extends StatelessWidget {
           child: ListTile(
             leading: const Icon(Icons.edit, color: Colors.blue),
             title:
-                const Text('Chỉnh sửa', style: TextStyle(color: Colors.blue)),
+            const Text('Chỉnh sửa', style: TextStyle(color: Colors.blue)),
             onTap: () {
               Navigator.pop(context);
               onEditComment();
@@ -135,10 +136,96 @@ class CommentItem extends StatelessWidget {
     );
   }
 
+  // ✅ FIX: Hàm xử lý avatar - Hỗ trợ cả Cloudinary URL và Base64
+  ImageProvider _getAvatarImageProvider(String? avatarUrl) {
+    // Ưu tiên 1: URL đầy đủ từ Cloudinary
+    if (avatarUrl != null &&
+        (avatarUrl.startsWith('http://') || avatarUrl.startsWith('https://'))) {
+      return CachedNetworkImageProvider(avatarUrl);
+    }
+
+    // Ưu tiên 2: Base64 (backward compatible)
+    if (avatarUrl != null && avatarUrl.isNotEmpty) {
+      try {
+        final data = avatarUrl.contains(',')
+            ? avatarUrl.split(',')[1]
+            : avatarUrl;
+        final bytes = base64Decode(data);
+        return MemoryImage(bytes);
+      } catch (e) {
+        print('Error decoding avatar: $e');
+      }
+    }
+
+    // Ưu tiên 3: Avatar mặc định
+    return const AssetImage('assets/img/imageuser.png');
+  }
+
+  // ✅ FIX: Hàm xử lý URL ảnh - Hỗ trợ cả Cloudinary và local server
+  String _getImageUrl(String imagePath) {
+    // Nếu đã là URL đầy đủ (Cloudinary hoặc bất kỳ URL nào)
+    if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) {
+      return imagePath;
+    }
+    // Nếu là path local server cũ
+    return '${ApiRoutes.serverBaseUrl}$imagePath';
+  }
+
+  // ✅ FIX: Widget hiển thị ảnh với CachedNetworkImage
+  Widget _buildImage(String imageUrl, {
+    double width = 80,
+    double height = 80,
+    VoidCallback? onTap,
+  }) {
+    final fullUrl = _getImageUrl(imageUrl); // ✅ Convert URL đúng cách
+
+    return GestureDetector(
+      onTap: onTap,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(8),
+        child: CachedNetworkImage(
+          imageUrl: fullUrl, // ✅ Sử dụng URL đã được xử lý
+          width: width,
+          height: height,
+          fit: BoxFit.cover,
+          placeholder: (context, url) => Container(
+            width: width,
+            height: height,
+            color: Colors.grey[200],
+            child: const Center(
+              child: SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
+            ),
+          ),
+          errorWidget: (context, url, error) {
+            print('Error loading image: $url - Error: $error');
+            return Container(
+              width: width,
+              height: height,
+              color: Colors.grey[300],
+              child: const Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.broken_image, color: Colors.grey, size: 24),
+                  SizedBox(height: 4),
+                  Text('Lỗi ảnh',
+                      style: TextStyle(fontSize: 10, color: Colors.grey)),
+                ],
+              ),
+            );
+          },
+        ),
+      ),
+    );
+  }
+
   void _showReplyDropdownMenu(BuildContext context, String replyId,
       String parentCommentId, GlobalKey iconKey) {
     final RenderBox renderBox =
-        iconKey.currentContext!.findRenderObject() as RenderBox;
+    iconKey.currentContext!.findRenderObject() as RenderBox;
     final position = renderBox.localToGlobal(Offset.zero);
     final size = renderBox.size;
 
@@ -156,7 +243,7 @@ class CommentItem extends StatelessWidget {
           child: ListTile(
             leading: const Icon(Icons.edit, color: Colors.blue),
             title:
-                const Text('Chỉnh sửa', style: TextStyle(color: Colors.blue)),
+            const Text('Chỉnh sửa', style: TextStyle(color: Colors.blue)),
             onTap: () {
               Navigator.pop(context);
               Reply? findReply(List<Reply> replies) {
@@ -220,7 +307,7 @@ class CommentItem extends StatelessWidget {
         final reply = flattenedReplies[index];
         final isEditingReply = editingReplyId == reply.id;
         final hasLikedReply =
-            reply.likes.any((like) => like.userId == currentUserId);
+        reply.likes.any((like) => like.userId == currentUserId);
         final isOwnReply = reply.userId.id == currentUserId;
         final GlobalKey replyMoreIconKey = GlobalKey();
 
@@ -247,12 +334,11 @@ class CommentItem extends StatelessWidget {
                           color: Colors.grey,
                         ),
                         const SizedBox(width: 4),
+                        // ✅ Avatar reply - Sử dụng hàm đã fix
                         CircleAvatar(
                           radius: 16,
-                          backgroundImage: reply.userId.avatarBytes != null
-                              ? MemoryImage(reply.userId.avatarBytes!)
-                              : const AssetImage('assets/img/imageuser.png')
-                                  as ImageProvider,
+                          backgroundImage: _getAvatarImageProvider(reply.userId.avatarUrl),
+                          backgroundColor: Colors.grey[300],
                         ),
                       ],
                     ),
@@ -364,20 +450,12 @@ class CommentItem extends StatelessWidget {
                                     padding: const EdgeInsets.only(right: 8),
                                     child: Stack(
                                       children: [
-                                        GestureDetector(
+                                        // ✅ Hiển thị ảnh - Sử dụng hàm đã fix
+                                        _buildImage(
+                                          imageUrl,
+                                          width: 60,
+                                          height: 60,
                                           onTap: () => onImageTap(imageUrl),
-                                          child: CachedNetworkImage(
-                                            imageUrl:
-                                                '${ApiRoutes.serverBaseUrl}$imageUrl',
-                                            width: 60,
-                                            height: 60,
-                                            fit: BoxFit.cover,
-                                            placeholder: (context, url) =>
-                                                const CircularProgressIndicator(),
-                                            errorWidget:
-                                                (context, url, error) =>
-                                                    const Icon(Icons.error),
-                                          ),
                                         ),
                                         Positioned(
                                           top: 0,
@@ -386,7 +464,10 @@ class CommentItem extends StatelessWidget {
                                             onTap: () =>
                                                 onRemoveExistingImage(imageUrl),
                                             child: Container(
-                                              color: Colors.black54,
+                                              decoration: BoxDecoration(
+                                                color: Colors.black54,
+                                                borderRadius: BorderRadius.circular(12),
+                                              ),
                                               child: const Icon(Icons.close,
                                                   color: Colors.white,
                                                   size: 16),
@@ -403,12 +484,15 @@ class CommentItem extends StatelessWidget {
                                     padding: const EdgeInsets.only(right: 8),
                                     child: Stack(
                                       children: [
-                                        Image.file(
-                                          File(editSelectedImages[newImageIndex]
-                                              .path),
-                                          width: 60,
-                                          height: 60,
-                                          fit: BoxFit.cover,
+                                        ClipRRect(
+                                          borderRadius: BorderRadius.circular(8),
+                                          child: Image.file(
+                                            File(editSelectedImages[newImageIndex]
+                                                .path),
+                                            width: 60,
+                                            height: 60,
+                                            fit: BoxFit.cover,
+                                          ),
                                         ),
                                         Positioned(
                                           top: 0,
@@ -417,7 +501,10 @@ class CommentItem extends StatelessWidget {
                                             onTap: () => onRemoveEditImage(
                                                 newImageIndex),
                                             child: Container(
-                                              color: Colors.black54,
+                                              decoration: BoxDecoration(
+                                                color: Colors.black54,
+                                                borderRadius: BorderRadius.circular(12),
+                                              ),
                                               child: const Icon(Icons.close,
                                                   color: Colors.white,
                                                   size: 16),
@@ -480,21 +567,13 @@ class CommentItem extends StatelessWidget {
                               scrollDirection: Axis.horizontal,
                               itemCount: reply.images.length,
                               itemBuilder: (context, index) {
-                                return GestureDetector(
-                                  onTap: () => onImageTap(reply.images[index]),
-                                  child: Padding(
-                                    padding: const EdgeInsets.only(right: 8),
-                                    child: CachedNetworkImage(
-                                      imageUrl:
-                                          '${ApiRoutes.serverBaseUrl}${reply.images[index]}',
-                                      width: 60,
-                                      height: 60,
-                                      fit: BoxFit.cover,
-                                      placeholder: (context, url) =>
-                                          const CircularProgressIndicator(),
-                                      errorWidget: (context, url, error) =>
-                                          const Icon(Icons.error),
-                                    ),
+                                return Padding(
+                                  padding: const EdgeInsets.only(right: 8),
+                                  child: _buildImage(
+                                    reply.images[index],
+                                    width: 60,
+                                    height: 60,
+                                    onTap: () => onImageTap(reply.images[index]),
                                   ),
                                 );
                               },
@@ -576,12 +655,11 @@ class CommentItem extends StatelessWidget {
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                // ✅ Avatar comment - Sử dụng hàm đã fix
                 CircleAvatar(
                   radius: 20,
-                  backgroundImage: user.avatarBytes != null
-                      ? MemoryImage(user.avatarBytes!)
-                      : const AssetImage('assets/img/imageuser.png')
-                          as ImageProvider,
+                  backgroundImage: _getAvatarImageProvider(user.avatarUrl),
+                  backgroundColor: Colors.grey[300],
                 ),
                 const SizedBox(width: 12),
                 Expanded(
@@ -674,7 +752,7 @@ class CommentItem extends StatelessWidget {
                             Text(
                               "Thêm ảnh",
                               style:
-                                  TextStyle(fontSize: 14, color: Colors.blue),
+                              TextStyle(fontSize: 14, color: Colors.blue),
                             ),
                           ],
                         ),
@@ -691,7 +769,7 @@ class CommentItem extends StatelessWidget {
                         child: ListView.builder(
                           scrollDirection: Axis.horizontal,
                           itemCount:
-                              comment.images.length + editSelectedImages.length,
+                          comment.images.length + editSelectedImages.length,
                           itemBuilder: (context, index) {
                             if (index < comment.images.length) {
                               final imageUrl = comment.images[index];
@@ -701,19 +779,11 @@ class CommentItem extends StatelessWidget {
                                 padding: const EdgeInsets.only(right: 8),
                                 child: Stack(
                                   children: [
-                                    GestureDetector(
+                                    _buildImage(
+                                      imageUrl,
+                                      width: 80,
+                                      height: 80,
                                       onTap: () => onImageTap(imageUrl),
-                                      child: CachedNetworkImage(
-                                        imageUrl:
-                                            '${ApiRoutes.serverBaseUrl}$imageUrl',
-                                        width: 80,
-                                        height: 80,
-                                        fit: BoxFit.cover,
-                                        placeholder: (context, url) =>
-                                            const CircularProgressIndicator(),
-                                        errorWidget: (context, url, error) =>
-                                            const Icon(Icons.error),
-                                      ),
                                     ),
                                     Positioned(
                                       top: 0,
@@ -813,21 +883,13 @@ class CommentItem extends StatelessWidget {
                           scrollDirection: Axis.horizontal,
                           itemCount: comment.images.length,
                           itemBuilder: (context, index) {
-                            return GestureDetector(
-                              onTap: () => onImageTap(comment.images[index]),
-                              child: Padding(
-                                padding: const EdgeInsets.only(right: 8),
-                                child: CachedNetworkImage(
-                                  imageUrl:
-                                      '${ApiRoutes.serverBaseUrl}${comment.images[index]}',
-                                  width: 80,
-                                  height: 80,
-                                  fit: BoxFit.cover,
-                                  placeholder: (context, url) =>
-                                      const CircularProgressIndicator(),
-                                  errorWidget: (context, url, error) =>
-                                      const Icon(Icons.error),
-                                ),
+                            return Padding(
+                              padding: const EdgeInsets.only(right: 8),
+                              child: _buildImage(
+                                comment.images[index],
+                                width: 80,
+                                height: 80,
+                                onTap: () => onImageTap(comment.images[index]),
                               ),
                             );
                           },
@@ -853,7 +915,7 @@ class CommentItem extends StatelessWidget {
                     const SizedBox(width: 16),
                     TextButton(
                       onPressed: onReply,
-                      child: const Text('Phản hồi'),
+                      child: const Text('Phản hồi' , style: TextStyle(color: Colors.black54),),
                     ),
                   ],
                 ),

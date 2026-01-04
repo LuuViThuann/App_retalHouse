@@ -3,6 +3,7 @@ import 'package:flutter_rentalhouse/config/api_routes.dart';
 import 'package:flutter_rentalhouse/models/rental.dart';
 import 'package:flutter_rentalhouse/services/auth_service.dart';
 import 'package:http/http.dart' as http;
+import 'package:http_parser/http_parser.dart';
 import 'dart:convert';
 
 class AdminViewModel extends ChangeNotifier {
@@ -66,7 +67,7 @@ class AdminViewModel extends ChangeNotifier {
     }
   }
 
-  /// ✅ Helper: Get token with refresh
+  /// Get token with refresh
   Future<String?> _getValidToken() async {
     try {
       final token = await _authService.getIdToken();
@@ -112,7 +113,6 @@ class AdminViewModel extends ChangeNotifier {
       ).timeout(const Duration(seconds: 15));
 
       debugPrint('📡 Response status: ${response.statusCode}');
-      debugPrint('📄 Response body: ${response.body}');
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
@@ -126,20 +126,13 @@ class AdminViewModel extends ChangeNotifier {
           _users.addAll(userList);
         }
 
-        // Cache avatars
-        for (var user in userList) {
-          if (user['avatarBase64'] != null && user['avatarBase64'].isNotEmpty) {
-            _avatarCache[user['id']] = user['avatarBase64'];
-          }
-        }
-
         _error = null;
       } else if (response.statusCode == 401) {
         _error = '⚠️ Token hết hạn - vui lòng đăng nhập lại';
-        debugPrint('❌ Unauthorized (401): Token expired or invalid');
+        debugPrint('❌ Unauthorized (401)');
       } else if (response.statusCode == 403) {
         _error = '🚫 Bạn không có quyền admin để truy cập';
-        debugPrint('❌ Forbidden (403): Not admin');
+        debugPrint('❌ Forbidden (403)');
       } else {
         _error = 'Lỗi tải danh sách người dùng (${response.statusCode})';
         debugPrint('❌ Error: ${response.body}');
@@ -150,36 +143,6 @@ class AdminViewModel extends ChangeNotifier {
     } finally {
       _isLoading = false;
       notifyListeners();
-    }
-  }
-
-  /// Lấy ảnh đại diện riêng lẻ (cho ảnh lớn)
-  Future<void> fetchAvatarForUser(String userId) async {
-    if (_avatarCache.containsKey(userId)) {
-      return;
-    }
-
-    try {
-      final token = await _getValidToken();
-      if (token == null) return;
-
-      final response = await http.get(
-        Uri.parse(ApiRoutes.adminUserAvatar(userId)),
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $token',
-        },
-      ).timeout(const Duration(seconds: 15));
-
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        if (data['avatarBase64'] != null) {
-          _avatarCache[userId] = data['avatarBase64'];
-          notifyListeners();
-        }
-      }
-    } catch (e) {
-      debugPrint('❌ Error fetch avatar for user $userId: $e');
     }
   }
 
@@ -197,66 +160,121 @@ class AdminViewModel extends ChangeNotifier {
         return;
       }
 
+      debugPrint('═══════════════════════════════════════════');
+      debugPrint('🔍 FETCH USER DETAIL');
+      debugPrint('═══════════════════════════════════════════');
+      debugPrint('User ID: $userId');
+
+      final url = ApiRoutes.adminUserDetail(userId);
+      debugPrint('🔗 URL: $url');
+
       final response = await http.get(
-        Uri.parse(ApiRoutes.adminUserDetail(userId)),
+        Uri.parse(url),
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $token',
         },
       ).timeout(const Duration(seconds: 15));
 
-      if (response.statusCode == 200) {
-        _currentUserDetail = jsonDecode(response.body);
+      debugPrint('📊 Response Status: ${response.statusCode}');
+      debugPrint('📋 Response Body: ${response.body}');
 
-        if (_currentUserDetail!['avatarBase64'] != null) {
-          _avatarCache[userId] = _currentUserDetail!['avatarBase64'];
-        }
+      if (response.statusCode == 200) {
+        final responseData = jsonDecode(response.body);
+        debugPrint('✅ Parsed response successfully');
+
+        _currentUserDetail = responseData;
         _error = null;
+        debugPrint('✅ User detail loaded');
       } else if (response.statusCode == 401) {
         _error = 'Token hết hạn - vui lòng đăng nhập lại';
+        debugPrint('❌ 401 Unauthorized');
+      } else if (response.statusCode == 404) {
+        _error = 'Không tìm thấy người dùng';
+        debugPrint('❌ 404 Not Found');
       } else {
         _error = 'Không tải được chi tiết người dùng (${response.statusCode})';
+        debugPrint('❌ Error: ${response.body}');
       }
     } catch (e) {
       _error = 'Lỗi: $e';
-      debugPrint('❌ Error: $e');
+      debugPrint('❌ Exception: $e');
     } finally {
       _isLoading = false;
       notifyListeners();
     }
   }
 
-  /// Cập nhật avatar người dùng
-  Future<bool> updateUserAvatar(String userId, String base64Image) async {
+  /// Cập nhật avatar người dùng (Upload multipart file)
+  Future<bool> updateUserAvatar(String userId, String imagePath) async {
     try {
       final token = await _getValidToken();
-      if (token == null) return false;
+      if (token == null) {
+        _error = 'Không lấy được token';
+        return false;
+      }
 
-      final response = await http
-          .put(
-            Uri.parse(ApiRoutes.adminUserAvatarUpdate(userId)),
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': 'Bearer $token',
-            },
-            body: jsonEncode({'avatarBase64': base64Image}),
-          )
-          .timeout(const Duration(seconds: 15));
+      debugPrint('═══════════════════════════════════════════');
+      debugPrint('📤 UPDATE USER AVATAR');
+      debugPrint('═══════════════════════════════════════════');
+      debugPrint('User ID: $userId');
+      debugPrint('Image Path: $imagePath');
+
+      var request = http.MultipartRequest(
+        'PUT',
+        Uri.parse(ApiRoutes.adminUserAvatarUpdate(userId)),
+      );
+
+      request.headers['Authorization'] = 'Bearer $token';
+
+      // Thêm file với key 'avatar'
+      request.files.add(
+        await http.MultipartFile.fromPath(
+          'avatar',
+          imagePath,
+          contentType: MediaType('image', 'jpeg'),
+        ),
+      );
+
+      debugPrint('📤 Sending multipart request...');
+      final response = await request.send().timeout(
+        const Duration(seconds: 30),
+        onTimeout: () {
+          throw Exception('Upload timeout');
+        },
+      );
+
+      final responseBody = await response.stream.bytesToString();
+      debugPrint('📊 Response Status: ${response.statusCode}');
+      debugPrint('📋 Response Body: $responseBody');
 
       if (response.statusCode == 200) {
-        _avatarCache[userId] = base64Image;
-        _updateUserInList(userId, {'avatarBase64': base64Image});
-        await fetchUserDetail(userId);
+        final data = jsonDecode(responseBody);
+        debugPrint('✅ Upload successful');
+
+        // Cập nhật detail
+        if (_currentUserDetail != null) {
+          _currentUserDetail!['avatarUrl'] = data['user']?['avatarUrl'] ??
+              data['avatarUrl'] ??
+              data['user']?['avatarUrl'];
+        }
+
+        _error = null;
+        notifyListeners();
         return true;
       } else if (response.statusCode == 401) {
         _error = 'Token hết hạn';
+        debugPrint('❌ 401 Unauthorized');
         return false;
       } else {
-        _error = 'Lỗi đổi ảnh: ${response.statusCode}';
+        final errorData = jsonDecode(responseBody);
+        _error = errorData['message'] ?? 'Lỗi đổi ảnh';
+        debugPrint('❌ Error: $errorData');
         return false;
       }
     } catch (e) {
-      _error = 'Lỗi: $e';
+      _error = 'Lỗi upload: $e';
+      debugPrint('❌ Exception: $e');
       return false;
     }
   }
@@ -265,32 +283,63 @@ class AdminViewModel extends ChangeNotifier {
   Future<bool> updateUser(String userId, Map<String, dynamic> data) async {
     try {
       final token = await _getValidToken();
-      if (token == null) return false;
+      if (token == null) {
+        _error = 'Không lấy được token';
+        return false;
+      }
 
-      final response = await http
-          .put(
-            Uri.parse(ApiRoutes.adminUserUpdate(userId)),
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': 'Bearer $token',
-            },
-            body: jsonEncode(data),
-          )
-          .timeout(const Duration(seconds: 15));
+      debugPrint('═══════════════════════════════════════════');
+      debugPrint('✏️ UPDATE USER INFO');
+      debugPrint('═══════════════════════════════════════════');
+      debugPrint('User ID: $userId');
+      debugPrint('Data: $data');
+
+      final url = ApiRoutes.adminUserUpdate(userId);
+      debugPrint('🔗 URL: $url');
+
+      final response = await http.put(
+        Uri.parse(url),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode(data),
+      ).timeout(const Duration(seconds: 15));
+
+      debugPrint('📊 Response Status: ${response.statusCode}');
+      debugPrint('📋 Response Body: ${response.body}');
 
       if (response.statusCode == 200) {
+        final responseData = jsonDecode(response.body);
+
+        // Cập nhật currentUserDetail
+        if (responseData['user'] != null) {
+          _currentUserDetail = responseData['user'];
+        }
+
         _updateUserInList(userId, data);
         _error = null;
+        notifyListeners();
+        debugPrint('✅ User updated successfully');
         return true;
       } else if (response.statusCode == 401) {
         _error = 'Token hết hạn';
+        debugPrint('❌ 401 Unauthorized');
+        return false;
+      } else if (response.statusCode == 400) {
+        final errorData = jsonDecode(response.body);
+        _error = errorData['message'] ?? 'Dữ liệu không hợp lệ';
+        debugPrint('❌ 400 Bad Request: $_error');
         return false;
       } else {
-        _error = 'Cập nhật thất bại: ${response.statusCode}';
+        final errorData = jsonDecode(response.body);
+        _error = errorData['message'] ?? 'Cập nhật thất bại';
+        debugPrint('❌ Error: $errorData');
         return false;
       }
     } catch (e) {
       _error = 'Lỗi: $e';
+      debugPrint('❌ Exception: $e');
       return false;
     }
   }
@@ -345,9 +394,8 @@ class AdminViewModel extends ChangeNotifier {
       }
 
       final url =
-          ApiRoutes.adminUsersWithPostsPaginated(page: page, limit: limit);
+      ApiRoutes.adminUsersWithPostsPaginated(page: page, limit: limit);
       debugPrint('🔗 Fetching users with posts from: $url');
-      debugPrint('🔑 Token: ${token.substring(0, 20)}...');
 
       final response = await http.get(
         Uri.parse(url),
@@ -357,14 +405,9 @@ class AdminViewModel extends ChangeNotifier {
         },
       ).timeout(const Duration(seconds: 15));
 
-      debugPrint('📡 Response status: ${response.statusCode}');
-      debugPrint('📄 Response body: ${response.body}');
-
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         final userList = List<Map<String, dynamic>>.from(data['users'] ?? []);
-
-        debugPrint('✅ Users with posts fetched: ${userList.length}');
 
         if (page == 1) {
           _users = userList;
@@ -374,14 +417,11 @@ class AdminViewModel extends ChangeNotifier {
 
         _error = null;
       } else if (response.statusCode == 401) {
-        _error = '⚠️ Token hết hạn - vui lòng đăng nhập lại';
-        debugPrint('❌ Unauthorized (401)');
+        _error = '⚠️ Token hết hạn';
       } else if (response.statusCode == 403) {
         _error = '🚫 Bạn không có quyền admin';
-        debugPrint('❌ Forbidden (403)');
       } else {
         _error = 'Lỗi tải danh sách (${response.statusCode})';
-        debugPrint('❌ Error: ${response.body}');
       }
     } catch (e) {
       _error = 'Lỗi mạng: $e';
@@ -394,10 +434,10 @@ class AdminViewModel extends ChangeNotifier {
 
   /// Lấy bài đăng của một user cụ thể
   Future<void> fetchUserPosts(
-    String userId, {
-    int page = 1,
-    int limit = 10,
-  }) async {
+      String userId, {
+        int page = 1,
+        int limit = 10,
+      }) async {
     _isLoading = true;
     _error = null;
     notifyListeners();
@@ -411,7 +451,6 @@ class AdminViewModel extends ChangeNotifier {
       }
 
       final url = ApiRoutes.adminUserPosts(userId, page: page, limit: limit);
-      debugPrint('🔗 Fetching user posts from: $url');
 
       final response = await http.get(
         Uri.parse(url),
@@ -421,16 +460,12 @@ class AdminViewModel extends ChangeNotifier {
         },
       ).timeout(const Duration(seconds: 15));
 
-      debugPrint('📡 Response status: ${response.statusCode}');
-
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         final rentalList = (data['rentals'] as List?)
-                ?.map((rental) => Rental.fromJson(rental))
-                .toList() ??
+            ?.map((rental) => Rental.fromJson(rental))
+            .toList() ??
             [];
-
-        debugPrint('✅ Posts fetched: ${rentalList.length}');
 
         if (page == 1) {
           _userPosts = rentalList;
@@ -442,11 +477,9 @@ class AdminViewModel extends ChangeNotifier {
         _postsTotalPages = data['pages'] ?? 1;
         _error = null;
       } else if (response.statusCode == 401) {
-        _error = 'Token hết hạn - vui lòng đăng nhập lại';
-        debugPrint('❌ Unauthorized (401)');
+        _error = 'Token hết hạn';
       } else {
         _error = 'Lỗi tải bài đăng: ${response.statusCode}';
-        debugPrint('❌ Error: ${response.body}');
       }
     } catch (e) {
       _error = 'Lỗi mạng: $e';
@@ -461,21 +494,9 @@ class AdminViewModel extends ChangeNotifier {
   Future<bool> deleteUserPost(String rentalId) async {
     try {
       final token = await _getValidToken();
-      if (token == null) {
-        _error = 'Token is null - không lấy được token';
-        debugPrint('❌ Token is null');
-        return false;
-      }
+      if (token == null) return false;
 
-      debugPrint('═══════════════════════════════════════════');
-      debugPrint('🗑️ DELETE POST REQUEST');
-      debugPrint('═══════════════════════════════════════════');
-
-      // ✅ ĐÚNG - Gọi route /admin/rentals/:rentalId
       final url = '${ApiRoutes.baseUrl}/admin/rentals/$rentalId';
-
-      debugPrint('🔗 DELETE URL: $url');
-      debugPrint('🔑 Token (first 50): ${token.substring(0, 50)}...');
 
       final response = await http.delete(
         Uri.parse(url),
@@ -485,40 +506,23 @@ class AdminViewModel extends ChangeNotifier {
         },
       ).timeout(const Duration(seconds: 15));
 
-      debugPrint('📊 Response Status: ${response.statusCode}');
-      debugPrint('📋 Response Body: ${response.body}');
-      debugPrint('═══════════════════════════════════════════');
-
       if (response.statusCode == 200) {
-        // ✅ FIX: Xóa từ danh sách bài đăng
         _userPosts.removeWhere((post) => post.id == rentalId);
         _error = null;
-
-        // ✅ FIX: Notify listeners để cập nhật UI
         notifyListeners();
-
-        debugPrint('✅ SUCCESS: Rental deleted and UI updated');
         return true;
       } else if (response.statusCode == 401) {
-        _error = 'Token hết hạn - vui lòng đăng nhập lại';
-        debugPrint('❌ 401 Unauthorized: Token expired');
+        _error = 'Token hết hạn';
         return false;
       } else if (response.statusCode == 403) {
-        _error = 'Bạn không có quyền admin để xóa bài viết';
-        debugPrint('❌ 403 Forbidden');
-        return false;
-      } else if (response.statusCode == 404) {
-        _error = 'Bài viết không tồn tại';
-        debugPrint('❌ 404: Rental not found');
+        _error = 'Bạn không có quyền xóa bài viết';
         return false;
       } else {
         _error = 'Lỗi xóa bài đăng: ${response.statusCode}';
-        debugPrint('❌ ERROR ${response.statusCode}');
         return false;
       }
     } catch (e) {
       _error = 'Lỗi: $e';
-      debugPrint('❌ EXCEPTION: $e');
       return false;
     }
   }
@@ -535,96 +539,50 @@ class AdminViewModel extends ChangeNotifier {
     await fetchUserPosts(userId, page: _postsPage + 1, limit: limit);
   }
 
-  // ============ CHỈNH SỬA - XÓA BÀI VIẾT
-  /// ========== EDIT RENTAL METHODS ==========
-
-  /// Cập nhật bài đăng (chỉ admin mới có quyền)
+  /// Cập nhật bài đăng
   Future<bool> adminEditRental(
-    String rentalId,
-    Map<String, dynamic> updateData,
-  ) async {
+      String rentalId,
+      Map<String, dynamic> updateData,
+      ) async {
     try {
       final token = await _getValidToken();
-      if (token == null) {
-        _error = 'Token is null';
-        return false;
-      }
-
-      debugPrint('═══════════════════════════════════════════');
-      debugPrint('✏️ EDIT RENTAL REQUEST');
-      debugPrint('═══════════════════════════════════════════');
-      debugPrint('📌 Rental ID: $rentalId');
-      debugPrint('🔑 Token: ${token.substring(0, 50)}...');
+      if (token == null) return false;
 
       final url = '${ApiRoutes.baseUrl}/admin/rentals/$rentalId';
-      debugPrint('🔗 URL: $url');
 
-      // Build request body
-      final body = jsonEncode(updateData);
-      debugPrint('📝 Update Data: $body');
-
-      final response = await http
-          .patch(
-            Uri.parse(url),
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': 'Bearer $token',
-            },
-            body: body,
-          )
-          .timeout(const Duration(seconds: 30));
-
-      debugPrint('📊 Response Status: ${response.statusCode}');
-      debugPrint('📋 Response: ${response.body}');
-      debugPrint('═══════════════════════════════════════════');
+      final response = await http.patch(
+        Uri.parse(url),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode(updateData),
+      ).timeout(const Duration(seconds: 30));
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-
-        // ✅ Cập nhật bài viết trong danh sách
         final index = _userPosts.indexWhere((post) => post.id == rentalId);
         if (index != -1) {
           _userPosts[index] = Rental.fromJson(data['rental']);
-          debugPrint('✅ Updated rental in list');
         }
-
         _error = null;
         notifyListeners();
-        debugPrint('✅ Rental updated successfully');
         return true;
-      } else if (response.statusCode == 401) {
-        _error = 'Token hết hạn - vui lòng đăng nhập lại';
-        debugPrint('❌ 401: Unauthorized');
-        return false;
-      } else if (response.statusCode == 403) {
-        _error = 'Bạn không có quyền chỉnh sửa bài viết này';
-        debugPrint('❌ 403: Forbidden');
-        return false;
-      } else if (response.statusCode == 404) {
-        _error = 'Bài viết không tồn tại';
-        debugPrint('❌ 404: Not found');
-        return false;
       } else {
         _error = 'Lỗi cập nhật: ${response.statusCode}';
-        debugPrint('❌ Error: ${response.statusCode}');
         return false;
       }
     } catch (e) {
       _error = 'Lỗi: $e';
-      debugPrint('❌ Exception: $e');
       return false;
     }
   }
-
-  /// ========== DELETE RENTAL METHODS ==========
 
   /// Xóa bài đăng người dùng (chỉ admin)
   Future<bool> adminDeleteRental(String rentalId) async {
     try {
       final token = await _getValidToken();
       if (token == null) return false;
-
-      debugPrint('🗑️ Attempting to delete rental: $rentalId');
 
       final response = await http.delete(
         Uri.parse('${ApiRoutes.baseUrl}/admin/rentals/$rentalId'),
@@ -634,38 +592,22 @@ class AdminViewModel extends ChangeNotifier {
         },
       ).timeout(const Duration(seconds: 15));
 
-      debugPrint('📡 Delete response status: ${response.statusCode}');
-      debugPrint('📄 Delete response body: ${response.body}');
-
       if (response.statusCode == 200) {
-        // Xóa từ danh sách bài đăng
         _userPosts.removeWhere((post) => post.id == rentalId);
         _error = null;
         notifyListeners();
-        debugPrint('✅ Rental deleted successfully');
         return true;
-      } else if (response.statusCode == 401) {
-        _error = 'Token hết hạn - vui lòng đăng nhập lại';
-        return false;
-      } else if (response.statusCode == 403) {
-        _error = 'Bạn không có quyền xóa bài viết này';
-        return false;
-      } else if (response.statusCode == 404) {
-        _error = 'Bài viết không tồn tại';
-        return false;
       } else {
         _error = 'Lỗi xóa bài viết: ${response.statusCode}';
         return false;
       }
     } catch (e) {
       _error = 'Lỗi mạng: $e';
-      debugPrint('❌ Exception: $e');
       return false;
     }
   }
 
-  /// ========== GET SINGLE RENTAL FOR EDITING ==========
-
+  /// Lấy bài đăng để chỉnh sửa
   Future<Rental?> fetchRentalForEdit(String rentalId) async {
     try {
       _isLoading = true;
@@ -678,15 +620,12 @@ class AdminViewModel extends ChangeNotifier {
         },
       ).timeout(const Duration(seconds: 15));
 
-      debugPrint('📡 Fetch rental response: ${response.statusCode}');
-
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         final rental = Rental.fromJson(data);
         _error = null;
         _isLoading = false;
         notifyListeners();
-        debugPrint('✅ Rental fetched successfully');
         return rental;
       } else {
         _error = 'Không tải được bài viết: ${response.statusCode}';
@@ -696,7 +635,6 @@ class AdminViewModel extends ChangeNotifier {
       }
     } catch (e) {
       _error = 'Lỗi: $e';
-      debugPrint('❌ Exception: $e');
       _isLoading = false;
       notifyListeners();
       return null;

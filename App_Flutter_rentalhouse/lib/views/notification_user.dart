@@ -272,6 +272,430 @@ class _NotificationUserState extends State<NotificationUser>
     );
   }
 
+  // ✅ Hàm xác định icon dựa trên loại thông báo
+  IconData _getNotificationIcon(String type) {
+    switch (type) {
+      case 'Comment':
+        return Icons.chat_bubble_outline_rounded;
+      case 'Reply':
+      case 'Comment_Reply':
+        return Icons.reply_rounded;
+      case 'feedback_response':
+        return Icons.feedback_rounded;
+      default:
+        return Icons.notifications_rounded;
+    }
+  }
+
+  // ✅ Hàm xác định màu dựa trên loại thông báo
+  Color _getNotificationColor(String type) {
+    switch (type) {
+      case 'Comment':
+        return const Color(0xFF4CAF50);
+      case 'Reply':
+      case 'Comment_Reply':
+        return const Color(0xFF2196F3);
+      case 'feedback_response':
+        return AppColors.primaryBlue;
+      default:
+        return AppColors.primaryBlue;
+    }
+  }
+
+  // ✅ Hàm lấy tiêu đề loại thông báo
+  String _getNotificationType(String type) {
+    switch (type) {
+      case 'Comment':
+        return 'Bình luận mới';
+      case 'Reply':
+        return 'Phản hồi mới';
+      case 'Comment_Reply':
+        return 'Phản hồi bình luận';
+      case 'feedback_response':
+        return 'Phản hồi phản ánh';
+      default:
+        return 'Thông báo';
+    }
+  }
+
+  // ✅ Build Comment Notification Detail
+  Widget _buildCommentNotificationDetail(NotificationModel notification) {
+    final details = notification.details as Map<String, dynamic>? ?? {};
+    final rentalTitle = details['rentalTitle'] as String? ?? 'Bài viết';
+    final commenterName = details['commenterName'] as String? ?? 'Người dùng';
+    final commentContent = details['commentContent'] as String? ?? notification.message;
+    final rating = details['rating'] as int? ?? 0;
+
+    return Container(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [const Color(0xFF4CAF50), const Color(0xFF45a049)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 56,
+                  height: 56,
+                  decoration: BoxDecoration(
+                    color: AppColors.white,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Center(
+                    child: Icon(
+                      Icons.chat_bubble_outline_rounded,
+                      color: Color(0xFF4CAF50),
+                      size: 28,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        notification.title,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        _formatTime(notification.createdAt),
+                        style: TextStyle(
+                          color: Colors.white.withOpacity(0.9),
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 20),
+
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: AppColors.blue50,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: AppColors.primaryBlue.withOpacity(0.3)),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.article, size: 16, color: AppColors.primaryBlue),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Bài viết: $rentalTitle',
+                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          Row(
+            children: [
+              CircleAvatar(
+                radius: 16,
+                backgroundColor: const Color(0xFF4CAF50).withOpacity(0.2),
+                child: const Icon(Icons.person, size: 16, color: Color(0xFF4CAF50)),
+              ),
+              const SizedBox(width: 12),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    commenterName,
+                    style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+                  ),
+                  Text(
+                    'đã bình luận',
+                    style: TextStyle(fontSize: 12, color: AppColors.grey600),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: AppColors.grey100,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.grey[300]!),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (rating > 0) ...[
+                  Row(
+                    children: [
+                      ...List.generate(5, (index) {
+                        return Icon(
+                          index < rating ? Icons.star : Icons.star_border,
+                          size: 18,
+                          color: Colors.amber,
+                        );
+                      }),
+                      const SizedBox(width: 8),
+                      Text(
+                        '$rating/5',
+                        style: const TextStyle(fontWeight: FontWeight.w600),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                ],
+                Text(
+                  commentContent,
+                  style: TextStyle(
+                    fontSize: 14,
+                    height: 1.5,
+                    color: AppColors.grey700,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 24),
+          SizedBox(
+            width: double.infinity,
+            height: 48,
+            child: ElevatedButton(
+              onPressed: () => Navigator.pop(context),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF4CAF50),
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                elevation: 0,
+              ),
+              child: const Text(
+                'Đóng',
+                style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ✅ Build Reply Notification Detail
+  Widget _buildReplyNotificationDetail(NotificationModel notification) {
+    final details = notification.details as Map<String, dynamic>? ?? {};
+    final rentalTitle = details['rentalTitle'] as String? ?? 'Bài viết';
+    final replierName = details['replierName'] as String? ?? 'Người dùng';
+    final replyContent = details['replyContent'] as String? ?? notification.message;
+    final originalComment = details['originalComment'] as String?;
+
+    return Container(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [const Color(0xFF2196F3), const Color(0xFF1976D2)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 56,
+                  height: 56,
+                  decoration: BoxDecoration(
+                    color: AppColors.white,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Center(
+                    child: Icon(
+                      Icons.reply_rounded,
+                      color: Color(0xFF2196F3),
+                      size: 28,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        notification.title,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        _formatTime(notification.createdAt),
+                        style: TextStyle(
+                          color: Colors.white.withOpacity(0.9),
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 20),
+
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: AppColors.blue50,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: AppColors.primaryBlue.withOpacity(0.3)),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.article, size: 16, color: AppColors.primaryBlue),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Bài viết: $rentalTitle',
+                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          if (originalComment != null && originalComment.isNotEmpty) ...[
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.grey[100],
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.grey[300]!),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Bình luận gốc:',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.grey600,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    originalComment,
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: AppColors.grey700,
+                      fontStyle: FontStyle.italic,
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+          ],
+
+          Row(
+            children: [
+              CircleAvatar(
+                radius: 16,
+                backgroundColor: const Color(0xFF2196F3).withOpacity(0.2),
+                child: const Icon(Icons.person, size: 16, color: Color(0xFF2196F3)),
+              ),
+              const SizedBox(width: 12),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    replierName,
+                    style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+                  ),
+                  Text(
+                    'đã phản hồi',
+                    style: TextStyle(fontSize: 12, color: AppColors.grey600),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: AppColors.blue50,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: AppColors.primaryBlue.withOpacity(0.3)),
+            ),
+            child: Text(
+              replyContent,
+              style: TextStyle(
+                fontSize: 14,
+                height: 1.5,
+                color: AppColors.grey700,
+              ),
+            ),
+          ),
+          const SizedBox(height: 24),
+          SizedBox(
+            width: double.infinity,
+            height: 48,
+            child: ElevatedButton(
+              onPressed: () => Navigator.pop(context),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF2196F3),
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                elevation: 0,
+              ),
+              child: const Text(
+                'Đóng',
+                style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildFeedbackNotificationDetail(NotificationModel notification) {
     final details = notification.details as Map<String, dynamic>? ?? {};
     final feedbackTitle = details['feedbackTitle'] as String? ?? 'Phản hồi của bạn';
@@ -285,7 +709,6 @@ class _NotificationUserState extends State<NotificationUser>
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Header
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
@@ -342,14 +765,12 @@ class _NotificationUserState extends State<NotificationUser>
           ),
           const SizedBox(height: 20),
 
-          // Message
           Text(
             notification.message,
             style: const TextStyle(fontSize: 15, height: 1.5),
           ),
           const SizedBox(height: 20),
 
-          // Feedback details
           Container(
             decoration: BoxDecoration(
               color: AppColors.blue50,
@@ -431,7 +852,6 @@ class _NotificationUserState extends State<NotificationUser>
             ),
           ),
 
-          // Admin response
           if (adminResponse != null && adminResponse.isNotEmpty) ...[
             const SizedBox(height: 20),
             Container(
@@ -672,20 +1092,23 @@ class _NotificationUserState extends State<NotificationUser>
                 height: 52,
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
-                    colors: [AppColors.primaryBlue.withOpacity(0.1), AppColors.primary.withOpacity(0.1)],
+                    colors: [
+                      _getNotificationColor(notification.type).withOpacity(0.1),
+                      _getNotificationColor(notification.type).withOpacity(0.05)
+                    ],
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                   ),
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(
-                    color: AppColors.primaryBlue.withOpacity(0.2),
+                    color: _getNotificationColor(notification.type).withOpacity(0.2),
                     width: 1,
                   ),
                 ),
-                child: const Center(
+                child: Center(
                   child: Icon(
-                    Icons.notifications_rounded,
-                    color: AppColors.primaryBlue,
+                    _getNotificationIcon(notification.type),
+                    color: _getNotificationColor(notification.type),
                     size: 26,
                   ),
                 ),
@@ -732,6 +1155,22 @@ class _NotificationUserState extends State<NotificationUser>
                             fontSize: 12,
                           ),
                         ),
+                        const SizedBox(width: 12),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: _getNotificationColor(notification.type).withOpacity(0.15),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            _getNotificationType(notification.type),
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                              color: _getNotificationColor(notification.type),
+                            ),
+                          ),
+                        ),
                       ],
                     ),
                   ],
@@ -761,7 +1200,51 @@ class _NotificationUserState extends State<NotificationUser>
   }
 
   void _showNotificationDetail(NotificationModel notification) {
-    if (notification.type == 'feedback_response') {
+    if (notification.type == 'Comment') {
+      showModalBottomSheet(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: Colors.transparent,
+        builder: (context) => Container(
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          child: DraggableScrollableSheet(
+            expand: false,
+            initialChildSize: 0.7,
+            minChildSize: 0.5,
+            maxChildSize: 0.95,
+            builder: (context, scrollController) => SingleChildScrollView(
+              controller: scrollController,
+              child: _buildCommentNotificationDetail(notification),
+            ),
+          ),
+        ),
+      );
+    } else if (notification.type == 'Reply' || notification.type == 'Comment_Reply') {
+      showModalBottomSheet(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: Colors.transparent,
+        builder: (context) => Container(
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          child: DraggableScrollableSheet(
+            expand: false,
+            initialChildSize: 0.7,
+            minChildSize: 0.5,
+            maxChildSize: 0.95,
+            builder: (context, scrollController) => SingleChildScrollView(
+              controller: scrollController,
+              child: _buildReplyNotificationDetail(notification),
+            ),
+          ),
+        ),
+      );
+    } else if (notification.type == 'feedback_response') {
       showModalBottomSheet(
         context: context,
         isScrollControlled: true,
@@ -780,155 +1263,6 @@ class _NotificationUserState extends State<NotificationUser>
               controller: scrollController,
               child: _buildFeedbackNotificationDetail(notification),
             ),
-          ),
-        ),
-      );
-    } else {
-      showModalBottomSheet(
-        context: context,
-        backgroundColor: Colors.transparent,
-        builder: (context) => Container(
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-          ),
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Drag handle
-              Center(
-                child: Container(
-                  width: 40,
-                  height: 4,
-                  margin: const EdgeInsets.only(bottom: 20),
-                  decoration: BoxDecoration(
-                    color: AppColors.grey600,
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-              ),
-
-              // Header
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [AppColors.primaryBlue, AppColors.primary],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 48,
-                      height: 48,
-                      decoration: BoxDecoration(
-                        color: AppColors.white,
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: const Center(
-                        child: Icon(
-                          Icons.notifications_rounded,
-                          color: AppColors.primaryBlue,
-                          size: 24,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            notification.title,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 17,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            _formatTime(notification.createdAt),
-                            style: TextStyle(
-                              color: Colors.white.withOpacity(0.9),
-                              fontSize: 12,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 20),
-
-              Text(
-                notification.message,
-                style: const TextStyle(
-                  fontSize: 15,
-                  height: 1.5,
-                ),
-              ),
-
-              if (notification.details != null) ...[
-                const SizedBox(height: 20),
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: AppColors.blue50,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: AppColors.primaryBlue.withOpacity(0.2)),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Row(
-                        children: [
-                          Icon(Icons.info_outline, size: 18, color: AppColors.primaryBlue),
-                          SizedBox(width: 8),
-                          Text(
-                            'Chi tiết',
-                            style: TextStyle(
-                              fontWeight: FontWeight.w600,
-                              fontSize: 14,
-                              color: AppColors.primaryBlue,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      _buildDetailsDisplay(notification.details!),
-                    ],
-                  ),
-                ),
-              ],
-
-              const SizedBox(height: 24),
-              SizedBox(
-                width: double.infinity,
-                height: 48,
-                child: ElevatedButton(
-                  onPressed: () => Navigator.pop(context),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primaryBlue,
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    elevation: 0,
-                  ),
-                  child: const Text(
-                    'Đóng',
-                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
-                  ),
-                ),
-              ),
-            ],
           ),
         ),
       );
@@ -1139,7 +1473,6 @@ class _NotificationUserState extends State<NotificationUser>
             return ListView(
               padding: const EdgeInsets.all(16),
               children: [
-                // Info banner
                 Container(
                   margin: const EdgeInsets.only(bottom: 16),
                   padding: const EdgeInsets.all(16),
@@ -1170,7 +1503,6 @@ class _NotificationUserState extends State<NotificationUser>
                   ),
                 ),
 
-                // Deleted items
                 ...deletedList.map((item) {
                   final data = item as Map<String, dynamic>;
                   final id = data['_id'] ?? '';
@@ -1240,7 +1572,6 @@ class _NotificationUserState extends State<NotificationUser>
                             ),
                           ),
                           const SizedBox(width: 12),
-                          // Restore button
                           Container(
                             height: 36,
                             decoration: BoxDecoration(
@@ -1273,7 +1604,6 @@ class _NotificationUserState extends State<NotificationUser>
                             ),
                           ),
                           const SizedBox(width: 8),
-                          // Delete forever button
                           Container(
                             width: 36,
                             height: 36,

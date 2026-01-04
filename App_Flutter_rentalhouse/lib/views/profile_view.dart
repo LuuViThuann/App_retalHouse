@@ -13,6 +13,8 @@ import 'package:flutter_rentalhouse/views/login_view.dart';
 import 'package:flutter_rentalhouse/views/my_profile_view.dart';
 import 'package:provider/provider.dart';
 
+import '../Widgets/Profile/PaymentHistoryView.dart';
+
 class ProfileView extends StatefulWidget {
   const ProfileView({super.key});
 
@@ -21,6 +23,63 @@ class ProfileView extends StatefulWidget {
 }
 
 class _ProfileViewState extends State<ProfileView> {
+  // Widget để hiển thị tiêu đề phân loại
+  Widget _buildSectionHeader(String title) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(0, 24, 0, 12),
+      child: Align(
+        alignment: Alignment.centerLeft,
+        child: Text(
+          title,
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.bold,
+            color: Colors.blue[700],
+          ),
+        ),
+      ),
+    );
+  }
+
+  //  Widget để hiển thị badge kế tiêu đề (giữ giao diện ban đầu)
+  Widget _buildMenuItemWithBadge({
+    required IconData icon,
+    required String text,
+    required VoidCallback onTap,
+    required int badgeCount,
+  }) {
+    return Stack(
+      children: [
+        ProfileMenuItem(
+          icon: icon,
+          text: text,
+          onTap: onTap,
+        ),
+        //  Badge nhỏ hiển thị kế tiêu đề
+        if (badgeCount > 0)
+          Positioned(
+            right: 0,
+            bottom: 28,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              decoration: BoxDecoration(
+                color: Colors.red,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Text(
+                badgeCount > 99 ? '99+' : '$badgeCount',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 10,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Consumer<AuthViewModel>(
@@ -37,6 +96,11 @@ class _ProfileViewState extends State<ProfileView> {
           });
           return const SizedBox.shrink();
         }
+
+        //  Tính toán số thông báo chưa đọc
+        final unreadNotificationCount = authViewModel.notifications
+            .where((notification) => !notification.read)
+            .length;
 
         // Use a default image or avatarBase64 if available
         ImageProvider avatarImage = const AssetImage('assets/img/imageuser.png');
@@ -74,30 +138,43 @@ class _ProfileViewState extends State<ProfileView> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
-                  SizedBox(height: 20),
+                  const SizedBox(height: 20),
                   CircleAvatar(
                     radius: 50,
                     backgroundImage: avatarImage,
                   ),
-                  SizedBox(height: 16),
+                  const SizedBox(height: 16),
                   Text(
                     user.username ?? 'Tên người dùng',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                   ),
                   Text(
                     user.email ?? 'Email@gmail.com',
-                    style: TextStyle(color: Colors.grey),
+                    style: const TextStyle(color: Colors.grey),
                   ),
-                  SizedBox(height: 24),
+
+                  // ===== PHÂN LOẠI: TÀI KHOẢN =====
+                  _buildSectionHeader('Tài Khoản'),
                   ProfileMenuItem(
                     icon: Icons.person_outline,
                     text: 'Thông tin cá nhân',
                     onTap: () => AppNavigator.goToProfile(context),
                   ),
                   ProfileMenuItem(
-                      icon: Icons.notifications_paused,
-                      text: 'Thông báo gần đây',
-                      onTap: () => AppNavigator.goToNotification(context)),
+                    icon: Icons.password,
+                    text: 'Thay đổi mật khẩu',
+                    onTap: () => AppNavigator.goToChangePassword(context),
+                  ),
+
+                  // ===== PHÂN LOẠI: HOẠT ĐỘNG =====
+                  _buildSectionHeader('Hoạt Động'),
+                  //  Updated: Notification with badge
+                  _buildMenuItemWithBadge(
+                    icon: Icons.notifications_paused,
+                    text: 'Thông báo gần đây',
+                    badgeCount: unreadNotificationCount,
+                    onTap: () => AppNavigator.goToNotification(context),
+                  ),
                   ProfileMenuItem(
                       icon: Icons.newspaper,
                       text: 'Tin tức đã lưu',
@@ -107,13 +184,24 @@ class _ProfileViewState extends State<ProfileView> {
                       text: 'Danh sách bài đăng của bạn',
                       onTap: () => AppNavigator.goToPosts(context)),
                   ProfileMenuItem(
+                    icon: Icons.receipt_long,
+                    text: 'Lịch sử giao dịch',
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const PaymentHistoryView(),
+                        ),
+                      );
+                    },
+                  ),
+                  ProfileMenuItem(
                       icon: Icons.comment,
                       text: 'Bình luận gần đây',
                       onTap: () => AppNavigator.goToComments(context)),
-                  ProfileMenuItem(
-                      icon: Icons.password,
-                      text: 'Thay đổi mật khẩu',
-                      onTap: () => AppNavigator.goToChangePassword(context)),
+
+                  // ===== PHÂN LOẠI: HỖ TRỢ =====
+                  _buildSectionHeader('Hỗ Trợ'),
                   ProfileMenuItem(
                       icon: Icons.info_outline,
                       text: 'Về chúng tôi',
@@ -143,6 +231,7 @@ class _ProfileViewState extends State<ProfileView> {
                       }
                     },
                   ),
+                  const SizedBox(height: 30),
                 ],
               ),
             ),

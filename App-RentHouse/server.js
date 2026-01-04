@@ -88,7 +88,7 @@ mongoose.connect(MONGODB_URI)
     console.error('❌ Error connecting to MongoDB:', err);
   });
 
-// ==================== WAIT FOR REDIS TO BE READY ====================
+// ==================== WAIT FOR REDIS TO BE READY ==================== 
 let redisReady = false;
 
 const waitForRedis = new Promise((resolve) => {
@@ -221,6 +221,8 @@ server.listen(PORT, () => {
   console.log(`✅ Redis: ${redisReady ? 'Connected' : 'Connecting...'}`);
   console.log(`✅ Firebase Admin: Initialized`);
   console.log(`✅ Socket.IO: Ready`);
+  console.log(" ========= > BACKEND ĐÃ AUTO RELOAD < ========= ");
+
 });
 
 // ==================== GRACEFUL SHUTDOWN ====================

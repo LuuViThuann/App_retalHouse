@@ -5,18 +5,36 @@ const admin = require('firebase-admin');
 const multer = require('multer');
 const { Comment, Reply, LikeComment } = require('../models/comments');
 const Rental = require('../models/Rental');
+const Notification = require('../models/notification');
 
+const cloudinary = require('../config/cloudinary');
+const { CloudinaryStorage } = require('multer-storage-cloudinary');
 
-// Configure multer for file uploads
-const storage = multer.diskStorage({
-  destination: './Uploads/',
-  filename: (req, file, cb) => {
-    cb(null, `${Date.now()}-${file.originalname}`);
+// Cấu hình Cloudinary Storage cho multer
+const storage = new CloudinaryStorage({
+  cloudinary: cloudinary,
+  params: {
+    folder: 'comments', // Thư mục trong Cloudinary
+    allowed_formats: ['jpg', 'jpeg', 'png', 'webp'],
+    transformation: [{ width: 1920, height: 1080, crop: 'limit' }],
   },
 });
-const upload = multer({ 
+
+const upload = multer({
   storage,
-  limits: { fileSize: 100 * 1024 * 1024 } // 20MB
+  limits: { fileSize: 100 * 1024 * 1024 }, // 100MB
+  fileFilter: (req, file, cb) => {
+    const allowedExtensions = /\.(jpeg|jpg|png|webp)$/i;
+    const extname = allowedExtensions.test(file.originalname);
+    
+    const allowedMimeTypes = /^image\/(jpeg|jpg|png|webp|octet-stream)/i;
+    const mimetype = allowedMimeTypes.test(file.mimetype);
+    
+    if (extname) {
+      return cb(null, true);
+    }
+    cb(new Error('Chỉ chấp nhận file ảnh (JPEG, JPG, PNG, WebP)'));
+  },
 });
 
 const authMiddleware = async (req, res, next) => {
@@ -31,11 +49,100 @@ const authMiddleware = async (req, res, next) => {
   }
 };
 
+// Helper function: Xóa ảnh trên Cloudinary
+const deleteCloudinaryImage = async (imageUrl) => {
+  try {
+    const urlParts = imageUrl.split('/');
+    const publicIdWithExt = urlParts[urlParts.length - 1];
+    const publicId = `comments/${publicIdWithExt.split('.')[0]}`;
+    
+    const result = await cloudinary.uploader.destroy(publicId);
+    console.log('Cloudinary delete result:', result);
+    return result;
+  } catch (error) {
+    console.error('Error deleting from Cloudinary:', error);
+    throw error;
+  }
+};
+
+
 // Helper function to adjust timestamps for +7 timezone
 const adjustTimestamps = (obj) => {
   const adjusted = { ...obj.toObject() };
   adjusted.createdAt = new Date(adjusted.createdAt.getTime() + 7 * 60 * 60 * 1000);
   return adjusted;
+};
+//  Create notification helper
+const createCommentNotification = async ({
+  userId,
+  rentalId,
+  rentalTitle,
+  commentId,
+  commenterName,
+  commentContent,
+  rating
+}) => {
+  try {
+    const notification = new Notification({
+      userId,
+      type: 'Comment',
+      title: `${commenterName} đã bình luận`,
+      message: `${commenterName} đã bình luận về bài viết của bạn: "${rentalTitle}"`,
+      rentalId,
+      commentId,
+      details: {
+        rentalTitle,
+        commenterName,
+        commentContent,
+        rating: rating || 0
+      },
+      read: false
+    });
+    await notification.save();
+    console.log('✅ Comment notification created:', notification._id);
+  } catch (err) {
+    console.error('❌ Error creating comment notification:', err);
+  }
+};
+
+//  Create reply notification helper
+const createReplyNotification = async ({
+  userId,
+  rentalId,
+  rentalTitle,
+  commentId,
+  replyId,
+  replierName,
+  replyContent,
+  originalComment,
+  notificationType = 'Reply' // 'Reply' for rental owner, 'Comment_Reply' for comment author
+}) => {
+  try {
+    const notification = new Notification({
+      userId,
+      type: notificationType,
+      title: notificationType === 'Comment_Reply' 
+        ? `${replierName} đã phản hồi bình luận của bạn`
+        : `${replierName} đã phản hồi bình luận`,
+      message: notificationType === 'Comment_Reply'
+        ? `${replierName} đã phản hồi bình luận của bạn`
+        : `${replierName} đã phản hồi bình luận trên bài viết của bạn: "${rentalTitle}"`,
+      rentalId,
+      commentId,
+      replyId,
+      details: {
+        rentalTitle,
+        replierName,
+        replyContent,
+        originalComment: originalComment || ''
+      },
+      read: false
+    });
+    await notification.save();
+    console.log('✅ Reply notification created:', notification._id);
+  } catch (err) {
+    console.error('❌ Error creating reply notification:', err);
+  }
 };
 
 module.exports = (io) => {
@@ -53,11 +160,11 @@ module.exports = (io) => {
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(parseInt(limit))
-        .populate('userId', 'avatarBase64 username');
+        .populate('userId', 'username avatarBase64 avatarUrl');
 
       const commentIds = comments.map(c => c._id);
       const replies = await Reply.find({ commentId: { $in: commentIds } })
-      .populate('userId', 'avatarBase64 username')
+        .populate('userId', 'username avatarBase64 avatarUrl')
         .lean();
 
       const likes = await LikeComment.find({
@@ -66,7 +173,7 @@ module.exports = (io) => {
           { targetId: { $in: replies.map(r => r._id) }, targetType: 'Reply' },
         ],
       })
-      .populate('userId', 'avatarBase64 username')
+        .populate('userId', 'username avatarBase64 avatarUrl')
         .lean();
 
       const totalComments = await Comment.countDocuments({ rentalId });
@@ -129,16 +236,19 @@ module.exports = (io) => {
       res.status(500).json({ message: err.message });
     }
   });
-
   // Create a new comment
   router.post('/comments', authMiddleware, upload.array('images'), async (req, res) => {
     try {
       const { rentalId, content, rating } = req.body;
       if (!rentalId || !content) return res.status(400).json({ message: 'Missing required fields' });
       if (!mongoose.Types.ObjectId.isValid(rentalId)) return res.status(400).json({ message: 'Invalid rentalId format' });
+      
       const rental = await Rental.findById(rentalId);
       if (!rental) return res.status(404).json({ message: 'Rental not found' });
-      const imageUrls = req.files.map((file) => `/uploads/${file.filename}`);
+      
+      // Lấy URL từ Cloudinary
+      const imageUrls = req.files.map((file) => file.path);
+      
       const comment = new Comment({
         rentalId: new mongoose.Types.ObjectId(rentalId),
         userId: req.userId,
@@ -146,16 +256,31 @@ module.exports = (io) => {
         rating: rating ? Number(rating) : 0,
         images: imageUrls,
       });
+      
       const savedComment = await comment.save();
       const populatedComment = await Comment.findById(savedComment._id).populate(
         'userId',
-        'avatarBase64 username'
+        'username avatarBase64 avatarUrl' 
       );
+      
       const adjustedComment = adjustTimestamps(populatedComment);
       adjustedComment.replies = [];
       adjustedComment.likes = [];
 
-      // Emit Socket.IO event for new comment
+      //  Create notification for rental owner ===================
+      if (rental.userId.toString() !== req.userId) {
+        const currentUser = await admin.auth().getUser(req.userId);
+        await createCommentNotification({
+          userId: rental.userId,
+          rentalId: rental._id,
+          rentalTitle: rental.title,
+          commentId: savedComment._id,
+          commenterName: currentUser.displayName || 'Người dùng ẩn danh',
+          commentContent: content,
+          rating: rating || 0
+        });
+      }
+
       io.emit('newComment', adjustedComment);
 
       res.status(201).json(adjustedComment);
@@ -175,38 +300,49 @@ module.exports = (io) => {
         const { content, imagesToRemove } = req.body;
         if (!mongoose.Types.ObjectId.isValid(commentId) || !content)
           return res.status(400).json({ message: 'Invalid format or missing content' });
+        
         const comment = await Comment.findById(commentId);
         if (!comment || comment.userId !== req.userId)
           return res.status(403).json({ message: 'Unauthorized or not found' });
 
         comment.content = content;
+        
+        // Xóa ảnh cũ trên Cloudinary
         if (imagesToRemove) {
           const imagesToRemoveArray = Array.isArray(imagesToRemove)
             ? imagesToRemove
             : JSON.parse(imagesToRemove || '[]');
+          
+          // Xóa từ Cloudinary
+          for (const imageUrl of imagesToRemoveArray) {
+            await deleteCloudinaryImage(imageUrl);
+          }
+          
           comment.images = comment.images.filter(
             (img) => !imagesToRemoveArray.includes(img)
           );
         }
+        
+        // Thêm ảnh mới từ Cloudinary
         if (req.files.length > 0) {
-          const newImageUrls = req.files.map((file) => `/uploads/${file.filename}`);
+          const newImageUrls = req.files.map((file) => file.path);
           comment.images = [...comment.images, ...newImageUrls];
         }
 
         const updatedComment = await comment.save();
         const populatedComment = await Comment.findById(commentId).populate(
           'userId',
-          'avatarBase64 username'
+          'username avatarBase64 avatarUrl' // 
         );
 
-        const replies = await Reply.find({ commentId }).populate('userId', 'avatarBase64 username').lean();
+        const replies = await Reply.find({ commentId }).populate('userId', 'username avatarBase64 avatarUrl').lean();
         const likes = await LikeComment.find({
           $or: [
             { targetId: commentId, targetType: 'Comment' },
             { targetId: { $in: replies.map((r) => r._id) }, targetType: 'Reply' },
           ],
         })
-        .populate('userId', 'avatarBase64 username')
+          .populate('userId', 'username avatarBase64 avatarUrl')
           .lean();
 
         const replyMap = new Map();
@@ -254,7 +390,6 @@ module.exports = (io) => {
             createdAt: new Date(like.createdAt.getTime() + 7 * 60 * 60 * 1000),
           }));
 
-        // Emit Socket.IO event for updated comment
         io.emit('updateComment', adjustedComment);
 
         res.status(200).json(adjustedComment);
@@ -270,14 +405,28 @@ module.exports = (io) => {
       const { commentId } = req.params;
       if (!mongoose.Types.ObjectId.isValid(commentId))
         return res.status(400).json({ message: 'Invalid commentId format' });
+      
       const comment = await Comment.findById(commentId);
       if (!comment || comment.userId !== req.userId)
         return res.status(403).json({ message: 'Unauthorized or not found' });
+      
+      // Xóa ảnh của comment trên Cloudinary
+      for (const imageUrl of comment.images) {
+        await deleteCloudinaryImage(imageUrl);
+      }
+      
+      // Lấy tất cả replies và xóa ảnh của chúng
+      const replies = await Reply.find({ commentId });
+      for (const reply of replies) {
+        for (const imageUrl of reply.images) {
+          await deleteCloudinaryImage(imageUrl);
+        }
+      }
+      
       await Reply.deleteMany({ commentId });
       await LikeComment.deleteMany({ targetId: commentId, targetType: 'Comment' });
       await Comment.findByIdAndDelete(commentId);
 
-      // Emit Socket.IO event for deleted comment
       io.emit('deleteComment', { commentId });
 
       res.json({ message: 'Comment deleted successfully' });
@@ -297,11 +446,14 @@ module.exports = (io) => {
         const { content, parentReplyId } = req.body;
         if (!content || !mongoose.Types.ObjectId.isValid(commentId))
           return res.status(400).json({ message: 'Missing content or invalid format' });
+        
         const comment = await Comment.findById(commentId);
         if (!comment) return res.status(404).json({ message: 'Comment not found' });
+        
         if (parentReplyId && !mongoose.Types.ObjectId.isValid(parentReplyId)) {
           return res.status(400).json({ message: 'Invalid parentReplyId format' });
         }
+        
         if (parentReplyId) {
           const parentReply = await Reply.findById(parentReplyId);
           if (!parentReply || parentReply.commentId.toString() !== commentId) {
@@ -310,7 +462,10 @@ module.exports = (io) => {
             });
           }
         }
-        const imageUrls = req.files.map((file) => `/uploads/${file.filename}`);
+        
+        // Lấy URL từ Cloudinary
+        const imageUrls = req.files.map((file) => file.path);
+        
         const reply = new Reply({
           commentId,
           parentReplyId: parentReplyId || null,
@@ -318,24 +473,25 @@ module.exports = (io) => {
           content,
           images: imageUrls,
         });
+        
         const savedReply = await reply.save();
         const populatedReply = await Reply.findById(savedReply._id).populate(
           'userId',
-          'username'
+          'username avatarBase64 avatarUrl' // ✅
         );
 
         const commentWithReplies = await Comment.findById(commentId).populate(
           'userId',
-          'avatarBase64 username'
+          'username avatarBase64 avatarUrl' // ✅
         );
-        const replies = await Reply.find({ commentId }).populate('userId', 'avatarBase64 username').lean();
+        const replies = await Reply.find({ commentId }).populate('userId', 'username avatarBase64 avatarUrl').lean();
         const likes = await LikeComment.find({
           $or: [
             { targetId: commentId, targetType: 'Comment' },
             { targetId: { $in: replies.map((r) => r._id) }, targetType: 'Reply' },
           ],
         })
-        .populate('userId', 'avatarBase64 username')
+          .populate('userId', 'username avatarBase64 avatarUrl')
           .lean();
 
         const replyMap = new Map();
@@ -383,7 +539,42 @@ module.exports = (io) => {
             createdAt: new Date(like.createdAt.getTime() + 7 * 60 * 60 * 1000),
           }));
 
-        // Emit Socket.IO event for new reply
+          //  Get rental info
+        const rental = await Rental.findById(comment.rentalId);
+        const currentUser = await admin.auth().getUser(req.userId);
+
+        //  Notify rental owner if different from replier
+        if (rental && rental.userId.toString() !== req.userId) {
+          await createReplyNotification({
+            userId: rental.userId,
+            rentalId: rental._id,
+            rentalTitle: rental.title,
+            commentId,
+            replyId: savedReply._id,
+            replierName: currentUser.displayName || 'Người dùng ẩn danh',
+            replyContent: content,
+            originalComment: comment.content || '',
+            notificationType: 'Reply'
+          });
+        }
+
+        //  Notify comment author if different from replier and rental owner
+        if (comment.userId.toString() !== req.userId && 
+            (!rental || rental.userId.toString() !== comment.userId.toString())) {
+          await createReplyNotification({
+            userId: comment.userId,
+            rentalId: rental._id,
+            rentalTitle: rental.title,
+            commentId,
+            replyId: savedReply._id,
+            replierName: currentUser.displayName || 'Người dùng ẩn danh',
+            replyContent: content,
+            originalComment: comment.content || '',
+            notificationType: 'Comment_Reply'
+          });
+        }
+
+
         io.emit('newReply', adjustedComment);
 
         res.status(201).json(adjustedComment);
@@ -409,6 +600,7 @@ module.exports = (io) => {
         ) {
           return res.status(400).json({ message: 'Invalid format or missing content' });
         }
+        
         const reply = await Reply.findById(replyId);
         if (
           !reply ||
@@ -419,32 +611,44 @@ module.exports = (io) => {
         }
 
         reply.content = content;
+        
+        // Xóa ảnh cũ trên Cloudinary
         if (imagesToRemove) {
           const imagesToRemoveArray = Array.isArray(imagesToRemove)
             ? imagesToRemove
             : JSON.parse(imagesToRemove || '[]');
+          
+          // Xóa từ Cloudinary
+          for (const imageUrl of imagesToRemoveArray) {
+            await deleteCloudinaryImage(imageUrl);
+          }
+          
           reply.images = reply.images.filter(
             (img) => !imagesToRemoveArray.includes(img)
           );
         }
+        
+        // Thêm ảnh mới từ Cloudinary
         if (req.files.length > 0) {
-          const newImageUrls = req.files.map((file) => `/uploads/${file.filename}`);
+          const newImageUrls = req.files.map((file) => file.path);
           reply.images = [...reply.images, ...newImageUrls];
         }
 
         const updatedReply = await reply.save();
         const comment = await Comment.findById(commentId).populate(
           'userId',
-          'avatarBase64 username'
+          'username avatarBase64 avatarUrl' // ✅
         );
-        const replies = await Reply.find({ commentId }).populate('userId', 'avatarBase64 username').lean();
+        const replies = await Reply.find({ commentId })
+        .populate('userId', 'username avatarBase64 avatarUrl') //
+        .lean();
         const likes = await LikeComment.find({
           $or: [
             { targetId: commentId, targetType: 'Comment' },
             { targetId: { $in: replies.map((r) => r._id) }, targetType: 'Reply' },
           ],
         })
-        .populate('userId', 'avatarBase64 username')
+          .populate('userId', 'username avatarBase64 avatarUrl')
           .lean();
 
         const replyMap = new Map();
@@ -492,7 +696,6 @@ module.exports = (io) => {
             createdAt: new Date(like.createdAt.getTime() + 7 * 60 * 60 * 1000),
           }));
 
-        // Emit Socket.IO event for updated reply
         io.emit('updateReply', adjustedComment);
 
         res.status(200).json(adjustedComment);
@@ -501,6 +704,7 @@ module.exports = (io) => {
       }
     }
   );
+
 
   // Delete a reply
   router.delete(
@@ -515,6 +719,7 @@ module.exports = (io) => {
         ) {
           return res.status(400).json({ message: 'Invalid format' });
         }
+        
         const reply = await Reply.findById(replyId);
         if (
           !reply ||
@@ -523,6 +728,20 @@ module.exports = (io) => {
         ) {
           return res.status(403).json({ message: 'Unauthorized or reply not found' });
         }
+        
+        // Xóa ảnh của reply trên Cloudinary
+        for (const imageUrl of reply.images) {
+          await deleteCloudinaryImage(imageUrl);
+        }
+        
+        // Lấy tất cả child replies và xóa ảnh của chúng
+        const childReplies = await Reply.find({ parentReplyId: replyId });
+        for (const childReply of childReplies) {
+          for (const imageUrl of childReply.images) {
+            await deleteCloudinaryImage(imageUrl);
+          }
+        }
+        
         await Reply.deleteMany({
           $or: [{ _id: replyId }, { parentReplyId: replyId }],
         });
@@ -530,16 +749,16 @@ module.exports = (io) => {
 
         const comment = await Comment.findById(commentId).populate(
           'userId',
-          'avatarBase64 username'
+          'username avatarBase64 avatarUrl' // ✅
         );
-        const replies = await Reply.find({ commentId }).populate('userId', 'avatarBase64 username').lean();
+        const replies = await Reply.find({ commentId }).populate('userId', 'username avatarBase64 avatarUrl').lean();
         const likes = await LikeComment.find({
           $or: [
             { targetId: commentId, targetType: 'Comment' },
             { targetId: { $in: replies.map((r) => r._id) }, targetType: 'Reply' },
           ],
         })
-        .populate('userId', 'avatarBase64 username')
+          .populate('userId', 'username avatarBase64 avatarUrl')
           .lean();
 
         const replyMap = new Map();
@@ -587,7 +806,6 @@ module.exports = (io) => {
             createdAt: new Date(like.createdAt.getTime() + 7 * 60 * 60 * 1000),
           }));
 
-        // Emit Socket.IO event for deleted reply
         io.emit('deleteReply', { commentId, replyId });
 
         res.status(200).json({
@@ -618,16 +836,16 @@ module.exports = (io) => {
         await LikeComment.deleteOne({ _id: existingLike._id });
         const populatedComment = await Comment.findById(commentId).populate(
           'userId',
-          'avatarBase64 username'
+          'username avatarBase64 avatarUrl' // ✅
         );
-        const replies = await Reply.find({ commentId }).populate('userId', 'avatarBase64 username').lean();
+        const replies = await Reply.find({ commentId }).populate('userId', 'username avatarBase64 avatarUrl').lean();
         const likes = await LikeComment.find({
           $or: [
             { targetId: commentId, targetType: 'Comment' },
             { targetId: { $in: replies.map((r) => r._id) }, targetType: 'Reply' },
           ],
         })
-        .populate('userId', 'avatarBase64 username')
+        .populate('userId', 'username avatarBase64 avatarUrl')
           .lean();
 
         const replyMap = new Map();
@@ -694,16 +912,16 @@ module.exports = (io) => {
 
       const populatedComment = await Comment.findById(commentId).populate(
         'userId',
-        'avatarBase64 username'
+        'username avatarBase64 avatarUrl' // ✅
       );
-      const replies = await Reply.find({ commentId }).populate('userId', 'avatarBase64 username').lean();
+      const replies = await Reply.find({ commentId }).populate('userId', 'username avatarBase64 avatarUrl').lean();
       const likes = await LikeComment.find({
         $or: [
           { targetId: commentId, targetType: 'Comment' },
           { targetId: { $in: replies.map((r) => r._id) }, targetType: 'Reply' },
         ],
       })
-        .populate('userId', 'avatarBase64 username')
+        .populate('userId', 'username avatarBase64 avatarUrl')
         .lean();
 
       const replyMap = new Map();
@@ -781,16 +999,16 @@ module.exports = (io) => {
 
       const populatedComment = await Comment.findById(commentId).populate(
         'userId',
-        'avatarBase64 username'
+        'username avatarBase64 avatarUrl' // ✅
       );
-      const replies = await Reply.find({ commentId }).populate('userId', 'avatarBase64 username').lean();
+      const replies = await Reply.find({ commentId }).populate('userId', 'username avatarBase64 avatarUrl').lean();
       const likes = await LikeComment.find({
         $or: [
           { targetId: commentId, targetType: 'Comment' },
           { targetId: { $in: replies.map((r) => r._id) }, targetType: 'Reply' },
         ],
       })
-        .populate('userId', 'avatarBase64 username')
+        .populate('userId', 'username avatarBase64 avatarUrl')
         .lean();
 
       const replyMap = new Map();
@@ -877,10 +1095,10 @@ module.exports = (io) => {
           await LikeComment.deleteOne({ _id: existingLike._id });
           const comment = await Comment.findById(commentId).populate(
             'userId',
-            'avatarBase64 username'
+            'username avatarBase64 avatarUrl' // ✅
           );
           const replies = await Reply.find({ commentId })
-            .populate('userId', 'avatarBase64 username')
+            .populate('userId', 'username avatarBase64 avatarUrl')
             .lean();
           const likes = await LikeComment.find({
             $or: [
@@ -888,7 +1106,7 @@ module.exports = (io) => {
               { targetId: { $in: replies.map((r) => r._id) }, targetType: 'Reply' },
             ],
           })
-            .populate('userId', 'avatarBase64 username')
+            .populate('userId', 'username avatarBase64 avatarUrl')
             .lean();
 
           const replyMap = new Map();
@@ -910,7 +1128,7 @@ module.exports = (io) => {
             }
             replyMap.get(commentIdStr).push(reply);
           });
-
+ 
           const buildReplyTree = (replyList, parentId = null) => {
             return replyList
               .filter((reply) =>
@@ -957,16 +1175,16 @@ module.exports = (io) => {
 
         const comment = await Comment.findById(commentId).populate(
           'userId',
-          'avatarBase64 username'
+          'username avatarBase64 avatarUrl' // ✅
         );
-        const replies = await Reply.find({ commentId }).populate('userId', 'avatarBase64 username')
+        const replies = await Reply.find({ commentId }).populate('userId', 'username avatarBase64 avatarUrl')
         const likes = await LikeComment.find({
           $or: [
             { targetId: commentId, targetType: 'Comment' },
             { targetId: { $in: replies.map((r) => r._id) }, targetType: 'Reply' },
           ],
         })
-          .populate('userId', 'avatarBase64 username')
+          .populate('userId', 'username avatarBase64 avatarUrl')
           .lean();
 
         const replyMap = new Map();
@@ -1055,16 +1273,16 @@ module.exports = (io) => {
 
         const comment = await Comment.findById(commentId).populate(
           'userId',
-          'avatarBase64 username'
+          'username avatarBase64 avatarUrl' // ✅
         );
-        const replies = await Reply.find({ commentId }).populate('userId', 'avatarBase64 username').lean();
+        const replies = await Reply.find({ commentId }).populate('userId', 'username avatarBase64 avatarUrl').lean();
         const likes = await LikeComment.find({
           $or: [
             { targetId: commentId, targetType: 'Comment' },
             { targetId: { $in: replies.map((r) => r._id) }, targetType: 'Reply' },
           ],
         })
-        .populate('userId', 'avatarBase64 username')
+          .populate('userId', 'username avatarBase64 avatarUrl')
           .lean();
 
         const replyMap = new Map();

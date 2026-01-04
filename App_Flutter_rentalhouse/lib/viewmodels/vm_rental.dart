@@ -139,15 +139,6 @@ class RentalViewModel extends ChangeNotifier {
         imagePaths,
         videoPaths: videoPaths,
       );
-
-      debugPrint('✅ Rental created successfully');
-      debugPrint('✅ Rental ID: ${createdRental.id}');
-      debugPrint('✅ Title: ${createdRental.title}');
-      debugPrint('✅ Published at: ${createdRental.publishedAt}');
-      debugPrint('✅ Payment status: ${createdRental.paymentStatus}');
-      debugPrint('✅ Is paid: ${createdRental.isPaid}');
-      debugPrint('✅ Is published: ${createdRental.isPublished}');
-
       // Refresh all rentals để cập nhật danh sách
       await fetchAllRentals();
 

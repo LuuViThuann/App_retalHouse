@@ -56,7 +56,6 @@ class _ManageNewsScreenState extends State<ManageNewsScreen> with AutomaticKeepA
     }
   }
 
-  // Fetch trong background không làm giật màn hình
   Future<void> _silentRefresh() async {
     try {
       final result = await _newsService.fetchAllNewsAdmin(page: 1, limit: 50);
@@ -72,7 +71,6 @@ class _ManageNewsScreenState extends State<ManageNewsScreen> with AutomaticKeepA
     }
   }
 
-  // Cập nhật item trong danh sách
   void _updateNewsInList(NewsModel updatedNews) {
     final index = newsList.indexWhere((n) => n.id == updatedNews.id);
     if (index != -1) {
@@ -82,7 +80,6 @@ class _ManageNewsScreenState extends State<ManageNewsScreen> with AutomaticKeepA
     }
   }
 
-  // Thêm item vào đầu danh sách
   void _addNewsToList(NewsModel newNews) {
     setState(() {
       newsList.insert(0, newNews);
@@ -94,18 +91,24 @@ class _ManageNewsScreenState extends State<ManageNewsScreen> with AutomaticKeepA
       context: context,
       builder: (_) => AlertDialog(
         backgroundColor: Colors.white,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('Xóa tin tức'),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text('Xóa tin tức',
+            style: TextStyle(fontWeight: FontWeight.w600, fontSize: 18)),
         content: const Text(
-            'Bạn có chắc chắn muốn xóa tin tức này?\nHành động này không thể hoàn tác.'),
+            'Bạn có chắc chắn muốn xóa?\nHành động này không thể hoàn tác.',
+            style: TextStyle(fontSize: 14, height: 1.5)),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Hủy'),
+            child: Text('Hủy',
+                style: TextStyle(
+                    color: Colors.grey[600], fontWeight: FontWeight.w500)),
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('Xóa', style: TextStyle(color: Colors.red)),
+            child: const Text('Xóa',
+                style: TextStyle(
+                    color: Colors.red, fontWeight: FontWeight.w600)),
           ),
         ],
       ),
@@ -117,7 +120,6 @@ class _ManageNewsScreenState extends State<ManageNewsScreen> with AutomaticKeepA
       await _newsService.deleteNews(newsId);
 
       if (mounted) {
-        // Xóa khỏi danh sách ngay lập tức
         setState(() {
           newsList.removeWhere((n) => n.id == newsId);
         });
@@ -159,13 +161,10 @@ class _ManageNewsScreenState extends State<ManageNewsScreen> with AutomaticKeepA
       ),
     );
 
-    // Chỉ cập nhật khi có thay đổi thực sự
     if (result != null && result['success'] == true && mounted) {
       final updatedNews = result['news'] as NewsModel?;
       if (updatedNews != null) {
         _updateNewsInList(updatedNews);
-
-        // Fetch trong background để đồng bộ
         Future.delayed(const Duration(milliseconds: 800), () {
           if (mounted) _silentRefresh();
         });
@@ -194,13 +193,10 @@ class _ManageNewsScreenState extends State<ManageNewsScreen> with AutomaticKeepA
       ),
     );
 
-    // Chỉ cập nhật khi có thay đổi thực sự
     if (result != null && result['success'] == true && mounted) {
       final newNews = result['news'] as NewsModel?;
       if (newNews != null) {
         _addNewsToList(newNews);
-
-        // Fetch trong background để đồng bộ
         Future.delayed(const Duration(milliseconds: 800), () {
           if (mounted) _silentRefresh();
         });
@@ -210,40 +206,72 @@ class _ManageNewsScreenState extends State<ManageNewsScreen> with AutomaticKeepA
 
   @override
   Widget build(BuildContext context) {
-    super.build(context); // QUAN TRỌNG: Phải gọi super.build cho AutomaticKeepAliveClientMixin
+    super.build(context);
     return Scaffold(
-      backgroundColor: Colors.grey[50],
-      appBar: AppBar(
-        title: const Text('Quản lý Tin tức'),
-        centerTitle: true,
-        backgroundColor: Colors.white,
-        foregroundColor: Colors.black,
-        elevation: 0,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: _fetchNews,
-          ),
-        ],
-      ),
+      backgroundColor: const Color(0xFFF5F7FA),
+      appBar: _buildAppBar(),
       body: isLoading && newsList.isEmpty
           ? _buildShimmerLoading()
           : newsList.isEmpty
           ? _buildEmptyState()
           : RefreshIndicator(
         onRefresh: _fetchNews,
+        color: Colors.blue[700],
+        backgroundColor: Colors.white,
         child: ListView.builder(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.fromLTRB(12, 16, 12, 80),
           itemCount: newsList.length,
           itemBuilder: (context, index) =>
               _buildNewsCard(newsList[index]),
         ),
       ),
-      floatingActionButton: FloatingActionButton(
+      floatingActionButton: _buildFAB(),
+    );
+  }
+
+  AppBar _buildAppBar() {
+    return AppBar(
+      title: const Text('Quản lý Tin tức',
+          style: TextStyle(
+              fontWeight: FontWeight.w600, fontSize: 18, color: Colors.black)),
+      centerTitle: false,
+      backgroundColor: Colors.white,
+      foregroundColor: Colors.black,
+      elevation: 0,
+      toolbarHeight: 64,
+      actions: [
+        Padding(
+          padding: const EdgeInsets.only(right: 8),
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: _fetchNews,
+              borderRadius: BorderRadius.circular(30),
+              child: Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Colors.grey[100],
+                ),
+                child: Icon(Icons.refresh, color: Colors.blue[700], size: 22),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildFAB() {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16, right: 8),
+      child: FloatingActionButton(
         backgroundColor: Colors.blue[700],
-        elevation: 6,
-        child: const Icon(Icons.add, color: Colors.white),
+        elevation: 8,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         onPressed: _navigateToAdd,
+        child: const Icon(Icons.add, color: Colors.white, size: 28),
       ),
     );
   }
@@ -252,188 +280,237 @@ class _ManageNewsScreenState extends State<ManageNewsScreen> with AutomaticKeepA
     final imageUrl = news.getFullImageUrl(ApiRoutes.serverBaseUrl);
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 16),
+      margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.08),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
           ),
         ],
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(16),
-        child: Stack(
-          children: [
-            // Ảnh nền
-            Image.network(
-              imageUrl,
-              height: 220,
-              width: double.infinity,
-              fit: BoxFit.cover,
-              loadingBuilder: (context, child, loadingProgress) {
-                if (loadingProgress == null) return child;
-                return Container(
+        child: Material(
+          color: Colors.white,
+          child: Stack(
+            children: [
+              // Ảnh nền
+              Image.network(
+                imageUrl,
+                height: 200,
+                width: double.infinity,
+                fit: BoxFit.cover,
+                loadingBuilder: (context, child, loadingProgress) {
+                  if (loadingProgress == null) return child;
+                  return Container(
                     color: Colors.grey[200],
-                    child: const Center(child: CircularProgressIndicator()));
-              },
-              errorBuilder: (_, __, ___) => Container(
-                color: Colors.grey[300],
-                child: const Icon(Icons.broken_image,
-                    size: 60, color: Colors.grey),
-              ),
-            ),
-
-            // Lớp mờ + nội dung
-            Container(
-              height: 220,
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [Colors.transparent, Colors.black.withOpacity(0.85)],
+                    height: 200,
+                    child: const Center(child: CircularProgressIndicator()),
+                  );
+                },
+                errorBuilder: (_, __, ___) => Container(
+                  height: 200,
+                  color: Colors.grey[300],
+                  child: const Icon(Icons.broken_image,
+                      size: 50, color: Colors.grey),
                 ),
               ),
-            ),
 
-            // === NÚT XEM CHI TIẾT ===
-            Positioned(
-              top: 12,
-              left: 12,
-              child: ElevatedButton.icon(
-                onPressed: () => _viewNewsDetail(news),
-                icon: const Icon(Icons.visibility, size: 18),
-                label:
-                const Text('Xem chi tiết', style: TextStyle(fontSize: 13)),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.white,
-                  foregroundColor: Colors.blue[700],
-                  elevation: 4,
-                  padding:
-                  const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(20)),
-                ),
-              ),
-            ),
-
-            // === Tag nổi bật ===
-            Positioned(
-              top: 12,
-              right: 80,
-              child: Container(
-                padding:
-                const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              // Gradient overlay
+              Container(
+                height: 200,
                 decoration: BoxDecoration(
-                  color: news.featured
-                      ? Colors.orange.shade600
-                      : Colors.grey.shade600,
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(news.featured ? Icons.star : Icons.star_border,
-                        color: Colors.white, size: 16),
-                    const SizedBox(width: 4),
-                    Text(
-                      news.featured ? 'Nổi bật' : 'Bình thường',
-                      style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-
-            // === Menu Chỉnh sửa / Xóa ===
-            Positioned(
-              top: 8,
-              right: 8,
-              child: Material(
-                color: Colors.black.withOpacity(0.4),
-                borderRadius: BorderRadius.circular(30),
-                child: PopupMenuButton<String>(
-                  color: Colors.white,
-                  padding: const EdgeInsets.all(12),
-                  icon: const Icon(Icons.more_vert,
-                      color: Colors.white, size: 28),
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16)),
-                  itemBuilder: (_) => [
-                    const PopupMenuItem(
-                        value: 'edit',
-                        child: Row(children: [
-                          Icon(Icons.edit, color: Colors.blue),
-                          SizedBox(width: 12),
-                          Text('Chỉnh sửa')
-                        ])),
-                    const PopupMenuItem(
-                        value: 'delete',
-                        child: Row(children: [
-                          Icon(Icons.delete, color: Colors.red),
-                          SizedBox(width: 12),
-                          Text('Xóa', style: TextStyle(color: Colors.red))
-                        ])),
-                  ],
-                  onSelected: (value) {
-                    if (value == 'edit') {
-                      _navigateToEdit(news);
-                    } else if (value == 'delete') {
-                      _deleteNews(news.id);
-                    }
-                  },
-                ),
-              ),
-            ),
-
-            // Nội dung tiêu đề
-            Positioned(
-              bottom: 16,
-              left: 16,
-              right: 16,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    news.title,
-                    style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      const Icon(Icons.visibility,
-                          color: Colors.white70, size: 16),
-                      const SizedBox(width: 4),
-                      Text('${news.views} lượt xem',
-                          style: const TextStyle(
-                              color: Colors.white70, fontSize: 13)),
-                      const Spacer(),
-                      Text(news.category,
-                          style: const TextStyle(
-                              color: Colors.white70, fontSize: 13)),
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      Colors.transparent,
+                      Colors.black.withOpacity(0.75)
                     ],
                   ),
-                ],
+                ),
               ),
-            ),
-          ],
+
+              // Nội dung chính
+              Positioned(
+                bottom: 0,
+                left: 0,
+                right: 0,
+                child: Container(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              news.title,
+                              style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600,
+                                  height: 1.3),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          _buildCategoryBadge(news.category),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Icon(Icons.visibility,
+                              color: Colors.white70, size: 14),
+                          const SizedBox(width: 4),
+                          Text('${news.views}',
+                              style: const TextStyle(
+                                  color: Colors.white70, fontSize: 12)),
+                          const SizedBox(width: 16),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: news.featured
+                                  ? Colors.orange.shade600
+                                  : Colors.grey.shade700,
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                    news.featured
+                                        ? Icons.star
+                                        : Icons.star_border,
+                                    color: Colors.white,
+                                    size: 12),
+                                const SizedBox(width: 3),
+                                Text(
+                                  news.featured ? 'Nổi bật' : 'Bình thường',
+                                  style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w500),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+
+              // Action buttons - top right
+              Positioned(
+                top: 8,
+                right: 8,
+                child: Material(
+                  color: Colors.transparent,
+                  child: PopupMenuButton<String>(
+                    color: Colors.white,
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12)),
+                    itemBuilder: (_) => [
+                      PopupMenuItem(
+                        value: 'view',
+                        child: Row(
+                          children: [
+                            Icon(Icons.visibility_outlined,
+                                color: Colors.blue[700], size: 20),
+                            const SizedBox(width: 12),
+                            const Text('Xem chi tiết',
+                                style: TextStyle(fontSize: 14)),
+                          ],
+                        ),
+                      ),
+                      PopupMenuItem(
+                        value: 'edit',
+                        child: Row(
+                          children: [
+                            Icon(Icons.edit_outlined,
+                                color: Colors.blue[700], size: 20),
+                            const SizedBox(width: 12),
+                            const Text('Chỉnh sửa',
+                                style: TextStyle(fontSize: 14)),
+                          ],
+                        ),
+                      ),
+                      PopupMenuItem(
+                        value: 'delete',
+                        child: Row(
+                          children: [
+                            Icon(Icons.delete_outline,
+                                color: Colors.red[600], size: 20),
+                            const SizedBox(width: 12),
+                            Text('Xóa',
+                                style: TextStyle(
+                                    color: Colors.red[600],
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w500)),
+                          ],
+                        ),
+                      ),
+                    ],
+                    onSelected: (value) {
+                      if (value == 'view') {
+                        _viewNewsDetail(news);
+                      } else if (value == 'edit') {
+                        _navigateToEdit(news);
+                      } else if (value == 'delete') {
+                        _deleteNews(news.id);
+                      }
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withOpacity(0.3),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(Icons.more_vert,
+                          color: Colors.white, size: 24),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
 
+  Widget _buildCategoryBadge(String category) {
+    final colors = {
+      'Tin tức': Colors.blue,
+      'Sự kiện': Colors.green,
+      'Khuyến mãi': Colors.red,
+      'Cập nhật': Colors.purple,
+    };
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: (colors[category] ?? Colors.blue).withOpacity(0.9),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Text(
+        category,
+        style: const TextStyle(
+            color: Colors.white, fontSize: 11, fontWeight: FontWeight.w500),
+      ),
+    );
+  }
+
   void _viewNewsDetail(NewsModel news) async {
-    AppLoadingDialog.show(context, message: 'Đang mở tin tức...');
+    AppLoadingDialog.show(context, message: 'Đang mở...');
 
     await Future.delayed(const Duration(milliseconds: 400));
 
@@ -459,16 +536,26 @@ class _ManageNewsScreenState extends State<ManageNewsScreen> with AutomaticKeepA
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.newspaper_outlined, size: 100, color: Colors.blue[300]),
+          Container(
+            width: 100,
+            height: 100,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: Colors.blue[100],
+            ),
+            child: Icon(Icons.newspaper_outlined,
+                size: 50, color: Colors.blue[700]),
+          ),
           const SizedBox(height: 24),
           const Text(
-            'Chưa có tin tức nào',
+            'Chưa có tin tức',
             style: TextStyle(
-                fontSize: 20, fontWeight: FontWeight.bold, color: Colors.grey),
+                fontSize: 18, fontWeight: FontWeight.w600, color: Colors.black),
           ),
           const SizedBox(height: 8),
-          const Text('Nhấn nút + để thêm tin tức đầu tiên',
-              style: TextStyle(color: Colors.grey)),
+          Text('Nhấn nút + để thêm tin tức đầu tiên',
+              style:
+              TextStyle(fontSize: 14, color: Colors.grey[600])),
         ],
       ),
     );
@@ -479,11 +566,11 @@ class _ManageNewsScreenState extends State<ManageNewsScreen> with AutomaticKeepA
       baseColor: Colors.grey[300]!,
       highlightColor: Colors.grey[100]!,
       child: ListView.builder(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.fromLTRB(12, 16, 12, 80),
         itemCount: 6,
         itemBuilder: (_, __) => Container(
-          margin: const EdgeInsets.only(bottom: 16),
-          height: 220,
+          margin: const EdgeInsets.only(bottom: 12),
+          height: 200,
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(16),

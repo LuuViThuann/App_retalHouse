@@ -6,53 +6,85 @@ import 'package:flutter_rentalhouse/models/Reply.dart';
 class User {
   final String id;
   final String username;
-  final String? avatarBase64;
+  final String? avatarUrl; // ✅ Đổi từ avatarBase64 → avatarUrl
 
   const User({
     required this.id,
     this.username = '',
-    this.avatarBase64,
+    this.avatarUrl,
   });
 
   factory User.fromJson(Map<String, dynamic> json) {
+    // ✅ Backend có thể trả về 2 field: avatarBase64 (cũ) hoặc avatarUrl (mới)
+    // Ưu tiên avatarUrl nếu có
+    final avatarUrl = json['avatarUrl']?.toString();
     final avatarBase64 = json['avatarBase64']?.toString();
+
     return User(
       id: json['_id']?.toString() ?? json['id']?.toString() ?? '',
       username: json['username']?.toString() ?? '',
-      avatarBase64:
-          avatarBase64 != null && avatarBase64.isNotEmpty ? avatarBase64 : null,
+      avatarUrl: avatarUrl ?? avatarBase64, // Fallback nếu vẫn còn base64
     );
   }
 
+  // ✅ Không cần decode base64 nữa vì đã là URL
+  // Giữ lại để backward compatible
   Uint8List? get avatarBytes {
-    if (avatarBase64 == null || avatarBase64!.isEmpty) return null;
+    if (avatarUrl == null || avatarUrl!.isEmpty) return null;
+
+    // Nếu là URL (bắt đầu với http/https), trả về null
+    if (avatarUrl!.startsWith('http')) return null;
+
+    // Nếu vẫn là base64, decode
     try {
-      final data = avatarBase64!.contains(',')
-          ? avatarBase64!.split(',')[1]
-          : avatarBase64!;
+      final data = avatarUrl!.contains(',')
+          ? avatarUrl!.split(',')[1]
+          : avatarUrl!;
       return base64Decode(data);
     } catch (e) {
-      print('Error decoding avatarBase64 for user $id: $e');
+      print('Error decoding avatar for user $id: $e');
       return null;
     }
   }
 
+  // ✅ Helper để check xem avatar có phải URL không
+  bool get isAvatarUrl => avatarUrl?.startsWith('http') ?? false;
+
   @override
   String toString() =>
-      'User(id: $id, username: $username, avatarBase64: ${avatarBase64?.substring(0, 20)}...)';
+      'User(id: $id, username: $username, avatarUrl: ${avatarUrl?.substring(0, 30)}...)';
 }
 
 class Like {
   final String userId;
+  final String? username; // ✅ Thêm để hiển thị tên người like
+  final String? avatarUrl; // ✅ Thêm để hiển thị avatar người like
 
-  const Like({required this.userId});
+  const Like({
+    required this.userId,
+    this.username,
+    this.avatarUrl,
+  });
 
   factory Like.fromJson(Map<String, dynamic> json) {
-    return Like(userId: json['userId']?.toString() ?? '');
+    // Backend trả về userId như object hoặc string
+    if (json['userId'] is Map) {
+      final userObj = json['userId'] as Map<String, dynamic>;
+      return Like(
+        userId: userObj['_id']?.toString() ?? '',
+        username: userObj['username']?.toString(),
+        avatarUrl: userObj['avatarUrl']?.toString() ?? userObj['avatarBase64']?.toString(),
+      );
+    }
+    return Like(
+      userId: json['userId']?.toString() ?? '',
+      username: json['username']?.toString(),
+      avatarUrl: json['avatarUrl']?.toString() ?? json['avatarBase64']?.toString(),
+    );
   }
 
   @override
-  String toString() => 'Like(userId: $userId)';
+  String toString() => 'Like(userId: $userId, username: $username)';
 }
 
 class Comment {
@@ -61,13 +93,13 @@ class Comment {
   final User userId;
   final String content;
   final double rating;
-  final List<String> images;
+  final List<String> images; // ✅ Đã là URL từ Cloudinary
   final bool isHidden;
   final DateTime createdAt;
   final List<Reply> replies;
   final List<Like> likes;
-  final String? rentalTitle; // Added for recent comments
-  final String? type; // Added to distinguish Comment vs Reply
+  final String? rentalTitle;
+  final String? type;
 
   const Comment({
     required this.id,
@@ -95,19 +127,19 @@ class Comment {
         content: json['content']?.toString() ?? '',
         rating: (json['rating'] as num?)?.toDouble() ?? 0.0,
         images: (json['images'] as List<dynamic>?)
-                ?.map((e) => e.toString())
-                .toList() ??
+            ?.map((e) => e.toString())
+            .toList() ??
             [],
         isHidden: json['isHidden'] == true,
         createdAt: DateTime.tryParse(json['createdAt']?.toString() ?? '') ??
             DateTime.now(),
         replies: (json['replies'] as List<dynamic>?)
-                ?.map((reply) => Reply.fromJson(reply))
-                .toList() ??
+            ?.map((reply) => Reply.fromJson(reply))
+            .toList() ??
             [],
         likes: (json['likes'] as List<dynamic>?)
-                ?.map((like) => Like.fromJson(like))
-                .toList() ??
+            ?.map((like) => Like.fromJson(like))
+            .toList() ??
             [],
         rentalTitle: json['rentalTitle']?.toString(),
         type: json['type']?.toString(),
