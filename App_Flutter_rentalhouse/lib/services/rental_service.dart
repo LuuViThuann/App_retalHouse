@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'dart:io';
@@ -9,33 +11,130 @@ import '../services/auth_service.dart';
 import '../viewmodels/vm_auth.dart';
 
 class RentalService {
+  // ✅ Timeout configuration
+  static const Duration _defaultTimeout = Duration(seconds: 30);
+  static const Duration _longTimeout = Duration(seconds: 60);
+  static const int _maxRetries = 3;
+
+  // ✅ HTTP Client với connection pooling
+  static final http.Client _client = http.Client();
+
+  // ✅ Circuit breaker pattern
+  static DateTime? _lastFailure;
+  static int _consecutiveFailures = 0;
+  static const int _failureThreshold = 5;
+  static const Duration _recoveryTime = Duration(minutes: 1);
+
+  bool _isCircuitOpen() {
+    if (_consecutiveFailures >= _failureThreshold && _lastFailure != null) {
+      final timeSinceLastFailure = DateTime.now().difference(_lastFailure!);
+      if (timeSinceLastFailure < _recoveryTime) {
+        return true;
+      } else {
+        // Reset circuit breaker
+        _consecutiveFailures = 0;
+        _lastFailure = null;
+      }
+    }
+    return false;
+  }
+
+  void _recordSuccess() {
+    _consecutiveFailures = 0;
+    _lastFailure = null;
+  }
+
+  void _recordFailure() {
+    _consecutiveFailures++;
+    _lastFailure = DateTime.now();
+  }
+
+  // ✅ Retry with exponential backoff
+  Future<T> _retryRequest<T>(
+      Future<T> Function() operation, {
+        int maxRetries = _maxRetries,
+        Duration initialDelay = const Duration(milliseconds: 500),
+      }) async {
+    int attempt = 0;
+    Duration delay = initialDelay;
+
+    while (attempt < maxRetries) {
+      try {
+        if (_isCircuitOpen()) {
+          throw Exception('Service temporarily unavailable. Please try again later.');
+        }
+
+        final result = await operation();
+        _recordSuccess();
+        return result;
+      } catch (e) {
+        attempt++;
+        _recordFailure();
+
+        if (attempt >= maxRetries) {
+          debugPrint('❌ Max retries ($maxRetries) reached: $e');
+          rethrow;
+        }
+
+        // Exponential backoff
+        debugPrint('⚠️ Retry attempt $attempt/$maxRetries after ${delay.inMilliseconds}ms');
+        await Future.delayed(delay);
+        delay *= 2; // Double the delay each time
+      }
+    }
+
+    throw Exception('Max retries exceeded');
+  }
+
+  // ✅ Safe request wrapper with proper error handling
+  Future<http.Response> _safeRequest(
+      Future<http.Response> Function() request, {
+        Duration? timeout,
+      }) async {
+    try {
+      final response = await request().timeout(
+        timeout ?? _defaultTimeout,
+        onTimeout: () {
+          throw TimeoutException('Request timeout after ${timeout?.inSeconds ?? _defaultTimeout.inSeconds}s');
+        },
+      );
+      return response;
+    } on SocketException catch (e) {
+      throw Exception('Không có kết nối mạng: ${e.message}');
+    } on TimeoutException catch (e) {
+      throw Exception('Timeout: ${e.message}');
+    } on http.ClientException catch (e) {
+      throw Exception('Lỗi kết nối: ${e.message}');
+    } catch (e) {
+      throw Exception('Lỗi không xác định: $e');
+    }
+  }
+
   Future<List<Rental>> fetchRentals({
     int page = 1,
     int limit = 10,
     String? token,
   }) async {
-    try {
-      final uri =
-      Uri.parse('${ApiRoutes.baseUrl}/rentals?page=$page&limit=$limit');
+    return _retryRequest(() async {
+      final uri = Uri.parse('${ApiRoutes.baseUrl}/rentals?page=$page&limit=$limit');
       final headers = {
         'Content-Type': 'application/json',
+        'Connection': 'keep-alive', // ✅ Keep connection alive
         if (token != null) 'Authorization': 'Bearer $token',
       };
 
-      final response = await http.get(uri, headers: headers);
+      final response = await _safeRequest(
+            () => _client.get(uri, headers: headers),
+      );
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         final List<dynamic> rentalsData = data['rentals'] ?? [];
         return rentalsData.map((json) => Rental.fromJson(json)).toList();
       } else {
-        throw Exception(
-            'Failed to fetch rentals: Status ${response.statusCode}, Body: ${response.body}');
+        throw Exception('Failed to fetch rentals: Status ${response.statusCode}');
       }
-    } catch (e) {
-      debugPrint('Error fetching rentals: $e');
-      throw Exception('Lỗi khi tải danh sách nhà trọ: $e');
-    }
+    });
   }
 
   Future<Rental?> fetchRentalById({
@@ -43,26 +142,31 @@ class RentalService {
     String? token,
   }) async {
     try {
-      final uri = Uri.parse('${ApiRoutes.baseUrl}/rentals/$rentalId');
-      final headers = {
-        'Content-Type': 'application/json',
-        if (token != null) 'Authorization': 'Bearer $token',
-      };
+      return await _retryRequest(() async {
+        final uri = Uri.parse('${ApiRoutes.baseUrl}/rentals/$rentalId');
+        final headers = {
+          'Content-Type': 'application/json',
+          'Connection': 'keep-alive',
+          if (token != null) 'Authorization': 'Bearer $token',
+        };
 
-      final response = await http.get(uri, headers: headers);
+        final response = await _safeRequest(
+              () => _client.get(uri, headers: headers),
+        );
 
-      if (response.statusCode == 200) {
-        return Rental.fromJson(jsonDecode(response.body));
-      } else {
-        debugPrint(
-            'Error fetching rental $rentalId: Status ${response.statusCode}, Body: ${response.body}');
-        return null;
-      }
+        if (response.statusCode == 200) {
+          return Rental.fromJson(jsonDecode(response.body));
+        } else {
+          debugPrint('⚠️ Error fetching rental $rentalId: Status ${response.statusCode}');
+          return null;
+        }
+      });
     } catch (e) {
-      debugPrint('Exception fetching rental $rentalId: $e');
+      debugPrint('❌ Exception fetching rental $rentalId: $e');
       return null;
     }
   }
+
 
   Future<void> fetchRentalDetails({
     required Rental rental,
@@ -349,72 +453,130 @@ class RentalService {
     double? minPrice,
     double? maxPrice,
     String? token,
+    int page = 1,
+    int limit = 10,
   }) async {
-    try {
+    return _retryRequest(() async {
       final queryParams = {
         'radius': radius.toString(),
-        'limit': '10',
+        'limit': limit.toString(),
+        'page': page.toString(),
       };
       if (minPrice != null) queryParams['minPrice'] = minPrice.toString();
       if (maxPrice != null) queryParams['maxPrice'] = maxPrice.toString();
 
       final uri = Uri.parse('${ApiRoutes.baseUrl}/rentals/nearby/$rentalId')
           .replace(queryParameters: queryParams);
+
       final headers = {
         'Content-Type': 'application/json',
+        'Connection': 'keep-alive',
         if (token != null) 'Authorization': 'Bearer $token',
       };
 
-      final response = await http.get(uri, headers: headers);
+      debugPrint('🔍 Fetching nearby rentals: $uri');
+
+      final response = await _safeRequest(
+            () => _client.get(uri, headers: headers),
+        timeout: _longTimeout, // ✅ Longer timeout for nearby search
+      );
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-
         final List<dynamic> rentalsData = data['rentals'] ?? [];
-        final String? warning = data['warning'];
-        final String? searchMethod = data['searchMethod'];
-
-        if (warning != null) {
-          debugPrint('Warning from server: $warning');
-        }
 
         final List<Rental> rentals = rentalsData
             .map((json) {
           try {
-            if (json['coordinates'] != null &&
-                json['coordinates'] is List) {
-              final coords = json['coordinates'] as List;
-              if (coords.length >= 2) {
-                json['location'] = json['location'] ?? {};
-                json['location']['longitude'] = coords[0];
-                json['location']['latitude'] = coords[1];
-              }
-            }
-
-            return Rental.fromJson(json);
+            return _parseRentalJson(json);
           } catch (e) {
-            debugPrint('Error parsing rental: $e, JSON: $json');
+            debugPrint('⚠️ Error parsing rental: $e');
             return null;
           }
         })
-            .where((rental) => rental != null)
-            .cast<Rental>()
+            .whereType<Rental>() // ✅ Filter out nulls
             .toList();
+
+        debugPrint('✅ Parsed ${rentals.length} nearby rentals');
 
         return {
           'rentals': rentals,
-          'warning': warning,
-          'searchMethod': searchMethod,
+          'warning': data['warning'],
+          'searchMethod': data['searchMethod'],
           'total': data['total'] ?? rentals.length,
           'radiusKm': data['radiusKm'] ?? radius,
+          'page': page,
+          'hasMore': rentals.length >= limit,
         };
       } else {
-        throw Exception(
-            'Failed to fetch nearby rentals: ${response.statusCode}, ${response.body}');
+        throw Exception('Failed to fetch nearby rentals: ${response.statusCode}');
       }
-    } catch (e) {
-      debugPrint('Error fetching nearby rentals: $e');
-      throw Exception('Lỗi khi tải nhà trọ gần đây: $e');
+    });
+  }
+
+  // ✅ Helper method to parse rental JSON safely
+  Rental _parseRentalJson(Map<String, dynamic> json) {
+    // Handle coordinates from array
+    if (json['coordinates'] != null && json['coordinates'] is List) {
+      final coords = json['coordinates'] as List;
+      if (coords.length >= 2) {
+        json['location'] = json['location'] ?? {};
+        json['location']['longitude'] = coords[0];
+        json['location']['latitude'] = coords[1];
+      }
     }
+
+    // Initialize area with defaults
+    json['area'] = {
+      'total': (json['area']?['total'] ?? 0).toDouble(),
+      'livingRoom': (json['area']?['livingRoom'] ?? 0).toDouble(),
+      'bedrooms': (json['area']?['bedrooms'] ?? 0).toDouble(),
+      'bathrooms': (json['area']?['bathrooms'] ?? 0).toDouble(),
+    };
+
+    // Initialize contactInfo with defaults
+    json['contactInfo'] = {
+      'name': json['contactInfo']?['name'] ?? 'Chủ nhà',
+      'phone': json['contactInfo']?['phone'] ?? 'Không có',
+      'availableHours': json['contactInfo']?['availableHours'] ?? '',
+    };
+
+    // Initialize rentalTerms with defaults
+    json['rentalTerms'] = {
+      'minimumLease': json['rentalTerms']?['minimumLease'] ?? 'Liên hệ',
+      'deposit': json['rentalTerms']?['deposit'] ?? 'Liên hệ',
+      'paymentMethod': json['rentalTerms']?['paymentMethod'] ?? 'Liên hệ',
+      'renewalTerms': json['rentalTerms']?['renewalTerms'] ?? 'Liên hệ',
+    };
+
+    // Initialize arrays with defaults
+    json['furniture'] = json['furniture'] ?? [];
+    json['amenities'] = json['amenities'] ?? [];
+    json['surroundings'] = json['surroundings'] ?? [];
+    json['images'] = json['images'] ?? [];
+    json['videos'] = json['videos'] ?? [];
+
+    // Ensure location has all required fields
+    json['location'] = {
+      'short': json['location']?['short'] ?? '',
+      'fullAddress': json['location']?['fullAddress'] ?? '',
+      'coordinates': {
+        'type': 'Point',
+        'coordinates': [
+          (json['location']?['longitude'] ?? 0).toDouble(),
+          (json['location']?['latitude'] ?? 0).toDouble(),
+        ],
+      },
+    };
+
+    json['status'] = json['status'] ?? 'available';
+    json['userId'] = json['userId'] ?? '';
+
+    return Rental.fromJson(json);
+  }
+
+  // ✅ Cleanup method - call this in app dispose
+  static void dispose() {
+    _client.close();
   }
 }

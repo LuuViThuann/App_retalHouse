@@ -12,7 +12,6 @@ import '../models/favorite.dart';
 import 'package:shimmer/shimmer.dart';
 import '../utils/ImageUrlHelper.dart';
 
-
 class SearchResultsPage extends StatefulWidget {
   final String? searchQuery;
   final double? minPrice;
@@ -40,7 +39,11 @@ class _SearchResultsPageState extends State<SearchResultsPage> {
   void initState() {
     super.initState();
     _scrollController = ScrollController();
-    _performSearch(1);
+
+    // 🔥 FIX: Delay API call để tránh setState trong build phase
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _performSearch(1);
+    });
   }
 
   @override
@@ -50,8 +53,10 @@ class _SearchResultsPageState extends State<SearchResultsPage> {
   }
 
   Future<void> _performSearch(int page) async {
-    final rentalViewModel =
-    Provider.of<RentalViewModel>(context, listen: false);
+    if (!mounted) return;
+
+    final rentalViewModel = Provider.of<RentalViewModel>(context, listen: false);
+
     try {
       await rentalViewModel.searchRentals(
         search: widget.searchQuery,
@@ -72,18 +77,18 @@ class _SearchResultsPageState extends State<SearchResultsPage> {
   }
 
   String formatCurrency(double amount) {
-    final formatter =
-    NumberFormat.currency(locale: 'vi_VN', symbol: '₫', decimalDigits: 0);
+    final formatter = NumberFormat.currency(
+        locale: 'vi_VN',
+        symbol: '₫',
+        decimalDigits: 0
+    );
     return formatter.format(amount);
   }
-
-  // Thay thế hàm _toggleFavorite hiện tại bằng code này:
 
   Future<void> _toggleFavorite(Rental rental) async {
     final authViewModel = Provider.of<AuthViewModel>(context, listen: false);
     final favoriteViewModel = Provider.of<FavoriteViewModel>(context, listen: false);
 
-    // ✅ Sửa: Kiểm tra currentUser thay vì isLoggedIn
     if (authViewModel.currentUser == null) {
       AppSnackBar.show(
         context,
@@ -97,8 +102,6 @@ class _SearchResultsPageState extends State<SearchResultsPage> {
     final isFav = favoriteViewModel.isFavorite(rentalId);
 
     if (isFav) {
-      // Xóa yêu thích
-      // ✅ Sửa: Sử dụng currentUser.token thay vì authViewModel.token
       final success = await favoriteViewModel.removeFavorite(
           rentalId,
           currentUser.token ?? ''
@@ -123,8 +126,6 @@ class _SearchResultsPageState extends State<SearchResultsPage> {
         }
       }
     } else {
-      // Thêm yêu thích
-      // ✅ Sửa: Sử dụng currentUser.id và currentUser.token
       final success = await favoriteViewModel.addFavorite(
           currentUser.id,
           rentalId,
@@ -217,8 +218,7 @@ class _SearchResultsPageState extends State<SearchResultsPage> {
                             top: Radius.circular(16),
                           ),
                           child: CachedNetworkImage(
-                            imageUrl:
-                            ImageUrlHelper.getImageUrl(rental.images[0]),
+                            imageUrl: ImageUrlHelper.getImageUrl(rental.images[0]),
                             width: double.infinity,
                             height: 180,
                             fit: BoxFit.cover,
@@ -479,10 +479,9 @@ class _SearchResultsPageState extends State<SearchResultsPage> {
 
                         const SizedBox(height: 8),
 
-                        // Info Row: Area, Rooms, Type
+                        // Info Row
                         Row(
                           children: [
-                            // Area
                             Expanded(
                               child: Row(
                                 children: [
@@ -503,8 +502,6 @@ class _SearchResultsPageState extends State<SearchResultsPage> {
                                 ],
                               ),
                             ),
-
-                            // Bedrooms
                             Expanded(
                               child: Row(
                                 children: [
@@ -525,8 +522,6 @@ class _SearchResultsPageState extends State<SearchResultsPage> {
                                 ],
                               ),
                             ),
-
-                            // Property Type
                             Expanded(
                               child: Row(
                                 children: [
@@ -556,11 +551,10 @@ class _SearchResultsPageState extends State<SearchResultsPage> {
 
                         const SizedBox(height: 10),
 
-                        // Price & View Details
+                        // Price & Details
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            // Price
                             Expanded(
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -584,8 +578,6 @@ class _SearchResultsPageState extends State<SearchResultsPage> {
                                 ],
                               ),
                             ),
-
-                            // View Details Button - Simplified
                             TextButton.icon(
                               onPressed: () {
                                 Navigator.push(

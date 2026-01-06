@@ -110,33 +110,45 @@ class VNPayService {
   }
 
   getFormattedDate(date) {
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-    const hours = String(date.getHours()).padStart(2, '0');
-    const minutes = String(date.getMinutes()).padStart(2, '0');
-    const seconds = String(date.getSeconds()).padStart(2, '0');
+    // Chuyển sang UTC+7 (giờ Việt Nam)
+    const vnTime = new Date(date.getTime() + (7 * 60 * 60 * 1000));
+    
+    const year = vnTime.getUTCFullYear();
+    const month = String(vnTime.getUTCMonth() + 1).padStart(2, '0');
+    const day = String(vnTime.getUTCDate()).padStart(2, '0');
+    const hours = String(vnTime.getUTCHours()).padStart(2, '0');
+    const minutes = String(vnTime.getUTCMinutes()).padStart(2, '0');
+    const seconds = String(vnTime.getUTCSeconds()).padStart(2, '0');
+    
     return `${year}${month}${day}${hours}${minutes}${seconds}`;
   }
-
   /**
    * Tạo URL thanh toán VNPAY
    */
   createPaymentUrl(params) {
     console.log('\n=== CREATING PAYMENT URL ===');
     console.log('Input params:', params);
-
+  
     if (!params.txnRef || !params.amount || !params.orderInfo) {
       throw new Error('Missing required params: txnRef, amount, orderInfo');
     }
-
+  
     const ipAddr = this.formatIpAddress(params.ipAddress);
-    const createDate = this.getFormattedDate(new Date());
-    const expireDate = this.getFormattedDate(new Date(Date.now() + 15 * 60 * 1000));
+    const now = new Date();
+    
+    // ✅ Thời gian tính theo UTC+7
+    const createDate = this.getFormattedDate(now);
+    const expireDate = this.getFormattedDate(new Date(now.getTime() + 30 * 60 * 1000)); // 30 phút
+    
     const amountInt = String(Math.round(parseFloat(params.amount) * 100));
-
+  
+    console.log('Timezone info:');
+    console.log('  Server time (UTC):', now.toISOString());
+    console.log('  VN time (UTC+7):', new Date(now.getTime() + 7 * 60 * 60 * 1000).toISOString());
+    console.log('  CreateDate:', createDate);
+    console.log('  ExpireDate:', expireDate);
     console.log('Amount calculation:', params.amount, '→', amountInt);
-
+  
     const vnpParams = {
       vnp_Version: '2.1.0',
       vnp_Command: 'pay',
@@ -152,31 +164,27 @@ class VNPayService {
       vnp_CreateDate: createDate,
       vnp_ExpireDate: expireDate,
     };
-
-    // Tính checksum theo chuẩn mới
+  
+    // Tính checksum
     const secureHash = this.generateChecksum(vnpParams);
-
-    // Build query string encoded
     const queryString = this.buildQueryString(vnpParams);
-
-    // Final URL: secureHash không cần encode lại vì chỉ chứa 0-9a-f
     const paymentUrl = `${this.vnpayUrl}?${queryString}&vnp_SecureHash=${secureHash}`;
-
+  
     console.log('\nPayment Parameters:');
     console.log('TMN Code:', vnpParams.vnp_TmnCode);
     console.log('Amount:', vnpParams.vnp_Amount);
     console.log('TxnRef:', vnpParams.vnp_TxnRef);
-    console.log('OrderInfo:', vnpParams.vnp_OrderInfo);
-    console.log('ReturnUrl:', vnpParams.vnp_ReturnUrl);
-
+    console.log('CreateDate:', vnpParams.vnp_CreateDate);
+    console.log('ExpireDate:', vnpParams.vnp_ExpireDate);
+  
     console.log('\nFinal Payment URL:');
     console.log(paymentUrl);
-    console.log('\nPayment URL created successfully');
-    console.log('=== END CREATE URL ===\n');
-
+    console.log('\n=== END CREATE URL ===\n');
+  
     return paymentUrl;
   }
 
+  
   /**
    * Xác minh Return URL và IPN
    */

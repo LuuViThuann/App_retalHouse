@@ -37,6 +37,11 @@ class _RentalDetailScreenState extends State<RentalDetailScreen>
   VideoPlayerController? _videoController;
   bool _isVideoInitialized = false;
 
+  // Màu chủ đạo thống nhất
+  static const primaryColor = Color(0xFF2563EB); // Blue-600
+  static const secondaryColor = Color(0xFF64748B); // Slate-600
+  static const backgroundColor = Color(0xFFF8FAFC); // Slate-50
+
   @override
   void initState() {
     super.initState();
@@ -48,7 +53,6 @@ class _RentalDetailScreenState extends State<RentalDetailScreen>
     _initializeFirstMedia();
   }
 
-  /// ✅ Cloudinary Helper Functions
   bool _isCloudinaryUrl(String url) =>
       url.startsWith('http://') || url.startsWith('https://');
 
@@ -94,18 +98,23 @@ class _RentalDetailScreenState extends State<RentalDetailScreen>
     }
   }
 
-  /// ✅ Main Media Widget (Image or Video)
   Widget _buildMainMedia() {
     final allMedia = _getAllMedia();
 
     if (allMedia.isEmpty) {
       return Container(
         height: 300,
-        color: Colors.grey[300],
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [Colors.grey[300]!, Colors.grey[200]!],
+          ),
+        ),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.image_not_supported_outlined, size: 60, color: Colors.grey[600]),
+            Icon(Icons.image_not_supported_outlined, size: 60, color: Colors.grey[500]),
             const SizedBox(height: 12),
             Text('Chưa có ảnh hoặc video', style: TextStyle(color: Colors.grey[600], fontSize: 16)),
           ],
@@ -143,8 +152,8 @@ class _RentalDetailScreenState extends State<RentalDetailScreen>
             child: VideoProgressIndicator(
               _videoController!,
               allowScrubbing: true,
-              colors: VideoProgressColors(
-                playedColor: Colors.blue,
+              colors: const VideoProgressColors(
+                playedColor: primaryColor,
                 bufferedColor: Colors.grey,
                 backgroundColor: Colors.white24,
               ),
@@ -170,58 +179,67 @@ class _RentalDetailScreenState extends State<RentalDetailScreen>
             color: Colors.grey[200],
             child: const Center(child: CircularProgressIndicator()),
           ),
-          errorWidget: (context, url, error) {
-            debugPrint('❌ Image error: $error');
-            return Container(
-              height: 300,
-              color: Colors.grey[300],
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.broken_image_outlined, size: 60, color: Colors.grey[600]),
-                  const SizedBox(height: 12),
-                  Text('Không thể tải ảnh', style: TextStyle(color: Colors.grey[600])),
-                ],
-              ),
-            );
-          },
+          errorWidget: (context, url, error) => Container(
+            height: 300,
+            color: Colors.grey[300],
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.broken_image_outlined, size: 60, color: Colors.grey[600]),
+                const SizedBox(height: 12),
+                Text('Không thể tải ảnh', style: TextStyle(color: Colors.grey[600])),
+              ],
+            ),
+          ),
         ),
       );
     }
   }
 
-  /// ✅ Media Thumbnail Widget
   Widget _buildMediaThumbnail(String mediaUrl, int index) {
     final fullUrl = _getMediaUrl(mediaUrl);
     final isVideoThumb = _isVideo(fullUrl);
+    final isSelected = _selectedMediaIndex == index;
 
     return GestureDetector(
       onTap: () async {
         setState(() => _selectedMediaIndex = index);
         await _loadMediaAtIndex(index);
       },
-      child: Stack(
-        children: [
-          Container(
-            margin: const EdgeInsets.symmetric(horizontal: 4.0),
-            width: 80,
-            decoration: BoxDecoration(
-              border: Border.all(
-                color: _selectedMediaIndex == index ? Colors.blue[700]! : Colors.grey[300]!,
-                width: _selectedMediaIndex == index ? 3 : 1,
-              ),
-              borderRadius: BorderRadius.circular(12),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        margin: const EdgeInsets.symmetric(horizontal: 4.0),
+        width: 80,
+        decoration: BoxDecoration(
+          border: Border.all(
+            color: isSelected ? primaryColor : Colors.grey[300]!,
+            width: isSelected ? 2.5 : 1,
+          ),
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: isSelected ? [
+            BoxShadow(
+              color: primaryColor.withOpacity(0.3),
+              blurRadius: 8,
+              spreadRadius: 1,
             ),
-            child: ClipRRect(
+          ] : [],
+        ),
+        child: Stack(
+          children: [
+            ClipRRect(
               borderRadius: BorderRadius.circular(10),
               child: isVideoThumb
                   ? Container(
                 color: Colors.black87,
-                child: const Icon(Icons.play_circle_outline, color: Colors.white, size: 32),
+                child: const Center(
+                  child: Icon(Icons.play_circle_outline, color: Colors.white, size: 32),
+                ),
               )
                   : CachedNetworkImage(
                 imageUrl: fullUrl,
                 fit: BoxFit.cover,
+                width: double.infinity,
+                height: double.infinity,
                 placeholder: (context, url) => Container(
                   color: Colors.grey[200],
                   child: const Center(child: CircularProgressIndicator(strokeWidth: 2)),
@@ -232,21 +250,21 @@ class _RentalDetailScreenState extends State<RentalDetailScreen>
                 ),
               ),
             ),
-          ),
-          if (isVideoThumb)
-            Positioned(
-              top: 4,
-              right: 8,
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-                decoration: BoxDecoration(
-                  color: Colors.black54,
-                  borderRadius: BorderRadius.circular(4),
+            if (isVideoThumb)
+              Positioned(
+                top: 4,
+                right: 4,
+                child: Container(
+                  padding: const EdgeInsets.all(4),
+                  decoration: BoxDecoration(
+                    color: Colors.black54,
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: const Icon(Icons.videocam, color: Colors.white, size: 14),
                 ),
-                child: const Icon(Icons.videocam, color: Colors.white, size: 12),
               ),
-            ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -335,18 +353,14 @@ class _RentalDetailScreenState extends State<RentalDetailScreen>
             content: Container(
               padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [Colors.orange.shade300, Colors.deepOrange.shade400],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-                borderRadius: BorderRadius.circular(16),
+                color: Colors.red[600],
+                borderRadius: BorderRadius.circular(12),
               ),
               child: Row(
                 children: [
                   const Icon(Icons.error_outline, color: Colors.white),
                   const SizedBox(width: 12),
-                  Expanded(child: Text(error, style: const TextStyle(color: Colors.white, fontSize: 16))),
+                  Expanded(child: Text(error, style: const TextStyle(color: Colors.white, fontSize: 15))),
                 ],
               ),
             ),
@@ -369,13 +383,8 @@ class _RentalDetailScreenState extends State<RentalDetailScreen>
         content: Container(
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [Color.fromARGB(255, 1, 180, 64), Color.fromARGB(255, 85, 221, 112)],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-            borderRadius: BorderRadius.circular(16),
-            boxShadow: [BoxShadow(color: Colors.black26, blurRadius: 8, offset: Offset(0, 4))],
+            color: Colors.green[600],
+            borderRadius: BorderRadius.circular(12),
           ),
           child: Row(
             children: [
@@ -384,7 +393,7 @@ class _RentalDetailScreenState extends State<RentalDetailScreen>
               Expanded(
                 child: Text(
                   isFavorited ? 'Đã thêm vào yêu thích' : 'Đã xóa khỏi yêu thích',
-                  style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w600),
+                  style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w500),
                 ),
               ),
             ],
@@ -450,275 +459,334 @@ class _RentalDetailScreenState extends State<RentalDetailScreen>
     final allMedia = _getAllMedia();
 
     return Scaffold(
+      backgroundColor: backgroundColor,
       body: CustomScrollView(
         slivers: [
+          // Hero Image/Video Section
           SliverAppBar(
-            expandedHeight: 300,
+            expandedHeight: 320,
             floating: false,
             pinned: true,
-            flexibleSpace: FlexibleSpaceBar(background: _buildMainMedia()),
-            leading: IconButton(
-              icon: const Icon(Icons.arrow_back, color: Colors.white),
-              onPressed: () => Navigator.pop(context),
-            ),
-            backgroundColor: Colors.blue[700],
-          ),
-          SliverToBoxAdapter(
-            child: ClipRRect(
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(30)),
-              child: Container(
-                color: Colors.white,
-                child: Padding(
-                  padding: const EdgeInsets.all(13.0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Title & Location Section
-                      Container(
-                        padding: const EdgeInsets.all(20),
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            colors: [Colors.blue.shade50, Colors.blue.shade100.withOpacity(0.3)],
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                          ),
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(color: Colors.blue.shade200),
+            elevation: 0,
+            flexibleSpace: FlexibleSpaceBar(
+              background: Stack(
+                fit: StackFit.expand,
+                children: [
+                  _buildMainMedia(),
+                  Positioned(
+                    bottom: 0,
+                    left: 0,
+                    right: 0,
+                    child: Container(
+                      height: 80,
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [
+                            Colors.transparent,
+                            Colors.black.withOpacity(0.5),
+                          ],
                         ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            leading: Container(
+              margin: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                shape: BoxShape.circle,
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.1),
+                    blurRadius: 8,
+                  ),
+                ],
+              ),
+              child: IconButton(
+                icon: const Icon(Icons.arrow_back, color: Colors.black87),
+                onPressed: () => Navigator.pop(context),
+              ),
+            ),
+            actions: [
+              Container(
+                margin: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.1),
+                      blurRadius: 8,
+                    ),
+                  ],
+                ),
+                child: IconButton(
+                  icon: const Icon(Icons.share, color: Colors.black87),
+                  onPressed: () {},
+                ),
+              ),
+            ],
+            backgroundColor: Colors.white,
+          ),
+
+          // Main Content
+          SliverToBoxAdapter(
+            child: Container(
+              color: backgroundColor,
+              child: Column(
+                children: [
+                  // Media Gallery
+                  if (allMedia.length > 1)
+                    Container(
+                      height: 90,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      child: ListView.builder(
+                        scrollDirection: Axis.horizontal,
+                        padding: const EdgeInsets.symmetric(horizontal: 12),
+                        itemCount: allMedia.length,
+                        itemBuilder: (context, index) => _buildMediaThumbnail(allMedia[index], index),
+                      ),
+                    ),
+
+                  // Title & Price Card
+                  Container(
+                    margin: const EdgeInsets.all(16),
+                    padding: const EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(16),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.04),
+                          blurRadius: 10,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          widget.rental.title,
+                          style: const TextStyle(
+                            fontSize: 22,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.black87,
+                            height: 1.3,
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        Row(
                           children: [
-                            Text(
-                              widget.rental.title,
-                              style: TextStyle(
-                                fontSize: 22,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.blue.shade800,
-                                height: 1.3,
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            GestureDetector(
-                              onTap: _navigateToMap,
-                              child: Row(
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Container(
-                                    padding: const EdgeInsets.all(6),
-                                    decoration: BoxDecoration(
-                                      color: Colors.blue.shade100,
-                                      borderRadius: BorderRadius.circular(8),
+                                  Text(
+                                    'Giá thuê',
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      color: Colors.grey[600],
+                                      fontWeight: FontWeight.w500,
                                     ),
-                                    child: Icon(Icons.location_on, size: 16, color: Colors.blue.shade700),
                                   ),
-                                  const SizedBox(width: 8),
-                                  Expanded(
-                                    child: Text(
-                                      widget.rental.location['fullAddress'],
-                                      style: TextStyle(
-                                        fontSize: 14,
-                                        color: Colors.blue.shade700,
-                                        fontWeight: FontWeight.w500,
-                                      ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    formatCurrency(widget.rental.price),
+                                    style: const TextStyle(
+                                      fontSize: 24,
+                                      fontWeight: FontWeight.bold,
+                                      color: primaryColor,
                                     ),
                                   ),
                                 ],
                               ),
                             ),
-                            const SizedBox(height: 16),
-                            Align(
-                              alignment: Alignment.center,
-                              child: GestureDetector(
-                                onTap: _navigateToMap,
+                            _isLoadingFavorite
+                                ? SizedBox(
+                              width: 48,
+                              height: 48,
+                              child: Lottie.asset(AssetsConfig.loadingLottie, fit: BoxFit.contain),
+                            )
+                                : Material(
+                              color: Colors.transparent,
+                              child: InkWell(
+                                onTap: _toggleFavorite,
+                                borderRadius: BorderRadius.circular(12),
                                 child: Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                  padding: const EdgeInsets.all(12),
                                   decoration: BoxDecoration(
-                                    color: Colors.blue.shade600,
-                                    borderRadius: BorderRadius.circular(8),
+                                    color: _isFavorite ? Colors.red[50] : Colors.grey[100],
+                                    borderRadius: BorderRadius.circular(12),
                                   ),
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Icon(Icons.map, color: Colors.white, size: 16),
-                                      const SizedBox(width: 8),
-                                      Text(
-                                        'Xem trên bản đồ',
-                                        style: TextStyle(
-                                          color: Colors.white,
-                                          fontSize: 14,
-                                          fontWeight: FontWeight.w500,
-                                        ),
-                                      ),
-                                    ],
+                                  child: Icon(
+                                    _isFavorite ? Icons.favorite : Icons.favorite_border,
+                                    color: _isFavorite ? Colors.red[600] : Colors.grey[600],
+                                    size: 24,
                                   ),
                                 ),
                               ),
                             ),
                           ],
                         ),
-                      ),
-                      const SizedBox(height: 16),
-                      // Info Chips
-                      SingleChildScrollView(
-                        scrollDirection: Axis.horizontal,
-                        child: Row(
+                        const SizedBox(height: 16),
+                        Row(
                           children: [
-                            InfoChip(label: 'Loại chỗ ở', value: widget.rental.propertyType),
+                            Icon(Icons.star, color: Colors.amber[600], size: 18),
                             const SizedBox(width: 4),
-                            const InfoChip(label: 'Phong cách', value: 'Hiện đại'),
-                            const SizedBox(width: 4),
-                            const InfoChip(label: 'Chi phí', value: 'Phù hợp'),
-                            const SizedBox(width: 4),
-                            const InfoChip(label: 'Hợp đồng', value: 'Đơn giản'),
+                            Text(
+                              '$_reviewCount đánh giá',
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: Colors.grey[700],
+                              ),
+                            ),
                           ],
                         ),
-                      ),
-                      const SizedBox(height: 16),
-                      // Price & Rating & Favorite
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                                child: Row(
-                                  children: [
-                                    Icon(Icons.account_balance_wallet, color: Colors.green.shade700, size: 24),
-                                    const SizedBox(width: 8),
-                                    Text('Giá: ', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w500)),
-                                    Text(
-                                      formatCurrency(widget.rental.price),
-                                      style: TextStyle(
-                                        fontSize: 20,
-                                        fontWeight: FontWeight.bold,
-                                        color: Colors.green.shade700,
-                                      ),
-                                    ),
-                                  ],
+                      ],
+                    ),
+                  ),
+
+                  // Location Card với nút xem bản đồ
+                  Container(
+                    margin: const EdgeInsets.symmetric(horizontal: 16),
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(16),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.04),
+                          blurRadius: 10,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(Icons.location_on, size: 20, color: secondaryColor),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                widget.rental.location['fullAddress'],
+                                style: TextStyle(
+                                  fontSize: 15,
+                                  color: Colors.grey[800],
+                                  height: 1.4,
                                 ),
                               ),
-                              const SizedBox(height: 12),
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                                decoration: BoxDecoration(
-                                  gradient: LinearGradient(
-                                    colors: [Colors.amber.shade50, Colors.amber.shade100.withOpacity(0.3)],
-                                  ),
-                                  borderRadius: BorderRadius.circular(16),
-                                  border: Border.all(color: Colors.amber.shade100),
-                                ),
-                                child: Row(
-                                  children: [
-                                    Icon(Icons.star, color: Colors.amber.shade700, size: 24),
-                                    const SizedBox(width: 8),
-                                    Text(
-                                      '($_reviewCount lượt đánh giá)',
-                                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
-                                    ),
-                                  ],
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton.icon(
+                            onPressed: _navigateToMap,
+                            icon: const Icon(Icons.map, size: 20),
+                            label: const Text('Xem trên bản đồ'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: primaryColor,
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              elevation: 0,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  const SizedBox(height: 16),
+
+                  // Info Chips
+                  SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: Row(
+                      children: [
+                        InfoChip(label: 'Loại chỗ ở', value: widget.rental.propertyType),
+                        const InfoChip(label: 'Phong cách', value: 'Hiện đại'),
+                        const InfoChip(label: 'Chi phí', value: 'Phù hợp'),
+                        const InfoChip(label: 'Hợp đồng', value: 'Đơn giản'),
+                      ],
+                    ),
+                  ),
+
+                  const SizedBox(height: 16),
+
+                  // Owner Badge
+                  Consumer<AuthViewModel>(
+                    builder: (context, authViewModel, child) {
+                      if (authViewModel.currentUser?.id == widget.rental.userId) {
+                        return Container(
+                          margin: const EdgeInsets.symmetric(horizontal: 16),
+                          padding: const EdgeInsets.all(14),
+                          decoration: BoxDecoration(
+                            color: Colors.amber[50],
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: Colors.amber[200]!),
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.verified_user, color: Colors.amber[800], size: 18),
+                              const SizedBox(width: 8),
+                              Text(
+                                'Đây là bài viết của bạn',
+                                style: TextStyle(
+                                  color: Colors.amber[900],
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600,
                                 ),
                               ),
                             ],
                           ),
-                          _isLoadingFavorite
-                              ? SizedBox(
-                            width: 32,
-                            height: 32,
-                            child: Lottie.asset(AssetsConfig.loadingLottie, fit: BoxFit.contain),
-                          )
-                              : InkWell(
-                            onTap: _toggleFavorite,
-                            borderRadius: BorderRadius.circular(20),
-                            child: Container(
-                              padding: const EdgeInsets.all(10),
-                              margin: const EdgeInsets.only(right: 16),
-                              decoration: BoxDecoration(
-                                gradient: LinearGradient(
-                                  colors: [
-                                    Colors.red.shade400.withOpacity(0.9),
-                                    Colors.red.shade600.withOpacity(0.9)
-                                  ],
-                                ),
-                                shape: BoxShape.circle,
-                              ),
-                              child: Icon(
-                                _isFavorite ? Icons.favorite : Icons.favorite_border,
-                                color: Colors.white,
-                                size: 24,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 24),
-                      // ✅ Media Gallery (Images + Videos)
-                      if (allMedia.length > 1)
-                        Container(
-                          height: 80,
-                          margin: const EdgeInsets.only(bottom: 16.0),
-                          child: ListView.builder(
-                            scrollDirection: Axis.horizontal,
-                            itemCount: allMedia.length,
-                            itemBuilder: (context, index) => _buildMediaThumbnail(allMedia[index], index),
-                          ),
-                        ),
-                      const SizedBox(height: 24),
-                      // Owner Badge
-                      Consumer<AuthViewModel>(
-                        builder: (context, authViewModel, child) {
-                          if (authViewModel.currentUser?.id == widget.rental.userId) {
-                            return Container(
-                              padding: const EdgeInsets.all(16),
-                              decoration: BoxDecoration(
-                                color: Colors.orange[50],
-                                borderRadius: BorderRadius.circular(12),
-                                border: Border.all(color: Colors.orange[200]!),
-                              ),
-                              child: Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Icon(Icons.info_outline, color: Colors.orange[600], size: 20),
-                                  const SizedBox(width: 8),
-                                  Text(
-                                    'Đây là bài viết của bạn',
-                                    style: TextStyle(
-                                      color: Colors.orange[600],
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.w500,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            );
-                          }
-                          return const SizedBox.shrink();
-                        },
-                      ),
-                    ],
+                        );
+                      }
+                      return const SizedBox.shrink();
+                    },
                   ),
-                ),
+
+                  const SizedBox(height: 8),
+                ],
               ),
             ),
           ),
+
+          // Tabs
           SliverPersistentHeader(
             pinned: true,
             delegate: _SliverAppBarDelegate(
               TabBar(
                 controller: _tabController,
-                labelColor: Colors.blue[700],
-                unselectedLabelColor: Colors.grey,
-                indicatorColor: Colors.blue[700],
+                labelColor: primaryColor,
+                unselectedLabelColor: secondaryColor,
+                indicatorColor: primaryColor,
+                indicatorWeight: 2.5,
+                labelStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
                 tabs: [
                   const Tab(text: 'Thông tin chi tiết'),
-                  Tab(text: 'Bình luận / đánh giá ($_reviewCount)'),
+                  Tab(text: 'Đánh giá ($_reviewCount)'),
                 ],
               ),
             ),
           ),
+
+          // Tab Content
           SliverToBoxAdapter(
             child: Container(
-              color: Colors.white,
+              color: backgroundColor,
               padding: const EdgeInsets.all(16.0),
               child: IndexedStack(
                 index: _tabController.index,
@@ -731,18 +799,16 @@ class _RentalDetailScreenState extends State<RentalDetailScreen>
                     )
                   else
                     Container(
-                      padding: const EdgeInsets.all(20),
-                      child: const Center(
-                        child: Column(
-                          children: [
-                            Icon(Icons.comment_outlined, size: 48, color: Color(0xFF9E9E9E)),
-                            SizedBox(height: 16),
-                            Text(
-                              'Không có bình luận cho bài viết này',
-                              style: TextStyle(fontSize: 16, color: Color(0xFF9E9E9E)),
-                            ),
-                          ],
-                        ),
+                      padding: const EdgeInsets.all(40),
+                      child: Column(
+                        children: [
+                          Icon(Icons.comment_outlined, size: 48, color: Colors.grey[400]),
+                          const SizedBox(height: 16),
+                          Text(
+                            'Chưa có đánh giá nào',
+                            style: TextStyle(fontSize: 15, color: Colors.grey[600]),
+                          ),
+                        ],
                       ),
                     ),
                 ],
@@ -766,7 +832,10 @@ class _SliverAppBarDelegate extends SliverPersistentHeaderDelegate {
 
   @override
   Widget build(BuildContext context, double shrinkOffset, bool overlapsContent) {
-    return Container(color: Colors.white, child: _tabBar);
+    return Container(
+      color: Colors.white,
+      child: _tabBar,
+    );
   }
 
   @override

@@ -2,10 +2,96 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 class ApiRoutes {
   static const String rootUrl =
-      'http://192.168.1.71:3000'; // http://192.168.43.168:3000 - mạng dữ liệu
+      'https://991ae13e080b.ngrok-free.app'; // http://192.168.43.168:3000 - mạng dữ liệu
   static const String baseUrl = '$rootUrl/api';
   static const String serverBaseUrl = rootUrl;
   static const String socketUrl = serverBaseUrl;
+
+  // ==================== ANALYTICS ENDPOINTS ====================
+
+  /// 📊 GET /api/analytics/overview - Tổng quan thống kê
+  static const String analyticsOverview = '$baseUrl/analytics/overview';
+
+  /// 💰 GET /api/analytics/price-distribution - Phân bố giá
+  static const String analyticsPriceDistribution = '$baseUrl/analytics/price-distribution';
+
+  /// 📈 GET /api/analytics/posts-timeline?period=day|week|month
+  static String analyticsPostsTimeline({String period = 'day'}) {
+    return '$baseUrl/analytics/posts-timeline?period=$period';
+  }
+
+  /// 📍 GET /api/analytics/location-stats - Thống kê theo khu vực
+  static const String analyticsLocationStats = '$baseUrl/analytics/location-stats';
+
+  /// 🔥 GET /api/analytics/hottest-areas?days=7 - Khu vực nóng nhất
+  static String analyticsHottestAreas({int days = 7}) {
+    return '$baseUrl/analytics/hottest-areas?days=$days';
+  }
+
+  /// 🌟 GET /api/analytics/trending-areas?days=7 - Khu vực trending
+  static String analyticsTrendingAreas({int days = 7}) {
+    return '$baseUrl/analytics/trending-areas?days=$days';
+  }
+
+  /// 🏠 GET /api/analytics/property-types - Thống kê loại nhà
+  static const String analyticsPropertyTypes = '$baseUrl/analytics/property-types';
+
+  // ==================== SEARCH HISTORY ====================
+  /// GET /api/search-history - Lấy lịch sử tìm kiếm
+  static const String searchHistory = '$baseUrl/search-history';
+
+  /// DELETE /api/search-history/:query - Xóa một mục lịch sử
+  static String deleteSearchHistoryItem(String query) {
+    final encodedQuery = Uri.encodeComponent(query);
+    return '$searchHistory/$encodedQuery';
+  }
+
+  /// DELETE /api/search-history - Xóa toàn bộ lịch sử
+  static const String clearSearchHistory = searchHistory;
+
+  // ==================== RENTALS SEARCH ====================
+
+  /// GET /api/rentals/search - Tìm kiếm tối ưu
+  static String rentalsSearch({
+    String? search,
+    double? minPrice,
+    double? maxPrice,
+    List<String>? propertyTypes,
+    String? status,
+    int page = 1,
+    int limit = 10,
+  }) {
+    final params = <String, String>{
+      'page': page.toString(),
+      'limit': limit.toString(),
+    };
+
+    if (search != null && search.isNotEmpty) {
+      params['search'] = search;
+    }
+
+    if (minPrice != null) {
+      params['minPrice'] = minPrice.toString();
+    }
+
+    if (maxPrice != null) {
+      params['maxPrice'] = maxPrice.toString();
+    }
+
+    if (propertyTypes != null && propertyTypes.isNotEmpty) {
+      // Gửi nhiều propertyType
+      for (final type in propertyTypes) {
+        params['propertyType'] = type;
+      }
+    }
+
+    if (status != null && status.isNotEmpty) {
+      params['status'] = status;
+    }
+
+    final uri = Uri.parse('$rentals/search').replace(queryParameters: params);
+    return uri.toString();
+  }
 
   // ==================== VNPAY PAYMENT ====================
   /// POST /api/vnpay/create-payment
@@ -222,7 +308,7 @@ class ApiRoutes {
   // GET: LẤY RIÊNG ẢNH ĐẠI DIỆN (MỚI - BẮT BUỘC PHẢI CÓ)
   static String adminUserAvatar(String userId) => '$adminUsers/$userId/avatar';
   // Định nghĩa các endpoint dữ liệu cụ thể ------------------------------------------
-  static const String searchHistory = '$baseUrl/search-history';
+
 
   static const String rentals = '$baseUrl/rentals';
   static const String register = '$baseUrl/auth/register';

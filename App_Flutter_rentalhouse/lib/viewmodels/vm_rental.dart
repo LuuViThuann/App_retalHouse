@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter_rentalhouse/services/rental_service.dart';
 import '../services/api_service.dart';
@@ -21,6 +23,12 @@ class RentalViewModel extends ChangeNotifier {
   double? _currentMinPrice;
   double? _currentMaxPrice;
 
+  // Debounce timer for search
+  Timer? _debounceTimer;
+
+  //  Cancellation tokens for ongoing requests
+  bool _isFetchingNearby = false;
+
   List<Rental> get rentals => _rentals;
   List<Rental> get searchResults => _searchResults;
   List<Rental> get nearbyRentals => _nearbyRentals;
@@ -35,10 +43,27 @@ class RentalViewModel extends ChangeNotifier {
   double? get currentMinPrice => _currentMinPrice;
   double? get currentMaxPrice => _currentMaxPrice;
 
+  @override
+  void dispose() {
+    _debounceTimer?.cancel();
+    super.dispose();
+  }
+
+  void _safeNotifyListeners() {
+    if (!_isLoading) {
+      try {
+        notifyListeners();
+      } catch (e) {
+        debugPrint('⚠️ Error notifying listeners: $e');
+      }
+    }
+  }
+
+
   Future<void> fetchRentals() async {
     _isLoading = true;
     _errorMessage = null;
-    notifyListeners();
+    _safeNotifyListeners();
 
     try {
       _rentals = await _apiService.getRentals();
@@ -49,7 +74,7 @@ class RentalViewModel extends ChangeNotifier {
       _errorMessage = e.toString();
     } finally {
       _isLoading = false;
-      notifyListeners();
+      _safeNotifyListeners();
     }
   }
 
@@ -57,7 +82,7 @@ class RentalViewModel extends ChangeNotifier {
   Future<void> fetchAllRentals() async {
     _isLoading = true;
     _errorMessage = null;
-    notifyListeners();
+    _safeNotifyListeners();
 
     try {
       _rentals = await _apiService.getRentals();
@@ -72,7 +97,7 @@ class RentalViewModel extends ChangeNotifier {
       debugPrint('❌ RentalViewModel: Error fetching rentals: $e');
     } finally {
       _isLoading = false;
-      notifyListeners();
+      _safeNotifyListeners();
     }
   }
 
@@ -119,7 +144,7 @@ class RentalViewModel extends ChangeNotifier {
       }) async {
     _isLoading = true;
     _errorMessage = null;
-    notifyListeners();
+    _safeNotifyListeners();
 
     try {
       debugPrint('🚀 RentalViewModel: Creating rental...');
@@ -176,7 +201,7 @@ class RentalViewModel extends ChangeNotifier {
       debugPrint('📝 User-friendly error message: $_errorMessage');
     } finally {
       _isLoading = false;
-      notifyListeners();
+      _safeNotifyListeners();
     }
   }
 
@@ -210,63 +235,83 @@ class RentalViewModel extends ChangeNotifier {
     }
   }
 
-  Future<void> fetchNearbyRentals(String rentalId,
-      {double? radius, double? minPrice, double? maxPrice}) async {
+  Future<void> fetchNearbyRentals(
+      String rentalId, {
+        double? radius,
+        double? minPrice,
+        double? maxPrice,
+      }) async {
+    // Cancel if already fetching
+    if (_isFetchingNearby) {
+      debugPrint('⚠️ Already fetching nearby rentals, skipping...');
+      return;
+    }
+
+    _isFetchingNearby = true;
     _isLoading = true;
     _errorMessage = null;
     _warningMessage = null;
-    notifyListeners();
+    _safeNotifyListeners();
 
-    // Cập nhật bộ lọc nếu được cung cấp
+    // Update filters
     if (radius != null) _currentRadius = radius;
     if (minPrice != null) _currentMinPrice = minPrice;
     if (maxPrice != null) _currentMaxPrice = maxPrice;
 
     try {
+      debugPrint('🔍 Fetching nearby rentals for $rentalId (radius: $_currentRadius km)');
+
       final result = await _rentalService.fetchNearbyRentals(
         rentalId: rentalId,
         radius: _currentRadius,
         minPrice: _currentMinPrice,
         maxPrice: _currentMaxPrice,
+        limit: 20, // ✅ Load more results
       );
 
-      _nearbyRentals = result['rentals'] ?? [];
-      _warningMessage = result['warning'];
+      // Only update if still relevant (not cancelled)
+      if (_isFetchingNearby) {
+        _nearbyRentals = result['rentals'] ?? [];
+        _warningMessage = result['warning'];
 
-      debugPrint('✅ Fetched ${_nearbyRentals.length} nearby rentals');
-      debugPrint('📍 Search method: ${result['searchMethod']}');
-      if (_warningMessage != null) {
-        debugPrint('⚠️ Warning: $_warningMessage');
+        debugPrint('✅ Fetched ${_nearbyRentals.length} nearby rentals');
+        debugPrint('📍 Search method: ${result['searchMethod']}');
+        if (_warningMessage != null) {
+          debugPrint('⚠️ Warning: $_warningMessage');
+        }
       }
     } catch (e) {
-      _errorMessage = e.toString();
-      debugPrint('❌ Error in fetchNearbyRentals: $e');
+      if (_isFetchingNearby) {
+        _errorMessage = e.toString();
+        debugPrint('❌ Error in fetchNearbyRentals: $_errorMessage');
+      }
     } finally {
+      _isFetchingNearby = false;
       _isLoading = false;
-      notifyListeners();
+      _safeNotifyListeners();
     }
   }
-
+  // ✅ Cancel ongoing nearby fetch
+  void cancelNearbyFetch() {
+    _isFetchingNearby = false;
+    debugPrint('🚫 Cancelled nearby rentals fetch');
+  }
   /// 🔥 Refresh tất cả dữ liệu rental (gọi khi có cập nhật từ MyPostsView/EditRentalScreen)
   Future<void> refreshAllRentals() async {
     try {
       debugPrint('🔄 RentalViewModel: Refreshing all rentals...');
-
       _isLoading = true;
-      notifyListeners();
+      _safeNotifyListeners();
 
-      // Fetch lại từ API
       await fetchAllRentals();
 
       debugPrint('✅ RentalViewModel: Rentals refreshed successfully');
-      notifyListeners();
     } catch (e) {
       debugPrint('❌ RentalViewModel: Error refreshing rentals: $e');
-      _errorMessage = 'Lỗi cập nhật dữ liệu: $e';
-      notifyListeners();
+      _errorMessage = e.toString();
     } finally {
       _isLoading = false;
-      notifyListeners();
+      _safeNotifyListeners();
     }
   }
 
@@ -275,7 +320,7 @@ class RentalViewModel extends ChangeNotifier {
     try {
       _rentals.removeWhere((rental) => rental.id == rentalId);
       debugPrint('✅ RentalViewModel: Rental $rentalId removed locally');
-      notifyListeners();
+      _safeNotifyListeners();
     } catch (e) {
       debugPrint('❌ Error removing rental locally: $e');
     }
@@ -288,7 +333,7 @@ class RentalViewModel extends ChangeNotifier {
       if (index != -1) {
         _rentals[index] = updatedRental;
         debugPrint('✅ RentalViewModel: Rental $rentalId updated locally');
-        notifyListeners();
+        _safeNotifyListeners();
       }
     } catch (e) {
       debugPrint('❌ Error updating rental locally: $e');
@@ -300,7 +345,7 @@ class RentalViewModel extends ChangeNotifier {
     try {
       _nearbyRentals.removeWhere((rental) => rental.id == rentalId);
       debugPrint('✅ RentalViewModel: Nearby rental $rentalId removed locally');
-      notifyListeners();
+      _safeNotifyListeners();
     } catch (e) {
       debugPrint('❌ Error removing nearby rental locally: $e');
     }
@@ -313,7 +358,7 @@ class RentalViewModel extends ChangeNotifier {
       if (index != -1) {
         _nearbyRentals[index] = updatedRental;
         debugPrint('✅ RentalViewModel: Nearby rental $rentalId updated locally');
-        notifyListeners();
+        _safeNotifyListeners();
       }
     } catch (e) {
       debugPrint('❌ Error updating nearby rental locally: $e');
@@ -357,7 +402,7 @@ class RentalViewModel extends ChangeNotifier {
   void clearErrors() {
     _errorMessage = null;
     _warningMessage = null;
-    notifyListeners();
+    _safeNotifyListeners();
   }
 
   // ============================================

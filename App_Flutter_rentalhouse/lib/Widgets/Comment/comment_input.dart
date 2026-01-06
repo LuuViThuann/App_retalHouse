@@ -161,7 +161,7 @@ class CommentInputField extends StatelessWidget {
               ElevatedButton(
                 onPressed: isPosting ? null : onSubmit,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.blue,
+                  backgroundColor: Colors.blueAccent,
                   shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(8)),
                 ),

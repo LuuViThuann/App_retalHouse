@@ -40,23 +40,9 @@ class InfoChip extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         margin: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
         decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: [
-              Colors.blue.shade50,
-              Colors.white,
-            ],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
+
           borderRadius: BorderRadius.circular(20),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.blue.shade100.withOpacity(0.2),
-              blurRadius: 8,
-              spreadRadius: 1,
-              offset: const Offset(0, 4),
-            ),
-          ],
+
           border: Border.all(color: Colors.blue.shade100.withOpacity(0.5)),
         ),
         child: Row(

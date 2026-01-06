@@ -21,4 +21,8 @@ class AppColors {
 
   static const Color primaryBlue = Color(0xFF1976D2);
   static final Color? greenSnackbar = Colors.green[700];
+
+  static const primaryColorIconDetail = Color(0xFF2563EB);
+  static const textColorIconDetail = Color(0xFF1E293B);
+  static const secondaryTextColorIconDetail = Color(0xFF64748B);
 }

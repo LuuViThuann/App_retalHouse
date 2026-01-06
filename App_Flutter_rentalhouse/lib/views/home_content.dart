@@ -8,6 +8,7 @@ import 'package:flutter_rentalhouse/Widgets/HomeMain/PropertyType_house.dart';
 import 'package:flutter_rentalhouse/Widgets/HomeMain/all_rental.dart';
 import 'package:flutter_rentalhouse/Widgets/Rental/RentalCardHorizontal.dart';
 import 'package:flutter_rentalhouse/config/navigator.dart';
+import 'package:flutter_rentalhouse/constants/app_color.dart';
 import 'package:flutter_rentalhouse/models/rental.dart';
 import 'package:flutter_rentalhouse/services/chat_ai_service.dart';
 import 'package:flutter_rentalhouse/services/rental_service.dart';
@@ -303,7 +304,7 @@ class _HomeContentState extends State<HomeContent> {
                   _buildModernMenuItem(
                     icon: Icons.person_outline_rounded,
                     text: 'Thông tin cá nhân',
-                    iconColor: Colors.blue[700]!,
+                    iconColor: AppColors.primaryColorIconDetail,
                     onTap: () {
                       Navigator.pop(context);
                       AppNavigator.goToProfile(context);
@@ -312,7 +313,7 @@ class _HomeContentState extends State<HomeContent> {
                   _buildModernMenuItem(
                     icon: Icons.lock_outline_rounded,
                     text: 'Thay đổi mật khẩu',
-                    iconColor: Colors.orange[700]!,
+                    iconColor: AppColors.primaryColorIconDetail,
                     onTap: () {
                       Navigator.pop(context);
                       AppNavigator.goToChangePassword(context);
@@ -324,7 +325,7 @@ class _HomeContentState extends State<HomeContent> {
                   _buildModernMenuItem(
                     icon: Icons.notifications_none_rounded,
                     text: 'Thông báo',
-                    iconColor: Colors.purple[700]!,
+                    iconColor: AppColors.primaryColorIconDetail,
                     trailing: ValueListenableBuilder<int>(
                       valueListenable: _unreadNotificationCount,
                       builder: (context, count, child) {
@@ -342,7 +343,7 @@ class _HomeContentState extends State<HomeContent> {
                   _buildModernMenuItem(
                     icon: Icons.receipt_long,
                     text: 'Lịch sử giao dịch',
-                    iconColor: Colors.blueGrey[700]!,
+                    iconColor: AppColors.primaryColorIconDetail,
                     onTap: () {
                       Navigator.push(
                         context,
@@ -355,7 +356,7 @@ class _HomeContentState extends State<HomeContent> {
                   _buildModernMenuItem(
                     icon: Icons.article_outlined,
                     text: 'Bài đăng của tôi',
-                    iconColor: Colors.green[700]!,
+                    iconColor: AppColors.primaryColorIconDetail,
                     onTap: () {
                       Navigator.pop(context);
                       AppNavigator.goToPosts(context);
@@ -364,7 +365,7 @@ class _HomeContentState extends State<HomeContent> {
                   _buildModernMenuItem(
                     icon: Icons.chat_bubble_outline_rounded,
                     text: 'Bình luận gần đây',
-                    iconColor: Colors.teal[700]!,
+                    iconColor: AppColors.primaryColorIconDetail,
                     onTap: () {
                       Navigator.pop(context);
                       AppNavigator.goToComments(context);
@@ -373,7 +374,7 @@ class _HomeContentState extends State<HomeContent> {
                   _buildModernMenuItem(
                     icon: Icons.bookmark_border_rounded,
                     text: 'Tin tức đã lưu',
-                    iconColor: Colors.amber[700]!,
+                    iconColor: AppColors.primaryColorIconDetail,
                     onTap: () {
                       Navigator.pop(context);
                       AppNavigator.goToNewsSave(context);
@@ -385,7 +386,7 @@ class _HomeContentState extends State<HomeContent> {
                   _buildModernMenuItem(
                     icon: Icons.info_outline_rounded,
                     text: 'Về chúng tôi',
-                    iconColor: Colors.indigo[700]!,
+                    iconColor: AppColors.primaryColorIconDetail,
                     onTap: () {
                       Navigator.pop(context);
                       AppNavigator.goToAboutUs(context);
@@ -394,7 +395,7 @@ class _HomeContentState extends State<HomeContent> {
                   _buildModernMenuItem(
                     icon: Icons.feedback_outlined,
                     text: 'Góp ý & Phản hồi',
-                    iconColor: Colors.pink[700]!,
+                    iconColor: AppColors.primaryColorIconDetail,
                     onTap: () {
                       Navigator.pop(context);
                       AppNavigator.goToresponUser(context);
@@ -468,7 +469,7 @@ class _HomeContentState extends State<HomeContent> {
                   width: 40,
                   height: 40,
                   decoration: BoxDecoration(
-                    color: iconColor.withOpacity(0.1),
+
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: Icon(
@@ -1345,7 +1346,7 @@ class _HomeContentState extends State<HomeContent> {
 
                   decoration: BoxDecoration(
                     border: Border.all(
-                      color: Colors.grey.withOpacity(0.2),
+                      color: Colors.white.withOpacity(0.2),
                       width: 1.2,
                     ),
                     borderRadius: BorderRadius.circular(12),

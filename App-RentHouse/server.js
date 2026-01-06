@@ -22,6 +22,7 @@ const bannerRoutes = require('./routes/banner');
 const newsRoutes = require('./routes/news');
 const aboutUsFeedbackRoutes = require('./routes/aboutus');
 const notificationRoutes = require('./routes/notifications');
+const analyticsRoutes = require('./routes/analytics');
 
 require('./models/conversation');
 require('./models/message');
@@ -145,6 +146,7 @@ app.use('/api/news', newsRoutes);
 // These routes are registered immediately but Redis client is injected when ready
 app.use('/api', aboutUsFeedbackRoutes);
 app.use('/api', notificationRoutes);
+app.use('/api/analytics', analyticsRoutes);
 
 // ==================== SOCKET.IO MIDDLEWARE ====================
 io.use(async (socket, next) => {

@@ -139,9 +139,9 @@ const createReplyNotification = async ({
       read: false
     });
     await notification.save();
-    console.log('✅ Reply notification created:', notification._id);
+    console.log('Reply notification created:', notification._id);
   } catch (err) {
-    console.error('❌ Error creating reply notification:', err);
+    console.error('Error creating reply notification:', err);
   }
 };
 

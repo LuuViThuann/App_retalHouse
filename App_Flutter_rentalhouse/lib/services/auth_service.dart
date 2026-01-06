@@ -21,14 +21,73 @@ class AuthService {
     clientId: '616377322079-eb0grhlmn2lbnifatbduclltcur9t3g4.apps.googleusercontent.com',
     scopes: ['email', 'profile', 'https://www.googleapis.com/auth/userinfo.profile'],
   );
+  // ✅ HTTP Client với connection pooling
+  static final http.Client _httpClient = http.Client();
 
+  // ✅ Timeout configurations
+  static const Duration _defaultTimeout = Duration(seconds: 30);
+  static const Duration _shortTimeout = Duration(seconds: 15);
+  static const Duration _lightTimeout = Duration(seconds: 10);
+
+  // ✅ Retry configuration
+  static const int _maxRetries = 3;
+  static const Duration _retryDelay = Duration(seconds: 2);
   // Validation functions
   bool _isValidEmail(String email) => RegExp(r'^[^@]+@[^@]+\.[^@]+').hasMatch(email);
   bool _isValidPhoneNumber(String phoneNumber) => RegExp(r'^\d{10}$').hasMatch(phoneNumber);
   bool _isValidPassword(String password) => password.length >= 6;
   bool _isValidUsername(String username) => username.length >= 3;
   bool _isValidAddress(String address) => address.isNotEmpty;
-
+  // ✅ HELPER: Make HTTP request with retry logic
+  Future<http.Response> _makeRequestWithRetry(
+      Future<http.Response> Function() requestFn, {
+        Duration timeout = _defaultTimeout,
+        int maxRetries = _maxRetries,
+        bool throwOnError = true,
+      }) async {
+    for (int attempt = 0; attempt < maxRetries; attempt++) {
+      try {
+        final response = await requestFn().timeout(
+          timeout,
+          onTimeout: () {
+            throw TimeoutException(
+              'Request timeout after ${timeout.inSeconds}s',
+              timeout,
+            );
+          },
+        );
+        return response;
+      } on SocketException catch (e) {
+        print('⚠️ Network error (attempt ${attempt + 1}/$maxRetries): ${e.message}');
+        if (attempt == maxRetries - 1) {
+          if (throwOnError) {
+            throw Exception('Lỗi kết nối mạng. Vui lòng kiểm tra internet.');
+          }
+          return http.Response('{"error": "Network error"}', 503);
+        }
+        await Future.delayed(_retryDelay * (attempt + 1));
+      } on TimeoutException catch (e) {
+        print('⚠️ Timeout (attempt ${attempt + 1}/$maxRetries): ${e.message}');
+        if (attempt == maxRetries - 1) {
+          if (throwOnError) {
+            throw Exception('Kết nối quá chậm. Vui lòng thử lại.');
+          }
+          return http.Response('{"error": "Timeout"}', 408);
+        }
+        await Future.delayed(_retryDelay * (attempt + 1));
+      } on http.ClientException catch (e) {
+        print('⚠️ Client error (attempt ${attempt + 1}/$maxRetries): ${e.message}');
+        if (attempt == maxRetries - 1) {
+          if (throwOnError) {
+            throw Exception('Lỗi kết nối: ${e.message}');
+          }
+          return http.Response('{"error": "Client error"}', 500);
+        }
+        await Future.delayed(_retryDelay * (attempt + 1));
+      }
+    }
+    throw Exception('Request failed after $maxRetries attempts');
+  }
   // ============================================
   // REGISTER
   // ============================================

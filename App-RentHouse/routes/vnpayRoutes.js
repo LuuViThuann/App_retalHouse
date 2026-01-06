@@ -78,7 +78,7 @@ router.post('/create-payment', authMiddleware, async (req, res) => {
       paymentUrl,
       transactionCode: payment.transactionCode,
       amount: payment.amount,
-      expiresIn: 15 * 60,
+      expiresIn: 30 * 60, // ✅ Cập nhật thành 30 phút
     });
   } catch (err) {
     console.error('❌ Error creating payment:', err);

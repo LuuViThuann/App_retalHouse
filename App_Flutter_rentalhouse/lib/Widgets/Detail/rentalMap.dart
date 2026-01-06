@@ -1,7 +1,12 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_rentalhouse/Widgets/Detail/FilterDialogWidget.dart';
+import 'package:flutter_rentalhouse/Widgets/Detail/HorizontalRentalList.dart';
+import 'package:flutter_rentalhouse/Widgets/Detail/NearbyRentals.dart';
+import 'package:flutter_rentalhouse/Widgets/Detail/analytics_screen.dart';
 import 'package:flutter_rentalhouse/Widgets/Detail/customMarker.dart';
 import 'package:flutter_rentalhouse/config/api_routes.dart';
+import 'package:flutter_rentalhouse/utils/Snackbar_process.dart';
 import 'package:flutter_rentalhouse/views/rental_detail_view.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geocoding/geocoding.dart';
@@ -30,10 +35,6 @@ class _RentalMapViewState extends State<RentalMapView> {
   bool _isMapLoading = true;
   Rental? _selectedRental;
   bool _showCustomInfo = false;
-
-  // Controllers cho dialog lọc
-  final TextEditingController _minPriceController = TextEditingController();
-  final TextEditingController _maxPriceController = TextEditingController();
 
   @override
   void initState() {
@@ -71,7 +72,7 @@ class _RentalMapViewState extends State<RentalMapView> {
         _animateToPosition(_rentalLatLng!, 16.0);
       } else {
         final locations =
-            await locationFromAddress(widget.rental.location['fullAddress']);
+        await locationFromAddress(widget.rental.location['fullAddress']);
         if (locations.isNotEmpty) {
           final location = locations.first;
           final latLng = LatLng(location.latitude, location.longitude);
@@ -121,7 +122,7 @@ class _RentalMapViewState extends State<RentalMapView> {
       if (currentLocation.latitude != null &&
           currentLocation.longitude != null) {
         final latLng =
-            LatLng(currentLocation.latitude!, currentLocation.longitude!);
+        LatLng(currentLocation.latitude!, currentLocation.longitude!);
         setState(() {
           _currentLatLng = latLng;
         });
@@ -139,34 +140,18 @@ class _RentalMapViewState extends State<RentalMapView> {
 
   Future<void> _fetchNearbyRentals() async {
     try {
-      print('=== FETCHING NEARBY RENTALS ===');
       final rentalViewModel =
-          Provider.of<RentalViewModel>(context, listen: false);
-
+      Provider.of<RentalViewModel>(context, listen: false);
       await rentalViewModel.fetchNearbyRentals(widget.rental.id);
-
-      print(
-          'SUCCESS: Parsed ${rentalViewModel.nearbyRentals.length} nearby rentals');
-
-      // Debug từng rental
-      for (var rental in rentalViewModel.nearbyRentals) {
-        print('Rental: ${rental.title}');
-        print(
-            '  - Coordinates: lat=${rental.location['latitude']}, lng=${rental.location['longitude']}');
-        print('  - Price: ${rental.price}');
-      }
-
       _updateMarkers();
     } catch (e) {
-      print('ERROR fetching nearby rentals: $e');
       setState(() {
-        _errorMessage = 'Lỗi khi tải nhà trọ gần đây: $e';
+        _errorMessage = 'Lỗi khi tải bất động sản gần đây: $e';
       });
     }
   }
 
   void _updateMarkers() async {
-    print('=== UPDATING MARKERS ===');
     final Set<Marker> markers = {};
 
     // Main rental marker (RED)
@@ -190,7 +175,6 @@ class _RentalMapViewState extends State<RentalMapView> {
           onTap: () => _showRentalInfo(widget.rental),
         ),
       );
-      print('Added main rental marker at ${_rentalLatLng}');
     }
 
     // Current location marker (BLUE)
@@ -206,43 +190,26 @@ class _RentalMapViewState extends State<RentalMapView> {
           icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueBlue),
         ),
       );
-      print('Added current location marker at ${_currentLatLng}');
     }
 
-    // Nearby rental markers (GREEN/BLUE)
+    // Nearby rental markers
     final rentalViewModel =
-        Provider.of<RentalViewModel>(context, listen: false);
-    print(
-        'Processing ${rentalViewModel.nearbyRentals.length} nearby rentals for markers');
+    Provider.of<RentalViewModel>(context, listen: false);
 
     for (int i = 0; i < rentalViewModel.nearbyRentals.length; i++) {
       final rental = rentalViewModel.nearbyRentals[i];
 
-      // Skip main rental
-      if (rental.id == widget.rental.id) {
-        print('Skipping main rental ${rental.id}');
-        continue;
-      }
-
-      // Validate rental before processing
-      if (!_validateRental(rental)) {
-        print(
-            'Warning: Invalid rental data for ${rental.title}, skipping marker');
-        continue;
-      }
+      if (rental.id == widget.rental.id) continue;
+      if (!_validateRental(rental)) continue;
 
       final lat = _safeParseDouble(
-              rental.location['latitude'], 'rental.location.latitude') ??
+          rental.location['latitude'], 'rental.location.latitude') ??
           0.0;
       final lng = _safeParseDouble(
-              rental.location['longitude'], 'rental.location.longitude') ??
+          rental.location['longitude'], 'rental.location.longitude') ??
           0.0;
 
-      if (lat == 0.0 && lng == 0.0) {
-        print(
-            'Warning: Rental ${rental.title} has invalid coordinates [0,0], skipping marker');
-        continue;
-      }
+      if (lat == 0.0 && lng == 0.0) continue;
 
       final position = LatLng(lat, lng);
       final customIcon = await CustomMarkerHelper.createCustomMarker(
@@ -258,69 +225,60 @@ class _RentalMapViewState extends State<RentalMapView> {
           infoWindow: InfoWindow(
             title: 'Gần đây: ${rental.title}',
             snippet:
-                '${_formatPriceCompact(rental.price)} - ${rental.location['short'] ?? ''}',
+            '${_formatPriceCompact(rental.price)} - ${rental.location['short'] ?? ''}',
           ),
           icon: customIcon,
           onTap: () => _showRentalInfo(rental),
         ),
       );
-
-      print('Added nearby rental marker: ${rental.title} at $position');
     }
-
-    print('Total markers created: ${markers.length}');
 
     if (mounted) {
       setState(() {
         _markers = markers;
       });
-      print('Markers updated in UI state');
     }
   }
 
-  // Hàm kiểm tra tính hợp lệ của Rental
+  String _buildImageUrl(String? imagePath) {
+    if (imagePath == null || imagePath.isEmpty) {
+      return 'https://via.placeholder.com/400x300?text=No+Image';
+    }
+
+    if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) {
+      return imagePath;
+    }
+
+    if (imagePath.startsWith('/')) {
+      return '${ApiRoutes.baseUrl.replaceAll('/api', '')}$imagePath';
+    }
+
+    return '${ApiRoutes.baseUrl.replaceAll('/api', '')}/$imagePath';
+  }
+
   bool _validateRental(Rental rental) {
     try {
-      if (rental.id.isEmpty || rental.title.isEmpty) {
-        debugPrint('Invalid rental: Missing id or title');
-        return false;
-      }
+      if (rental.id.isEmpty || rental.title.isEmpty) return false;
       final price = _safeParseDouble(rental.price, 'rental.price');
       final lat = _safeParseDouble(
           rental.location['latitude'], 'rental.location.latitude');
       final lng = _safeParseDouble(
           rental.location['longitude'], 'rental.location.longitude');
-      if (price == null || lat == null || lng == null) {
-        debugPrint('Invalid rental: Invalid price or coordinates');
-        return false;
-      }
+      if (price == null || lat == null || lng == null) return false;
       return true;
     } catch (e) {
-      debugPrint('Error validating rental: $e');
       return false;
     }
   }
 
-  // Helper method to safely parse a value to double
   double? _safeParseDouble(dynamic value, String fieldName) {
-    if (value == null) {
-      debugPrint('Warning: $fieldName is null');
-      return null;
-    }
+    if (value == null) return null;
     if (value is num) return value.toDouble();
     if (value is String) {
       final trimmed = value.trim().replaceAll(',', '.');
-      if (trimmed.isEmpty) {
-        debugPrint('Warning: $fieldName is empty string');
-        return null;
-      }
-      final result = double.tryParse(trimmed);
-      if (result == null) {
-        debugPrint('Error: Failed to parse $fieldName with value "$value"');
-      }
-      return result;
+      if (trimmed.isEmpty) return null;
+      return double.tryParse(trimmed);
     }
-    debugPrint('Error: $fieldName is of invalid type: ${value.runtimeType}');
     return null;
   }
 
@@ -336,7 +294,6 @@ class _RentalMapViewState extends State<RentalMapView> {
         return '${price.toStringAsFixed(0)} VNĐ';
       }
     } catch (e) {
-      debugPrint('Error formatting price: $e');
       return '0 VNĐ';
     }
   }
@@ -350,10 +307,15 @@ class _RentalMapViewState extends State<RentalMapView> {
   void _showRentalInfo(Rental rental) {
     if (!_validateRental(rental)) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Dữ liệu bài viết không hợp lệ')),
+        const SnackBar(
+          content: Text('❌ Dữ liệu bài viết không hợp lệ'),
+          backgroundColor: Colors.red,
+          duration: Duration(seconds: 2),
+        ),
       );
       return;
     }
+
     setState(() {
       _selectedRental = rental;
       _showCustomInfo = true;
@@ -402,7 +364,6 @@ class _RentalMapViewState extends State<RentalMapView> {
       );
       return formatter.format(price);
     } catch (e) {
-      debugPrint('Error formatting currency: $e');
       return '0 VNĐ';
     }
   }
@@ -413,16 +374,16 @@ class _RentalMapViewState extends State<RentalMapView> {
     }
 
     final rental = _selectedRental!;
-    final imageUrl = rental.images.isNotEmpty
-        ? '${ApiRoutes.baseUrl.replaceAll('/api', '')}${rental.images[0]}'
-        : '';
+    final imageUrl = _buildImageUrl(
+      rental.images.isNotEmpty ? rental.images[0] : null,
+    );
 
     final bool isCurrentRental = rental.id == widget.rental.id;
     final bool hasValidCoords = _safeParseDouble(
-                rental.location['latitude'], 'rental.location.latitude') !=
-            null &&
+        rental.location['latitude'], 'rental.location.latitude') !=
+        null &&
         _safeParseDouble(
-                rental.location['longitude'], 'rental.location.longitude') !=
+            rental.location['longitude'], 'rental.location.longitude') !=
             null &&
         (rental.location['latitude'] != 0.0 ||
             rental.location['longitude'] != 0.0);
@@ -450,27 +411,26 @@ class _RentalMapViewState extends State<RentalMapView> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // Header
             Container(
               width: double.infinity,
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               decoration: BoxDecoration(
                 color: isCurrentRental ? Colors.red[50] : Colors.green[50],
                 borderRadius:
-                    const BorderRadius.vertical(top: Radius.circular(14)),
+                const BorderRadius.vertical(top: Radius.circular(14)),
               ),
               child: Row(
                 children: [
                   Icon(
                     isCurrentRental ? Icons.home : Icons.location_on,
                     color:
-                        isCurrentRental ? Colors.red[600] : Colors.green[600],
+                    isCurrentRental ? Colors.red[600] : Colors.green[600],
                     size: 20,
                   ),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      isCurrentRental ? 'Nhà trọ này' : 'Nhà trọ gần đây',
+                      isCurrentRental ? 'Bất động sản này' : 'Bất động sản gần đây',
                       style: TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w600,
@@ -511,8 +471,6 @@ class _RentalMapViewState extends State<RentalMapView> {
                 ],
               ),
             ),
-
-            // Content
             Padding(
               padding: const EdgeInsets.all(16),
               child: Column(
@@ -521,7 +479,6 @@ class _RentalMapViewState extends State<RentalMapView> {
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Image
                       ClipRRect(
                         borderRadius: BorderRadius.circular(8),
                         child: CachedNetworkImage(
@@ -550,7 +507,6 @@ class _RentalMapViewState extends State<RentalMapView> {
                         ),
                       ),
                       const SizedBox(width: 12),
-                      // Info
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -591,7 +547,6 @@ class _RentalMapViewState extends State<RentalMapView> {
                     ],
                   ),
                   const SizedBox(height: 12),
-                  // Action buttons
                   Row(
                     children: [
                       Expanded(
@@ -604,12 +559,6 @@ class _RentalMapViewState extends State<RentalMapView> {
                                   builder: (context) =>
                                       RentalDetailScreen(rental: rental),
                                 ),
-                              );
-                            } else {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                    content:
-                                        Text('Dữ liệu bài viết không hợp lệ')),
                               );
                             }
                           },
@@ -630,18 +579,17 @@ class _RentalMapViewState extends State<RentalMapView> {
                         child: OutlinedButton.icon(
                           onPressed: hasValidCoords
                               ? () {
-                                  final position = LatLng(
-                                    _safeParseDouble(
-                                            rental.location['latitude'],
-                                            'rental.location.latitude') ??
-                                        0.0,
-                                    _safeParseDouble(
-                                            rental.location['longitude'],
-                                            'rental.location.longitude') ??
-                                        0.0,
-                                  );
-                                  _openInGoogleMaps(position, rental.title);
-                                }
+                            final position = LatLng(
+                              _safeParseDouble(rental.location['latitude'],
+                                  'rental.location.latitude') ??
+                                  0.0,
+                              _safeParseDouble(
+                                  rental.location['longitude'],
+                                  'rental.location.longitude') ??
+                                  0.0,
+                            );
+                            _openInGoogleMaps(position, rental.title);
+                          }
                               : null,
                           icon: Icon(
                             hasValidCoords
@@ -653,7 +601,7 @@ class _RentalMapViewState extends State<RentalMapView> {
                               hasValidCoords ? 'Chỉ đường' : 'Không có vị trí'),
                           style: OutlinedButton.styleFrom(
                             foregroundColor:
-                                hasValidCoords ? Colors.blue[600] : Colors.grey,
+                            hasValidCoords ? Colors.blue[600] : Colors.grey,
                             padding: const EdgeInsets.symmetric(vertical: 8),
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(8),
@@ -679,109 +627,225 @@ class _RentalMapViewState extends State<RentalMapView> {
 
   void _showFilterDialog() {
     final rentalViewModel =
-        Provider.of<RentalViewModel>(context, listen: false);
+    Provider.of<RentalViewModel>(context, listen: false);
 
-    double selectedRadius = rentalViewModel.currentRadius;
-    _minPriceController.text =
-        rentalViewModel.currentMinPrice?.toString() ?? '';
-    _maxPriceController.text =
-        rentalViewModel.currentMaxPrice?.toString() ?? '';
-
-    showDialog(
+    showFilterDialog(
       context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: const Text('Lọc nhà trọ gần đây'),
-          content: StatefulBuilder(
-            builder: (context, setDialogState) {
-              return Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text('Bán kính (km):'),
-                  DropdownButton<double>(
-                    value: selectedRadius,
-                    isExpanded: true,
-                    items: [5.0, 10.0, 15.0, 20.0, 30.0].map((value) {
-                      return DropdownMenuItem<double>(
-                        value: value,
-                        child: Text('$value km'),
-                      );
-                    }).toList(),
-                    onChanged: (value) {
-                      if (value != null) {
-                        setDialogState(() {
-                          selectedRadius = value;
-                        });
-                      }
-                    },
-                  ),
-                  const SizedBox(height: 16),
-                  const Text('Khoảng giá (VNĐ):'),
-                  TextField(
-                    controller: _minPriceController,
-                    keyboardType: TextInputType.number,
-                    decoration: const InputDecoration(
-                      labelText: 'Giá tối thiểu',
-                      border: OutlineInputBorder(),
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  TextField(
-                    controller: _maxPriceController,
-                    keyboardType: TextInputType.number,
-                    decoration: const InputDecoration(
-                      labelText: 'Giá tối đa',
-                      border: OutlineInputBorder(),
-                    ),
-                  ),
-                ],
-              );
-            },
-          ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                rentalViewModel.resetNearbyFilters();
-                _fetchNearbyRentals();
-                Navigator.pop(context);
-              },
-              child: const Text('Đặt lại'),
-            ),
-            TextButton(
-              onPressed: () async {
-                double? minPrice = _minPriceController.text.isNotEmpty
-                    ? double.tryParse(_minPriceController.text)
-                    : null;
-                double? maxPrice = _maxPriceController.text.isNotEmpty
-                    ? double.tryParse(_maxPriceController.text)
-                    : null;
-
-                if (minPrice != null &&
-                    maxPrice != null &&
-                    minPrice > maxPrice) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                        content: Text(
-                            'Giá tối thiểu không được lớn hơn giá tối đa')),
-                  );
-                  return;
-                }
-
-                await rentalViewModel.fetchNearbyRentals(
-                  widget.rental.id,
-                  radius: selectedRadius,
-                  minPrice: minPrice,
-                  maxPrice: maxPrice,
-                );
-                _updateMarkers();
-                Navigator.pop(context);
-              },
-              child: const Text('Áp dụng'),
-            ),
-          ],
+      initialRadius: rentalViewModel.currentRadius,
+      initialMinPrice: rentalViewModel.currentMinPrice,
+      initialMaxPrice: rentalViewModel.currentMaxPrice,
+      onApply: (radius, minPrice, maxPrice) async {
+        await rentalViewModel.fetchNearbyRentals(
+          widget.rental.id,
+          radius: radius,
+          minPrice: minPrice,
+          maxPrice: maxPrice,
         );
+
+        _updateMarkers();
+
+        if (mounted) {
+          AppSnackBar.show(
+            context,
+            AppSnackBar.success(
+              message: 'Tìm thấy ${rentalViewModel.nearbyRentals.length} kết quả',
+              seconds: 3,
+            ),
+          );
+        }
       },
+      onReset: () {
+        rentalViewModel.resetNearbyFilters();
+        _fetchNearbyRentals();
+      },
+    );
+  }
+
+  Widget _buildTopLeftControls() {
+    final rentalViewModel = Provider.of<RentalViewModel>(context);
+
+    return Positioned(
+      top: 16,
+      left: 16,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // ============ THỐNG KÊ BUTTON ============
+          Container(
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.1),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const AnalyticsScreen(),
+                    ),
+                  );
+                },
+                borderRadius: BorderRadius.circular(12),
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.analytics, color: Colors.purple[700], size: 20),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Thống kê',
+                        style: TextStyle(
+                          color: Colors.purple[700],
+                          fontWeight: FontWeight.w600,
+                          fontSize: 14,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          // Filter button
+          Container(
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.1),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                onTap: _showFilterDialog,
+                borderRadius: BorderRadius.circular(12),
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.tune_rounded, color: Colors.blue[700], size: 20),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Lọc',
+                        style: TextStyle(
+                          color: Colors.blue[700],
+                          fontWeight: FontWeight.w600,
+                          fontSize: 14,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+
+          // Refresh button
+          Container(
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.1),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                onTap: rentalViewModel.isLoading
+                    ? null
+                    : () async {
+                  await _fetchNearbyRentals();
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Row(
+                          children: [
+                            const Icon(Icons.check_circle, color: Colors.white),
+                            const SizedBox(width: 12),
+                            Text('Đã cập nhật: ${rentalViewModel.nearbyRentals.length} bài'),
+                          ],
+                        ),
+                        backgroundColor: Colors.green[700],
+                        behavior: SnackBarBehavior.floating,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        margin: const EdgeInsets.all(16),
+                        duration: const Duration(seconds: 1),
+                      ),
+                    );
+                  }
+                },
+                borderRadius: BorderRadius.circular(12),
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: rentalViewModel.isLoading
+                      ? SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      valueColor: AlwaysStoppedAnimation<Color>(
+                        Colors.blue[700]!,
+                      ),
+                    ),
+                  )
+                      : Icon(Icons.refresh_rounded, color: Colors.blue[700], size: 20),
+                ),
+              ),
+            ),
+          ),
+
+          const SizedBox(height: 12),
+
+          // Info badge showing count
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: Colors.green[600],
+              borderRadius: BorderRadius.circular(12),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.1),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: Text(
+              '${rentalViewModel.nearbyRentals.length} bài',
+              style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+                fontSize: 12,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -807,31 +871,6 @@ class _RentalMapViewState extends State<RentalMapView> {
           ),
         ),
         actions: [
-          // Debug button
-          IconButton(
-            onPressed: () async {
-              print('=== MANUAL DEBUG ===');
-              print('Main rental coords: ${widget.rental.location}');
-              print('Nearby rentals: ${rentalViewModel.nearbyRentals.length}');
-              print('Current markers: ${_markers.length}');
-
-              await _fetchNearbyRentals();
-
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(
-                      'Debug: ${_markers.length} markers, ${rentalViewModel.nearbyRentals.length} nearby'),
-                ),
-              );
-            },
-            icon: const Icon(Icons.refresh, color: Colors.black),
-            tooltip: 'Làm mới',
-          ),
-          IconButton(
-            onPressed: _showFilterDialog,
-            icon: const Icon(Icons.filter_list, color: Colors.black),
-            tooltip: 'Lọc',
-          ),
           IconButton(
             onPressed: () {
               if (_rentalLatLng != null) {
@@ -844,93 +883,111 @@ class _RentalMapViewState extends State<RentalMapView> {
         ],
       ),
       body: Stack(
+          children: [
+      Column(
+      children: [
+      if (_errorMessage != null)
+      Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16.0),
+      color: Colors.red[50],
+      child: Row(
         children: [
-          Column(
-            children: [
-              if (_errorMessage != null)
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(16.0),
-                  color: Colors.red[50],
-                  child: Row(
-                    children: [
-                      Icon(Icons.error_outline,
-                          color: Colors.red[600], size: 20),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          _errorMessage!,
-                          style:
-                              TextStyle(color: Colors.red[700], fontSize: 14),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              if (rentalViewModel.warningMessage != null)
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(16.0),
-                  color: Colors.yellow[50],
-                  child: Row(
-                    children: [
-                      Icon(Icons.warning_amber,
-                          color: Colors.yellow[700], size: 20),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          rentalViewModel.warningMessage!,
-                          style: TextStyle(
-                              color: Colors.yellow[800], fontSize: 14),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              Expanded(
-                child: _isMapLoading
-                    ? const Center(child: CircularProgressIndicator())
-                    : GoogleMap(
-                        mapType: MapType.normal,
-                        initialCameraPosition: CameraPosition(
-                          target: _rentalLatLng ??
-                              _currentLatLng ??
-                              const LatLng(10.0, 105.0),
-                          zoom: 16.0,
-                        ),
-                        onMapCreated: (GoogleMapController controller) {
-                          _controller = controller;
-                          if (_rentalLatLng != null) {
-                            controller.animateCamera(
-                                CameraUpdate.newLatLngZoom(_rentalLatLng!, 16));
-                          } else if (_currentLatLng != null) {
-                            controller.animateCamera(CameraUpdate.newLatLngZoom(
-                                _currentLatLng!, 16));
-                          }
-                        },
-                        onTap: (_) => _hideRentalInfo(),
-                        markers: _markers,
-                        myLocationEnabled: true,
-                        myLocationButtonEnabled: true,
-                        zoomControlsEnabled: true,
-                        scrollGesturesEnabled: true,
-                        rotateGesturesEnabled: true,
-                        tiltGesturesEnabled: true,
-                      ),
-              ),
-            ],
+          Icon(Icons.error_outline,
+              color: Colors.red[600], size: 20),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              _errorMessage!,
+              style:
+              TextStyle(color: Colors.red[700], fontSize: 14),
+            ),
           ),
-          // Custom info window overlay
-          _buildCustomInfoWindow(),
         ],
       ),
-    );
-  }
+    ),
+    if (rentalViewModel.warningMessage != null)
+    Container(
+    width: double.infinity,
+    padding: const EdgeInsets.all(16.0),
+    color: Colors.yellow[50],
+    child: Row(
+    children: [
+    Icon(Icons.warning_amber,
+    color: Colors.yellow[700], size: 20),
+    const SizedBox(width: 8),
+    Expanded(
+    child: Text(
+    rentalViewModel.warningMessage!,
+    style: TextStyle(
+    color: Colors.yellow[800], fontSize: 14),
+    ),// Phần build method tiếp theo (từ dòng bị cắt ở document 4)
 
-  @override
-  void dispose() {
-    _minPriceController.dispose();
-    _maxPriceController.dispose();
-    super.dispose();
+    ),
+    ],
+    ),
+    ),
+        Expanded(
+          child: _isMapLoading
+              ? const Center(child: CircularProgressIndicator())
+              : GoogleMap(
+            mapType: MapType.normal,
+            initialCameraPosition: CameraPosition(
+              target: _rentalLatLng ??
+                  _currentLatLng ??
+                  const LatLng(10.0, 105.0),
+              zoom: 16.0,
+            ),
+            onMapCreated: (GoogleMapController controller) {
+              _controller = controller;
+              if (_rentalLatLng != null) {
+                controller.animateCamera(
+                    CameraUpdate.newLatLngZoom(_rentalLatLng!, 16));
+              } else if (_currentLatLng != null) {
+                controller.animateCamera(
+                    CameraUpdate.newLatLngZoom(_currentLatLng!, 16));
+              }
+            },
+            onTap: (_) => _hideRentalInfo(),
+            markers: _markers,
+            myLocationEnabled: true,
+            myLocationButtonEnabled: true,
+            zoomControlsEnabled: true,
+            scrollGesturesEnabled: true,
+            rotateGesturesEnabled: true,
+            tiltGesturesEnabled: true,
+          ),
+        ),
+      ],
+      ),
+
+            // Top left controls overlay
+            _buildTopLeftControls(),
+
+            // Custom info window overlay
+            _buildCustomInfoWindow(),
+
+            // Horizontal rental list at bottom
+            HorizontalRentalListWidget(
+              rentals: rentalViewModel.nearbyRentals,
+              mainRental: widget.rental,
+              validateRental: _validateRental,
+              onRentalTap: (rental) {
+                final lat = _safeParseDouble(
+                    rental.location['latitude'], 'rental.location.latitude') ??
+                    0.0;
+                final lng = _safeParseDouble(
+                    rental.location['longitude'], 'rental.location.longitude') ??
+                    0.0;
+
+                if (lat != 0.0 && lng != 0.0) {
+                  _animateToPosition(LatLng(lat, lng), 16.0);
+                  _showRentalInfo(rental);
+                }
+              },
+            ),
+          ],
+      ),
+    );
   }
 }
