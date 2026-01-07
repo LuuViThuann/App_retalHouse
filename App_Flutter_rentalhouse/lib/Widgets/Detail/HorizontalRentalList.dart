@@ -4,7 +4,7 @@ import 'package:intl/intl.dart';
 
 import '../../config/api_routes.dart';
 import '../../models/rental.dart';
-import 'NearbyRentals.dart'; // Điều chỉnh đường dẫn nếu cần
+import 'NearbyRentals.dart';
 
 class HorizontalRentalListWidget extends StatelessWidget {
   final List<Rental> rentals;
@@ -12,12 +12,18 @@ class HorizontalRentalListWidget extends StatelessWidget {
   final Function(Rental rental) onRentalTap;
   final bool Function(Rental rental) validateRental;
 
+  // 🔥 THÊM: Tham số cho hiển thị trạng thái lọc
+  final bool isFilterApplied;
+  final int totalRentals;
+
   const HorizontalRentalListWidget({
     super.key,
     required this.rentals,
     required this.mainRental,
     required this.onRentalTap,
     required this.validateRental,
+    this.isFilterApplied = false,
+    this.totalRentals = 0,
   });
 
   String _buildImageUrl(String? imagePath) {
@@ -146,23 +152,50 @@ class HorizontalRentalListWidget extends StatelessWidget {
     );
   }
 
+  // 🔥 THÊM: Widget hiển thị trạng thái không có kết quả
+  Widget _buildEmptyState() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.search_off_rounded,
+            size: 48,
+            color: Colors.grey[400],
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'Không tìm thấy bất động sản\ntrong khoảng giá đã chọn',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 14,
+              color: Colors.grey[600],
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    if (rentals.isEmpty) return const SizedBox.shrink();
+    // 🔥 CẬP NHẬT: Hiển thị toàn bộ widget ngay cả khi không có bài
+    // (trước là dùng rentals.isEmpty -> return SizedBox.shrink())
 
     return Positioned(
       bottom: 0,
       left: 0,
       right: 0,
       child: Container(
-        // Giữ nền trắng hoàn toàn như bản gốc
         color: Colors.white,
-        // Không fix cứng height → linh hoạt, tránh overflow trên mọi thiết bị
         constraints: const BoxConstraints(minHeight: 180, maxHeight: 240),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // Header (giữ nguyên như bạn)
+            // ============================================
+            // HEADER - CẬP NHẬT để hiển thị trạng thái lọc
+            // ============================================
             Container(
               padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
               decoration: BoxDecoration(
@@ -179,58 +212,113 @@ class HorizontalRentalListWidget extends StatelessWidget {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Row(
-                    children: [
-                      Icon(Icons.location_city_rounded, size: 20, color: Colors.blue[700]),
-                      const SizedBox(width: 8),
-                      Text(
-                        'Bất động sản gần đây • ${rentals.length}',
-                        style: const TextStyle(
-                          color: Colors.black87,
-                          fontSize: 15.5,
-                          fontWeight: FontWeight.w700,
+                  // 🔥 CẬP NHẬT: Hiển thị số bài và trạng thái lọc
+                  Expanded(
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.location_city_rounded,
+                          size: 20,
+                          color: isFilterApplied ? Colors.orange[700] : Colors.blue[700],
                         ),
-                      ),
-                    ],
-                  ),
-                  TextButton.icon(
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => NearbyRentalsListView(
-                            rentals: rentals,
-                            mainRental: mainRental,
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Bất động sản gần đây',
+                                style: TextStyle(
+                                  color: Colors.black87,
+                                  fontSize: 15.5,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                              // 🔥 THÊM: Hiển thị số bài đã lọc nếu có
+                              if (isFilterApplied && totalRentals > 0)
+                                Text(
+                                  '${rentals.length}/$totalRentals bài',
+                                  style: TextStyle(
+                                    color: Colors.orange[700],
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                )
+                              else
+                                Text(
+                                  '${rentals.length} bài',
+                                  style: TextStyle(
+                                    color: Colors.grey[600],
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                            ],
                           ),
                         ),
-                      );
-                    },
-                    icon: Icon(Icons.arrow_forward_ios_rounded, size: 14, color: Colors.blue[700]),
-                    label: Text(
-                      'Xem thêm',
-                      style: TextStyle(color: Colors.blue[700], fontSize: 13, fontWeight: FontWeight.w600),
-                    ),
-                    style: TextButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                      backgroundColor: Colors.blue[50],
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      ],
                     ),
                   ),
+                  const SizedBox(width: 12),
+
+                  // 🔥 CẬP NHẬT: Nút "Xem thêm" chỉ hiển thị khi có bài
+                  if (rentals.isNotEmpty)
+                    TextButton.icon(
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => NearbyRentalsListView(
+                              rentals: rentals,
+                              mainRental: mainRental,
+                            ),
+                          ),
+                        );
+                      },
+                      icon: Icon(
+                        Icons.arrow_forward_ios_rounded,
+                        size: 14,
+                        color: isFilterApplied ? Colors.orange[700] : Colors.blue[700],
+                      ),
+                      label: Text(
+                        'Xem thêm',
+                        style: TextStyle(
+                          color: isFilterApplied ? Colors.orange[700] : Colors.blue[700],
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      style: TextButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        backgroundColor: isFilterApplied
+                            ? Colors.orange[50]
+                            : Colors.blue[50],
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                      ),
+                    ),
                 ],
               ),
             ),
 
-            // Phần list ngang - đã tinh chỉnh để không overflow
+            // ============================================
+            // CONTENT AREA - Danh sách hoặc trạng thái rỗng
+            // ============================================
             SizedBox(
-              height: 148, // Giá trị này đã test ổn, không overflow 8px nữa
-              child: ListView.builder(
+              height: 148,
+              child: rentals.isEmpty
+                  ? _buildEmptyState()
+                  : ListView.builder(
                 scrollDirection: Axis.horizontal,
                 physics: const ClampingScrollPhysics(),
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
                 itemCount: rentals.length,
                 itemBuilder: (context, index) {
                   final rental = rentals[index];
-                  if (!validateRental(rental)) return const SizedBox.shrink();
+                  if (!validateRental(rental)) {
+                    return const SizedBox.shrink();
+                  }
                   return _buildHorizontalRentalCard(context, rental);
                 },
               ),

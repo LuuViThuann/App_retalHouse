@@ -2,38 +2,38 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 class ApiRoutes {
   static const String rootUrl =
-      'https://991ae13e080b.ngrok-free.app'; // http://192.168.43.168:3000 - mạng dữ liệu
+      'http://192.168.1.152:3000'; // http://192.168.43.168:3000 - mạng dữ liệu
   static const String baseUrl = '$rootUrl/api';
   static const String serverBaseUrl = rootUrl;
   static const String socketUrl = serverBaseUrl;
 
   // ==================== ANALYTICS ENDPOINTS ====================
 
-  /// 📊 GET /api/analytics/overview - Tổng quan thống kê
+  /// GET /api/analytics/overview - Tổng quan thống kê
   static const String analyticsOverview = '$baseUrl/analytics/overview';
 
-  /// 💰 GET /api/analytics/price-distribution - Phân bố giá
+  ///GET /api/analytics/price-distribution - Phân bố giá
   static const String analyticsPriceDistribution = '$baseUrl/analytics/price-distribution';
 
-  /// 📈 GET /api/analytics/posts-timeline?period=day|week|month
+  ///  GET /api/analytics/posts-timeline?period=day|week|month
   static String analyticsPostsTimeline({String period = 'day'}) {
     return '$baseUrl/analytics/posts-timeline?period=$period';
   }
 
-  /// 📍 GET /api/analytics/location-stats - Thống kê theo khu vực
+  /// GET /api/analytics/location-stats - Thống kê theo khu vực
   static const String analyticsLocationStats = '$baseUrl/analytics/location-stats';
 
-  /// 🔥 GET /api/analytics/hottest-areas?days=7 - Khu vực nóng nhất
+  ///GET /api/analytics/hottest-areas?days=7 - Khu vực nóng nhất
   static String analyticsHottestAreas({int days = 7}) {
     return '$baseUrl/analytics/hottest-areas?days=$days';
   }
 
-  /// 🌟 GET /api/analytics/trending-areas?days=7 - Khu vực trending
+  ///GET /api/analytics/trending-areas?days=7 - Khu vực trending
   static String analyticsTrendingAreas({int days = 7}) {
     return '$baseUrl/analytics/trending-areas?days=$days';
   }
 
-  /// 🏠 GET /api/analytics/property-types - Thống kê loại nhà
+  ///GET /api/analytics/property-types - Thống kê loại nhà
   static const String analyticsPropertyTypes = '$baseUrl/analytics/property-types';
 
   // ==================== SEARCH HISTORY ====================

@@ -258,15 +258,21 @@ class RentalViewModel extends ChangeNotifier {
     if (minPrice != null) _currentMinPrice = minPrice;
     if (maxPrice != null) _currentMaxPrice = maxPrice;
 
+    debugPrint('🔥 fetchNearbyRentals called with:');
+    debugPrint('   Radius: $_currentRadius km');
+    debugPrint('   MinPrice: $_currentMinPrice');
+    debugPrint('   MaxPrice: $_currentMaxPrice');
+
     try {
       debugPrint('🔍 Fetching nearby rentals for $rentalId (radius: $_currentRadius km)');
+      debugPrint('💰 Price filter: min=$_currentMinPrice, max=$_currentMaxPrice');
 
       final result = await _rentalService.fetchNearbyRentals(
         rentalId: rentalId,
         radius: _currentRadius,
-        minPrice: _currentMinPrice,
-        maxPrice: _currentMaxPrice,
-        limit: 20, // ✅ Load more results
+        minPrice: _currentMinPrice, // 🔥 Truyền minPrice (có thể null)
+        maxPrice: _currentMaxPrice, // 🔥 Truyền maxPrice (có thể null)
+        limit: 20,
       );
 
       // Only update if still relevant (not cancelled)
@@ -274,8 +280,12 @@ class RentalViewModel extends ChangeNotifier {
         _nearbyRentals = result['rentals'] ?? [];
         _warningMessage = result['warning'];
 
+        final appliedFilters = result['appliedFilters'];
+
         debugPrint('✅ Fetched ${_nearbyRentals.length} nearby rentals');
         debugPrint('📍 Search method: ${result['searchMethod']}');
+        debugPrint('💰 Applied filters: $appliedFilters');
+
         if (_warningMessage != null) {
           debugPrint('⚠️ Warning: $_warningMessage');
         }
@@ -397,6 +407,7 @@ class RentalViewModel extends ChangeNotifier {
     _currentMaxPrice = null;
     notifyListeners();
   }
+
 
   /// 🔥 Clear tất cả error messages
   void clearErrors() {

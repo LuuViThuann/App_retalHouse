@@ -25,6 +25,7 @@ import 'package:flutter_rentalhouse/views/rental_detail_view.dart';
 import 'package:flutter_rentalhouse/views/search_rental.dart';
 import 'package:provider/provider.dart';
 import 'package:shimmer/shimmer.dart';
+import '../Widgets/Detail/analytics_screen.dart';
 import '../Widgets/Profile/PaymentHistoryView.dart';
 import '../models/user.dart';
 import 'package:intl/intl.dart';
@@ -1282,6 +1283,7 @@ class _HomeContentState extends State<HomeContent> {
                     suffixIcon: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
+                        // ICON CHUYỂN TRANG TÌM KIẾM ===============================
                         GestureDetector(
                           onTap: () => Navigator.push(
                             context,
@@ -1297,6 +1299,29 @@ class _HomeContentState extends State<HomeContent> {
                             child: Icon(Icons.tune, color: Colors.white, size: 25),
                           ),
                         ),
+                        // ICON XEM THỐNG KÊ ==========================================
+                        GestureDetector(
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(builder: (_) =>const AnalyticsScreen()),
+                            );
+                          },
+                          child: Container(
+                            margin: const EdgeInsets.symmetric(horizontal: 4),
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: Colors.blue[700],
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: const Icon(
+                              Icons.analytics,
+                              color: Colors.white,
+                              size: 25,
+                            ),
+                          ),
+                        ),
+                        // ICON MỞ MAP THEO VỊ TRÍ TÀI KHON HIỆN TẠI ===============================
                         GestureDetector(
                           onTap: () {
                             Navigator.push(
@@ -1318,6 +1343,8 @@ class _HomeContentState extends State<HomeContent> {
                             ),
                           ),
                         ),
+
+                        // ============================================================
                       ],
                     ),
                     filled: true,

@@ -457,13 +457,24 @@ class RentalService {
     int limit = 10,
   }) async {
     return _retryRequest(() async {
+      // 🔥 BUILD QUERY PARAMETERS - CẬP NHẬT
       final queryParams = {
         'radius': radius.toString(),
         'limit': limit.toString(),
         'page': page.toString(),
       };
-      if (minPrice != null) queryParams['minPrice'] = minPrice.toString();
-      if (maxPrice != null) queryParams['maxPrice'] = maxPrice.toString();
+
+      // Chỉ thêm minPrice nếu nó khác null
+      if (minPrice != null && minPrice > 0) {
+        queryParams['minPrice'] = minPrice.toString();
+        debugPrint('📌 Adding minPrice: $minPrice');
+      }
+
+      // Chỉ thêm maxPrice nếu nó khác null
+      if (maxPrice != null && maxPrice > 0) {
+        queryParams['maxPrice'] = maxPrice.toString();
+        debugPrint('📌 Adding maxPrice: $maxPrice');
+      }
 
       final uri = Uri.parse('${ApiRoutes.baseUrl}/rentals/nearby/$rentalId')
           .replace(queryParameters: queryParams);
@@ -474,15 +485,23 @@ class RentalService {
         if (token != null) 'Authorization': 'Bearer $token',
       };
 
-      debugPrint('🔍 Fetching nearby rentals: $uri');
+      debugPrint('🔍 Fetching nearby rentals:');
+      debugPrint('   URL: $uri');
+      debugPrint('   Radius: ${radius}km');
+      debugPrint('   Price range: ${minPrice ?? "Any"} - ${maxPrice ?? "Any"}');
 
       final response = await _safeRequest(
             () => _client.get(uri, headers: headers),
-        timeout: _longTimeout, // ✅ Longer timeout for nearby search
+        timeout: _longTimeout,
       );
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
+
+        debugPrint('📊 Response status: ${response.statusCode}');
+        debugPrint('   Applied filters: ${data['appliedFilters']}');
+        debugPrint('   Search method: ${data['searchMethod']}');
+
         final List<dynamic> rentalsData = data['rentals'] ?? [];
 
         final List<Rental> rentals = rentalsData
@@ -494,7 +513,7 @@ class RentalService {
             return null;
           }
         })
-            .whereType<Rental>() // ✅ Filter out nulls
+            .whereType<Rental>()
             .toList();
 
         debugPrint('✅ Parsed ${rentals.length} nearby rentals');
@@ -507,6 +526,7 @@ class RentalService {
           'radiusKm': data['radiusKm'] ?? radius,
           'page': page,
           'hasMore': rentals.length >= limit,
+          'appliedFilters': data['appliedFilters'], // 🔥 THÊM: Feedback filters
         };
       } else {
         throw Exception('Failed to fetch nearby rentals: ${response.statusCode}');

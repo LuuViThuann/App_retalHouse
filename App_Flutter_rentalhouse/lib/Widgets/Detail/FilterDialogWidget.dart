@@ -36,8 +36,25 @@ class _FilterDialogWidgetState extends State<FilterDialogWidget>
   void initState() {
     super.initState();
     _selectedRadius = widget.initialRadius;
-    _minPriceController.text = widget.initialMinPrice?.toString() ?? '';
-    _maxPriceController.text = widget.initialMaxPrice?.toString() ?? '';
+    // 🔥 CẬP NHẬT: Format initial prices để hiển thị đúng
+    if (widget.initialMinPrice != null && widget.initialMinPrice! > 0) {
+      final formatter = NumberFormat.currency(
+        locale: 'vi_VN',
+        symbol: '',
+        decimalDigits: 0,
+      );
+      _minPriceController.text = formatter.format(widget.initialMinPrice!.toInt());
+    }
+
+    if (widget.initialMaxPrice != null && widget.initialMaxPrice! > 0) {
+      final formatter = NumberFormat.currency(
+        locale: 'vi_VN',
+        symbol: '',
+        decimalDigits: 0,
+      );
+      _maxPriceController.text = formatter.format(widget.initialMaxPrice!.toInt());
+    }
+
 
     // Setup animation
     _animationController = AnimationController(
@@ -72,6 +89,7 @@ class _FilterDialogWidgetState extends State<FilterDialogWidget>
       Navigator.of(context).pop();
     }
   }
+
   final _currencyFormat = NumberFormat.currency(
     locale: 'vi_VN',
     symbol: '',
@@ -92,7 +110,10 @@ class _FilterDialogWidgetState extends State<FilterDialogWidget>
           child: Container(
             constraints: BoxConstraints(
               maxWidth: 500,
-              maxHeight: MediaQuery.of(context).size.height * 0.85,
+              maxHeight: MediaQuery
+                  .of(context)
+                  .size
+                  .height * 0.85,
             ),
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -374,7 +395,8 @@ class _FilterDialogWidgetState extends State<FilterDialogWidget>
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  'Tìm kiếm trong bán kính ${_selectedRadius.toStringAsFixed(0)} km từ vị trí hiện tại',
+                  'Tìm kiếm trong bán kính ${_selectedRadius.toStringAsFixed(
+                      0)} km từ vị trí hiện tại',
                   style: TextStyle(
                     fontSize: 12,
                     color: Colors.blue[900],
@@ -479,12 +501,41 @@ class _FilterDialogWidgetState extends State<FilterDialogWidget>
   }
 
   void _handleApply() {
-    double? minPrice = _minPriceController.text.isNotEmpty
-        ? double.tryParse(_minPriceController.text)
-        : null;
-    double? maxPrice = _maxPriceController.text.isNotEmpty
-        ? double.tryParse(_maxPriceController.text)
-        : null;
+    // 🔥 CẬP NHẬT: Parse giá từ chuỗi định dạng (loại bỏ dấu phân cách)
+    double? minPrice;
+    double? maxPrice;
+
+    // Parse min price
+    if (_minPriceController.text.isNotEmpty) {
+      final cleanedText = _minPriceController.text.replaceAll(
+          RegExp(r'[^\d]'), '');
+      if (cleanedText.isNotEmpty) {
+        minPrice = double.tryParse(cleanedText);
+        debugPrint('✅ Min price parsed: $minPrice');
+      }
+    }
+
+    // Parse max price
+    if (_maxPriceController.text.isNotEmpty) {
+      final cleanedText = _maxPriceController.text.replaceAll(
+          RegExp(r'[^\d]'), '');
+      if (cleanedText.isNotEmpty) {
+        maxPrice = double.tryParse(cleanedText);
+        debugPrint('✅ Max price parsed: $maxPrice');
+      }
+    }
+
+    // Validation
+    if (minPrice == null && maxPrice == null) {
+      AppSnackBar.show(
+        context,
+        AppSnackBar.error(
+          message: 'Vui lòng nhập ít nhất một khoảng giá',
+          seconds: 3,
+        ),
+      );
+      return;
+    }
 
     if (minPrice != null && maxPrice != null && minPrice > maxPrice) {
       AppSnackBar.show(
@@ -497,7 +548,14 @@ class _FilterDialogWidgetState extends State<FilterDialogWidget>
       return;
     }
 
+    debugPrint('🔥 Applying filter:');
+    debugPrint('   Radius: $_selectedRadius km');
+    debugPrint('   MinPrice: $minPrice');
+    debugPrint('   MaxPrice: $maxPrice');
+
+    // Gọi callback onApply
     widget.onApply(_selectedRadius, minPrice, maxPrice);
+
     AppSnackBar.show(
       context,
       AppSnackBar.success(
