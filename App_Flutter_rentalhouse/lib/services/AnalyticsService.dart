@@ -5,11 +5,24 @@ import 'package:flutter/foundation.dart';
 import '../config/api_routes.dart';
 
 class AnalyticsService {
+  /// ✅ Helper: Build query parameters from filters
+  String _buildQueryParams(Map<String, String?>? filters) {
+    if (filters == null || filters.isEmpty) return '';
+
+    final params = filters.entries
+        .where((e) => e.value != null && e.value!.isNotEmpty)
+        .map((e) => '${e.key}=${Uri.encodeComponent(e.value!)}')
+        .join('&');
+
+    return params.isEmpty ? '' : '?$params';
+  }
+
   /// Lấy tổng quan thống kê
-  Future<Map<String, dynamic>> fetchOverview() async {
+  Future<Map<String, dynamic>> fetchOverview({Map<String, String?>? filters}) async {
     try {
+      final queryParams = _buildQueryParams(filters);
       final response = await http.get(
-        Uri.parse(ApiRoutes.analyticsOverview),
+        Uri.parse('${ApiRoutes.analyticsOverview}$queryParams'),
         headers: {'Content-Type': 'application/json'},
       ).timeout(
         const Duration(seconds: 10),
@@ -28,10 +41,11 @@ class AnalyticsService {
   }
 
   /// Lấy phân bố giá
-  Future<List<dynamic>> fetchPriceDistribution() async {
+  Future<List<dynamic>> fetchPriceDistribution({Map<String, String?>? filters}) async {
     try {
+      final queryParams = _buildQueryParams(filters);
       final response = await http.get(
-        Uri.parse(ApiRoutes.analyticsPriceDistribution),
+        Uri.parse('${ApiRoutes.analyticsPriceDistribution}$queryParams'),
         headers: {'Content-Type': 'application/json'},
       ).timeout(
         const Duration(seconds: 10),
@@ -52,9 +66,14 @@ class AnalyticsService {
   /// Lấy dữ liệu timeline bài đăng
   Future<Map<String, dynamic>> fetchPostsTimeline({
     String period = 'day',
+    Map<String, String?>? filters,
   }) async {
     try {
-      final url = ApiRoutes.analyticsPostsTimeline(period: period);
+      final baseUrl = ApiRoutes.analyticsPostsTimeline(period: period);
+      final queryParams = _buildQueryParams(filters);
+      final separator = baseUrl.contains('?') ? '&' : '?';
+      final url = queryParams.isEmpty ? baseUrl : '$baseUrl$separator${queryParams.substring(1)}';
+
       final response = await http.get(
         Uri.parse(url),
         headers: {'Content-Type': 'application/json'},
@@ -75,10 +94,11 @@ class AnalyticsService {
   }
 
   /// Lấy thống kê theo khu vực
-  Future<Map<String, dynamic>> fetchLocationStats() async {
+  Future<Map<String, dynamic>> fetchLocationStats({Map<String, String?>? filters}) async {
     try {
+      final queryParams = _buildQueryParams(filters);
       final response = await http.get(
-        Uri.parse(ApiRoutes.analyticsLocationStats),
+        Uri.parse('${ApiRoutes.analyticsLocationStats}$queryParams'),
         headers: {'Content-Type': 'application/json'},
       ).timeout(
         const Duration(seconds: 10),
@@ -97,9 +117,16 @@ class AnalyticsService {
   }
 
   /// Lấy khu vực có nhiều BĐS nhất
-  Future<List<dynamic>> fetchHottestAreas({int days = 7}) async {
+  Future<List<dynamic>> fetchHottestAreas({
+    int days = 7,
+    Map<String, String?>? filters,
+  }) async {
     try {
-      final url = ApiRoutes.analyticsHottestAreas(days: days);
+      final baseUrl = ApiRoutes.analyticsHottestAreas(days: days);
+      final queryParams = _buildQueryParams(filters);
+      final separator = baseUrl.contains('?') ? '&' : '?';
+      final url = queryParams.isEmpty ? baseUrl : '$baseUrl$separator${queryParams.substring(1)}';
+
       final response = await http.get(
         Uri.parse(url),
         headers: {'Content-Type': 'application/json'},
@@ -120,9 +147,16 @@ class AnalyticsService {
   }
 
   /// Lấy khu vực đang "trending"
-  Future<List<dynamic>> fetchTrendingAreas({int days = 7}) async {
+  Future<List<dynamic>> fetchTrendingAreas({
+    int days = 7,
+    Map<String, String?>? filters,
+  }) async {
     try {
-      final url = ApiRoutes.analyticsTrendingAreas(days: days);
+      final baseUrl = ApiRoutes.analyticsTrendingAreas(days: days);
+      final queryParams = _buildQueryParams(filters);
+      final separator = baseUrl.contains('?') ? '&' : '?';
+      final url = queryParams.isEmpty ? baseUrl : '$baseUrl$separator${queryParams.substring(1)}';
+
       final response = await http.get(
         Uri.parse(url),
         headers: {'Content-Type': 'application/json'},
@@ -143,10 +177,11 @@ class AnalyticsService {
   }
 
   /// Lấy thống kê loại nhà
-  Future<List<dynamic>> fetchPropertyTypes() async {
+  Future<List<dynamic>> fetchPropertyTypes({Map<String, String?>? filters}) async {
     try {
+      final queryParams = _buildQueryParams(filters);
       final response = await http.get(
-        Uri.parse(ApiRoutes.analyticsPropertyTypes),
+        Uri.parse('${ApiRoutes.analyticsPropertyTypes}$queryParams'),
         headers: {'Content-Type': 'application/json'},
       ).timeout(
         const Duration(seconds: 10),

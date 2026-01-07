@@ -210,56 +210,145 @@ router.get('/posts-timeline', async (req, res) => {
  */
 router.get('/location-stats', async (req, res) => {
   try {
-    const data = await getOrSetCache('location-stats', async () => {
-      const locationParts = await Rental.aggregate([
-        {
-          $match: {
-            status: 'available',
-            'location.fullAddress': { $exists: true, $ne: '' },
-          },
-        },
-        {
-          $addFields: {
-            addressParts: { $split: ['$location.fullAddress', ','] },
-          },
-        },
-        {
-          $group: {
-            _id: null,
-            addresses: { $push: '$addressParts' },
-          },
-        },
-      ]);
+    const { province, district, ward } = req.query;
+    
+    // Create cache key based on filters
+    const cacheKey = `location-stats:${province || 'all'}:${district || 'all'}:${ward || 'all'}`;
+    
+    const data = await getOrSetCache(cacheKey, async () => {
+      const matchFilter = { status: 'available' };
+      
+      let result = {
+        locations: [],
+        totalPosts: 0,
+        filterLevel: 'none',
+      };
 
-      const cities = {};
-      const districts = {};
-      const wards = {};
-
-      if (locationParts.length > 0) {
-        locationParts[0].addresses.forEach((parts) => {
-          const cleanedParts = parts.map((p) => p.trim()).filter((p) => p);
-          if (cleanedParts.length >= 3) {
-            const city = cleanedParts[cleanedParts.length - 1];
-            const district = cleanedParts[cleanedParts.length - 2];
-            const ward = cleanedParts[0];
-
-            cities[city] = (cities[city] || 0) + 1;
-            districts[district] = (districts[district] || 0) + 1;
-            wards[ward] = (wards[ward] || 0) + 1;
-          }
+      if (ward && district && province) {
+        // 📍 Ward level filter → Show only this ward
+        result.filterLevel = 'ward';
+        
+        const wardCount = await Rental.countDocuments({
+          ...matchFilter,
+          'location.province': province,
+          'location.district': district,
+          'location.ward': ward,
         });
+
+        result.locations = [
+          {
+            type: 'ward',
+            name: ward,
+            count: wardCount,
+          },
+        ];
+        result.totalPosts = wardCount;
+
+      } else if (district && province) {
+        // 📍 District level filter → Show top wards in this district
+        result.filterLevel = 'district';
+        
+        const topWards = await Rental.aggregate([
+          {
+            $match: {
+              ...matchFilter,
+              'location.province': province,
+              'location.district': district,
+            },
+          },
+          {
+            $group: {
+              _id: '$location.ward',
+              count: { $sum: 1 },
+            },
+          },
+          { $match: { _id: { $ne: null, $ne: '' } } },
+          { $sort: { count: -1 } },
+          { $limit: 10 },
+          {
+            $project: {
+              type: { $literal: 'ward' },
+              name: '$_id',
+              count: 1,
+              _id: 0,
+            },
+          },
+        ]);
+
+        result.locations = topWards;
+        result.totalPosts = topWards.reduce((sum, w) => sum + w.count, 0);
+
+      } else if (province) {
+        // 📍 Province level filter → Show top districts in this province
+        result.filterLevel = 'province';
+        
+        const topDistricts = await Rental.aggregate([
+          {
+            $match: {
+              ...matchFilter,
+              'location.province': province,
+            },
+          },
+          {
+            $group: {
+              _id: '$location.district',
+              count: { $sum: 1 },
+            },
+          },
+          { $match: { _id: { $ne: null, $ne: '' } } },
+          { $sort: { count: -1 } },
+          { $limit: 10 },
+          {
+            $project: {
+              type: { $literal: 'district' },
+              name: '$_id',
+              count: 1,
+              _id: 0,
+            },
+          },
+        ]);
+
+        result.locations = topDistricts;
+        result.totalPosts = topDistricts.reduce((sum, d) => sum + d.count, 0);
+
+      } else {
+        // 📍 No filter → Show top 10 provinces
+        result.filterLevel = 'none';
+        
+        const topProvinces = await Rental.aggregate([
+          { $match: matchFilter },
+          {
+            $group: {
+              _id: '$location.province',
+              count: { $sum: 1 },
+            },
+          },
+          { $match: { _id: { $ne: null, $ne: '', $ne: 'Việt Nam' } } },
+          { $sort: { count: -1 } },
+          { $limit: 10 },
+          {
+            $project: {
+              type: { $literal: 'province' },
+              name: '$_id',
+              count: 1,
+              _id: 0,
+            },
+          },
+        ]);
+
+        result.locations = topProvinces;
+        result.totalPosts = topProvinces.reduce((sum, p) => sum + p.count, 0);
       }
 
-      const toSortedArray = (obj) =>
-        Object.entries(obj)
-          .map(([name, count]) => ({ name, count }))
-          .sort((a, b) => b.count - a.count);
+      console.log('📊 Location stats result:', {
+        filterLevel: result.filterLevel,
+        locationsCount: result.locations.length,
+        totalPosts: result.totalPosts,
+        filters: { province, district, ward },
+        sampleData: result.locations.slice(0, 2),
+      });
 
-      return {
-        cities: toSortedArray(cities),
-        districts: toSortedArray(districts).slice(0, 20),
-        wards: toSortedArray(wards).slice(0, 20),
-      };
+      return result;
     });
 
     res.json(data);
@@ -271,7 +360,6 @@ router.get('/location-stats', async (req, res) => {
     });
   }
 });
-
 /**
  * 5. 🔥 Khu vực có nhiều bài đăng nhất
  * GET /api/analytics/hottest-areas?days=7

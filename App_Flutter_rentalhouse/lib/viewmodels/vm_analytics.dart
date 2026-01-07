@@ -36,9 +36,9 @@ class AnalyticsViewModel extends ChangeNotifier {
   // ============ FETCH METHODS ============
 
   /// Tải tổng quan
-  Future<void> fetchOverview() async {
+  Future<void> fetchOverview({Map<String, String?>? filters}) async {
     try {
-      _overviewData = await _analyticsService.fetchOverview();
+      _overviewData = await _analyticsService.fetchOverview(filters: filters);
       _errorMessage = null;
       notifyListeners();
     } catch (e) {
@@ -49,9 +49,9 @@ class AnalyticsViewModel extends ChangeNotifier {
   }
 
   /// Tải phân bố giá
-  Future<void> fetchPriceDistribution() async {
+  Future<void> fetchPriceDistribution({Map<String, String?>? filters}) async {
     try {
-      _priceDistribution = await _analyticsService.fetchPriceDistribution();
+      _priceDistribution = await _analyticsService.fetchPriceDistribution(filters: filters);
       _errorMessage = null;
       notifyListeners();
     } catch (e) {
@@ -62,9 +62,12 @@ class AnalyticsViewModel extends ChangeNotifier {
   }
 
   /// Tải timeline
-  Future<void> fetchPostsTimeline({String period = 'day'}) async {
+  Future<void> fetchPostsTimeline({String period = 'day', Map<String, String?>? filters}) async {
     try {
-      _timelineData = await _analyticsService.fetchPostsTimeline(period: period);
+      _timelineData = await _analyticsService.fetchPostsTimeline(
+        period: period,
+        filters: filters,
+      );
       _selectedPeriod = period;
       _errorMessage = null;
       notifyListeners();
@@ -76,9 +79,9 @@ class AnalyticsViewModel extends ChangeNotifier {
   }
 
   /// Tải thống kê khu vực
-  Future<void> fetchLocationStats() async {
+  Future<void> fetchLocationStats({Map<String, String?>? filters}) async {
     try {
-      _locationStats = await _analyticsService.fetchLocationStats();
+      _locationStats = await _analyticsService.fetchLocationStats(filters: filters);
       _errorMessage = null;
       notifyListeners();
     } catch (e) {
@@ -89,9 +92,12 @@ class AnalyticsViewModel extends ChangeNotifier {
   }
 
   /// Tải khu vực nóng
-  Future<void> fetchHottestAreas({int days = 7}) async {
+  Future<void> fetchHottestAreas({int days = 7, Map<String, String?>? filters}) async {
     try {
-      _hotAreas = await _analyticsService.fetchHottestAreas(days: days);
+      _hotAreas = await _analyticsService.fetchHottestAreas(
+        days: days,
+        filters: filters,
+      );
       _errorMessage = null;
       notifyListeners();
     } catch (e) {
@@ -102,9 +108,12 @@ class AnalyticsViewModel extends ChangeNotifier {
   }
 
   /// Tải khu vực trending
-  Future<void> fetchTrendingAreas({int days = 7}) async {
+  Future<void> fetchTrendingAreas({int days = 7, Map<String, String?>? filters}) async {
     try {
-      _trendingAreas = await _analyticsService.fetchTrendingAreas(days: days);
+      _trendingAreas = await _analyticsService.fetchTrendingAreas(
+        days: days,
+        filters: filters,
+      );
       _errorMessage = null;
       notifyListeners();
     } catch (e) {
@@ -115,14 +124,41 @@ class AnalyticsViewModel extends ChangeNotifier {
   }
 
   /// Tải loại nhà
-  Future<void> fetchPropertyTypes() async {
+  Future<void> fetchPropertyTypes({Map<String, String?>? filters}) async {
     try {
-      _propertyTypes = await _analyticsService.fetchPropertyTypes();
+      _propertyTypes = await _analyticsService.fetchPropertyTypes(filters: filters);
       _errorMessage = null;
       notifyListeners();
     } catch (e) {
       _errorMessage = e.toString();
       debugPrint('Error fetching property types: $e');
+      notifyListeners();
+    }
+  }
+
+  /// ✅ NEW: Tải tất cả dữ liệu với filter
+  Future<void> fetchFilteredAnalytics(Map<String, String?> filters) async {
+    _isLoading = true;
+    _errorMessage = null;
+    notifyListeners();
+
+    try {
+      await Future.wait([
+        fetchOverview(filters: filters),
+        fetchPriceDistribution(filters: filters),
+        fetchPostsTimeline(filters: filters),
+        fetchLocationStats(filters: filters),
+        fetchHottestAreas(filters: filters),
+        fetchTrendingAreas(filters: filters),
+        fetchPropertyTypes(filters: filters),
+      ]);
+
+      debugPrint('✅ Filtered analytics loaded successfully');
+    } catch (e) {
+      _errorMessage = 'Lỗi tải dữ liệu lọc: $e';
+      debugPrint('❌ Error loading filtered analytics: $e');
+    } finally {
+      _isLoading = false;
       notifyListeners();
     }
   }

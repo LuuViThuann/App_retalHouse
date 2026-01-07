@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_dynamic_links/firebase_dynamic_links.dart';
 import 'package:flutter_rentalhouse/services/auth_service.dart';
+import 'package:flutter_rentalhouse/viewmodels/vm_analytics.dart';
 import 'package:flutter_rentalhouse/viewmodels/vm_auth.dart';
 import 'package:flutter_rentalhouse/viewmodels/vm_chat.dart';
 import 'package:flutter_rentalhouse/viewmodels/vm_favorite.dart';
@@ -86,7 +87,7 @@ class RentalApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => RentalViewModel()),
         ChangeNotifierProvider(create: (_) => FavoriteViewModel()),
         ChangeNotifierProvider(create: (_) => ChatViewModel()),
-
+        ChangeNotifierProvider(create: (_) => AnalyticsViewModel()),
         // Admin
         ChangeNotifierProvider(create: (_) => AdminViewModel()),
         Provider(create: (_) => AuthService()),
