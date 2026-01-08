@@ -147,7 +147,23 @@ class _RentalMapViewState extends State<RentalMapView> {
       final rentalViewModel =
       Provider.of<RentalViewModel>(context, listen: false);
 
-      await rentalViewModel.fetchNearbyRentals(widget.rental.id);
+      // 🔥 CHECK: If viewing from current location, pass coordinates
+      bool isCurrentLocationView = widget.rental.id.startsWith('current_location_');
+
+      if (isCurrentLocationView && _currentLatLng != null) {
+        debugPrint('🔍 Fetching nearby rentals from current location');
+        debugPrint('   Coordinates: (${_currentLatLng!.latitude}, ${_currentLatLng!.longitude})');
+
+        await rentalViewModel.fetchNearbyRentals(
+          widget.rental.id,
+          latitude: _currentLatLng!.latitude,   // 🔥 NEW: Pass latitude
+          longitude: _currentLatLng!.longitude, // 🔥 NEW: Pass longitude
+        );
+      } else {
+        debugPrint('🔍 Fetching nearby rentals from rental post');
+
+        await rentalViewModel.fetchNearbyRentals(widget.rental.id);
+      }
 
       // 🔥 LƯU DANH SÁCH BAN ĐẦU (chưa lọc)
       setState(() {
@@ -187,11 +203,19 @@ class _RentalMapViewState extends State<RentalMapView> {
     debugPrint('✅ Filtered: ${_filteredNearbyRentals.length} / ${_originalNearbyRentals.length} rentals');
     debugPrint('   Min: ${_formatPriceCompact(minPrice)}, Max: ${_formatPriceCompact(maxPrice)}');
   }
+
+
   void _updateMarkers() async {
     final Set<Marker> markers = {};
 
-    // Main rental marker
-    if (_rentalLatLng != null && _validateRental(widget.rental)) {
+    // 🔥 KIỂM TRA: Rental chính có phải vị trí hiện tại không?
+    bool isCurrentLocationView = widget.rental.id.startsWith('current_location_');
+
+    // 🔥 CHỈ hiển thị marker đỏ nếu KHÔNG phải xem từ vị trí hiện tại
+    if (!isCurrentLocationView &&
+        _rentalLatLng != null &&
+        _validateRental(widget.rental)) {
+
       final customIcon = await CustomMarkerHelper.createCustomMarker(
         price: widget.rental.price,
         propertyType: 'Rental',
@@ -213,8 +237,22 @@ class _RentalMapViewState extends State<RentalMapView> {
       );
     }
 
-    // Current location marker
-    if (_currentLatLng != null) {
+    //  Hiển thị marker xanh cho vị trí hiện tại (chỉ khi xem từ vị trí hiện tại)
+    if (isCurrentLocationView && _currentLatLng != null) {
+      markers.add(
+        Marker(
+          markerId: const MarkerId('current-location'),
+          position: _currentLatLng!,
+          infoWindow: const InfoWindow(
+            title: 'Vị trí của bạn',
+            snippet: 'Vị trí hiện tại',
+          ),
+          icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueBlue),
+        ),
+      );
+    }
+    // Hiển thị marker xanh cho vị trí hiện tại (khi xem bài viết, hiển thị bên cạnh)
+    else if (!isCurrentLocationView && _currentLatLng != null) {
       markers.add(
         Marker(
           markerId: const MarkerId('current-location'),
@@ -228,26 +266,24 @@ class _RentalMapViewState extends State<RentalMapView> {
       );
     }
 
-    // 🔥 CẬP NHẬT: Dùng _filteredNearbyRentals thay vì nearbyRentals
-    final rentalViewModel =
-    Provider.of<RentalViewModel>(context, listen: false);
-
-    // Dùng danh sách đã lọc
+    //  Hiển thị các bài đăng gợi ý xung quanh
     final displayRentals = _isFilterApplied ? _filteredNearbyRentals : _originalNearbyRentals;
 
     for (int i = 0; i < displayRentals.length; i++) {
       final rental = displayRentals[i];
 
-      if (rental.id == widget.rental.id) continue;
+      // Bỏ qua bài đăng chính (khi xem từ bài viết)
+      if (!isCurrentLocationView && rental.id == widget.rental.id) continue;
+
+      // Bỏ qua nếu không có dữ liệu hợp lệ
       if (!_validateRental(rental)) continue;
 
       final lat = _safeParseDouble(
-          rental.location['latitude'], 'rental.location.latitude') ??
-          0.0;
+          rental.location['latitude'], 'rental.location.latitude') ?? 0.0;
       final lng = _safeParseDouble(
-          rental.location['longitude'], 'rental.location.longitude') ??
-          0.0;
+          rental.location['longitude'], 'rental.location.longitude') ?? 0.0;
 
+      // Bỏ qua nếu tọa độ không hợp lệ
       if (lat == 0.0 && lng == 0.0) continue;
 
       final position = LatLng(lat, lng);
@@ -262,7 +298,7 @@ class _RentalMapViewState extends State<RentalMapView> {
           markerId: MarkerId('nearby-${rental.id}'),
           position: position,
           infoWindow: InfoWindow(
-            title: 'Gần đây: ${rental.title}',
+            title: 'Gợi ý: ${rental.title}',
             snippet:
             '${_formatPriceCompact(rental.price)} - ${rental.location['short'] ?? ''}',
           ),
@@ -676,13 +712,26 @@ class _RentalMapViewState extends State<RentalMapView> {
 
       // 🔥 onApply: Áp dụng bộ lọc
       onApply: (radius, minPrice, maxPrice) async {
-        // Cập nhật bán kính
-        await rentalViewModel.fetchNearbyRentals(
-          widget.rental.id,
-          radius: radius,
-          minPrice: minPrice,
-          maxPrice: maxPrice,
-        );
+        // 🔥 CHECK: If current location, pass coordinates
+        bool isCurrentLocationView = widget.rental.id.startsWith('current_location_');
+
+        if (isCurrentLocationView && _currentLatLng != null) {
+          await rentalViewModel.fetchNearbyRentals(
+            widget.rental.id,
+            radius: radius,
+            minPrice: minPrice,
+            maxPrice: maxPrice,
+            latitude: _currentLatLng!.latitude,   // 🔥 Pass coords
+            longitude: _currentLatLng!.longitude,
+          );
+        } else {
+          await rentalViewModel.fetchNearbyRentals(
+            widget.rental.id,
+            radius: radius,
+            minPrice: minPrice,
+            maxPrice: maxPrice,
+          );
+        }
 
         // Cập nhật danh sách ban đầu
         setState(() {
@@ -884,12 +933,12 @@ class _RentalMapViewState extends State<RentalMapView> {
                   setState(() {
                     _filteredNearbyRentals = List.from(_originalNearbyRentals);
                     _isFilterApplied = false;
-
                   });
 
                   // BƯỚC 2: Reset bộ lọc trong ViewModel
                   rentalViewModel.resetNearbyFilters();
-                  //  Tải lại dữ liệu từ API (không có bộ lọc)
+
+                  // BƯỚC 3: Tải lại dữ liệu từ API (không có bộ lọc)
                   await _fetchNearbyRentals();
 
                   if (mounted) {

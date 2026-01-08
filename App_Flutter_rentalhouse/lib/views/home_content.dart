@@ -23,15 +23,21 @@ import 'package:flutter_rentalhouse/views/favorite_view.dart';
 import 'package:flutter_rentalhouse/views/login_view.dart';
 import 'package:flutter_rentalhouse/views/rental_detail_view.dart';
 import 'package:flutter_rentalhouse/views/search_rental.dart';
+import 'package:location/location.dart' as loc;
+import 'package:lottie/lottie.dart';
 import 'package:provider/provider.dart';
 import 'package:shimmer/shimmer.dart';
 import '../Widgets/Detail/analytics_screen.dart';
+import '../Widgets/Detail/rentalMap.dart';
 import '../Widgets/Profile/PaymentHistoryView.dart';
+import '../config/loading.dart';
 import '../models/user.dart';
 import 'package:intl/intl.dart';
 import '../config/api_routes.dart';
 import 'package:http/http.dart' as http;
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+
+import '../utils/Snackbar_process.dart';
 
 class HomeContent extends StatefulWidget {
   const HomeContent({super.key});
@@ -82,6 +88,140 @@ class _HomeContentState extends State<HomeContent> {
         }
       }
     });
+  }
+
+  Future<void> _getCurrentLocationAndNavigateToMap() async {
+    try {
+      final location = loc.Location();
+
+      //  Kiểm tra dịch vụ định vị
+      bool serviceEnabled = await location.serviceEnabled();
+      if (!serviceEnabled) {
+        serviceEnabled = await location.requestService();
+        if (!serviceEnabled) {
+          if (mounted) {
+            Navigator.pop(context); // Đóng loading dialog
+            AppSnackBar.show(
+              context,
+              AppSnackBar.error(
+                message: 'Dịch vụ vị trí chưa được bật. Vui lòng bật GPS.',
+              ),
+            );
+          }
+          return;
+        }
+      }
+
+      //  Kiểm tra quyền truy cập
+      var permissionGranted = await location.hasPermission();
+      if (permissionGranted == loc.PermissionStatus.denied) {
+        permissionGranted = await location.requestPermission();
+        if (permissionGranted != loc.PermissionStatus.granted) {
+          if (mounted) {
+            Navigator.pop(context); // Đóng loading dialog
+            AppSnackBar.show(
+              context,
+              AppSnackBar.error(
+                message: 'Vui lòng cấp quyền truy cập vị trí.',
+              ),
+            );
+          }
+          return;
+        }
+      }
+
+      //  Lấy vị trí hiện tại
+      final currentLocation = await location.getLocation();
+
+      if (currentLocation.latitude == null || currentLocation.longitude == null) {
+        if (mounted) {
+          Navigator.pop(context); // Đóng loading dialog
+          AppSnackBar.show(
+            context,
+            AppSnackBar.error(
+              message: 'Không thể lấy vị trí hiện tại. Vui lòng thử lại.',
+            ),
+          );
+        }
+        return;
+      }
+
+      //  Tạo rental đại diện cho vị trí hiện tại từ dữ liệu thực
+      final authViewModel = Provider.of<AuthViewModel>(context, listen: false);
+      final currentUser = authViewModel.currentUser;
+
+      final currentLocationRental = Rental(
+        id: 'current_location_${DateTime.now().millisecondsSinceEpoch}',
+        title: 'Vị trí của tôi',
+        price: 0,
+        propertyType: 'Location',
+        location: {
+          'short': 'Vị trí hiện tại',
+          'fullAddress': 'Vị trí hiện tại của tôi',
+          'latitude': currentLocation.latitude!,
+          'longitude': currentLocation.longitude!,
+        },
+        images: [],
+        videos: [],
+        createdAt: DateTime.now(),
+        userId: currentUser?.id ?? '',
+        landlord: currentUser?.id ?? '',
+        area: {
+          'total': 0.0,
+          'livingRoom': 0.0,
+          'bedrooms': 0,
+          'bathrooms': 0,
+        },
+        furniture: [],
+        amenities: [],
+        surroundings: [],
+        rentalTerms: {
+          'minimumLease': '',
+          'deposit': '',
+          'paymentMethod': '',
+          'renewalTerms': '',
+        },
+        contactInfo: {
+          'name': currentUser?.username ?? 'Người dùng',
+          'phone': currentUser?.phoneNumber ?? '',
+          'availableHours': '',
+        },
+        status: 'available',
+      );
+
+      // Delay một chút để loading dialog hiển thị rõ
+      await Future.delayed(const Duration(milliseconds: 500));
+
+      //Đóng loading dialog
+      if (mounted) {
+        Navigator.pop(context);
+      }
+
+      // 🔥 Điều hướng tới RentalMapView với vị trí hiện tại thực tế
+      if (mounted) {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => RentalMapView(
+              rental: currentLocationRental,
+            ),
+          ),
+        );
+      }
+
+      print('✅ Opened map with real location: (${currentLocation.latitude}, ${currentLocation.longitude})');
+    } catch (e) {
+      print('❌ Error getting location: $e');
+      if (mounted) {
+        Navigator.pop(context); // Đóng loading dialog
+        AppSnackBar.show(
+          context,
+          AppSnackBar.error(
+            message: 'Lỗi: $e',
+          ),
+        );
+      }
+    }
   }
 
   Future<void> fetchProvinces() async {
@@ -1324,10 +1464,56 @@ class _HomeContentState extends State<HomeContent> {
                         // ICON MỞ MAP THEO VỊ TRÍ TÀI KHON HIỆN TẠI ===============================
                         GestureDetector(
                           onTap: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(builder: (_) => Container()),
+                            //  Hiển thị loading dialog
+                            showDialog(
+                              context: context,
+                              barrierDismissible: false,
+                              builder: (BuildContext dialogContext) {
+                                return Dialog(
+                                  backgroundColor: Colors.transparent,
+                                  elevation: 0,
+                                  child: Center(
+                                    child: Container(
+                                      padding: const EdgeInsets.all(20),
+                                      child: Column(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          // Loading animation
+                                          Lottie.asset(
+                                            AssetsConfig.loadingLottie,
+                                            width: 80,
+                                            height: 80,
+                                            fit: BoxFit.fill,
+                                          ),
+                                          const SizedBox(height: 16),
+                                          // Loading text
+                                          const Text(
+                                            'Đang mở bản đồ',
+                                            style: TextStyle(
+                                              fontSize: 16,
+                                              fontWeight: FontWeight.w600,
+                                              color: Colors.white,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 8),
+                                          // Subtext
+                                          Text(
+                                            'Vui lòng đợi...',
+                                            style: TextStyle(
+                                              fontSize: 13,
+                                              color: Colors.white,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                );
+                              },
                             );
+
+                            //  Lấy vị trí hiện tại từ device
+                            _getCurrentLocationAndNavigateToMap();
                           },
                           child: Container(
                             margin: const EdgeInsets.symmetric(horizontal: 4),
@@ -1342,7 +1528,7 @@ class _HomeContentState extends State<HomeContent> {
                               size: 25,
                             ),
                           ),
-                        ),
+                        )
 
                         // ============================================================
                       ],

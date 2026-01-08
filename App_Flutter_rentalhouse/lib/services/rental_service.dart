@@ -11,15 +11,15 @@ import '../services/auth_service.dart';
 import '../viewmodels/vm_auth.dart';
 
 class RentalService {
-  // ✅ Timeout configuration
+  // Timeout configuration
   static const Duration _defaultTimeout = Duration(seconds: 30);
   static const Duration _longTimeout = Duration(seconds: 60);
-  static const int _maxRetries = 3;
+  static const int _maxRetries = 2;
 
-  // ✅ HTTP Client với connection pooling
+  //  HTTP Client với connection pooling
   static final http.Client _client = http.Client();
 
-  // ✅ Circuit breaker pattern
+  //  Circuit breaker pattern
   static DateTime? _lastFailure;
   static int _consecutiveFailures = 0;
   static const int _failureThreshold = 5;
@@ -447,6 +447,116 @@ class RentalService {
     }
   }
 
+  Future<Map<String, dynamic>> fetchNearbyFromLocation({
+    required double latitude,
+    required double longitude,
+    double radius = 10.0,
+    double? minPrice,
+    double? maxPrice,
+    String? token,
+    int page = 1,
+    int limit = 10,
+  }) async {
+    //  CLIENT-SIDE VALIDATION
+    if (latitude.abs() > 90 || longitude.abs() > 180) {
+      throw Exception(
+          'Tọa độ không hợp lệ: latitude=$latitude, longitude=$longitude'
+      );
+    }
+
+    if (radius <= 0 || radius > 100) {
+      throw Exception('Bán kính phải từ 0-100 km, nhận được: $radius');
+    }
+
+    return _retryRequest(
+          () async {
+        //  Build URL using ApiRoutes
+        final url = ApiRoutes.nearbyFromLocation(
+          latitude: latitude,
+          longitude: longitude,
+          radius: radius,
+          page: page,
+          limit: limit,
+          minPrice: minPrice,
+          maxPrice: maxPrice,
+        );
+
+        final uri = Uri.parse(url);
+
+        final headers = {
+          'Content-Type': 'application/json',
+          'Connection': 'keep-alive',
+          if (token != null) 'Authorization': 'Bearer $token',
+        };
+
+        debugPrint('🔍 [NEARBY-FROM-LOCATION] Requesting:');
+        debugPrint('   Coords: ($latitude, $longitude)');
+        debugPrint('   Radius: ${radius}km');
+        debugPrint('   Prices: ${minPrice?.toStringAsFixed(0) ?? "Any"} - ${maxPrice?.toStringAsFixed(0) ?? "Any"}');
+
+        final response = await _safeRequest(
+              () => _client.get(uri, headers: headers),
+          timeout: const Duration(seconds: 60), // 60s timeout cho geospatial query
+        );
+
+        //  HANDLE RESPONSES
+        if (response.statusCode == 200) {
+          final data = jsonDecode(response.body);
+
+          debugPrint(' [NEARBY-FROM-LOCATION] Success');
+          debugPrint('   Status: ${response.statusCode}');
+          debugPrint('   Search method: ${data['searchMethod']}');
+          debugPrint('   Found: ${data['rentals']?.length ?? 0} rentals');
+
+          final List<dynamic> rentalsData = data['rentals'] ?? [];
+          final List<Rental> rentals = rentalsData
+              .map((json) {
+            try {
+              return _parseRentalJson(json);
+            } catch (e) {
+              debugPrint('⚠️ Error parsing rental: $e');
+              return null;
+            }
+          })
+              .whereType<Rental>()
+              .toList();
+
+          //  Return tất cả info (bao gồm warning từ backend)
+          return {
+            'rentals': rentals,
+            'warning': data['warning'],
+            'searchMethod': data['searchMethod'],
+            'total': data['total'] ?? rentals.length,
+            'radiusKm': data['radiusKm'] ?? radius,
+            'page': data['page'] ?? page,
+            'hasMore': (data['page'] ?? page) < (data['pages'] ?? 1),
+            'appliedFilters': data['appliedFilters'],
+          };
+        } else if (response.statusCode == 400) {
+          //  Bad request - validation error
+          final errorData = jsonDecode(response.body);
+          throw Exception('Yêu cầu không hợp lệ: ${errorData['message']}');
+        } else if (response.statusCode == 500) {
+          // Server error - need to check backend logs
+          final errorData = jsonDecode(response.body);
+          debugPrint('📋 Server error details: ${errorData['error']}');
+          debugPrint('💡 Hint: ${errorData['hint']}');
+
+          // Provide helpful message
+          throw Exception(
+              'Lỗi máy chủ: ${errorData['message']}. '
+                  'Vui lòng thử lại sau hoặc liên hệ admin.'
+          );
+        } else {
+          throw Exception(
+              'Failed to fetch nearby rentals: Status ${response.statusCode}'
+          );
+        }
+      },
+      maxRetries: 2, //  Fewer retries for faster feedback
+    );
+  }
+
   Future<Map<String, dynamic>> fetchNearbyRentals({
     required String rentalId,
     double radius = 10.0,
@@ -456,28 +566,23 @@ class RentalService {
     int page = 1,
     int limit = 10,
   }) async {
+    // 🔥 CHECK: If rentalId starts with 'current_location_', it's invalid
+    if (rentalId.startsWith('current_location_')) {
+      throw Exception('Invalid rental ID for nearby search. Use fetchNearbyFromLocation instead.');
+    }
+
     return _retryRequest(() async {
-      // 🔥 BUILD QUERY PARAMETERS - CẬP NHẬT
-      final queryParams = {
-        'radius': radius.toString(),
-        'limit': limit.toString(),
-        'page': page.toString(),
-      };
+      // 🔥 SỬ DỤNG ApiRoutes
+      final url = ApiRoutes.nearbyRentals(
+        rentalId: rentalId,
+        radius: radius,
+        page: page,
+        limit: limit,
+        minPrice: minPrice,
+        maxPrice: maxPrice,
+      );
 
-      // Chỉ thêm minPrice nếu nó khác null
-      if (minPrice != null && minPrice > 0) {
-        queryParams['minPrice'] = minPrice.toString();
-        debugPrint('📌 Adding minPrice: $minPrice');
-      }
-
-      // Chỉ thêm maxPrice nếu nó khác null
-      if (maxPrice != null && maxPrice > 0) {
-        queryParams['maxPrice'] = maxPrice.toString();
-        debugPrint('📌 Adding maxPrice: $maxPrice');
-      }
-
-      final uri = Uri.parse('${ApiRoutes.baseUrl}/rentals/nearby/$rentalId')
-          .replace(queryParameters: queryParams);
+      final uri = Uri.parse(url);
 
       final headers = {
         'Content-Type': 'application/json',
@@ -526,7 +631,7 @@ class RentalService {
           'radiusKm': data['radiusKm'] ?? radius,
           'page': page,
           'hasMore': rentals.length >= limit,
-          'appliedFilters': data['appliedFilters'], // 🔥 THÊM: Feedback filters
+          'appliedFilters': data['appliedFilters'],
         };
       } else {
         throw Exception('Failed to fetch nearby rentals: ${response.statusCode}');
@@ -595,7 +700,7 @@ class RentalService {
     return Rental.fromJson(json);
   }
 
-  // ✅ Cleanup method - call this in app dispose
+  //  Cleanup method - call this in app dispose
   static void dispose() {
     _client.close();
   }

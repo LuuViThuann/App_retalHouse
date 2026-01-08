@@ -1073,6 +1073,511 @@ router.delete('/search-history', [sanitizeHeadersMiddleware, authMiddleware], as
     });
   }
 });
+
+//  XEM CÁC BÀI TỪ VỊ TRÍ HIỆN TẠI 
+router.get('/rentals/nearby-from-location', async (req, res) => {
+  const requestId = Date.now(); // Để track request
+  
+  try {
+    const { latitude, longitude, radius = 10, page = 1, limit = 10, minPrice, maxPrice } = req.query;
+    const skip = (Number(page) - 1) * Number(limit);
+    
+    console.log(`🔍 [${requestId}] [NEARBY-FROM-LOCATION] Request:`, {
+      latitude,
+      longitude,
+      radius,
+      minPrice,
+      maxPrice,
+      page,
+      limit
+    });
+    
+    // ✅ VALIDATE COORDINATES
+    const lat = parseFloat(latitude);
+    const lon = parseFloat(longitude);
+    
+    if (isNaN(lat) || isNaN(lon)) {
+      return res.status(400).json({ 
+        success: false,
+        message: 'Invalid coordinates: latitude and longitude must be numbers',
+        received: { latitude, longitude }
+      });
+    }
+    
+    if (Math.abs(lon) > 180 || Math.abs(lat) > 90) {
+      return res.status(400).json({ 
+        success: false,
+        message: 'Coordinates out of valid range',
+        received: { latitude: lat, longitude: lon },
+        validRange: { latitude: '[-90, 90]', longitude: '[-180, 180]' }
+      });
+    }
+    
+    // ✅ VALIDATE RADIUS
+    const radiusNum = parseFloat(radius);
+    if (isNaN(radiusNum) || radiusNum <= 0 || radiusNum > 100) {
+      return res.status(400).json({
+        success: false,
+        message: 'Radius must be between 0 and 100 km',
+        received: radius
+      });
+    }
+    
+    // ✅ BUILD PRICE FILTER SAFELY
+    let priceFilter = {};
+    
+    if (minPrice !== undefined && minPrice !== null && minPrice !== '') {
+      const minVal = Number(minPrice);
+      if (!isNaN(minVal) && minVal >= 0) {
+        priceFilter.$gte = minVal;
+        console.log(`✅ [${requestId}] Min price filter: >= ${minVal}`);
+      }
+    }
+    
+    if (maxPrice !== undefined && maxPrice !== null && maxPrice !== '') {
+      const maxVal = Number(maxPrice);
+      if (!isNaN(maxVal) && maxVal > 0) {
+        priceFilter.$lte = maxVal;
+        console.log(`✅ [${requestId}] Max price filter: <= ${maxVal}`);
+      }
+    }
+    
+    const radiusInMeters = radiusNum * 1000;
+    const radiusInRadians = radiusInMeters / 6378100; // Earth's radius in meters
+    
+    console.log(`📍 [${requestId}] Search center: [${lon}, ${lat}]`);
+    console.log(`📏 [${requestId}] Radius: ${radiusNum}km (${radiusInMeters}m)`);
+
+    // ✅ BUILD QUERY FILTER
+    const geoQueryFilter = {
+      status: 'available',
+    };
+    
+    if (Object.keys(priceFilter).length > 0) {
+      geoQueryFilter.price = priceFilter;
+    }
+
+    let nearbyRentals = [];
+    let total = 0;
+    let searchMethod = 'geospatial_from_location';
+    
+    try {
+      // 🔥 CHECK: Ensure geospatial index exists
+      const indexes = await Rental.collection.getIndexes();
+      const hasGeoIndex = Object.keys(indexes).some(key => 
+        indexes[key]['location.coordinates'] === '2dsphere'
+      );
+      
+      if (!hasGeoIndex) {
+        console.warn(`⚠️ [${requestId}] No 2dsphere index, creating...`);
+        await Rental.collection.createIndex({ 'location.coordinates': '2dsphere' });
+        console.log(`✅ [${requestId}] Geospatial index created`);
+      }
+      
+      // 🔥 EXECUTE GEOSPATIAL QUERY
+      console.log(`🚀 [${requestId}] Executing geospatial aggregation...`);
+      
+      nearbyRentals = await Rental.aggregate([
+        {
+          $geoNear: {
+            near: { type: 'Point', coordinates: [lon, lat] },
+            distanceField: 'distance',
+            maxDistance: radiusInMeters,
+            spherical: true,
+            query: geoQueryFilter,
+          },
+        },
+        { $skip: skip },
+        { $limit: Number(limit) },
+        {
+          $project: {
+            title: 1,
+            price: 1,
+            location: 1,
+            images: 1,
+            videos: 1,
+            propertyType: 1,
+            createdAt: 1,
+            distance: 1,
+            coordinates: '$location.coordinates.coordinates',
+            area: 1,
+            furniture: 1,
+            amenities: 1,
+            surroundings: 1,
+            rentalTerms: 1,
+            contactInfo: 1,
+            status: 1,
+            userId: 1,
+          },
+        },
+      ]).maxTimeMS(30000);
+      
+      console.log(`✅ [${requestId}] Query returned ${nearbyRentals.length} results`);
+      
+      // COUNT TOTAL
+      total = await Rental.countDocuments({
+        'location.coordinates': {
+          $geoWithin: {
+            $centerSphere: [[lon, lat], radiusInRadians],
+          },
+        },
+        ...geoQueryFilter,
+      }).maxTimeMS(10000);
+      
+      console.log(`✅ [${requestId}] Total count: ${total}`);
+      
+    } catch (geoError) {
+      console.error(`❌ [${requestId}] Geospatial error:`, geoError.message);
+      
+      // ✅ FALLBACK: Simple query
+      console.log(`⚠️ [${requestId}] Falling back to simple query...`);
+      searchMethod = 'fallback_location_based';
+      
+      nearbyRentals = await Rental.find(geoQueryFilter)
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(Number(limit))
+        .select('title price location images videos propertyType createdAt area furniture amenities surroundings rentalTerms contactInfo status userId')
+        .lean()
+        .maxTimeMS(10000);
+      
+      total = await Rental.countDocuments(geoQueryFilter).maxTimeMS(5000);
+      
+      console.log(`✅ [${requestId}] Fallback returned ${nearbyRentals.length} results`);
+      
+      // Calculate approximate distance
+      nearbyRentals = nearbyRentals.map(rental => {
+        const [rentLon, rentLat] = rental.location?.coordinates?.coordinates || [0, 0];
+        
+        // Haversine formula
+        const R = 6371;
+        const dLat = (rentLat - lat) * Math.PI / 180;
+        const dLon = (rentLon - lon) * Math.PI / 180;
+        const a = 
+          Math.sin(dLat/2) * Math.sin(dLat/2) +
+          Math.cos(lat * Math.PI / 180) * Math.cos(rentLat * Math.PI / 180) *
+          Math.sin(dLon/2) * Math.sin(dLon/2);
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+        const distance = R * c * 1000;
+        
+        return { ...rental, distance };
+      });
+    }
+    
+    // ✅ TRANSFORM RESULTS
+    const transformedRentals = nearbyRentals.map(rental => ({
+      ...rental,
+      coordinates: rental.coordinates || rental.location?.coordinates?.coordinates || [0, 0],
+      distance: rental.distance ? (rental.distance / 1000).toFixed(2) : null,
+      distanceKm: rental.distance ? (rental.distance / 1000).toFixed(2) + 'km' : 'N/A'
+    }));
+    
+    console.log(`✅ [${requestId}] Response: ${transformedRentals.length} rentals`);
+    
+    res.json({
+      success: true,
+      rentals: transformedRentals,
+      total,
+      page: Number(page),
+      pages: Math.ceil(total / Number(limit)),
+      hasMore: (Number(page) * Number(limit)) < total,
+      searchMethod,
+      centerCoordinates: { longitude: lon, latitude: lat },
+      radiusKm: radiusNum,
+      appliedFilters: {
+        minPrice: priceFilter.$gte || null,
+        maxPrice: priceFilter.$lte || null,
+      }
+    });
+    
+  } catch (err) {
+    console.error(`❌ [${requestId}] CRITICAL Error:`, err);
+    
+    res.status(500).json({ 
+      success: false,
+      message: 'Failed to fetch rental details',
+      error: err.message,
+      hint: 'Check server logs for detailed error'
+    });
+  }
+});
+
+router.get('/rentals/nearby/:id', async (req, res) => {
+  try {
+    const { radius = 10, page = 1, limit = 10, minPrice, maxPrice } = req.query;
+    const skip = (Number(page) - 1) * Number(limit);
+    
+    // ✅ Set timeout headers
+    req.setTimeout(60000); // 60 seconds
+    res.setTimeout(60000);
+    
+    console.log(`🔍 Fetching nearby rentals for ID: ${req.params.id} (radius: ${radius}km)`);
+    console.log(`💰 Price filter: min=${minPrice}, max=${maxPrice}`);
+    
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(400).json({ 
+        success: false,
+        message: 'Invalid rental ID format' 
+      });
+    }
+    
+    const rental = await Rental.findById(req.params.id)
+      .select('location coordinates') 
+      .lean();
+      
+    if (!rental) {
+      console.log(`❌ Rental with ID ${req.params.id} not found`);
+      return res.status(404).json({ 
+        success: false,
+        message: 'Rental not found' 
+      });
+    }
+    
+    // Extract coordinates
+    let coordinates;
+    if (rental.location?.coordinates?.coordinates && 
+        Array.isArray(rental.location.coordinates.coordinates) && 
+        rental.location.coordinates.coordinates.length === 2) {
+      coordinates = rental.location.coordinates.coordinates;
+    } else if (rental.coordinates && Array.isArray(rental.coordinates) && rental.coordinates.length === 2) {
+      coordinates = rental.coordinates;
+    } else {
+      return res.status(400).json({ 
+        success: false,
+        message: 'Rental has invalid coordinate structure' 
+      });
+    }
+    
+    const [longitude, latitude] = coordinates;
+    
+    if (typeof longitude !== 'number' || typeof latitude !== 'number' ||
+        isNaN(longitude) || isNaN(latitude) ||
+        Math.abs(longitude) > 180 || Math.abs(latitude) > 90) {
+      return res.status(400).json({ 
+        success: false,
+        message: 'Rental has invalid coordinate values' 
+      });
+    }
+
+    // ============================================
+    // BUILD PRICE FILTER - CẬP NHẬT
+    // ============================================
+    let priceFilter = {};
+    if (minPrice !== undefined && minPrice !== null && minPrice !== '') {
+      const minVal = Number(minPrice);
+      if (!isNaN(minVal)) {
+        priceFilter.$gte = minVal;
+        console.log(`✅ Min price filter: >= ${minVal}`);
+      }
+    }
+    if (maxPrice !== undefined && maxPrice !== null && maxPrice !== '') {
+      const maxVal = Number(maxPrice);
+      if (!isNaN(maxVal)) {
+        priceFilter.$lte = maxVal;
+        console.log(`✅ Max price filter: <= ${maxVal}`);
+      }
+    }
+    
+    // Handle [0, 0] coordinates - fallback to location-based search
+    if (longitude === 0 && latitude === 0) {
+      console.log('⚠️ Coordinates are [0, 0], using location-based fallback');
+      
+      const fullRental = await Rental.findById(req.params.id).select('location').lean();
+      const locationParts = fullRental.location?.fullAddress?.split(',') || [];
+      const wardInfo = locationParts.length > 1 ? locationParts[1].trim() : '';
+      
+      const query = {
+        _id: { $ne: new mongoose.Types.ObjectId(req.params.id) },
+        status: 'available',
+        ...(wardInfo && { 'location.fullAddress': { $regex: wardInfo, $options: 'i' } }),
+      };
+      
+      // 🔥 Thêm price filter vào query
+      if (Object.keys(priceFilter).length > 0) {
+        query.price = priceFilter;
+        console.log(`✅ Applied price filter to fallback query:`, priceFilter);
+      }
+
+      const [nearbyRentals, total] = await Promise.all([
+        Rental.find(query)
+          .select('title price location images videos propertyType createdAt area') 
+          .skip(skip)
+          .limit(Number(limit))
+          .lean(),
+        Rental.countDocuments(query)
+      ]);
+      
+      console.log(`✅ Fallback search: Found ${nearbyRentals.length} rentals (total: ${total})`);
+      
+      return res.json({
+        success: true,
+        rentals: nearbyRentals.map(rental => ({
+          ...rental,
+          distance: null,
+          coordinates: rental.location?.coordinates?.coordinates || rental.coordinates || [0, 0]
+        })),
+        total,
+        page: Number(page),
+        pages: Math.ceil(total / Number(limit)),
+        warning: 'Rental coordinates are invalid ([0, 0]). Showing rentals in the same area instead.',
+        searchMethod: 'location_fallback'
+      });
+    }
+    
+    const radiusInMeters = parseFloat(radius) * 1000;
+    const radiusInRadians = radiusInMeters / 6378100;
+    
+    console.log(`📍 Search center: [${longitude}, ${latitude}]`);
+    console.log(`📏 Radius: ${radius}km (${radiusInMeters}m)`);
+
+    // ============================================
+    // 🔥 GEOSPATIAL QUERY - CẬP NHẬT với price filter
+    // ============================================
+    
+    // Build query filter object
+    const geoQueryFilter = {
+      _id: { $ne: new mongoose.Types.ObjectId(req.params.id) },
+      status: 'available',
+    };
+    
+    // 🔥 Thêm price filter vào geo query
+    if (Object.keys(priceFilter).length > 0) {
+      geoQueryFilter.price = priceFilter;
+    }
+
+    const [nearbyRentals, total] = await Promise.all([
+      Rental.aggregate([
+        {
+          $geoNear: {
+            near: { type: 'Point', coordinates: [longitude, latitude] },
+            distanceField: 'distance',
+            maxDistance: radiusInMeters,
+            spherical: true,
+            query: geoQueryFilter, // 🔥 Áp dụng filter vào geoNear
+          },
+        },
+        { $skip: skip },
+        { $limit: Number(limit) },
+        {
+          $project: {
+            title: 1,
+            price: 1,
+            location: 1,
+            images: 1,
+            videos: 1,
+            propertyType: 1,
+            createdAt: 1,
+            distance: 1,
+            coordinates: '$location.coordinates.coordinates',
+            area: 1,
+            furniture: 1,
+            amenities: 1,
+            surroundings: 1,
+            rentalTerms: 1,
+            contactInfo: 1,
+            status: 1,
+            userId: 1,
+          },
+        },
+      ]),
+      // 🔥 Count với price filter
+      Rental.countDocuments({
+        'location.coordinates': {
+          $geoWithin: {
+            $centerSphere: [[longitude, latitude], radiusInRadians],
+          },
+        },
+        ...geoQueryFilter,
+      })
+    ]);
+    
+    console.log(`✅ Geospatial query: Found ${nearbyRentals.length} rentals (total: ${total})`);
+    
+    const transformedRentals = nearbyRentals.map(rental => ({
+      ...rental,
+      coordinates: rental.coordinates || rental.location?.coordinates?.coordinates || [0, 0],
+      distance: rental.distance ? (rental.distance / 1000).toFixed(2) : null,
+      distanceKm: rental.distance ? (rental.distance / 1000).toFixed(2) + 'km' : 'N/A'
+    }));
+    
+    res.json({
+      success: true,
+      rentals: transformedRentals,
+      total,
+      page: Number(page),
+      pages: Math.ceil(total / Number(limit)),
+      hasMore: (Number(page) * Number(limit)) < total,
+      searchMethod: 'geospatial',
+      centerCoordinates: { longitude, latitude },
+      radiusKm: parseFloat(radius),
+      appliedFilters: {
+        minPrice: Object.keys(priceFilter).includes('$gte') ? priceFilter.$gte : null,
+        maxPrice: Object.keys(priceFilter).includes('$lte') ? priceFilter.$lte : null,
+      }
+    });
+    
+  } catch (err) {
+    console.error('❌ Error fetching nearby rentals:', err);
+    
+    if (err.name === 'CastError') {
+      return res.status(400).json({ 
+        success: false,
+        message: 'Invalid rental ID format', 
+        error: err.message 
+      });
+    }
+    
+    if (err.message?.includes('timeout')) {
+      return res.status(504).json({
+        success: false,
+        message: 'Request timeout. Please try again.',
+        error: 'Gateway Timeout'
+      });
+    }
+    
+    res.status(500).json({ 
+      success: false,
+      message: 'Failed to fetch nearby rentals', 
+      error: err.message 
+    });
+  }
+});
+// ==================== ADMIN HELPER ====================
+router.post('/admin/ensure-geospatial-index', verifyAdmin, async (req, res) => {
+  try {
+    console.log('🔧 [ENSURE-INDEX] Starting...');
+    
+    // Drop old index if exists
+    try {
+      await Rental.collection.dropIndex('location.coordinates_2dsphere');
+      console.log('⚠️ Dropped old index');
+    } catch (e) {
+      // Index doesn't exist
+    }
+    
+    // Create new index
+    await Rental.collection.createIndex({ 'location.coordinates': '2dsphere' });
+    console.log('✅ Geospatial index created');
+    
+    // Verify
+    const indexes = await Rental.collection.getIndexes();
+    
+    res.json({
+      success: true,
+      message: 'Geospatial index ensured',
+      indexes: Object.keys(indexes),
+    });
+    
+  } catch (err) {
+    console.error('❌ Error ensuring index:', err);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to ensure geospatial index',
+      error: err.message,
+    });
+  }
+});
+
 router.get('/rentals/:id', async (req, res) => {
   try {
     const rental = await Rental.findById(req.params.id);
@@ -1794,247 +2299,7 @@ router.patch('/rentals/fix-coordinates/:id', authMiddleware, async (req, res) =>
   }
 });
 
-router.get('/rentals/nearby/:id', async (req, res) => {
-  try {
-    const { radius = 10, page = 1, limit = 10, minPrice, maxPrice } = req.query;
-    const skip = (Number(page) - 1) * Number(limit);
-    
-    // ✅ Set timeout headers
-    req.setTimeout(60000); // 60 seconds
-    res.setTimeout(60000);
-    
-    console.log(`🔍 Fetching nearby rentals for ID: ${req.params.id} (radius: ${radius}km)`);
-    console.log(`💰 Price filter: min=${minPrice}, max=${maxPrice}`);
-    
-    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
-      return res.status(400).json({ 
-        success: false,
-        message: 'Invalid rental ID format' 
-      });
-    }
-    
-    const rental = await Rental.findById(req.params.id)
-      .select('location coordinates') 
-      .lean();
-      
-    if (!rental) {
-      console.log(`❌ Rental with ID ${req.params.id} not found`);
-      return res.status(404).json({ 
-        success: false,
-        message: 'Rental not found' 
-      });
-    }
-    
-    // Extract coordinates
-    let coordinates;
-    if (rental.location?.coordinates?.coordinates && 
-        Array.isArray(rental.location.coordinates.coordinates) && 
-        rental.location.coordinates.coordinates.length === 2) {
-      coordinates = rental.location.coordinates.coordinates;
-    } else if (rental.coordinates && Array.isArray(rental.coordinates) && rental.coordinates.length === 2) {
-      coordinates = rental.coordinates;
-    } else {
-      return res.status(400).json({ 
-        success: false,
-        message: 'Rental has invalid coordinate structure' 
-      });
-    }
-    
-    const [longitude, latitude] = coordinates;
-    
-    if (typeof longitude !== 'number' || typeof latitude !== 'number' ||
-        isNaN(longitude) || isNaN(latitude) ||
-        Math.abs(longitude) > 180 || Math.abs(latitude) > 90) {
-      return res.status(400).json({ 
-        success: false,
-        message: 'Rental has invalid coordinate values' 
-      });
-    }
-
-    // ============================================
-    // 🔥 BUILD PRICE FILTER - CẬP NHẬT
-    // ============================================
-    let priceFilter = {};
-    if (minPrice !== undefined && minPrice !== null && minPrice !== '') {
-      const minVal = Number(minPrice);
-      if (!isNaN(minVal)) {
-        priceFilter.$gte = minVal;
-        console.log(`✅ Min price filter: >= ${minVal}`);
-      }
-    }
-    if (maxPrice !== undefined && maxPrice !== null && maxPrice !== '') {
-      const maxVal = Number(maxPrice);
-      if (!isNaN(maxVal)) {
-        priceFilter.$lte = maxVal;
-        console.log(`✅ Max price filter: <= ${maxVal}`);
-      }
-    }
-    
-    // Handle [0, 0] coordinates - fallback to location-based search
-    if (longitude === 0 && latitude === 0) {
-      console.log('⚠️ Coordinates are [0, 0], using location-based fallback');
-      
-      const fullRental = await Rental.findById(req.params.id).select('location').lean();
-      const locationParts = fullRental.location?.fullAddress?.split(',') || [];
-      const wardInfo = locationParts.length > 1 ? locationParts[1].trim() : '';
-      
-      const query = {
-        _id: { $ne: new mongoose.Types.ObjectId(req.params.id) },
-        status: 'available',
-        ...(wardInfo && { 'location.fullAddress': { $regex: wardInfo, $options: 'i' } }),
-      };
-      
-      // 🔥 Thêm price filter vào query
-      if (Object.keys(priceFilter).length > 0) {
-        query.price = priceFilter;
-        console.log(`✅ Applied price filter to fallback query:`, priceFilter);
-      }
-
-      const [nearbyRentals, total] = await Promise.all([
-        Rental.find(query)
-          .select('title price location images videos propertyType createdAt area') 
-          .skip(skip)
-          .limit(Number(limit))
-          .lean(),
-        Rental.countDocuments(query)
-      ]);
-      
-      console.log(`✅ Fallback search: Found ${nearbyRentals.length} rentals (total: ${total})`);
-      
-      return res.json({
-        success: true,
-        rentals: nearbyRentals.map(rental => ({
-          ...rental,
-          distance: null,
-          coordinates: rental.location?.coordinates?.coordinates || rental.coordinates || [0, 0]
-        })),
-        total,
-        page: Number(page),
-        pages: Math.ceil(total / Number(limit)),
-        warning: 'Rental coordinates are invalid ([0, 0]). Showing rentals in the same area instead.',
-        searchMethod: 'location_fallback'
-      });
-    }
-    
-    const radiusInMeters = parseFloat(radius) * 1000;
-    const radiusInRadians = radiusInMeters / 6378100;
-    
-    console.log(`📍 Search center: [${longitude}, ${latitude}]`);
-    console.log(`📏 Radius: ${radius}km (${radiusInMeters}m)`);
-
-    // ============================================
-    // 🔥 GEOSPATIAL QUERY - CẬP NHẬT với price filter
-    // ============================================
-    
-    // Build query filter object
-    const geoQueryFilter = {
-      _id: { $ne: new mongoose.Types.ObjectId(req.params.id) },
-      status: 'available',
-    };
-    
-    // 🔥 Thêm price filter vào geo query
-    if (Object.keys(priceFilter).length > 0) {
-      geoQueryFilter.price = priceFilter;
-    }
-
-    const [nearbyRentals, total] = await Promise.all([
-      Rental.aggregate([
-        {
-          $geoNear: {
-            near: { type: 'Point', coordinates: [longitude, latitude] },
-            distanceField: 'distance',
-            maxDistance: radiusInMeters,
-            spherical: true,
-            query: geoQueryFilter, // 🔥 Áp dụng filter vào geoNear
-          },
-        },
-        { $skip: skip },
-        { $limit: Number(limit) },
-        {
-          $project: {
-            title: 1,
-            price: 1,
-            location: 1,
-            images: 1,
-            videos: 1,
-            propertyType: 1,
-            createdAt: 1,
-            distance: 1,
-            coordinates: '$location.coordinates.coordinates',
-            area: 1,
-            furniture: 1,
-            amenities: 1,
-            surroundings: 1,
-            rentalTerms: 1,
-            contactInfo: 1,
-            status: 1,
-            userId: 1,
-          },
-        },
-      ]),
-      // 🔥 Count với price filter
-      Rental.countDocuments({
-        'location.coordinates': {
-          $geoWithin: {
-            $centerSphere: [[longitude, latitude], radiusInRadians],
-          },
-        },
-        ...geoQueryFilter,
-      })
-    ]);
-    
-    console.log(`✅ Geospatial query: Found ${nearbyRentals.length} rentals (total: ${total})`);
-    
-    const transformedRentals = nearbyRentals.map(rental => ({
-      ...rental,
-      coordinates: rental.coordinates || rental.location?.coordinates?.coordinates || [0, 0],
-      distance: rental.distance ? (rental.distance / 1000).toFixed(2) : null,
-      distanceKm: rental.distance ? (rental.distance / 1000).toFixed(2) + 'km' : 'N/A'
-    }));
-    
-    res.json({
-      success: true,
-      rentals: transformedRentals,
-      total,
-      page: Number(page),
-      pages: Math.ceil(total / Number(limit)),
-      hasMore: (Number(page) * Number(limit)) < total,
-      searchMethod: 'geospatial',
-      centerCoordinates: { longitude, latitude },
-      radiusKm: parseFloat(radius),
-      appliedFilters: {
-        minPrice: Object.keys(priceFilter).includes('$gte') ? priceFilter.$gte : null,
-        maxPrice: Object.keys(priceFilter).includes('$lte') ? priceFilter.$lte : null,
-      }
-    });
-    
-  } catch (err) {
-    console.error('❌ Error fetching nearby rentals:', err);
-    
-    if (err.name === 'CastError') {
-      return res.status(400).json({ 
-        success: false,
-        message: 'Invalid rental ID format', 
-        error: err.message 
-      });
-    }
-    
-    if (err.message?.includes('timeout')) {
-      return res.status(504).json({
-        success: false,
-        message: 'Request timeout. Please try again.',
-        error: 'Gateway Timeout'
-      });
-    }
-    
-    res.status(500).json({ 
-      success: false,
-      message: 'Failed to fetch nearby rentals', 
-      error: err.message 
-    });
-  }
-});
-
+// =================================================================
 router.get('/rentals/nearby-fallback/:id', async (req, res) => {
   try {
     const { radius = 5 } = req.query;

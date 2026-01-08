@@ -240,6 +240,8 @@ class RentalViewModel extends ChangeNotifier {
         double? radius,
         double? minPrice,
         double? maxPrice,
+        double? latitude,
+        double? longitude,
       }) async {
     // Cancel if already fetching
     if (_isFetchingNearby) {
@@ -253,47 +255,98 @@ class RentalViewModel extends ChangeNotifier {
     _warningMessage = null;
     _safeNotifyListeners();
 
+    //  VALIDATE COORDINATES
+    if (latitude != null && longitude != null) {
+      if (latitude.abs() > 90 || longitude.abs() > 180) {
+        _errorMessage = 'Tọa độ không hợp lệ (lat: [-90,90], lon: [-180,180])';
+        _isLoading = false;
+        _isFetchingNearby = false;
+        _safeNotifyListeners();
+        return;
+      }
+    }
+
     // Update filters
     if (radius != null) _currentRadius = radius;
     if (minPrice != null) _currentMinPrice = minPrice;
     if (maxPrice != null) _currentMaxPrice = maxPrice;
 
-    debugPrint('🔥 fetchNearbyRentals called with:');
+    debugPrint(' fetchNearbyRentals called with:');
+    debugPrint('   Rental ID: $rentalId');
     debugPrint('   Radius: $_currentRadius km');
     debugPrint('   MinPrice: $_currentMinPrice');
     debugPrint('   MaxPrice: $_currentMaxPrice');
 
+    if (latitude != null && longitude != null) {
+      debugPrint('   Coordinates: ($latitude, $longitude)');
+    }
+
     try {
-      debugPrint('🔍 Fetching nearby rentals for $rentalId (radius: $_currentRadius km)');
-      debugPrint('💰 Price filter: min=$_currentMinPrice, max=$_currentMaxPrice');
+      Map<String, dynamic> result;
 
-      final result = await _rentalService.fetchNearbyRentals(
-        rentalId: rentalId,
-        radius: _currentRadius,
-        minPrice: _currentMinPrice, // 🔥 Truyền minPrice (có thể null)
-        maxPrice: _currentMaxPrice, // 🔥 Truyền maxPrice (có thể null)
-        limit: 20,
-      );
+      //DECIDE WHICH ENDPOINT TO USE
+      if (rentalId.startsWith('current_location_') && latitude != null && longitude != null) {
+        debugPrint('🔍 Using fetchNearbyFromLocation (current location view)');
 
-      // Only update if still relevant (not cancelled)
+        result = await _rentalService.fetchNearbyFromLocation(
+          latitude: latitude,
+          longitude: longitude,
+          radius: _currentRadius,
+          minPrice: _currentMinPrice,
+          maxPrice: _currentMaxPrice,
+          limit: 20,
+        );
+      } else {
+        debugPrint('🔍 Using fetchNearbyRentals (rental post view)');
+
+        //  Validate rentalId
+        if (rentalId.isEmpty || rentalId.startsWith('current_location_')) {
+          throw Exception(
+              'Invalid rental ID: $rentalId. Use location coordinates instead.'
+          );
+        }
+
+        result = await _rentalService.fetchNearbyRentals(
+          rentalId: rentalId,
+          radius: _currentRadius,
+          minPrice: _currentMinPrice,
+          maxPrice: _currentMaxPrice,
+          limit: 20,
+        );
+      }
+
       if (_isFetchingNearby) {
         _nearbyRentals = result['rentals'] ?? [];
         _warningMessage = result['warning'];
 
-        final appliedFilters = result['appliedFilters'];
-
-        debugPrint('✅ Fetched ${_nearbyRentals.length} nearby rentals');
-        debugPrint('📍 Search method: ${result['searchMethod']}');
-        debugPrint('💰 Applied filters: $appliedFilters');
-
+        debugPrint(' Fetched ${_nearbyRentals.length} nearby rentals');
         if (_warningMessage != null) {
           debugPrint('⚠️ Warning: $_warningMessage');
         }
       }
     } catch (e) {
       if (_isFetchingNearby) {
-        _errorMessage = e.toString();
+        //  USER-FRIENDLY ERROR MESSAGES
+        String errorMsg = e.toString();
+
+        if (errorMsg.contains('Invalid coordinates')) {
+          _errorMessage = 'Tọa độ không hợp lệ. Vui lòng thử lại.';
+        } else if (errorMsg.contains('Invalid rental ID')) {
+          _errorMessage = 'ID bài đăng không hợp lệ.';
+        } else if (errorMsg.contains('Bài đăng không tìm thấy')) {
+          _errorMessage = 'Bài đăng không tìm thấy.';
+        } else if (errorMsg.contains('timeout')) {
+          _errorMessage = 'Quá thời gian chờ. Vui lòng thử lại với bán kính nhỏ hơn.';
+        } else if (errorMsg.contains('Lỗi kết nối')) {
+          _errorMessage = 'Lỗi kết nối mạng. Vui lòng kiểm tra internet.';
+        } else if (errorMsg.contains('Lỗi máy chủ')) {
+          _errorMessage = 'Lỗi máy chủ. Vui lòng thử lại sau.';
+        } else {
+          _errorMessage = 'Không thể tải dữ liệu gần đây';
+        }
+
         debugPrint('❌ Error in fetchNearbyRentals: $_errorMessage');
+        debugPrint('   Original error: $e');
       }
     } finally {
       _isFetchingNearby = false;
