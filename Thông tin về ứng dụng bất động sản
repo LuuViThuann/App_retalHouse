@@ -1,0 +1,30 @@
+Thông tin mô tả công nghệ sử dụng và chức năng trong ứng dụng bất động sản 
+*-------------------------------------------------------------------------
+* CÔNG NGHỆ SỬ DỤNG : 
+--------------------
+- Về phía Front-End
++ Dart / Flutter 
+-------------------
+- Về phía Backend : 
++ NodeJS / ExpressJS : xử lý các logic API 
++ Flutter xử lý đồng bộ dữ liệu 2 bên 
+-------------------
+- Database : 
++ MongoDB - NoSQL : Tận dụng Geospatial tích hợp xử lý logic hiển thị các bài gợi ý xung quanh
++ Firebase : Lưu trữ thông tin người dùng + tích hợp login Google
+-------------------
+- Các công nghệ và dịch vụ khác liên quan : 
++ Tích hợp VNPay thanh toán khi đăng bài trong môi trường sanbox-test
++ Cloudinary : Lưu trữ các hình ảnh và tối ưu dung lượng ảnh , sau đó lưu link ảnh URL trong DB 
++ Redis : Cache dữ liệu tạm thời gọi lại nhanh hơn , không tốn query truy vấn lại trong DB 
++ Docker : Tạo môi trường chạy đồng nhất cho Node-JS , Redis , mongoDB , Elasticsearch , NodeJS 
++ Socket.IO : Chạy dữ liệu thời gian thực 
++ ElasticSearch : tối ưu chỉ mục cho tìm kiếm các bài viết
++ PostMan : Kiểm thử các API 
++ Sử dụng Nominatim - OpenStreetMap dịch vụ bản đồ để chuyển địa chỉ sang tọa độ
++ Tích hợp KEY từ OpenAI : cho chức năng chat giao tiếp tư vấn 
++ Sử dụng Bcrypt chuyển mật khẩu sang chuỗi hash lưu trong DB.
+*-------------------------------------------------------------------------
+
+* Link xem demo ứng dụng hiện tại :  https://drive.google.com/file/d/1QdOGp06JYeKNe_fZuYhWBfIrIQOwXFiL/view?usp=sharing
+
