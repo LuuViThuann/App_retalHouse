@@ -45,7 +45,7 @@ Tác dụng: Model dùng cho việc quản lý các cuộc trò chuyện giữa 
 10. const Message = require('../models/message');
 Tác dụng: Model để thao tác với các tin nhắn cụ thể trong một cuộc trò chuyện.
  
- --> Trong xử lý phần CHAT : ------------------------------------------------
+ --> Trong xử lý phần CHAT : ------------------------------------------------ 
 /****
  * Các route xử lý cuộc trò chuyện và tin nhắn
  * 1. Tạo hoặc lấy cuộc trò chuyện -> POST /conversations

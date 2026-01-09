@@ -27,12 +27,12 @@ class _ChatAIBottomSheetState extends State<ChatAIBottomSheet> {
     messages.add({
       'role': 'ai',
       'text':
-      '👋 Xin chào! Tôi là trợ lý AI chuyên về bất động sản. Tôi có thể giúp bạn:\n\n'
-          '🏠 Tìm kiếm nhà theo loại hình (căn hộ, nhà riêng, phòng trọ...)\n'
-          '💰 Tìm nhà theo mức giá phù hợp\n'
-          '📍 Tìm theo vị trí cụ thể\n'
-          '📐 Tìm theo diện tích mong muốn\n'
-          '✨ Tư vấn về tiện nghi và lựa chọn phù hợp\n\n'
+      ' Xin chào! Tôi là trợ lý AI chuyên về bất động sản. Tôi có thể giúp bạn:\n\n'
+          '- Tìm kiếm nhà theo loại hình (căn hộ, nhà riêng, phòng trọ...)\n'
+          '- Tìm nhà theo mức giá phù hợp\n'
+          '- Tìm theo vị trí cụ thể\n'
+          '- Tìm theo diện tích mong muốn\n'
+          '- Tư vấn về tiện nghi và lựa chọn phù hợp\n\n'
           'Hãy cho tôi biết bạn đang tìm kiếm gì nhé!',
     });
   }
@@ -303,7 +303,7 @@ Nếu có bài đăng phù hợp, hãy giới thiệu chúng một cách tự nh
                               fontSize: 18, fontWeight: FontWeight.bold),
                         ),
                         Text(
-                          "Powered by OpenAI & Backend API",
+                          "Thông tin được cung cấp bởi trợ lý AI",
                           style: TextStyle(
                               fontSize: 11, color: Colors.grey[600]),
                         ),

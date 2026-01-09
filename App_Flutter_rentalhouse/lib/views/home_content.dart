@@ -1338,6 +1338,7 @@ class _HomeContentState extends State<HomeContent> {
       'Biệt thự',
       'Văn phòng',
       'Mặt bằng kinh doanh',
+      'Đất nền',
     ];
 
     final propertyIcons = [
@@ -1347,6 +1348,7 @@ class _HomeContentState extends State<HomeContent> {
       Icons.villa,
       Icons.business,
       Icons.storefront,
+      Icons.terrain,
     ];
 
     return Scaffold(
@@ -1590,10 +1592,10 @@ class _HomeContentState extends State<HomeContent> {
                             children: List.generate(
                               3,
                                   (i) => _buildCategoryItem(
-                                propertyIcons[i + 3],
-                                propertyTypes[i + 3],
+                                propertyIcons[i + 4],
+                                propertyTypes[i + 4],
                                 context,
-                                propertyTypes[i + 3],
+                                propertyTypes[i + 4],
                               ),
                             ),
                           ),

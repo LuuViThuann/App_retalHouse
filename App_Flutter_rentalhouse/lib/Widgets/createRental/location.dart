@@ -49,7 +49,7 @@ class _LocationFormState extends State<LocationForm> {
 
   void _onAddressChanged() {
     if (_debounce?.isActive ?? false) _debounce!.cancel();
-    _debounce = Timer(const Duration(milliseconds: 1000), () {
+    _debounce = Timer(const Duration(milliseconds: 1500), () { // Tăng lên 1.5s
       final address = widget.fullAddressController.text.trim();
       if (address.isNotEmpty &&
           address.length > 15 &&

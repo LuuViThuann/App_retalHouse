@@ -26,6 +26,8 @@ const normalizePropertyType = (propertyType) => {
     'office': 'Office',
     'Mặt bằng kinh doanh': 'Shop',
     'shop': 'Shop',
+    'Đất nền': 'Land',
+    'land': 'Land',
   };
   
   const normalized = typeMap[propertyType] || typeMap[propertyType?.toLowerCase()];

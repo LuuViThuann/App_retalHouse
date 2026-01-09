@@ -211,7 +211,7 @@ class _PropertyTypeScreenState extends State<PropertyTypeScreen> {
                             Icon(Icons.search_off,
                                 size: 90, color: Colors.grey[400]),
                             const SizedBox(height: 20),
-                            const Text('Không tìm thấy nhà cho thuê',
+                            const Text('Không tìm thấy thông tin phù hợp',
                                 style: TextStyle(
                                     fontSize: 18, fontWeight: FontWeight.w600)),
                             if (hasActiveFilter)

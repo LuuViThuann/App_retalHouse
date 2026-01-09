@@ -838,7 +838,9 @@ class _CreateRentalScreenState extends State<CreateRentalScreen> {
         padding: const EdgeInsets.symmetric(horizontal: 16.0),
         child: Form(
           key: _formKey,
+          autovalidateMode: AutovalidateMode.disabled,
           child: ListView(
+            physics: const BouncingScrollPhysics(),
             children: [
               const SizedBox(height: 16),
               BasicInfoForm(

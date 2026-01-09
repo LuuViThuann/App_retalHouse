@@ -484,7 +484,7 @@ router.post('/register', upload.single('avatar'), async (req, res) => {
   }
 });
 
-// ✅ ĐĂNG NHẬP
+//  ĐĂNG NHẬP
 router.post('/login', async (req, res) => {
   const { idToken } = req.body;
   if (!idToken) {

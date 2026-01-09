@@ -11,20 +11,21 @@ import '../services/auth_service.dart';
 import '../viewmodels/vm_auth.dart';
 
 class RentalService {
-  // Timeout configuration
+  // Timeout configuration =========================================================
   static const Duration _defaultTimeout = Duration(seconds: 30);
   static const Duration _longTimeout = Duration(seconds: 60);
   static const int _maxRetries = 2;
 
-  //  HTTP Client với connection pooling
+  //  HTTP Client với connection pooling ========================================================
   static final http.Client _client = http.Client();
 
-  //  Circuit breaker pattern
+  //  Circuit breaker pattern ========================================================
   static DateTime? _lastFailure;
   static int _consecutiveFailures = 0;
   static const int _failureThreshold = 5;
   static const Duration _recoveryTime = Duration(minutes: 1);
 
+  // Kiểm tra trạng thái circuit breaker ========================================================
   bool _isCircuitOpen() {
     if (_consecutiveFailures >= _failureThreshold && _lastFailure != null) {
       final timeSinceLastFailure = DateTime.now().difference(_lastFailure!);
@@ -39,17 +40,19 @@ class RentalService {
     return false;
   }
 
+  // Ghi nhận thành công và thất bại ========================================================
   void _recordSuccess() {
     _consecutiveFailures = 0;
     _lastFailure = null;
   }
 
+  // Ghi nhận thất bại ========================================================
   void _recordFailure() {
     _consecutiveFailures++;
     _lastFailure = DateTime.now();
   }
 
-  // ✅ Retry with exponential backoff
+  //  Retry with exponential backoff ========================================================
   Future<T> _retryRequest<T>(
       Future<T> Function() operation, {
         int maxRetries = _maxRetries,
@@ -72,12 +75,12 @@ class RentalService {
         _recordFailure();
 
         if (attempt >= maxRetries) {
-          debugPrint('❌ Max retries ($maxRetries) reached: $e');
+          debugPrint(' Max retries ($maxRetries) reached: $e');
           rethrow;
         }
 
         // Exponential backoff
-        debugPrint('⚠️ Retry attempt $attempt/$maxRetries after ${delay.inMilliseconds}ms');
+        debugPrint(' Retry attempt $attempt/$maxRetries after ${delay.inMilliseconds}ms');
         await Future.delayed(delay);
         delay *= 2; // Double the delay each time
       }
@@ -86,7 +89,7 @@ class RentalService {
     throw Exception('Max retries exceeded');
   }
 
-  // ✅ Safe request wrapper with proper error handling
+  //  Safe request wrapper with proper error handling =========================================================
   Future<http.Response> _safeRequest(
       Future<http.Response> Function() request, {
         Duration? timeout,
@@ -110,6 +113,7 @@ class RentalService {
     }
   }
 
+  // Fetch rentals with pagination ========================================================
   Future<List<Rental>> fetchRentals({
     int page = 1,
     int limit = 10,
@@ -119,7 +123,7 @@ class RentalService {
       final uri = Uri.parse('${ApiRoutes.baseUrl}/rentals?page=$page&limit=$limit');
       final headers = {
         'Content-Type': 'application/json',
-        'Connection': 'keep-alive', // ✅ Keep connection alive
+        'Connection': 'keep-alive', // Keep connection alive
         if (token != null) 'Authorization': 'Bearer $token',
       };
 
@@ -137,6 +141,7 @@ class RentalService {
     });
   }
 
+  // Fetch rental by ID ========================================================
   Future<Rental?> fetchRentalById({
     required String rentalId,
     String? token,
@@ -157,17 +162,17 @@ class RentalService {
         if (response.statusCode == 200) {
           return Rental.fromJson(jsonDecode(response.body));
         } else {
-          debugPrint('⚠️ Error fetching rental $rentalId: Status ${response.statusCode}');
+          debugPrint(' Error fetching rental $rentalId: Status ${response.statusCode}');
           return null;
         }
       });
     } catch (e) {
-      debugPrint('❌ Exception fetching rental $rentalId: $e');
+      debugPrint(' Exception fetching rental $rentalId: $e');
       return null;
     }
   }
 
-
+// Fetch rental details (average rating and review count) ========================================================
   Future<void> fetchRentalDetails({
     required Rental rental,
     required Function(double, int) onSuccess,
@@ -201,6 +206,7 @@ class RentalService {
     }
   }
 
+  // Kiểm tra trạng thái yêu thích ========================================================
   Future<void> checkFavoriteStatus({
     required Rental rental,
     required Function(bool) onSuccess,
@@ -245,6 +251,7 @@ class RentalService {
     }
   }
 
+  // Chuyển đổi trạng thái yêu thích ========================================================
   Future<void> toggleFavorite({
     required Rental rental,
     required bool isFavorite,
@@ -296,11 +303,11 @@ class RentalService {
     }
   }
 
-  // ✅ Cập nhật createRental để gửi ảnh và video
+  //  Cập nhật createRental để gửi ảnh và video =========================================================
   Future<void> createRental({
     required Rental rental,
     required List<String> imagePaths,
-    required List<String> videoPaths, // ✅ Add video paths
+    required List<String> videoPaths, //  Add video paths
     required String token,
     required Function(Rental) onSuccess,
     required Function(String) onError,
@@ -338,13 +345,13 @@ class RentalService {
       request.fields['contactInfoAvailableHours'] = rental.contactInfo['availableHours'] ?? '';
       request.fields['status'] = rental.status;
 
-      // ✅ Upload images
+      //  Upload images
       for (var imagePath in imagePaths) {
         var file = await http.MultipartFile.fromPath('media', imagePath);
         request.files.add(file);
       }
 
-      // ✅ Upload videos
+      //  Upload videos
       for (var videoPath in videoPaths) {
         var file = await http.MultipartFile.fromPath('media', videoPath);
         request.files.add(file);
@@ -367,13 +374,13 @@ class RentalService {
     }
   }
 
-  // ✅ Cập nhật updateRental để gửi ảnh và video
+  //  Cập nhật updateRental để gửi ảnh và video =========================================================
   Future<void> updateRental({
     required Rental rental,
     required String token,
-    List<String>? newImagePaths, // ✅ New images to upload
-    List<String>? newVideoPaths, // ✅ New videos to upload
-    List<String>? removedMediaUrls, // ✅ URLs to remove
+    List<String>? newImagePaths,
+    List<String>? newVideoPaths,
+    List<String>? removedMediaUrls,
     required Function(Rental) onSuccess,
     required Function(String) onError,
   }) async {
@@ -409,12 +416,12 @@ class RentalService {
       request.fields['contactInfoAvailableHours'] = rental.contactInfo['availableHours'] ?? '';
       request.fields['status'] = rental.status;
 
-      // ✅ Add removed media URLs
+      //  Add removed media URLs
       if (removedMediaUrls != null && removedMediaUrls.isNotEmpty) {
         request.fields['removedMedia'] = jsonEncode(removedMediaUrls);
       }
 
-      // ✅ Upload new images
+      //  Upload new images
       if (newImagePaths != null) {
         for (var imagePath in newImagePaths) {
           var file = await http.MultipartFile.fromPath('media', imagePath);
@@ -422,7 +429,7 @@ class RentalService {
         }
       }
 
-      // ✅ Upload new videos
+      //  Upload new videos
       if (newVideoPaths != null) {
         for (var videoPath in newVideoPaths) {
           var file = await http.MultipartFile.fromPath('media', videoPath);
@@ -446,7 +453,7 @@ class RentalService {
       onError('Lỗi khi cập nhật nhà trọ: $e');
     }
   }
-
+// Tìm kiếm nhà trọ gần vị trí hiện tại ========================================================
   Future<Map<String, dynamic>> fetchNearbyFromLocation({
     required double latitude,
     required double longitude,
@@ -514,14 +521,14 @@ class RentalService {
             try {
               return _parseRentalJson(json);
             } catch (e) {
-              debugPrint('⚠️ Error parsing rental: $e');
+              debugPrint(' Error parsing rental: $e');
               return null;
             }
           })
               .whereType<Rental>()
               .toList();
 
-          //  Return tất cả info (bao gồm warning từ backend)
+          //  Return tất cả info (bao gồm warning từ backend) ========================================================
           return {
             'rentals': rentals,
             'warning': data['warning'],
@@ -539,8 +546,8 @@ class RentalService {
         } else if (response.statusCode == 500) {
           // Server error - need to check backend logs
           final errorData = jsonDecode(response.body);
-          debugPrint('📋 Server error details: ${errorData['error']}');
-          debugPrint('💡 Hint: ${errorData['hint']}');
+          debugPrint(' Server error details: ${errorData['error']}');
+          debugPrint(' Hint: ${errorData['hint']}');
 
           // Provide helpful message
           throw Exception(
@@ -556,7 +563,7 @@ class RentalService {
       maxRetries: 2, //  Fewer retries for faster feedback
     );
   }
-
+// Tìm kiếm nhà trọ gần một nhà trọ cụ thể ========================================================
   Future<Map<String, dynamic>> fetchNearbyRentals({
     required String rentalId,
     double radius = 10.0,
@@ -566,13 +573,13 @@ class RentalService {
     int page = 1,
     int limit = 10,
   }) async {
-    // 🔥 CHECK: If rentalId starts with 'current_location_', it's invalid
+    // CHECK: If rentalId starts with 'current_location_', it's invalid
     if (rentalId.startsWith('current_location_')) {
       throw Exception('Invalid rental ID for nearby search. Use fetchNearbyFromLocation instead.');
     }
 
     return _retryRequest(() async {
-      // 🔥 SỬ DỤNG ApiRoutes
+      //  SỬ DỤNG ApiRoutes
       final url = ApiRoutes.nearbyRentals(
         rentalId: rentalId,
         radius: radius,
@@ -590,7 +597,7 @@ class RentalService {
         if (token != null) 'Authorization': 'Bearer $token',
       };
 
-      debugPrint('🔍 Fetching nearby rentals:');
+      debugPrint(' Fetching nearby rentals:');
       debugPrint('   URL: $uri');
       debugPrint('   Radius: ${radius}km');
       debugPrint('   Price range: ${minPrice ?? "Any"} - ${maxPrice ?? "Any"}');
@@ -603,7 +610,7 @@ class RentalService {
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
 
-        debugPrint('📊 Response status: ${response.statusCode}');
+        debugPrint(' Response status: ${response.statusCode}');
         debugPrint('   Applied filters: ${data['appliedFilters']}');
         debugPrint('   Search method: ${data['searchMethod']}');
 
@@ -614,14 +621,14 @@ class RentalService {
           try {
             return _parseRentalJson(json);
           } catch (e) {
-            debugPrint('⚠️ Error parsing rental: $e');
+            debugPrint(' Error parsing rental: $e');
             return null;
           }
         })
             .whereType<Rental>()
             .toList();
 
-        debugPrint('✅ Parsed ${rentals.length} nearby rentals');
+        debugPrint(' Parsed ${rentals.length} nearby rentals');
 
         return {
           'rentals': rentals,
@@ -639,7 +646,7 @@ class RentalService {
     });
   }
 
-  // ✅ Helper method to parse rental JSON safely
+  //  Helper method to parse rental JSON safely ========================================================
   Rental _parseRentalJson(Map<String, dynamic> json) {
     // Handle coordinates from array
     if (json['coordinates'] != null && json['coordinates'] is List) {

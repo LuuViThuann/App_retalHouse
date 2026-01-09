@@ -85,6 +85,8 @@ const normalizePropertyType = (propertyType) => {
     'office': 'Office',
     'Mặt bằng kinh doanh': 'Shop',
     'shop': 'Shop',
+    'Đất nền': 'Land',
+    'land': 'Land',
   };
   
   const normalized = typeMap[propertyType] || typeMap[propertyType?.toLowerCase()];
@@ -110,7 +112,7 @@ const deleteCloudinaryMedia = async (cloudinaryIds) => {
       results.push({ publicId, result });
       console.log('✅ Cloudinary delete:', publicId, result);
     } catch (error) {
-      console.error('❌ Error deleting from Cloudinary:', publicId, error);
+      console.error(' Error deleting from Cloudinary:', publicId, error);
       results.push({ publicId, error: error.message });
     }
   }
@@ -146,14 +148,14 @@ const verifyAdmin = async (req, res, next) => {
   }
 };
 /**
- * Middleware kiểm tra xem user đã thanh toán hay chưa
+ * Middleware kiểm tra xem user đã thanh toán hay chưa ====================================================================
  * Nếu chưa, tạo payment request
  */
 const checkPaymentStatus = async (req, res, next) => {
   try {
     const { paymentTransactionCode } = req.body;
     
-    // ❌ Nếu không có transaction code → YÊU CẦU CLIENT THANH TOÁN TRƯỚC
+    //  Nếu không có transaction code → YÊU CẦU CLIENT THANH TOÁN TRƯỚC
     if (!paymentTransactionCode) {
       return res.status(402).json({
         success: false,
@@ -182,7 +184,7 @@ const checkPaymentStatus = async (req, res, next) => {
       });
     }
 
-    // 🔥 CRITICAL FIX: Chỉ check completed, không block nếu processing
+    //  CRITICAL FIX: Chỉ check completed, không block nếu processing
     if (payment.status === 'completed') {
       // ✅ Payment đã hoàn tất → cho phép tạo rental
       console.log(`✅ Payment verified: ${paymentTransactionCode} (completed)`);
@@ -213,7 +215,7 @@ const checkPaymentStatus = async (req, res, next) => {
     });
 
   } catch (err) {
-    console.error('❌ Error in checkPaymentStatus middleware:', err);
+    console.error('Error in checkPaymentStatus middleware:', err);
     res.status(500).json({
       success: false,
       message: 'Lỗi kiểm tra trạng thái thanh toán',
@@ -491,7 +493,7 @@ router.patch('/admin/rentals/:rentalId', verifyAdmin, upload.array('media'), asy
 });
 
 
-// ========== ADMIN DELETE RENTAL ==========
+// ========== ADMIN DELETE RENTAL ========== ====================================================================
 router.delete('/admin/rentals/:rentalId', verifyAdmin, async (req, res) => {
   try {
     

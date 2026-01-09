@@ -6,11 +6,12 @@ class RentalConstants {
     'Biệt thự',
     'Văn phòng',
     'Mặt bằng kinh doanh',
+    'Đất nền',
     'Khác',
   ];
 
   static const List<String> statusOptionsVietnamese = [
     'Đang hoạt động',
-    'Đã được thuê',
+    'Đã tạm dừng',
   ];
 }

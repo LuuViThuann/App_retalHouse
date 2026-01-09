@@ -57,26 +57,18 @@ class AuthViewModel extends ChangeNotifier {
       );
       if (user != null) {
         _currentUser = user;
+        _errorMessage = null; // Clear error on success
       } else {
-        _errorMessage = 'Đăng ký thất bại. Vui lòng thử lại.';
+        _errorMessage = 'Đăng ký thất bại. Vui lòng thử lại';
       }
     } catch (e) {
-      // Xử lý lỗi cụ thể từ backend
-      if (e.toString().contains('Email đã được sử dụng')) {
-        _errorMessage = 'Email đã được sử dụng';
-      } else if (e.toString().contains('Số điện thoại đã được sử dụng')) {
-        _errorMessage = 'Số điện thoại đã được sử dụng';
-      } else if (e.toString().contains('Email không hợp lệ')) {
-        _errorMessage = 'Email không hợp lệ';
-      } else if (e.toString().contains('Số điện thoại phải có 10 chữ số')) {
-        _errorMessage = 'Số điện thoại phải có 10 chữ số';
-      } else if (e.toString().contains('Mật khẩu phải có ít nhất 6 ký tự')) {
-        _errorMessage = 'Mật khẩu phải có ít nhất 6 ký tự';
-      } else if (e.toString().contains('Vui lòng upload ảnh')) {
-        _errorMessage = 'Vui lòng chọn ảnh đại diện';
-      } else {
-        _errorMessage = 'Đăng ký thất bại: ${e.toString()}';
+      // ✅ Extract clean error message
+      String errorMsg = e.toString();
+      if (errorMsg.startsWith('Exception: ')) {
+        errorMsg = errorMsg.substring(11);
       }
+      _errorMessage = errorMsg;
+      print(' Register error in ViewModel: $_errorMessage');
     } finally {
       _isLoading = false;
       notifyListeners();
@@ -98,12 +90,18 @@ class AuthViewModel extends ChangeNotifier {
       );
       if (user != null) {
         _currentUser = user;
+        _errorMessage = null; //  Clear error on success
       } else {
-        _errorMessage =
-        'Đăng nhập thất bại. Vui lòng kiểm tra email hoặc mật khẩu.';
+        _errorMessage = 'Đăng nhập thất bại. Vui lòng thử lại';
       }
     } catch (e) {
-      _errorMessage = e.toString();
+      //  Extract clean error message
+      String errorMsg = e.toString();
+      if (errorMsg.startsWith('Exception: ')) {
+        errorMsg = errorMsg.substring(11); // Remove "Exception: " prefix
+      }
+      _errorMessage = errorMsg;
+      print('❌ Login error in ViewModel: $_errorMessage');
     } finally {
       _isLoading = false;
       notifyListeners();
@@ -119,11 +117,18 @@ class AuthViewModel extends ChangeNotifier {
       AppUser? user = await _authService.signInWithGoogle();
       if (user != null) {
         _currentUser = user;
+        _errorMessage = null; //  Clear error on success
       } else {
-        _errorMessage = 'Đăng nhập Google thất bại. Vui lòng thử lại.';
+        _errorMessage = 'Đăng nhập Google thất bại. Vui lòng thử lại';
       }
     } catch (e) {
-      _errorMessage = e.toString();
+      //  Extract clean error message
+      String errorMsg = e.toString();
+      if (errorMsg.startsWith('Exception: ')) {
+        errorMsg = errorMsg.substring(11);
+      }
+      _errorMessage = errorMsg;
+      print('❌ Google sign-in error in ViewModel: $_errorMessage');
     } finally {
       _isLoading = false;
       notifyListeners();

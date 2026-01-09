@@ -3,14 +3,14 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 class ApiRoutes {
   static const String rootUrl =
-      'http://192.168.1.239:3000'; // http://192.168.43.168:3000 - mạng dữ liệu
+      'http://192.168.1.25:3000'; // http://192.168.43.168:3000 - mạng dữ liệu
   static const String baseUrl = '$rootUrl/api';
   static const String serverBaseUrl = rootUrl;
   static const String socketUrl = serverBaseUrl;
 
-// ==================== NEARBY RENTALS (FIXED) ====================
+// ==================== NEARBY RENTALS (FIXED) =================================
+  //Lấy bài đăng gần một bài đăng khác (dùng rental ID)
 
-  /// 🔥 FIX: Lấy bài đăng gần một bài đăng khác (dùng rental ID)
   static String nearbyRentals({
     required String rentalId,
     double radius = 10.0,
@@ -19,7 +19,7 @@ class ApiRoutes {
     double? minPrice,
     double? maxPrice,
   }) {
-    // ✅ Validate rentalId
+    //  Validate rentalId
     if (rentalId.isEmpty || rentalId.startsWith('current_location_')) {
       throw ArgumentError('Invalid rental ID: $rentalId. Use nearbyFromLocation instead.');
     }
@@ -41,12 +41,10 @@ class ApiRoutes {
     final uri = Uri.parse('$rentals/nearby/$rentalId')
         .replace(queryParameters: params);
 
-    debugPrint('🔗 Nearby rentals URL: ${uri.toString()}');
+    debugPrint(' Nearby rentals URL: ${uri.toString()}');
     return uri.toString();
   }
 
-  /// 🔥 FIX: Lấy bài đăng gần một vị trí cụ thể (dùng tọa độ)
-  /// ⚠️ CỨU TRỊ: Nếu coordinates [0, 0], sẽ fallback to location-based search
   static String nearbyFromLocation({
     required double latitude,
     required double longitude,
@@ -56,14 +54,14 @@ class ApiRoutes {
     double? minPrice,
     double? maxPrice,
   }) {
-    // ✅ VALIDATE COORDINATES
+
     if (latitude.abs() > 90 || longitude.abs() > 180) {
       throw ArgumentError(
           'Invalid coordinates: lat=$latitude (must be [-90,90]), lon=$longitude (must be [-180,180])'
       );
     }
 
-    // ✅ VALIDATE RADIUS
+
     if (radius <= 0 || radius > 100) {
       throw ArgumentError('Radius must be between 0 and 100 km, got $radius');
     }
@@ -91,7 +89,7 @@ class ApiRoutes {
     return uri.toString();
   }
 
-  /// 🔥 BARU: Endpoint để khắc phục geospatial index (chỉ gọi một lần)
+  ///  BARU: Endpoint để khắc phục geospatial index (chỉ gọi một lần)
   static const String ensureGeospatialIndex = '$baseUrl/admin/ensure-geospatial-index';
   // ==================== ANALYTICS ENDPOINTS ====================
 

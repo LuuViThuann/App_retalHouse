@@ -107,8 +107,9 @@ class BasicInfoForm extends StatelessWidget {
           keyboardType: TextInputType.number,
           inputFormatters: [
             FilteringTextInputFormatter.digitsOnly,
-            ThousandsFormatter(),
+            OptimizedThousandsFormatter(),
           ],
+
           isRequired: true,
           validator: Validators.priceValidator,
         ),

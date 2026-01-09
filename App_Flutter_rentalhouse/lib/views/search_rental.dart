@@ -30,6 +30,7 @@ class _SearchScreenState extends State<SearchScreen> with SingleTickerProviderSt
     'Biệt thự': 'Villa',
     'Văn phòng': 'Office',
     'Mặt bằng kinh doanh': 'Shop',
+    'Đất nền': 'Land',
   };
 
   final Map<String, IconData> _propertyTypeIcons = {
@@ -39,6 +40,7 @@ class _SearchScreenState extends State<SearchScreen> with SingleTickerProviderSt
     'Biệt thự': Icons.villa,
     'Văn phòng': Icons.business,
     'Mặt bằng kinh doanh': Icons.store,
+    'Đất nền': Icons.terrain,
   };
 
   @override

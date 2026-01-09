@@ -160,7 +160,7 @@ class RentalTermsForm extends StatelessWidget {
               keyboardType: TextInputType.number,
               inputFormatters: [
                 FilteringTextInputFormatter.digitsOnly,
-                ThousandsFormatter(allowZero: true),
+                OptimizedThousandsFormatter(),
               ],
               suffixText: ' VNĐ',
               isRequired: true,

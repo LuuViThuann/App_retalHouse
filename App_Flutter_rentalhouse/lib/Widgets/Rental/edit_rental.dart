@@ -579,6 +579,7 @@ class _EditRentalScreenState extends State<EditRentalScreen> {
       {'value': 'Biệt thự', 'label': 'Biệt thự'},
       {'value': 'Văn phòng', 'label': 'Văn phòng'},
       {'value': 'Mặt bằng', 'label': 'Mặt bằng'},
+      {'value': 'Đất nền', 'label': 'Đất nền'},
     ];
 
     // Kiểm tra nếu giá trị hiện tại không có trong danh sách, set về null

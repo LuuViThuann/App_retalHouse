@@ -135,7 +135,6 @@ class AuthService {
       request.fields['address'] = address;
       request.fields['username'] = username;
 
-      // ✅ Upload file with field 'avatar'
       request.files.add(await http.MultipartFile.fromPath('avatar', imagePath));
 
       print('📤 Sending multipart request...');
@@ -143,7 +142,6 @@ class AuthService {
       final responseBody = await response.stream.bytesToString();
 
       print('📊 Response: ${response.statusCode}');
-      print('📋 Body: ${responseBody.substring(0, 200)}');
 
       if (response.statusCode == 201) {
         final data = jsonDecode(responseBody);
@@ -160,19 +158,44 @@ class AuthService {
           role: data['role'] ?? 'user',
         );
       } else {
+        // ✅ Xóa user Firebase nếu đăng ký backend thất bại
         await user.delete();
         final error = jsonDecode(responseBody);
         throw Exception(error['message'] ?? 'Đăng ký thất bại');
       }
     } on FirebaseAuthException catch (e) {
-      String msg = 'Đăng ký thất bại';
-      if (e.code == 'email-already-in-use') msg = 'Email đã được sử dụng';
-      if (e.code == 'weak-password') msg = 'Mật khẩu quá yếu';
-      if (e.code == 'invalid-email') msg = 'Email không hợp lệ';
-      throw Exception(msg);
+      // ✅ Xử lý lỗi Firebase Auth với thông báo thân thiện
+      print('❌ FirebaseAuthException: ${e.code}');
+
+      switch (e.code) {
+        case 'email-already-in-use':
+          throw Exception('Email đã được sử dụng');
+
+        case 'invalid-email':
+          throw Exception('Email không hợp lệ');
+
+        case 'weak-password':
+          throw Exception('Mật khẩu quá yếu. Vui lòng chọn mật khẩu mạnh hơn');
+
+        case 'operation-not-allowed':
+          throw Exception('Đăng ký không được phép');
+
+        case 'network-request-failed':
+          throw Exception('Lỗi kết nối mạng. Vui lòng kiểm tra internet');
+
+        default:
+          throw Exception('Đăng ký thất bại. Vui lòng thử lại');
+      }
+    } on SocketException catch (_) {
+      throw Exception('Không có kết nối internet');
+    } on TimeoutException catch (_) {
+      throw Exception('Kết nối quá chậm. Vui lòng thử lại');
     } catch (e) {
       print('❌ Registration error: $e');
-      rethrow;
+      if (e.toString().contains('Exception: ')) {
+        rethrow;
+      }
+      throw Exception('Đăng ký thất bại. Vui lòng thử lại');
     }
   }
 
@@ -228,9 +251,45 @@ class AuthService {
         final error = jsonDecode(response.body);
         throw Exception(error['message'] ?? 'Đăng nhập thất bại');
       }
+    } on FirebaseAuthException catch (e) {
+      // ✅ Xử lý lỗi Firebase Auth với thông báo thân thiện
+      print('❌ FirebaseAuthException: ${e.code}');
+
+      switch (e.code) {
+        case 'invalid-credential':
+        case 'wrong-password':
+        case 'user-not-found':
+          throw Exception('Email hoặc mật khẩu không chính xác');
+
+        case 'invalid-email':
+          throw Exception('Email không hợp lệ');
+
+        case 'user-disabled':
+          throw Exception('Tài khoản đã bị vô hiệu hóa');
+
+        case 'too-many-requests':
+          throw Exception('Quá nhiều lần thử. Vui lòng thử lại sau');
+
+        case 'network-request-failed':
+          throw Exception('Lỗi kết nối mạng. Vui lòng kiểm tra internet');
+
+        case 'operation-not-allowed':
+          throw Exception('Phương thức đăng nhập không được phép');
+
+        default:
+          throw Exception('Đăng nhập thất bại. Vui lòng thử lại');
+      }
+    } on SocketException catch (_) {
+      throw Exception('Không có kết nối internet');
+    } on TimeoutException catch (_) {
+      throw Exception('Kết nối quá chậm. Vui lòng thử lại');
     } catch (e) {
       print('❌ Login error: $e');
-      rethrow;
+      // ✅ Nếu lỗi đã có message rõ ràng thì giữ nguyên
+      if (e.toString().contains('Exception: ')) {
+        rethrow;
+      }
+      throw Exception('Đăng nhập thất bại. Vui lòng thử lại');
     }
   }
 
@@ -241,8 +300,8 @@ class AuthService {
     try {
       final googleUser = await _googleSignIn.signIn();
       if (googleUser == null) {
-        print('Google Sign-In cancelled');
-        return null;
+        print('❌ Google Sign-In cancelled by user');
+        throw Exception('Đăng nhập Google đã bị hủy');
       }
 
       final googleAuth = await googleUser.authentication;
@@ -250,7 +309,7 @@ class AuthService {
       final accessToken = googleAuth.accessToken;
 
       if (idToken == null || idToken.isEmpty) {
-        throw Exception('Failed to obtain ID token');
+        throw Exception('Không lấy được token từ Google');
       }
 
       final credential = GoogleAuthProvider.credential(
@@ -260,11 +319,11 @@ class AuthService {
 
       final userCredential = await _auth.signInWithCredential(credential);
       final user = userCredential.user;
-      if (user == null) throw Exception('Failed to sign in with Google');
+      if (user == null) throw Exception('Đăng nhập Google thất bại');
 
       final firebaseIdToken = await user.getIdToken(true);
       if (firebaseIdToken == null || firebaseIdToken.isEmpty) {
-        throw Exception('Failed to obtain Firebase ID token');
+        throw Exception('Không lấy được Firebase token');
       }
 
       final response = await http.post(
@@ -277,7 +336,7 @@ class AuthService {
           'avatar': googleUser.photoUrl,
           'idToken': firebaseIdToken,
         }),
-      );
+      ).timeout(const Duration(seconds: 20));
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
@@ -297,11 +356,40 @@ class AuthService {
         );
       } else {
         final errorData = jsonDecode(response.body);
-        throw Exception('Đăng nhập Google thất bại: ${errorData['message'] ?? response.body}');
+        throw Exception(errorData['message'] ?? 'Đăng nhập Google thất bại');
       }
+    } on FirebaseAuthException catch (e) {
+      print('❌ FirebaseAuthException: ${e.code}');
+
+      switch (e.code) {
+        case 'account-exists-with-different-credential':
+          throw Exception('Email đã được sử dụng với phương thức đăng nhập khác');
+
+        case 'invalid-credential':
+          throw Exception('Thông tin đăng nhập Google không hợp lệ');
+
+        case 'operation-not-allowed':
+          throw Exception('Đăng nhập Google không được phép');
+
+        case 'user-disabled':
+          throw Exception('Tài khoản đã bị vô hiệu hóa');
+
+        case 'network-request-failed':
+          throw Exception('Lỗi kết nối mạng. Vui lòng kiểm tra internet');
+
+        default:
+          throw Exception('Đăng nhập Google thất bại. Vui lòng thử lại');
+      }
+    } on SocketException catch (_) {
+      throw Exception('Không có kết nối internet');
+    } on TimeoutException catch (_) {
+      throw Exception('Kết nối quá chậm. Vui lòng thử lại');
     } catch (e) {
       print('❌ Google sign in error: $e');
-      throw Exception('Đăng nhập Google thất bại: $e');
+      if (e.toString().contains('Exception: ')) {
+        rethrow;
+      }
+      throw Exception('Đăng nhập Google thất bại. Vui lòng thử lại');
     }
   }
 

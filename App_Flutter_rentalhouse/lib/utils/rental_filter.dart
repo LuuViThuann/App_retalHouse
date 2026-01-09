@@ -27,6 +27,7 @@ class RentalFilter {
     'Biệt thự',
     'Văn phòng',
     'Mặt bằng',
+    'Đất nền',
   ];
 
 

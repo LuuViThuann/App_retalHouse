@@ -2,55 +2,43 @@
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 
-class ThousandsFormatter extends TextInputFormatter {
-  final NumberFormat _formatter;
-  final bool allowZero;
-
-  ThousandsFormatter({String? locale, this.allowZero = false})
-      : _formatter = NumberFormat.decimalPattern(locale ?? 'vi_VN');
+class OptimizedThousandsFormatter extends TextInputFormatter {
+  final NumberFormat _formatter = NumberFormat('#,###', 'vi_VN');
 
   @override
   TextEditingValue formatEditUpdate(
       TextEditingValue oldValue,
       TextEditingValue newValue,
       ) {
-    if (newValue.text.isEmpty) {
+    // Nhanh chóng bỏ qua nếu không thay đổi số
+    final newTextOnlyDigits = newValue.text.replaceAll(RegExp(r'[^\d]'), '');
+    final oldTextOnlyDigits = oldValue.text.replaceAll(RegExp(r'[^\d]'), '');
+
+    if (newTextOnlyDigits == oldTextOnlyDigits) {
+      return newValue;
+    }
+
+    if (newTextOnlyDigits.isEmpty) {
       return newValue.copyWith(text: '');
     }
 
-    String newText = newValue.text.replaceAll(RegExp(r'[^\d]'), '');
+    // Parse an toàn
+    final number = int.tryParse(newTextOnlyDigits);
+    if (number == null) return oldValue;
 
-    if (newText.isEmpty) {
-      return newValue.copyWith(text: '');
-    }
+    final formatted = _formatter.format(number);
 
-    // Ngăn người dùng nhập '0' là ký tự đầu tiên nếu không cho phép số 0
-    // và giá trị hiện tại không phải là '' (để cho phép xóa về rỗng)
-    if (!allowZero && newText == '0' && oldValue.text.isNotEmpty) {
-      // Nếu người dùng cố nhập '0' vào đầu một số đã có (ví dụ '0123')
-      // hoặc nhập '0' khi trường không rỗng và không cho phép số 0.
-      // Trong trường hợp này, ta có thể trả về giá trị cũ để không cho phép thay đổi,
-      // hoặc trả về TextEditingValue.empty nếu muốn xóa hẳn.
-      // Ở đây, ta sẽ không cho phép bắt đầu bằng '0' nếu allowZero là false.
-      if (oldValue.text.isEmpty || newValue.text.length == 1) {
-        return TextEditingValue.empty;
-      }
-      return oldValue;
-    }
-    if (!allowZero && newText.startsWith('0') && newText.length > 1) {
-      newText = newText.substring(1); // Loại bỏ số 0 ở đầu nếu có nhiều hơn 1 chữ số
-      if (newText.isEmpty) { // Nếu sau khi bỏ số 0 mà rỗng thì trả về rỗng
-        return TextEditingValue.empty;
-      }
-    }
+    // Tính toán vị trí con trỏ mới (quan trọng để không nhảy lung tung)
+    final oldLength = oldValue.text.length;
+    final newLength = formatted.length;
+    int newOffset = newValue.selection.end + (newLength - oldLength);
 
-
-    double value = double.tryParse(newText) ?? 0.0;
-    String formattedText = _formatter.format(value);
+    newOffset = newOffset.clamp(0, formatted.length);
 
     return newValue.copyWith(
-      text: formattedText,
-      selection: TextSelection.collapsed(offset: formattedText.length),
+      text: formatted,
+      selection: TextSelection.collapsed(offset: newOffset),
+      composing: TextRange.empty,
     );
   }
 }

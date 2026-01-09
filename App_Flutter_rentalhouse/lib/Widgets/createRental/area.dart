@@ -2,6 +2,35 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_rentalhouse/Widgets/createRental/validation_rental.dart';
 
+// ===================== CUSTOM DECIMAL INPUT FORMATTER =====================
+/// Formatter tối ưu cho số thập phân - Giảm lag khi gõ
+class _DecimalInputFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(
+      TextEditingValue oldValue,
+      TextEditingValue newValue,
+      ) {
+    // Nếu text rỗng, cho phép
+    if (newValue.text.isEmpty) {
+      return newValue;
+    }
+
+    // Kiểm tra chỉ có số và một dấu chấm
+    final parts = newValue.text.split('.');
+    if (parts.length > 2) {
+      return oldValue;
+    }
+
+    // Giới hạn 2 chữ số sau dấu chấy
+    if (parts.length == 2 && parts[1].length > 2) {
+      return oldValue;
+    }
+
+    return newValue;
+  }
+}
+
+// ===================== OPTIMIZED AREA FORM =====================
 class AreaForm extends StatelessWidget {
   final TextEditingController totalController;
   final TextEditingController livingRoomController;
@@ -30,6 +59,7 @@ class AreaForm extends StatelessWidget {
     );
   }
 
+  /// Tối ưu: Build TextField một lần, tái sử dụng
   Widget _buildTextField({
     required TextEditingController controller,
     required String label,
@@ -40,9 +70,11 @@ class AreaForm extends StatelessWidget {
     return Expanded(
       child: TextFormField(
         controller: controller,
-        keyboardType: TextInputType.numberWithOptions(decimal: true),
+        keyboardType: TextInputType.number,
+        // Tối ưu: Giảm số lượng formatter
         inputFormatters: [
-          FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}')),
+          FilteringTextInputFormatter.allow(RegExp(r'[0-9.]')),
+          _DecimalInputFormatter(),
         ],
         decoration: InputDecoration(
           labelText: isRequired ? '$label *' : label,
@@ -65,6 +97,8 @@ class AreaForm extends StatelessWidget {
           contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
         ),
         validator: validator,
+        textAlign: TextAlign.start,
+        autocorrect: false,
       ),
     );
   }
