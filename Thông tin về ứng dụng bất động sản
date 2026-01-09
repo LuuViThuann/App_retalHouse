@@ -14,6 +14,7 @@ Thông tin mô tả công nghệ sử dụng và chức năng trong ứng dụng
 + Firebase : Lưu trữ thông tin người dùng + tích hợp login Google
 -------------------
 - Các công nghệ và dịch vụ khác liên quan : 
++ Tích hợp VNPay thanh toán khi đăng bài trong môi trường sanbox-test
 + Cloudinary : Lưu trữ các hình ảnh và tối ưu dung lượng ảnh , sau đó lưu link ảnh URL trong DB 
 + Redis : Cache dữ liệu tạm thời gọi lại nhanh hơn , không tốn query truy vấn lại trong DB 
 + Docker : Tạo môi trường chạy đồng nhất cho Node-JS , Redis , mongoDB , Elasticsearch , NodeJS 
@@ -22,30 +23,8 @@ Thông tin mô tả công nghệ sử dụng và chức năng trong ứng dụng
 + PostMan : Kiểm thử các API 
 + Sử dụng Nominatim - OpenStreetMap dịch vụ bản đồ để chuyển địa chỉ sang tọa độ
 + Tích hợp KEY từ OpenAI : cho chức năng chat giao tiếp tư vấn 
-+ Tích hợp VNPay thanh toán trong môi trường sanbox-test
++ Sử dụng Bcrypt chuyển mật khẩu sang chuỗi hash lưu trong DB.
 *-------------------------------------------------------------------------
 
-* THÔNG TIN CHỨC NĂNG CÓ TRONG ỨNG DỤNG : 
-- Các chức năng hiện tại : 
-
-+ Đăng nhập / Đăng ký / Khôi phục pass qua Email / Đăng nhập GG
-+ Hiển thị các thông tin loại bất động sản / bài mới tại trang chính 
-+ Tìm kiếm thông tin BĐS theo loại / từ khóa / khoảng giá 
-+ Thống kê tổng quan về các loại BĐS / giá cả , ....
-+ Tìm kiếm các BĐS thông qua tương tác trên bản đồ và hiển thị các gợi ý các bài đăng khác trong bán kính vị trí đó 
-+ Lọc khoảng giá trong bán kính đang xem trên bản đồ
-+ Đăng bài tính phí thanh toán thông qua test VNPay
-+ Lưu lịch sử giao dịch thanh toán
-+ Tạo cuộc trò chuyện và nhắn tin thông qua bài viết của người đăng BĐS 
-+ ChatBox - AI tư vấn BĐS 
-+ Lưu yêu thích các BĐS 
-+ Xem chi tiết thông tin BĐS và bình luận / phản hồi / đánh giá cho người dùng trong chi tiết bài đăng
-+ Lưu các thông báo tương tác gần đây trong app
-+ Đăng gửi các góp ý & phản hồi 
-+ Thông tin hồ sơ cá nhân 
-+ Xem danh sách bài đăng thuộc trong tài khoản
-+ Danh sách tin tức 
-
-Link xem demo ứng dụng phía User : 
-Link xem demo ứng dụng phía Admin : 
+* Link xem demo ứng dụng hiện tại :  https://drive.google.com/file/d/1QdOGp06JYeKNe_fZuYhWBfIrIQOwXFiL/view?usp=sharing
 
