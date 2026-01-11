@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_dynamic_links/firebase_dynamic_links.dart';
+import 'package:flutter_rentalhouse/services/TokenExpirationManager.dart';
 import 'package:flutter_rentalhouse/services/auth_service.dart';
 import 'package:flutter_rentalhouse/viewmodels/vm_analytics.dart';
 import 'package:flutter_rentalhouse/viewmodels/vm_auth.dart';
@@ -14,6 +15,8 @@ import 'package:flutter_rentalhouse/views/reset_password.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 
+import 'Widgets/HomeMain/GlobalTokenExpiredDialog.dart';
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await dotenv.load(fileName: "assets/.env");
@@ -21,7 +24,9 @@ void main() async {
   runApp(RentalApp());
 }
 
-// Lớp xử lý Firebase Dynamic Links
+// ============================================
+// Firebase Dynamic Links Handler
+// ============================================
 class DeepLinkHandler {
   final FirebaseDynamicLinks _dynamicLinks = FirebaseDynamicLinks.instance;
 
@@ -30,12 +35,12 @@ class DeepLinkHandler {
     _dynamicLinks.onLink.listen((PendingDynamicLinkData? dynamicLink) async {
       await _handleDeepLink(context, dynamicLink?.link);
     }, onError: (e) {
-      print('Error processing dynamic link: $e');
+      print(' Error processing dynamic link: $e');
     });
 
     // Xử lý liên kết khi ứng dụng được mở từ trạng thái đóng
     final PendingDynamicLinkData? initialLink =
-        await _dynamicLinks.getInitialLink();
+    await _dynamicLinks.getInitialLink();
     if (initialLink != null) {
       await _handleDeepLink(context, initialLink.link);
     }
@@ -43,8 +48,8 @@ class DeepLinkHandler {
 
   Future<void> _handleDeepLink(BuildContext context, Uri? deepLink) async {
     if (deepLink != null) {
-      print('Deep link received: $deepLink');
-      print('Path: ${deepLink.path}, Query: ${deepLink.queryParameters}');
+      print(' Deep link received: $deepLink');
+      print(' Path: ${deepLink.path}, Query: ${deepLink.queryParameters}');
       final oobCode = deepLink.queryParameters['oobCode'];
       if (oobCode != null && deepLink.path == '/reset-password') {
         if (!context.mounted) return;
@@ -63,33 +68,64 @@ class DeepLinkHandler {
         );
       }
     } else {
-      print('No deep link received');
+      print('ℹ No deep link received');
     }
   }
 }
 
-class RentalApp extends StatelessWidget {
+// ============================================
+// Main App - StatefulWidget
+// ============================================
+class RentalApp extends StatefulWidget {
   final DeepLinkHandler _deepLinkHandler = DeepLinkHandler();
 
   RentalApp({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  State<RentalApp> createState() => _RentalAppState();
+}
+
+class _RentalAppState extends State<RentalApp> {
+  @override
+  void initState() {
+    super.initState();
+
     // Khởi tạo DeepLinkHandler sau khi widget được xây dựng
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _deepLinkHandler.initDynamicLinks(context);
+      if (mounted) {
+        widget._deepLinkHandler.initDynamicLinks(context);
+      }
     });
+  }
 
+  @override
+  void dispose() {
+    //  Clear token expiration manager
+    TokenExpirationManager().clear();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
-        // User
+        // ============================================
+        // User ViewModels
+        // ============================================
         ChangeNotifierProvider(create: (_) => AuthViewModel()),
         ChangeNotifierProvider(create: (_) => RentalViewModel()),
         ChangeNotifierProvider(create: (_) => FavoriteViewModel()),
         ChangeNotifierProvider(create: (_) => ChatViewModel()),
         ChangeNotifierProvider(create: (_) => AnalyticsViewModel()),
-        // Admin
+
+        // ============================================
+        // Admin ViewModels
+        // ============================================
         ChangeNotifierProvider(create: (_) => AdminViewModel()),
+
+        // ============================================
+        // Services
+        // ============================================
         Provider(create: (_) => AuthService()),
       ],
       child: MaterialApp(
@@ -100,11 +136,29 @@ class RentalApp extends StatelessWidget {
           useMaterial3: true,
           fontFamily: 'Roboto',
         ),
-        // Định nghĩa các route để điều hướng
+
+        // ============================================
+        //  Builder - Wrap with GlobalTokenExpiredDialog
+        //  NO navigatorKey parameter needed!
+        // ============================================
+        builder: (context, child) {
+          return GlobalTokenExpiredDialog(
+            child: child!,
+          );
+        },
+
+        // ============================================
+        // Routes
+        // ============================================
         routes: {
           '/login': (context) => const LoginScreen(),
           '/reset-password': (context) => const ResetPasswordScreen(),
+          '/welcome': (context) => const WelcomeScreen(),
         },
+
+        // ============================================
+        // Generate Route
+        // ============================================
         onGenerateRoute: (settings) {
           if (settings.name == '/reset-password') {
             final args = settings.arguments as Map<String, dynamic>?;
@@ -115,6 +169,10 @@ class RentalApp extends StatelessWidget {
           }
           return null;
         },
+
+        // ============================================
+        // Home Screen
+        // ============================================
         home: const WelcomeScreen(),
       ),
     );

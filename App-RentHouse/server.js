@@ -9,6 +9,7 @@ const http = require('http');
 const { Server } = require('socket.io');
 const redis = require('redis');
 
+const aiRecommendationRoutes = require('./routes/ai-recommendations');
 const rentalRoutes = require('./routes/rental');
 const authRoutes = require('./routes/auth');
 const chatRoutes = require('./routes/chat');
@@ -23,6 +24,7 @@ const newsRoutes = require('./routes/news');
 const aboutUsFeedbackRoutes = require('./routes/aboutus');
 const notificationRoutes = require('./routes/notifications');
 const analyticsRoutes = require('./routes/analytics');
+
 
 require('./models/conversation');
 require('./models/message');
@@ -128,6 +130,8 @@ app.locals.redisClient = redisClient;
 waitForRedis.then(() => {
   console.log('✅ Redis client available in app.locals for all routes');
 });
+
+app.use('/api/ai', aiRecommendationRoutes);
 
 app.use('/api/auth', authRoutes);
 app.use('/api', rentalRoutes);

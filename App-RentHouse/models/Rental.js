@@ -118,12 +118,12 @@ const rentalSchema = new mongoose.Schema({
     default: 'pending',
   },
   
-  // ✨ Payment Information
+  // Payment Information
   paymentInfo: {
     transactionCode: {
       type: String,
       sparse: true,
-      // ⚠️ FIXED: Removed "index: true" - will use compound index below
+     
     },
     paymentId: {
       type: mongoose.Schema.Types.ObjectId,
@@ -138,7 +138,7 @@ const rentalSchema = new mongoose.Schema({
       type: String,
       enum: ['pending', 'completed', 'failed'],
       default: 'pending',
-      // ⚠️ FIXED: Removed "index: true" - will use compound index below
+     
     },
     paidAt: {
       type: Date,
@@ -146,7 +146,7 @@ const rentalSchema = new mongoose.Schema({
     },
   },
   
-  // ✨ Publication Status
+  //  Publication Status
   publishedAt: {
     type: Date,
     sparse: true,

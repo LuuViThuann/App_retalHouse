@@ -19,6 +19,18 @@ const bannerSchema = new mongoose.Schema({
     type: String,
     // Public ID của ảnh trên Cloudinary (để xóa ảnh sau này)
   },
+  rentalId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Rental',
+    default: null,
+    sparse: true,
+  },
+  newsId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'News',
+    default: null,
+    sparse: true,
+  },
   link: {
     type: String,
     trim: true,

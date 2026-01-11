@@ -33,7 +33,11 @@ const commentSchema = new mongoose.Schema({
     default: false,
   },
 });
+commentSchema.index({ rentalId: 1, isHidden: 1 });
+commentSchema.index({ userId: 1 });
 
+module.exports = mongoose.model('Comment', commentSchema);
+// ====================================================================
 const replySchema = new mongoose.Schema({
   commentId: {
     type: mongoose.Schema.Types.ObjectId,
@@ -66,7 +70,13 @@ const replySchema = new mongoose.Schema({
     default: Date.now,
   },
 });
+replySchema.index({ commentId: 1 });
+replySchema.index({ userId: 1 });
+replySchema.index({ parentReplyId: 1 });
 
+module.exports = mongoose.model('Reply', replySchema);
+
+// ================================================================
 const likeCommentSchema = new mongoose.Schema({
   targetId: {
     type: mongoose.Schema.Types.ObjectId,
@@ -89,6 +99,11 @@ const likeCommentSchema = new mongoose.Schema({
   },
 });
 
+likeCommentSchema.index({ targetId: 1, targetType: 1 });
+likeCommentSchema.index({ userId: 1 });
+
+module.exports = mongoose.model('LikeComment', likeCommentSchema);
+// ====================
 module.exports = {
   Comment: mongoose.model('Comment', commentSchema),
   Reply: mongoose.model('Reply', replySchema),

@@ -19,10 +19,19 @@ class Rental {
   final DateTime createdAt;
   final String landlord;
 
-  // 🔥 PAYMENT FIELDS
+
   final String? paymentTransactionCode;
   final Map<String, dynamic>? paymentInfo;
   final DateTime? publishedAt;
+
+
+  bool? isAIRecommended;
+  double? aiScore;
+  String? recommendationReason;
+  String? distanceKm;
+
+  double? locationBonus;
+  double? finalScore;
 
   Rental({
     required this.id,
@@ -42,21 +51,30 @@ class Rental {
     required this.status,
     required this.createdAt,
     required this.landlord,
+
     // 🔥 PAYMENT PARAMETERS
     this.paymentTransactionCode,
     this.paymentInfo,
     this.publishedAt,
+
+
+    this.isAIRecommended,
+    this.aiScore,
+    this.recommendationReason,
+    this.distanceKm,
+    this.locationBonus,     // ← thêm
+    this.finalScore,        // ← thêm
   });
 
-  // 🔥 PAYMENT HELPER GETTERS
+
   bool get isPaid => paymentInfo?['status'] == 'completed';
   bool get isPublished => publishedAt != null;
   bool get requiresPayment => !isPaid;
 
-  // 🔥 Get payment status info
+  //  Get payment status info
   String get paymentStatus => paymentInfo?['status'] ?? 'pending';
 
-  // 🔥 Get formatted payment amount
+  //  Get formatted payment amount
   String get formattedPaymentAmount {
     final amount = paymentInfo?['amount'] ?? 10000;
     return '${amount.toString().replaceAllMapped(
@@ -83,10 +101,19 @@ class Rental {
     String? status,
     DateTime? createdAt,
     String? landlord,
-    // 🔥 PAYMENT PARAMETERS
+
+    //  PAYMENT PARAMETERS
     String? paymentTransactionCode,
     Map<String, dynamic>? paymentInfo,
     DateTime? publishedAt,
+
+    // AI PARAMETERS
+    bool? isAIRecommended,
+    double? aiScore,
+    String? recommendationReason,
+    String? distanceKm,
+    double? locationBonus,
+    double? finalScore,
   }) {
     return Rental(
       id: id ?? this.id,
@@ -106,10 +133,19 @@ class Rental {
       status: status ?? this.status,
       createdAt: createdAt ?? this.createdAt,
       landlord: landlord ?? this.landlord,
-      // 🔥 PAYMENT FIELDS
+
+      //  PAYMENT FIELDS
       paymentTransactionCode: paymentTransactionCode ?? this.paymentTransactionCode,
       paymentInfo: paymentInfo ?? this.paymentInfo,
       publishedAt: publishedAt ?? this.publishedAt,
+
+      //  AI FIELDS
+      isAIRecommended: isAIRecommended ?? this.isAIRecommended,
+      aiScore: aiScore ?? this.aiScore,
+      recommendationReason: recommendationReason ?? this.recommendationReason,
+      distanceKm: distanceKm ?? this.distanceKm,
+      locationBonus: locationBonus ?? this.locationBonus,
+      finalScore: finalScore ?? this.finalScore,
     );
   }
 
@@ -142,9 +178,15 @@ class Rental {
     'createdAt': createdAt.toIso8601String(),
     'landlord': landlord,
 
-    // 🔥 THÊM PAYMENT TRANSACTION CODE KHI TẠO MỚI
+    //
     if (paymentTransactionCode != null && paymentTransactionCode!.isNotEmpty)
       'paymentTransactionCode': paymentTransactionCode,
+
+    //
+    if (isAIRecommended != null) 'isAIRecommended': isAIRecommended,
+    if (aiScore != null) 'aiScore': aiScore,
+    if (recommendationReason != null) 'recommendationReason': recommendationReason,
+    if (distanceKm != null) 'distanceKm': distanceKm,
   };
 
   factory Rental.fromJson(Map<String, dynamic> json) {
@@ -275,7 +317,7 @@ class Rental {
             json['createdAt'] as String? ?? DateTime.now().toIso8601String()),
         landlord: json['userId'] as String? ?? '',
 
-        // 🔥 PARSE PAYMENT INFO
+        //  PARSE PAYMENT INFO
         paymentTransactionCode: json['paymentInfo']?['transactionCode'] as String?,
         paymentInfo: json['paymentInfo'] != null
             ? Map<String, dynamic>.from(json['paymentInfo'] as Map)
@@ -283,6 +325,15 @@ class Rental {
         publishedAt: json['publishedAt'] != null
             ? DateTime.parse(json['publishedAt'] as String)
             : null,
+
+        // PARSE AI RECOMMENDATION FIELDS
+        isAIRecommended: json['isAIRecommended'] as bool?,
+        aiScore: (json['aiScore'] as num?)?.toDouble(),
+        recommendationReason: json['recommendationReason'] as String?,
+        distanceKm: json['distanceKm']?.toString(),
+
+        locationBonus: (json['locationBonus'] as num?)?.toDouble(),
+        finalScore:    (json['finalScore'] as num?)?.toDouble(),
       );
     } catch (e, stackTrace) {
       debugPrint('❌ Error parsing Rental from JSON: $e');
@@ -303,7 +354,7 @@ class Rental {
     return null;
   }
 
-  // 🔥 ADDITIONAL HELPER METHODS
+  //
 
   /// Check if rental requires payment before publishing
   bool needsPayment() {
@@ -359,10 +410,36 @@ class Rental {
     return difference.inMinutes < 30;
   }
 
+  //
+
+  /// Get AI recommendation badge text
+  String getAIBadgeText() {
+    if (isAIRecommended == true) {
+      return '🤖 Gợi ý AI';
+    }
+    return '';
+  }
+
+  /// Get AI score formatted (0-100%)
+  String getAIScoreFormatted() {
+    if (aiScore == null) return '';
+    final percentage = (aiScore! * 100).toStringAsFixed(0);
+    return '$percentage%';
+  }
+
+  /// Check if this is an AI recommendation
+  bool get isFromAI => isAIRecommended == true;
+
+  /// Get recommendation reason or default message
+  String getRecommendationReason() {
+    return recommendationReason ?? 'Phù hợp với sở thích của bạn';
+  }
+
   @override
   String toString() {
     return 'Rental(id: $id, title: $title, price: $price, status: $status, '
-        'paymentStatus: $paymentStatus, isPublished: $isPublished)';
+        'paymentStatus: $paymentStatus, isPublished: $isPublished, '
+        'isAIRecommended: $isAIRecommended, aiScore: $aiScore)';
   }
 
   @override

@@ -27,5 +27,6 @@ const messageSchema = new mongoose.Schema({
 
 // Create an index on createdAt for cursor-based pagination
 messageSchema.index({ conversationId: 1, createdAt: -1 });
+messageSchema.index({ senderId: 1 });
 
 module.exports = mongoose.model('Message', messageSchema);

@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_rentalhouse/models/comments.dart';
 import 'package:flutter_rentalhouse/models/notification.dart';
 import 'package:flutter_rentalhouse/models/rental.dart';
+import '../services/TokenExpirationManager.dart';
 import '../services/auth_service.dart';
 import '../models/user.dart';
 
@@ -33,7 +34,43 @@ class AuthViewModel extends ChangeNotifier {
   int get commentsTotalPages => _commentsTotalPages;
   int get notificationsTotalPages => _notificationsTotalPages;
 
-  // ✅ ĐĂNG KÝ - Thay đổi từ avatarBase64 → imagePath
+  AuthViewModel() {
+    TokenExpirationManager().addLogoutListener(_onUserLogout);
+  }
+  void _onUserLogout() {
+    print(' User logout triggered from TokenExpirationManager');
+    _currentUser = null;
+    _myPosts = [];
+    _recentComments = [];
+    _notifications = [];
+    _errorMessage = null;
+    _isLoading = false;
+    _postsPage = 1;
+    _commentsPage = 1;
+    _notificationsPage = 1;
+    _postsTotalPages = 1;
+    _commentsTotalPages = 1;
+    _notificationsTotalPages = 1;
+    notifyListeners();
+  }
+
+  void _handleError(dynamic error, String source) {
+    String errorMsg = error.toString();
+
+    if (errorMsg.contains('SESSION_EXPIRED')) {
+      _errorMessage = 'Phiên đăng nhập hết hạn. Vui lòng đăng nhập lại';
+      _currentUser = null;
+      print(' SESSION_EXPIRED detected in $source');
+    } else if (errorMsg.startsWith('Exception: ')) {
+      _errorMessage = errorMsg.substring(11);
+    } else {
+      _errorMessage = errorMsg;
+    }
+
+    print(' $source error: $_errorMessage');
+  }
+
+  // ĐĂNG KÝ - Thay đổi từ avatarBase64 → imagePath
   Future<void> register({
     required String email,
     required String password,
@@ -579,4 +616,23 @@ class AuthViewModel extends ChangeNotifier {
       notifyListeners();
     }
   }
+
+  // ============================================
+  //  HELPER METHODS
+  // ============================================
+
+  void clearErrorMessage() {
+    _errorMessage = null;
+    notifyListeners();
+  }
+
+  bool isLoggedIn() {
+    return _currentUser != null;
+  }
+  @override
+  void dispose() {
+    TokenExpirationManager().removeLogoutListener(_onUserLogout);
+    super.dispose();
+  }
+
 }

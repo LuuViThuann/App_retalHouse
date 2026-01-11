@@ -26,7 +26,7 @@ class RentalFilter {
     'Căn hộ chung cư',
     'Biệt thự',
     'Văn phòng',
-    'Mặt bằng',
+    'Mặt bằng kinh doanh',
     'Đất nền',
   ];
 

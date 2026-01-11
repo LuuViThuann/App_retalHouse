@@ -648,13 +648,57 @@ class RentalService {
 
   //  Helper method to parse rental JSON safely ========================================================
   Rental _parseRentalJson(Map<String, dynamic> json) {
-    // Handle coordinates from array
+    debugPrint('\n🔍 [PARSE-RENTAL] Starting parse for: ${json['_id']}');
+
+    // 🔥 FIX: Handle coordinates từ API response (có thể từ geospatial query hoặc AI)
     if (json['coordinates'] != null && json['coordinates'] is List) {
       final coords = json['coordinates'] as List;
       if (coords.length >= 2) {
+        debugPrint('   ✅ Found coordinates array: [${coords[0]}, ${coords[1]}]');
+
+        // Initialize location nếu chưa có
         json['location'] = json['location'] ?? {};
-        json['location']['longitude'] = coords[0];
-        json['location']['latitude'] = coords[1];
+        json['location']['longitude'] = double.parse(coords[0].toString());
+        json['location']['latitude'] = double.parse(coords[1].toString());
+        debugPrint('   ✅ Set from array: lon=${json['location']['longitude']}, lat=${json['location']['latitude']}');
+      }
+    }
+
+    // 🔥 FIX: Handle longitude/latitude trực tiếp từ location object (từ AI API)
+    if (json['location'] != null && json['location'] is Map) {
+      final loc = json['location'] as Map;
+
+      // If API sends longitude/latitude directly, preserve them
+      if (loc['longitude'] != null) {
+        debugPrint('   ✅ Found location.longitude: ${loc['longitude']}');
+        loc['longitude'] = double.parse(loc['longitude'].toString());
+      }
+
+      if (loc['latitude'] != null) {
+        debugPrint('   ✅ Found location.latitude: ${loc['latitude']}');
+        loc['latitude'] = double.parse(loc['latitude'].toString());
+      }
+
+      // If coordinates array exists, also use it
+      if (loc['coordinates'] != null && loc['coordinates'] is Map) {
+        final coords = loc['coordinates'] as Map;
+        if (coords['coordinates'] is List) {
+          final arr = coords['coordinates'] as List;
+          if (arr.length >= 2) {
+            debugPrint('   ✅ Found location.coordinates.coordinates: [${arr[0]}, ${arr[1]}]');
+
+            // Ensure longitude/latitude are set
+            if (loc['longitude'] == null || (loc['longitude'] as num) == 0) {
+              loc['longitude'] = double.parse(arr[0].toString());
+              debugPrint('   ✅ Set longitude from array: ${loc['longitude']}');
+            }
+
+            if (loc['latitude'] == null || (loc['latitude'] as num) == 0) {
+              loc['latitude'] = double.parse(arr[1].toString());
+              debugPrint('   ✅ Set latitude from array: ${loc['latitude']}');
+            }
+          }
+        }
       }
     }
 
@@ -688,21 +732,84 @@ class RentalService {
     json['images'] = json['images'] ?? [];
     json['videos'] = json['videos'] ?? [];
 
-    // Ensure location has all required fields
+    // 🔥 FIX: Ensure location has all required fields with proper coordinates
+    final finalLocation = json['location'] ?? {};
+
+    // Get coordinates từ các nguồn khác nhau
+    double finalLon = 0.0;
+    double finalLat = 0.0;
+
+    // Priority: longitude/latitude trực tiếp > coordinates array > default
+    if (finalLocation['longitude'] != null && (finalLocation['longitude'] as num) != 0) {
+      finalLon = double.parse(finalLocation['longitude'].toString());
+    } else if (finalLocation['coordinates'] is Map) {
+      final coords = finalLocation['coordinates'] as Map;
+      if (coords['coordinates'] is List) {
+        final arr = coords['coordinates'] as List;
+        if (arr.length >= 1 && arr[0] != null) {
+          finalLon = double.parse(arr[0].toString());
+        }
+      }
+    }
+
+    if (finalLocation['latitude'] != null && (finalLocation['latitude'] as num) != 0) {
+      finalLat = double.parse(finalLocation['latitude'].toString());
+    } else if (finalLocation['coordinates'] is Map) {
+      final coords = finalLocation['coordinates'] as Map;
+      if (coords['coordinates'] is List) {
+        final arr = coords['coordinates'] as List;
+        if (arr.length >= 2 && arr[1] != null) {
+          finalLat = double.parse(arr[1].toString());
+        }
+      }
+    }
+
+    debugPrint('   📍 Final coordinates: lon=$finalLon, lat=$finalLat');
+
     json['location'] = {
-      'short': json['location']?['short'] ?? '',
-      'fullAddress': json['location']?['fullAddress'] ?? '',
+      'short': finalLocation['short'] ?? '',
+      'fullAddress': finalLocation['fullAddress'] ?? '',
+      'longitude': finalLon,  // 🔥 ENSURE coordinates
+      'latitude': finalLat,    // 🔥 ENSURE coordinates
       'coordinates': {
         'type': 'Point',
-        'coordinates': [
-          (json['location']?['longitude'] ?? 0).toDouble(),
-          (json['location']?['latitude'] ?? 0).toDouble(),
-        ],
+        'coordinates': [finalLon, finalLat],
       },
     };
 
     json['status'] = json['status'] ?? 'available';
     json['userId'] = json['userId'] ?? '';
+
+    // Parse AI metadata fields
+    if (json['isAIRecommended'] != null) {
+      json['isAIRecommended'] = json['isAIRecommended'] as bool;
+    }
+
+    if (json['aiScore'] != null) {
+      json['aiScore'] = (json['aiScore'] as num).toDouble();
+    }
+
+    if (json['locationBonus'] != null) {
+      json['locationBonus'] = (json['locationBonus'] as num).toDouble();
+    }
+
+    if (json['finalScore'] != null) {
+      json['finalScore'] = (json['finalScore'] as num).toDouble();
+    }
+
+    if (json['recommendationReason'] != null) {
+      json['recommendationReason'] = json['recommendationReason'] as String;
+    }
+
+    if (json['distanceKm'] != null) {
+      json['distanceKm'] = json['distanceKm'].toString();
+    }
+
+    if (json['distance_km'] != null) {
+      json['distanceKm'] = json['distance_km'].toString();
+    }
+
+    debugPrint('✅ [PARSE-RENTAL] Complete: $finalLon, $finalLat\n');
 
     return Rental.fromJson(json);
   }
@@ -711,4 +818,302 @@ class RentalService {
   static void dispose() {
     _client.close();
   }
+
+  /// Fetch AI-powered personalized recommendations
+
+
+  Future<Map<String, dynamic>> fetchAIRecommendations({
+    required double latitude,
+    required double longitude,
+    double radius = 10.0,
+    double? minPrice,
+    double? maxPrice,
+    String? token,
+    int limit = 10,
+  }) async {
+    // Validate coordinates
+    if (latitude.abs() > 90 || longitude.abs() > 180) {
+      throw Exception(
+          'Tọa độ không hợp lệ: latitude=$latitude, longitude=$longitude'
+      );
+    }
+
+    return _retryRequest(() async {
+      // 🔥 SỬ DỤNG endpoint từ ai-recommendations.js
+      final url = Uri.parse(
+          '${ApiRoutes.baseUrl}/ai/recommendations/personalized'
+              '?latitude=$latitude'
+              '&longitude=$longitude'
+              '&radius=$radius'
+              '&limit=$limit'
+              '${minPrice != null ? '&minPrice=$minPrice' : ''}'
+              '${maxPrice != null ? '&maxPrice=$maxPrice' : ''}'
+      );
+
+      final headers = {
+        'Content-Type': 'application/json',
+        'Connection': 'keep-alive',
+        if (token != null) 'Authorization': 'Bearer $token',
+      };
+
+      debugPrint('🤖 [AI-RECOMMENDATIONS] Requesting:');
+      debugPrint('   URL: $url');
+      debugPrint('   Coords: ($latitude, $longitude)');
+      debugPrint('   Radius: ${radius}km');
+      debugPrint('   Prices: ${minPrice?.toStringAsFixed(0) ?? "Any"} - ${maxPrice?.toStringAsFixed(0) ?? "Any"}');
+
+      final response = await _safeRequest(
+            () => _client.get(url, headers: headers),
+        timeout: const Duration(seconds: 30),
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+
+        debugPrint('✅ [AI-RECOMMENDATIONS] Success');
+        debugPrint('   Status: ${response.statusCode}');
+        debugPrint('   Is AI: ${data['isAIRecommendation']}');
+        debugPrint('   Found: ${data['rentals']?.length ?? 0} rentals');
+        debugPrint('   Message: ${data['message']}');
+
+        final List<dynamic> rentalsData = data['rentals'] ?? [];
+
+        // 🔥 DEBUG: Log first rental structure từ API
+        if (rentalsData.isNotEmpty) {
+          debugPrint('🔍 [DEBUG] First rental from AI API:');
+          final first = rentalsData[0];
+          debugPrint('   _id: ${first['_id']}');
+          debugPrint('   title: ${first['title']}');
+          debugPrint('   location keys: ${(first['location'] as Map?)?.keys.toString()}');
+          debugPrint('   longitude: ${first['location']?['longitude']}');
+          debugPrint('   latitude: ${first['location']?['latitude']}');
+          debugPrint('   coordinates: ${first['location']?['coordinates']}');
+          debugPrint('   aiScore: ${first['aiScore']}');
+          debugPrint('   locationBonus: ${first['locationBonus']}');
+          debugPrint('   finalScore: ${first['finalScore']}');
+        }
+
+        final List<Rental> rentals = rentalsData
+            .map((json) {
+          try {
+            debugPrint('\n🔄 Parsing rental: ${json['_id']}');
+
+            // 🔥 FIX: Ensure coordinates are properly set from API response
+            // Backend already sends longitude/latitude in location object
+
+            if (json['location'] != null && json['location'] is Map) {
+              final loc = json['location'] as Map;
+
+              // Backend sends both longitude/latitude AND coordinates object
+              if (loc['longitude'] != null && loc['latitude'] != null) {
+                debugPrint('   ✅ Has longitude/latitude from API');
+                debugPrint('      longitude: ${loc['longitude']}, latitude: ${loc['latitude']}');
+              }
+
+              if (loc['coordinates'] != null) {
+                final coords = loc['coordinates'];
+                if (coords is Map && coords['coordinates'] is List) {
+                  debugPrint('   ✅ Has coordinates array');
+                  final arr = coords['coordinates'] as List;
+                  if (arr.length >= 2) {
+                    debugPrint('      [${arr[0]}, ${arr[1]}]');
+                  }
+                }
+              }
+            }
+
+            final rental = _parseRentalJson(json);
+
+            // 🔥 FIX: Set AI metadata từ API response
+            if (json['aiScore'] != null) {
+              rental.aiScore = (json['aiScore'] as num).toDouble();
+              debugPrint('   ✅ aiScore: ${rental.aiScore}');
+            }
+
+            if (json['locationBonus'] != null) {
+              rental.locationBonus = (json['locationBonus'] as num).toDouble();
+              debugPrint('   ✅ locationBonus: ${rental.locationBonus}');
+            }
+
+            if (json['finalScore'] != null) {
+              rental.finalScore = (json['finalScore'] as num).toDouble();
+              debugPrint('   ✅ finalScore: ${rental.finalScore}');
+            }
+
+            if (json['isAIRecommended'] != null) {
+              rental.isAIRecommended = json['isAIRecommended'] as bool;
+              debugPrint('   ✅ isAIRecommended: ${rental.isAIRecommended}');
+            }
+
+            if (json['recommendationReason'] != null) {
+              rental.recommendationReason = json['recommendationReason'] as String;
+              debugPrint('   ✅ reason: ${rental.recommendationReason}');
+            }
+
+            // 🔥 DEBUG: Final check
+            debugPrint('   Final coordinates: (${rental.location['longitude']}, ${rental.location['latitude']})');
+
+            return rental;
+          } catch (e) {
+            debugPrint('❌ Error parsing AI rental: $e');
+            debugPrint('   JSON: $json');
+            return null;
+          }
+        })
+            .whereType<Rental>()
+            .toList();
+
+        debugPrint('\n✅ [AI-RECOMMENDATIONS] Parsed ${rentals.length} rentals');
+
+        // 🔥 DEBUG: Verify all rentals have coordinates
+        final withCoords = rentals.where((r) =>
+        (r.location['longitude'] as num?)?.toDouble() != 0 &&
+            (r.location['latitude'] as num?)?.toDouble() != 0
+        ).length;
+        debugPrint('   Rentals with valid coordinates: $withCoords/${rentals.length}');
+
+        return {
+          'rentals': rentals,
+          'isAIRecommendation': data['isAIRecommendation'] ?? false,
+          'message': data['message'] ?? 'Gợi ý',
+          'total': data['total'] ?? rentals.length,
+          'filters': data['filters'],
+        };
+      } else if (response.statusCode == 400) {
+        final errorData = jsonDecode(response.body);
+        throw Exception('Yêu cầu không hợp lệ: ${errorData['message']}');
+      } else if (response.statusCode == 500) {
+        final errorData = jsonDecode(response.body);
+        debugPrint('❌ Server error: ${errorData['error']}');
+        throw Exception(
+            'Lỗi máy chủ: ${errorData['message']}. '
+                'Vui lòng thử lại sau.'
+        );
+      } else {
+        throw Exception(
+            'Failed to fetch AI recommendations: Status ${response.statusCode}'
+        );
+      }
+    }, maxRetries: 2);
+  }
+
+  /// Fetch AI-powered nearby recommendations for a specific rental
+  Future<Map<String, dynamic>> fetchAINearbyRecommendations({
+    required String rentalId,
+    double radius = 10.0,
+    String? token,
+    int limit = 10,
+  }) async {
+    // Validate rentalId
+    if (rentalId.isEmpty || rentalId.startsWith('current_location_')) {
+      throw Exception('Invalid rental ID for AI nearby search.');
+    }
+
+    return _retryRequest(() async {
+      // 🔥 SỬ DỤNG endpoint từ ai-recommendations.js
+      final url = Uri.parse(
+          '${ApiRoutes.baseUrl}/ai/recommendations/nearby/$rentalId'
+              '?limit=$limit'
+              '&radius=$radius'
+      );
+
+      final headers = {
+        'Content-Type': 'application/json',
+        'Connection': 'keep-alive',
+        if (token != null) 'Authorization': 'Bearer $token',
+      };
+
+      debugPrint('🤖 [AI-NEARBY] Requesting:');
+      debugPrint('   URL: $url');
+      debugPrint('   Rental ID: $rentalId');
+      debugPrint('   Radius: ${radius}km');
+
+      final response = await _safeRequest(
+            () => _client.get(url, headers: headers),
+        timeout: const Duration(seconds: 30),
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+
+        debugPrint('✅ [AI-NEARBY] Success');
+        debugPrint('   Status: ${response.statusCode}');
+        debugPrint('   Is AI: ${data['isAIRecommendation']}');
+        debugPrint('   Found: ${data['rentals']?.length ?? 0} rentals');
+        debugPrint('   Message: ${data['message']}');
+
+        final List<dynamic> rentalsData = data['rentals'] ?? [];
+
+        // 🔥 DEBUG: Log structure
+        if (rentalsData.isNotEmpty) {
+          debugPrint('🔍 [DEBUG] First rental from AI nearby API:');
+          final first = rentalsData[0];
+          debugPrint('   _id: ${first['_id']}');
+          debugPrint('   longitude: ${first['location']?['longitude']}');
+          debugPrint('   latitude: ${first['location']?['latitude']}');
+          debugPrint('   distance_km: ${first['distance_km']}');
+          debugPrint('   aiScore: ${first['aiScore']}');
+        }
+
+        final List<Rental> rentals = rentalsData
+            .map((json) {
+          try {
+            final rental = _parseRentalJson(json);
+
+            // 🔥 FIX: Set AI metadata từ API
+            if (json['aiScore'] != null) {
+              rental.aiScore = (json['aiScore'] as num).toDouble();
+            }
+
+            if (json['locationBonus'] != null) {
+              rental.locationBonus = (json['locationBonus'] as num).toDouble();
+            }
+
+            if (json['finalScore'] != null) {
+              rental.finalScore = (json['finalScore'] as num).toDouble();
+            }
+
+            if (json['isAIRecommended'] != null) {
+              rental.isAIRecommended = json['isAIRecommended'] as bool;
+            }
+
+            if (json['distance_km'] != null) {
+              rental.distanceKm = json['distance_km'].toString();
+            }
+
+            if (json['distanceKm'] != null) {
+              rental.distanceKm = json['distanceKm'].toString();
+            }
+
+            return rental;
+          } catch (e) {
+            debugPrint('❌ Error parsing AI nearby rental: $e');
+            return null;
+          }
+        })
+            .whereType<Rental>()
+            .toList();
+
+        debugPrint('✅ [AI-NEARBY] Parsed ${rentals.length} rentals');
+
+        return {
+          'rentals': rentals,
+          'isAIRecommendation': data['isAIRecommendation'] ?? false,
+          'message': data['message'] ?? 'Gợi ý gần đây',
+          'total': data['total'] ?? rentals.length,
+          'mainRental': data['mainRental'],
+        };
+      } else if (response.statusCode == 404) {
+        throw Exception('Rental not found');
+      } else if (response.statusCode == 400) {
+        final errorData = jsonDecode(response.body);
+        throw Exception('Yêu cầu không hợp lệ: ${errorData['message']}');
+      } else {
+        throw Exception(
+            'Failed to fetch AI nearby recommendations: Status ${response.statusCode}'
+        );
+      }
+    }, maxRetries: 2);
+  }
+
 }

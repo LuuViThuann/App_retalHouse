@@ -6,6 +6,7 @@ import 'package:flutter_facebook_auth/flutter_facebook_auth.dart';
 import 'package:flutter_rentalhouse/models/comments.dart';
 import 'package:flutter_rentalhouse/models/notification.dart';
 import 'package:flutter_rentalhouse/models/rental.dart';
+import 'package:flutter_rentalhouse/services/TokenExpirationManager.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart';
@@ -21,15 +22,15 @@ class AuthService {
     clientId: '616377322079-eb0grhlmn2lbnifatbduclltcur9t3g4.apps.googleusercontent.com',
     scopes: ['email', 'profile', 'https://www.googleapis.com/auth/userinfo.profile'],
   );
-  // ✅ HTTP Client với connection pooling
+  //  HTTP Client với connection pooling
   static final http.Client _httpClient = http.Client();
 
-  // ✅ Timeout configurations
+  //  Timeout configurations
   static const Duration _defaultTimeout = Duration(seconds: 30);
   static const Duration _shortTimeout = Duration(seconds: 15);
   static const Duration _lightTimeout = Duration(seconds: 10);
 
-  // ✅ Retry configuration
+  //  Retry configuration
   static const int _maxRetries = 3;
   static const Duration _retryDelay = Duration(seconds: 2);
   // Validation functions
@@ -38,7 +39,7 @@ class AuthService {
   bool _isValidPassword(String password) => password.length >= 6;
   bool _isValidUsername(String username) => username.length >= 3;
   bool _isValidAddress(String address) => address.isNotEmpty;
-  // ✅ HELPER: Make HTTP request with retry logic
+  //  HELPER: Make HTTP request with retry logic
   Future<http.Response> _makeRequestWithRetry(
       Future<http.Response> Function() requestFn, {
         Duration timeout = _defaultTimeout,
@@ -490,6 +491,8 @@ class AuthService {
         }),
       );
 
+      checkTokenExpiration(response.statusCode);
+
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         final avatarUrl = await fetchAvatarUrl(user.uid, idToken);
@@ -527,21 +530,17 @@ class AuthService {
       final idToken = await user.getIdToken(true);
       if (idToken == null) return null;
 
-      print('═══════════════════════════════════════════');
-      print('📤 UPLOAD PROFILE IMAGE');
-      print('═══════════════════════════════════════════');
-
       var request = http.MultipartRequest('POST', Uri.parse(ApiRoutes.uploadImage));
       request.fields['idToken'] = idToken;
 
-      // ✅ Upload with field 'avatar'
+      //  Upload with field 'avatar'
       request.files.add(await http.MultipartFile.fromPath('avatar', imagePath));
 
-      print('📤 Sending multipart request...');
+
       final response = await request.send();
       final responseBody = await response.stream.bytesToString();
 
-      print('📊 Response: ${response.statusCode}');
+      checkTokenExpiration(response.statusCode);
 
       if (response.statusCode == 200) {
         final data = jsonDecode(responseBody);
@@ -551,14 +550,13 @@ class AuthService {
           throw Exception('No avatarUrl in response');
         }
 
-        print('✅ Upload successful');
         return avatarUrl;
       } else {
         final errorData = jsonDecode(responseBody);
         throw Exception('Tải ảnh lên thất bại: ${errorData['message'] ?? responseBody}');
       }
     } catch (e) {
-      print('❌ Upload image error: $e');
+      print(' Upload image error: $e');
       throw Exception('Tải ảnh lên thất bại: $e');
     }
   }
@@ -729,7 +727,30 @@ class AuthService {
       throw Exception('Lấy bình luận thất bại: $e');
     }
   }
+  // ============================================
+  // CHECK THÔNG BÁO PHIÊN ĐĂNG NHẬP HẾT HẠN
+  Future<void> _handleTokenExpiration(int statusCode) async {
+    if (statusCode == 401) {
+      print(' Token expired or invalid - Showing global dialog');
 
+      try {
+        await _auth.signOut();
+      } catch (e) {
+        print('Error signing out: $e');
+      }
+
+      //  Trigger dialog toàn cục
+      throw Exception('SESSION_EXPIRED');
+    }
+  }
+
+  void checkTokenExpiration(int statusCode) {
+    if (statusCode == 401) {
+      print('❌ Token expired (401 Unauthorized)');
+      TokenExpirationManager().markTokenAsExpired();
+      throw Exception('SESSION_EXPIRED');
+    }
+  }
   // ============================================
   // FETCH NOTIFICATIONS
   // ============================================
@@ -750,6 +771,8 @@ class AuthService {
           'Authorization': 'Bearer $idToken',
         },
       ).timeout(const Duration(seconds: 15));
+
+      checkTokenExpiration(response.statusCode);
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
@@ -807,6 +830,7 @@ class AuthService {
           'Authorization': 'Bearer $idToken',
         },
       ).timeout(const Duration(seconds: 10));
+      checkTokenExpiration(response.statusCode);
 
       return response.statusCode == 200;
     } catch (e) {

@@ -1,9 +1,9 @@
+// customMarker.dart - CẬP NHẬT để hỗ trợ AI badge
+
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
-import 'package:flutter/rendering.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
-import 'package:intl/intl.dart';
 
 class CustomMarkerHelper {
   static Future<BitmapDescriptor> createCustomMarker({
@@ -11,22 +11,30 @@ class CustomMarkerHelper {
     required String propertyType,
     required bool isMainRental,
     required bool hasValidCoords,
+    bool isAIRecommended = false,
   }) async {
     final recorder = ui.PictureRecorder();
     final canvas = Canvas(recorder);
 
-    // Kích thước marker lớn hơn để dễ nhìn và rõ ràng hơn
     const double width = 230;
     const double height = 98;
     const double padding = 14;
     const double iconSize = 28;
 
-    // Màu sắc gradient theo loại
+    // 🔥 Màu sắc gradient - THÊM màu cho AI
     List<Color> gradientColors;
     Color borderColor;
     Color iconColor;
 
-    if (!hasValidCoords) {
+    if (isAIRecommended) {
+      //  AI Recommendation - Màu tím/xanh lam đặc biệt
+      gradientColors = [
+        const Color(0xFF6C63FF), // Tím
+        const Color(0xFF00D4FF), // Xanh lam
+      ];
+      borderColor = const Color(0xFF6C63FF);
+      iconColor = Colors.white;
+    } else if (!hasValidCoords) {
       gradientColors = [
         const Color(0xFFFF6B35),
         const Color(0xFFFF9234),
@@ -49,7 +57,7 @@ class CustomMarkerHelper {
       iconColor = Colors.white;
     }
 
-    // Vẽ shadow mềm mại hơn
+    // Shadow
     final shadowPath = Path()
       ..addRRect(RRect.fromRectAndRadius(
         Rect.fromLTWH(3, 3, width, height),
@@ -63,7 +71,7 @@ class CustomMarkerHelper {
         ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6),
     );
 
-    // Vẽ background với gradient
+    // Background gradient
     final rect = Rect.fromLTWH(0, 0, width, height);
     final rrect = RRect.fromRectAndRadius(
       rect,
@@ -79,7 +87,7 @@ class CustomMarkerHelper {
 
     canvas.drawRRect(rrect, gradientPaint);
 
-    // Vẽ border sáng bóng
+    // Border
     final borderPaint = Paint()
       ..color = Colors.white
       ..style = PaintingStyle.stroke
@@ -87,7 +95,7 @@ class CustomMarkerHelper {
 
     canvas.drawRRect(rrect, borderPaint);
 
-    // Vẽ highlight effect (ánh sáng phía trên)
+    // Highlight effect
     final highlightRect = RRect.fromRectAndRadius(
       Rect.fromLTWH(3, 3, width - 6, height / 2 - 3),
       const Radius.circular(height / 2),
@@ -100,12 +108,11 @@ class CustomMarkerHelper {
         ..style = PaintingStyle.fill,
     );
 
-    // Vẽ icon nhà bên trái
+    // Icon nhà
     final iconPath = Path();
     const iconLeft = padding;
     const iconTop = (height - iconSize) / 2;
 
-    // Hình ngôi nhà đơn giản
     iconPath.moveTo(iconLeft + iconSize / 2, iconTop);
     iconPath.lineTo(iconLeft + iconSize, iconTop + iconSize / 3);
     iconPath.lineTo(iconLeft + iconSize, iconTop + iconSize);
@@ -120,7 +127,7 @@ class CustomMarkerHelper {
         ..style = PaintingStyle.fill,
     );
 
-    // Vẽ cửa nhà
+    // Cửa nhà
     canvas.drawRect(
       Rect.fromLTWH(
         iconLeft + iconSize / 3,
@@ -131,7 +138,7 @@ class CustomMarkerHelper {
       Paint()..color = borderColor,
     );
 
-    // Format và vẽ giá tiền
+    // Giá tiền
     String priceText = _formatPriceModern(price);
 
     final textPainter = TextPainter(
@@ -156,7 +163,6 @@ class CustomMarkerHelper {
 
     textPainter.layout();
 
-    // Căn giữa text bên phải icon
     final textOffset = Offset(
       iconLeft + iconSize + 8,
       (height - textPainter.height) / 2,
@@ -164,7 +170,7 @@ class CustomMarkerHelper {
 
     textPainter.paint(canvas, textOffset);
 
-    // Vẽ tam giác pointer với gradient - lớn hơn
+    // Pointer triangle
     final pointerPath = Path();
     const pointerWidth = 20.0;
     const pointerHeight = 14.0;
@@ -174,7 +180,6 @@ class CustomMarkerHelper {
     pointerPath.lineTo(width / 2 + pointerWidth / 2, height);
     pointerPath.close();
 
-    // Gradient cho pointer
     final pointerPaint = Paint()
       ..shader = ui.Gradient.linear(
         Offset(width / 2, height),
@@ -184,7 +189,6 @@ class CustomMarkerHelper {
 
     canvas.drawPath(pointerPath, pointerPaint);
 
-    // Border cho pointer
     canvas.drawPath(
       pointerPath,
       Paint()
@@ -193,9 +197,9 @@ class CustomMarkerHelper {
         ..strokeWidth = 3,
     );
 
-    // Vẽ badge nhỏ nếu là nhà chính hoặc không có tọa độ - lớn hơn
-    if (isMainRental || !hasValidCoords) {
-      const badgeSize = 24.0;
+    // 🔥 BADGE - CẬP NHẬT để hiển thị AI icon
+    if (isAIRecommended || isMainRental || !hasValidCoords) {
+      const badgeSize = 28.0; // Tăng size cho dễ nhìn
       final badgeCenter = Offset(width - badgeSize / 2 - 5, badgeSize / 2 + 5);
 
       // Badge background
@@ -205,19 +209,33 @@ class CustomMarkerHelper {
         Paint()..color = Colors.white,
       );
 
+      Color badgeColor;
+      String badgeIcon;
+
+      if (isAIRecommended) {
+        badgeColor = const Color(0xFF6C63FF); // Tím cho AI
+        badgeIcon = '🤖'; // Robot emoji
+      } else if (isMainRental) {
+        badgeColor = Colors.yellow.shade600;
+        badgeIcon = '★';
+      } else {
+        badgeColor = Colors.orange.shade600;
+        badgeIcon = '!';
+      }
+
       canvas.drawCircle(
         badgeCenter,
         badgeSize / 2 - 2,
-        Paint()..color = isMainRental ? Colors.yellow.shade600 : Colors.orange.shade600,
+        Paint()..color = badgeColor,
       );
 
-      // Badge icon - font lớn hơn
+      // Badge icon
       final badgeIconPainter = TextPainter(
         text: TextSpan(
-          text: isMainRental ? '★' : '!',
+          text: badgeIcon,
           style: TextStyle(
             color: Colors.white,
-            fontSize: 14,
+            fontSize: isAIRecommended ? 16 : 14,
             fontWeight: FontWeight.bold,
           ),
         ),
@@ -256,10 +274,5 @@ class CustomMarkerHelper {
     } else {
       return '${price.toStringAsFixed(0)}đ';
     }
-  }
-
-  static String _formatPriceCompact(double price) {
-    // Giữ lại hàm cũ để backward compatible
-    return _formatPriceModern(price);
   }
 }

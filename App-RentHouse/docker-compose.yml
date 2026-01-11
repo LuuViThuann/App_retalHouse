@@ -13,6 +13,34 @@ services:
     command: npm run dev
     depends_on:
       - mongo
+      - python-ml
+    networks:
+      - app-network
+
+  python-ml:
+    build: ../PyThon_ML_App
+    container_name: python-ml
+    restart: unless-stopped
+    ports:
+      - "8001:8001"
+    env_file:
+      - ../PyThon_ML_App/.env          # Sử dụng .env như cũ
+    volumes:
+      - ../PyThon_ML_App:/app
+      - /app/__pycache__
+      - python-models:/app/models
+    #  THAY ĐỔI: Chạy export trước, sau đó chạy main app
+    entrypoint: >
+      sh -c "
+        echo ' Waiting for MongoDB...';
+        sleep 10;
+        echo ' Starting data export...';
+        python data/export_dataset.py;
+        echo ' Starting ML app...';
+        python app/main.py
+      "
+    depends_on:
+      - mongo
     networks:
       - app-network
 
@@ -33,3 +61,4 @@ networks:
 
 volumes:
   mongo_data:
+  python-models:
