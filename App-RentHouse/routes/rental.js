@@ -3,6 +3,14 @@ require('dotenv').config();
 const express = require('express'); // đã xóa ESlint
 const router = express.Router();
 const mongoose = require('mongoose');
+
+const { 
+  trackRentalView, 
+  trackAction, 
+  trackDetailedInteraction,
+  getUserAnalytics 
+} = require('../middleware/trackingMiddleware');
+
 const Rental = require('../models/Rental');
 const Favorite = require('../models/favorite');
 const { Comment, Reply, LikeComment } = require('../models/comments');
@@ -1580,7 +1588,7 @@ router.post('/admin/ensure-geospatial-index', verifyAdmin, async (req, res) => {
   }
 });
 
-router.get('/rentals/:id', async (req, res) => {
+router.get('/rentals/:id', trackRentalView, async (req, res) => {
   try {
     const rental = await Rental.findById(req.params.id);
     if (!rental) return res.status(404).json({ message: 'Rental not found' });
@@ -1644,6 +1652,10 @@ router.get('/rentals/:id', async (req, res) => {
     res.status(500).json({ message: 'Failed to fetch rental details', error: err.message });
   }
 });
+
+router.post('/track-interaction', authMiddleware, trackDetailedInteraction);
+
+router.get('/user-analytics', authMiddleware, getUserAnalytics);
 
 router.post('/rentals', authMiddleware, upload.array('media'), checkPaymentStatus, async (req, res) => {
   try {
@@ -2168,6 +2180,142 @@ router.post('/rentals/geocode/:id', authMiddleware, async (req, res) => {
     res.status(500).json({ message: 'Failed to geocode address', error: err.message });
   }
 });
+
+// Theo dõi hành động  ===============================================================================================
+router.post('/rentals/:id/contact', authMiddleware, trackAction('contact'), async (req, res) => {
+  try {
+    // Xử lý logic contact (gửi email, sms, etc.)
+    res.json({ 
+      success: true, 
+      message: 'Contact request sent successfully' 
+    });
+  } catch (err) {
+    res.status(500).json({ 
+      success: false, 
+      message: 'Failed to send contact request', 
+      error: err.message 
+    });
+  }
+});
+router.post('/rentals/:id/share', authMiddleware, trackAction('share'), async (req, res) => {
+  try {
+    res.json({ 
+      success: true, 
+      message: 'Share tracked successfully' 
+    });
+  } catch (err) {
+    res.status(500).json({ 
+      success: false, 
+      message: 'Failed to track share', 
+      error: err.message 
+    });
+  }
+});
+router.get('/rentals/trending/now', async (req, res) => {
+  try {
+    const UserInteraction = require('../models/UserInteraction');
+    const limit = parseInt(req.query.limit) || 10;
+    
+    // Get trending rental IDs
+    const trending = await UserInteraction.getTrendingRentals(limit);
+    
+    if (trending.length === 0) {
+      return res.json({
+        success: true,
+        rentals: [],
+        message: 'No trending data yet'
+      });
+    }
+    
+    // Get full rental data
+    const rentalIds = trending.map(t => t._id);
+    const rentals = await Rental.find({ _id: { $in: rentalIds }, status: 'available' })
+      .lean();
+    
+    // Merge with scores
+    const rentalsWithScore = rentals.map(rental => {
+      const trendData = trending.find(t => t._id.toString() === rental._id.toString());
+      return {
+        ...rental,
+        trendingScore: trendData?.totalScore || 0,
+        viewCount: trendData?.viewCount || 0,
+        favoriteCount: trendData?.favoriteCount || 0,
+        contactCount: trendData?.contactCount || 0
+      };
+    });
+    
+    // Sort by score
+    rentalsWithScore.sort((a, b) => b.trendingScore - a.trendingScore);
+    
+    res.json({
+      success: true,
+      rentals: rentalsWithScore,
+      count: rentalsWithScore.length
+    });
+  } catch (err) {
+    console.error('Error getting trending rentals:', err);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Failed to get trending rentals', 
+      error: err.message 
+    });
+  }
+});
+router.get('/rentals/:id/stats', async (req, res) => {
+  try {
+    const UserInteraction = require('../models/UserInteraction');
+    const rentalId = req.params.id;
+    
+    if (!mongoose.Types.ObjectId.isValid(rentalId)) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Invalid rental ID' 
+      });
+    }
+    
+    const stats = await UserInteraction.getRentalPopularity(rentalId);
+    
+    res.json({
+      success: true,
+      rentalId,
+      stats
+    });
+  } catch (err) {
+    console.error('Error getting rental stats:', err);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Failed to get rental stats', 
+      error: err.message 
+    });
+  }
+});
+router.get('/admin/export-interactions', verifyAdmin, async (req, res) => {
+  try {
+    const UserInteraction = require('../models/UserInteraction');
+    const limit = parseInt(req.query.limit) || 10000;
+    const skip = parseInt(req.query.skip) || 0;
+    
+    const interactions = await UserInteraction.find()
+      .sort({ timestamp: -1 })
+      .skip(skip)
+      .limit(limit)
+      .lean();
+    
+    res.json({
+      success: true,
+      count: interactions.length,
+      data: interactions
+    });
+  } catch (err) {
+    console.error('Error exporting interactions:', err);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Failed to export interactions', 
+      error: err.message 
+    });
+  }
+});
+// ==================================================================================================
 
 router.post('/rentals/geocode-all', authMiddleware, async (req, res) => {
   try {

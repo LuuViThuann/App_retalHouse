@@ -3,10 +3,76 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 class ApiRoutes {
   static const String rootUrl =
-      'http://192.168.1.25:3000'; // http://192.168.43.168:3000 - mạng dữ liệu
+      'http://192.168.1.2:3000'; // http://192.168.43.168:3000 - mạng dữ liệu
   static const String baseUrl = '$rootUrl/api';
   static const String serverBaseUrl = rootUrl;
   static const String socketUrl = serverBaseUrl;
+
+  // ====================  AI RECOMMENDATIONS ====================
+
+  static String aiRecommendationsPersonalized({
+    int limit = 10,
+    double? latitude,
+    double? longitude,
+    double radius = 10.0,
+    double? minPrice,
+    double? maxPrice,
+  }) {
+    final params = <String, String>{
+      'limit': limit.toString(),
+    };
+
+    // GỬI THÔNG TIN XÁC NHẬN TOẠN ĐỘ VÀ KHOẢNG CÁCH
+    if (latitude != null && longitude != null) {
+      params['latitude'] = latitude.toStringAsFixed(6);
+      params['longitude'] = longitude.toStringAsFixed(6);
+      params['radius'] = radius.toStringAsFixed(2);
+    } else {
+      throw ArgumentError(
+          'latitude and longitude are required for aiRecommendationsPersonalized'
+      );
+    }
+
+    if (minPrice != null && minPrice > 0) {
+      params['minPrice'] = minPrice.toStringAsFixed(0);
+    }
+
+    if (maxPrice != null && maxPrice > 0) {
+      params['maxPrice'] = maxPrice.toStringAsFixed(0);
+    }
+
+    final uri = Uri.parse('$baseUrl/ai/recommendations/personalized')
+        .replace(queryParameters: params);
+
+    debugPrint('🤖 AI Personalized URL: ${uri.toString()}');
+    return uri.toString();
+  }
+
+  /// GET /api/ai/recommendations/nearby/:rentalId
+  /// AI gợi ý nearby kết hợp với geospatial query
+  ///  Backend: ai-recommendations.js
+  static String aiRecommendationsNearby({
+    required String rentalId,
+    int limit = 10,
+    double radius = 10.0,
+  }) {
+    if (rentalId.isEmpty || rentalId.startsWith('current_location_')) {
+      throw ArgumentError(
+          'Invalid rental ID: $rentalId. Use aiRecommendationsPersonalized instead.'
+      );
+    }
+
+    final params = <String, String>{
+      'limit': limit.toString(),
+      'radius': radius.toStringAsFixed(2),
+    };
+
+    final uri = Uri.parse('$baseUrl/ai/recommendations/nearby/$rentalId')
+        .replace(queryParameters: params);
+
+    debugPrint('🤖 AI Nearby URL: ${uri.toString()}');
+    return uri.toString();
+  }
 
 // ==================== NEARBY RENTALS (FIXED) =================================
   //Lấy bài đăng gần một bài đăng khác (dùng rental ID)

@@ -4,9 +4,14 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_rentalhouse/services/rental_service.dart';
 import '../services/api_service.dart';
 import '../models/rental.dart';
+import '../services/auth_service.dart';
 
 class RentalViewModel extends ChangeNotifier {
   // Các thông tin gọi  =========================================================
+
+  bool _isAIRecommendation = false;
+  String? _aiRecommendationMessage;
+
   final ApiService _apiService = ApiService();
   final RentalService _rentalService = RentalService();
   List<Rental> _rentals = [];
@@ -29,6 +34,9 @@ class RentalViewModel extends ChangeNotifier {
 
   //  Cancellation tokens for ongoing requests =========================================================
   bool _isFetchingNearby = false;
+
+  bool get isAIRecommendation => _isAIRecommendation;
+  String? get aiRecommendationMessage => _aiRecommendationMessage;
 
   List<Rental> get rentals => _rentals;
   List<Rental> get searchResults => _searchResults;
@@ -528,5 +536,200 @@ class RentalViewModel extends ChangeNotifier {
       'new': newRentals,
       'publishedRate': total > 0 ? (published / total * 100).toStringAsFixed(1) : '0.0',
     };
+  }
+
+  // =====================================================================================================
+  // THÊM CÁC PHƯƠNG THỨC LIÊN QUAN ĐẾN AI RECOMMENDATIONS
+  Future<void> fetchAIRecommendations({
+    required double latitude,
+    required double longitude,
+    double? radius,
+    double? minPrice,
+    double? maxPrice,
+  }) async {
+    // Cancel if already fetching
+    if (_isFetchingNearby) {
+      debugPrint('⚠️ Already fetching, skipping AI recommendations...');
+      return;
+    }
+
+    _isFetchingNearby = true;
+    _isLoading = true;
+    _errorMessage = null;
+    _warningMessage = null;
+    _isAIRecommendation = false;
+    _aiRecommendationMessage = null;
+    notifyListeners();
+
+    // Validate coordinates
+    if (latitude.abs() > 90 || longitude.abs() > 180) {
+      _errorMessage = 'Tọa độ không hợp lệ (lat: [-90,90], lon: [-180,180])';
+      _isLoading = false;
+      _isFetchingNearby = false;
+      notifyListeners();
+      return;
+    }
+
+    // Update filters
+    if (radius != null) _currentRadius = radius;
+    if (minPrice != null) _currentMinPrice = minPrice;
+    if (maxPrice != null) _currentMaxPrice = maxPrice;
+
+    try {
+      final token = await AuthService().getIdToken();
+
+      if (token == null) {
+        throw Exception('Vui lòng đăng nhập để xem gợi ý AI');
+      }
+
+      final result = await _rentalService.fetchAIRecommendations(
+        latitude: latitude,
+        longitude: longitude,
+        radius: _currentRadius,
+        minPrice: _currentMinPrice,
+        maxPrice: _currentMaxPrice,
+        limit: 20,
+        token: token,
+      );
+
+      if (_isFetchingNearby) {
+
+        _nearbyRentals = [];
+        _nearbyRentals = result['rentals'] ?? [];
+        _isAIRecommendation = result['isAIRecommendation'] ?? false;
+        _aiRecommendationMessage = result['message'] ?? 'Gợi ý';
+
+        debugPrint('✅ [AI-RECOMMENDATIONS] Success');
+        debugPrint('   Found: ${_nearbyRentals.length} rentals');
+        debugPrint('   Is AI: $_isAIRecommendation');
+        debugPrint('   Message: $_aiRecommendationMessage');
+
+
+        notifyListeners();
+      }
+    } catch (e) {
+      if (_isFetchingNearby) {
+        String errorMsg = e.toString();
+
+        if (errorMsg.contains('Invalid coordinates')) {
+          _errorMessage = 'Tọa độ không hợp lệ. Vui lòng thử lại.';
+        } else if (errorMsg.contains('đăng nhập')) {
+          _errorMessage = errorMsg.replaceAll('Exception: ', '');
+        } else if (errorMsg.contains('401')) {
+          _errorMessage = 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.';
+        } else if (errorMsg.contains('timeout')) {
+          _errorMessage = 'Quá thời gian chờ. Vui lòng thử lại.';
+        } else if (errorMsg.contains('Lỗi kết nối')) {
+          _errorMessage = 'Lỗi kết nối mạng. Vui lòng kiểm tra internet.';
+        } else if (errorMsg.contains('Lỗi máy chủ')) {
+          _errorMessage = 'Lỗi máy chủ. Vui lòng thử lại sau.';
+        } else {
+          _errorMessage = 'Không thể tải gợi ý AI';
+        }
+
+        debugPrint('❌ [AI-RECOMMENDATIONS] Error: $_errorMessage');
+        debugPrint('   Original: $e');
+
+        // Fallback to empty list
+        _nearbyRentals = [];
+        _isAIRecommendation = false;
+
+        notifyListeners();
+      }
+    } finally {
+      _isFetchingNearby = false;
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  // =====================================================================================================
+  /// Fetch AI-powered nearby recommendations for a specific rental
+  Future<void> fetchAINearbyRecommendations({
+    required String rentalId,
+    double? radius,
+  }) async {
+    // Cancel if already fetching
+    if (_isFetchingNearby) {
+      return;
+    }
+
+    _isFetchingNearby = true;
+    _isLoading = true;
+    _errorMessage = null;
+    _warningMessage = null;
+    _isAIRecommendation = false;
+    _aiRecommendationMessage = null;
+    notifyListeners();
+
+    // Validate rentalId
+    if (rentalId.isEmpty || rentalId.startsWith('current_location_')) {
+      _errorMessage = 'ID bài đăng không hợp lệ.';
+      _isLoading = false;
+      _isFetchingNearby = false;
+      notifyListeners();
+      return;
+    }
+
+    // Update radius if provided
+    if (radius != null) _currentRadius = radius;
+
+    try {
+      final token = await AuthService().getIdToken();
+
+      if (token == null) {
+        throw Exception('Vui lòng đăng nhập để xem gợi ý AI');
+      }
+
+      debugPrint(' Got authentication token');
+
+      final result = await _rentalService.fetchAINearbyRecommendations(
+        rentalId: rentalId,
+        radius: _currentRadius,
+        limit: 20,
+        token: token,
+      );
+
+      if (_isFetchingNearby) {
+        //  Cập nhật dữ liệu rõ ràng
+        _nearbyRentals = [];
+        _nearbyRentals = result['rentals'] ?? [];
+        _isAIRecommendation = result['isAIRecommendation'] ?? false;
+        _aiRecommendationMessage = result['message'] ?? 'Gợi ý gần đây';
+
+        //  Notify ngay sau khi update dữ liệu
+        notifyListeners();
+      }
+    } catch (e) {
+      if (_isFetchingNearby) {
+        String errorMsg = e.toString();
+
+        if (errorMsg.contains('Rental not found')) {
+          _errorMessage = 'Bài đăng không tìm thấy.';
+        } else if (errorMsg.contains('Invalid rental ID')) {
+          _errorMessage = 'ID bài đăng không hợp lệ.';
+        } else if (errorMsg.contains('đăng nhập')) {
+          _errorMessage = errorMsg.replaceAll('Exception: ', '');
+        } else if (errorMsg.contains('401')) {
+          _errorMessage = 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.';
+        } else if (errorMsg.contains('timeout')) {
+          _errorMessage = 'Quá thời gian chờ. Vui lòng thử lại.';
+        } else if (errorMsg.contains('Lỗi kết nối')) {
+          _errorMessage = 'Lỗi kết nối mạng. Vui lòng kiểm tra internet.';
+        } else {
+          _errorMessage = 'Không thể tải gợi ý AI';
+        }
+
+        // Fallback to empty list
+        _nearbyRentals = [];
+        _isAIRecommendation = false;
+
+        notifyListeners();
+      }
+    } finally {
+      _isFetchingNearby = false;
+      _isLoading = false;
+      notifyListeners();
+    }
   }
 }

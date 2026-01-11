@@ -2,6 +2,14 @@ require('dotenv').config();
 const express = require('express');
 const router = express.Router();
 const mongoose = require('mongoose');
+
+const { 
+  trackRentalView, 
+  trackAction, 
+  trackDetailedInteraction,
+  getUserAnalytics 
+} = require('../middleware/trackingMiddleware');
+
 const admin = require('firebase-admin');
 const Rental = require('../models/Rental');
 const Favorite = require('../models/favorite');
@@ -19,7 +27,7 @@ const authMiddleware = async (req, res, next) => {
   }
 };
 
-router.post('/favorites', authMiddleware, async (req, res) => {
+router.post('/favorites', authMiddleware, trackAction('favorite'), async (req, res) => {
   try {
     const { rentalId } = req.body;
     const rental = await Rental.findById(rentalId);
@@ -34,7 +42,7 @@ router.post('/favorites', authMiddleware, async (req, res) => {
   }
 });
 
-router.delete('/favorites/:rentalId', authMiddleware, async (req, res) => {
+router.delete('/favorites/:rentalId', authMiddleware, trackAction('unfavorite'),async (req, res) => {
   try {
     const rentalId = req.params.rentalId;
 
