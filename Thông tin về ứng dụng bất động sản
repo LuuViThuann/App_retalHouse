@@ -25,6 +25,27 @@ Thông tin mô tả công nghệ sử dụng và chức năng trong ứng dụng
 + Tích hợp KEY từ OpenAI : cho chức năng chat giao tiếp tư vấn 
 + Sử dụng Bcrypt chuyển mật khẩu sang chuỗi hash lưu trong DB.
 *-------------------------------------------------------------------------
-
-* Link xem demo ứng dụng hiện tại :  https://drive.google.com/file/d/1QdOGp06JYeKNe_fZuYhWBfIrIQOwXFiL/view?usp=sharing
+* THÔNG TIN CHỨC NĂNG CÓ TRONG ỨNG DỤNG : 
+- Các chức năng hiện tại đang xây dựng : 
++ Đăng nhập / Đăng ký / Khôi phục pass qua Email / Đăng nhập GG
++ Hiển thị các thông tin loại bất động sản / bài mới tại trang chính 
++ Tìm kiếm thông tin BĐS theo loại / từ khóa / khoảng giá 
++ Đăng bài tính phí thanh toán thông qua test VNPay
++ Thống kê tổng quan về các loại BĐS / giá cả , ....
++ Tìm kiếm các BĐS thông qua tương tác trên bản đồ và hiển thị các gợi ý các bài đăng khác trong bán kính vị trí đó 
++ Lọc khoảng giá trong bán kính đang xem trên bản đồ
++ Lưu lịch sử giao dịch thanh toán
++ Tạo cuộc trò chuyện và nhắn tin thông qua bài viết của người đăng BĐS 
++ ChatBox - AI tư vấn BĐS 
++ Lưu yêu thích các BĐS 
++ Xem chi tiết thông tin BĐS và bình luận / phản hồi / đánh giá cho người dùng trong chi tiết bài đăng
++ Lưu các thông báo tương tác gần đây trong app
++ Đăng gửi các góp ý & phản hồi 
++ Thông tin hồ sơ cá nhân 
++ Xem danh sách bài đăng thuộc trong tài khoản
++ Danh sách tin tức 
+*-------------------------------------------------------------------------
+*TRAIN MODEL AI - Sử dụng Python cá nhân hóa gợi ý cho USER 
+*-------------------------------------------------------------------------
+* Link xem demo ứng dụng hiện tại :  https://drive.google.com/file/d/1WujHEhS1lJzFnmhoTGFbagbxZhWch5Ut/view?usp=sharing
 
