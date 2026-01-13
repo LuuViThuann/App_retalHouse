@@ -9,6 +9,7 @@ const http = require('http');
 const { Server } = require('socket.io');
 const redis = require('redis');
 
+const poiRoutes = require('./routes/poi-routes');
 const aiRecommendationRoutes = require('./routes/ai-recommendations');
 const rentalRoutes = require('./routes/rental');
 const authRoutes = require('./routes/auth');
@@ -132,6 +133,7 @@ waitForRedis.then(() => {
 });
 
 app.use('/api/ai', aiRecommendationRoutes);
+app.use('/api/poi', poiRoutes);
 
 app.use('/api/auth', authRoutes);
 app.use('/api', rentalRoutes);

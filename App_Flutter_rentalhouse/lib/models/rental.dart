@@ -32,6 +32,8 @@ class Rental {
 
   double? locationBonus;
   double? finalScore;
+  List<Map<String, dynamic>>? nearestPOIs;
+
 
   Rental({
     required this.id,
@@ -64,6 +66,7 @@ class Rental {
     this.distanceKm,
     this.locationBonus,     // ← thêm
     this.finalScore,        // ← thêm
+    this.nearestPOIs,
   });
 
 
@@ -294,6 +297,18 @@ class Rental {
         };
       }
 
+      List<Map<String, dynamic>>? poisData;
+      if (json['nearestPOIs'] != null && json['nearestPOIs'] is List) {
+        poisData = (json['nearestPOIs'] as List).map((poi) {
+          return {
+            'name': poi['name'] as String? ?? '',
+            'category': poi['category'] as String? ?? '',
+            'icon': poi['icon'] as String? ?? '📍',
+            'distance': poi['distance']?.toString() ?? '0',
+          };
+        }).toList();
+      }
+
       final price = _parseDouble(json['price'], 'price') ?? 0.0;
 
       return Rental(
@@ -303,6 +318,7 @@ class Rental {
         price: price,
         area: areaData,
         location: locationData,
+        nearestPOIs: poisData,
         propertyType: json['propertyType'] as String? ?? 'Khác',
         furniture: List<String>.from(json['furniture'] as List? ?? []),
         amenities: List<String>.from(json['amenities'] as List? ?? []),

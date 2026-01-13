@@ -3,10 +3,39 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 class ApiRoutes {
   static const String rootUrl =
-      'http://192.168.1.2:3000'; // http://192.168.43.168:3000 - mạng dữ liệu
+      'http://192.168.1.22:3000'; // http://192.168.43.168:3000 - mạng dữ liệu
   static const String baseUrl = '$rootUrl/api';
   static const String serverBaseUrl = rootUrl;
   static const String socketUrl = serverBaseUrl;
+
+  // ==================== POI ENDPOINTS ====================
+  /// GET /api/poi/categories - Lấy danh sách categories
+  static const String poiCategories = '$baseUrl/poi/categories';
+  static const String filterRentalsByPOI = '$baseUrl/poi/filter-rentals-by-poi';
+  /// POST /api/poi/ai-recommendations - AI + POI combined
+  static const String aiPOIRecommendations = '$baseUrl/poi/ai-recommendations';
+  /// GET /api/poi/nearby?latitude=...&longitude=...&category=EDUCATION&radius=5
+  static String poiNearby({
+    required double latitude,
+    required double longitude,
+    String? category,
+    double radius = 5.0,
+  }) {
+    final params = <String, String>{
+      'latitude': latitude.toStringAsFixed(6),
+      'longitude': longitude.toStringAsFixed(6),
+      'radius': radius.toStringAsFixed(2),
+    };
+    if (category != null && category != 'ALL') {
+      params['category'] = category;
+    }
+    final uri = Uri.parse('$baseUrl/poi/nearby').replace(queryParameters: params);
+    return uri.toString();
+  }
+
+
+  /// POST /api/poi/rentals-near-poi - Lấy rentals gần POI
+  static const String rentalsNearPOI = '$baseUrl/poi/rentals-near-poi';
 
   // ====================  AI RECOMMENDATIONS ====================
 

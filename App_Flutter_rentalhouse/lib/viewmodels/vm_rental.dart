@@ -2,9 +2,11 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter_rentalhouse/services/rental_service.dart';
+import '../models/poi.dart';
 import '../services/api_service.dart';
 import '../models/rental.dart';
 import '../services/auth_service.dart';
+import '../services/poi_service.dart';
 
 class RentalViewModel extends ChangeNotifier {
   // Các thông tin gọi  =========================================================
@@ -23,6 +25,12 @@ class RentalViewModel extends ChangeNotifier {
   int _total = 0;
   int _page = 1;
   int _pages = 1;
+
+  // CÁC BIẾN CHO POI ==========================================================
+  final POIService _poiService = POIService();
+  List<POICategory> _poiCategories = [];
+  List<POI> _nearbyPOIs = [];
+  List<String> _selectedPOICategories = [];
 
   // Thêm các thuộc tính cho bộ lọc nearby rentals và trạng thái =========================================================
   double _currentRadius = 10.0;
@@ -51,6 +59,11 @@ class RentalViewModel extends ChangeNotifier {
   double get currentRadius => _currentRadius;
   double? get currentMinPrice => _currentMinPrice;
   double? get currentMaxPrice => _currentMaxPrice;
+
+  // POI getters =========================================================
+  List<POICategory> get poiCategories => _poiCategories;
+  List<POI> get nearbyPOIs => _nearbyPOIs;
+  List<String> get selectedPOICategories => _selectedPOICategories;
 
   // ============================================
   //  LIFECYCLE METHODS
@@ -732,4 +745,108 @@ class RentalViewModel extends ChangeNotifier {
       notifyListeners();
     }
   }
+
+  /// Fetch POI categories
+  Future<void> fetchPOICategories() async {
+    try {
+      _poiCategories = await _poiService.getCategories();
+      debugPrint('✅ Loaded ${_poiCategories.length} POI categories');
+      notifyListeners();
+    } catch (e) {
+      debugPrint('❌ Error fetching POI categories: $e');
+    }
+  }
+
+  /// Fetch POIs near location
+  Future<void> fetchPOIsNearLocation({
+    required double latitude,
+    required double longitude,
+    String? category,
+    double radius = 5.0,
+  }) async {
+    try {
+      _nearbyPOIs = await _poiService.getPOIsNearby(
+        latitude: latitude,
+        longitude: longitude,
+        category: category,
+        radius: radius,
+      );
+
+      debugPrint('✅ Found ${_nearbyPOIs.length} POIs');
+      notifyListeners();
+    } catch (e) {
+      debugPrint('❌ Error fetching POIs: $e');
+      _errorMessage = 'Không thể tải danh sách tiện ích: $e';
+      notifyListeners();
+    }
+  }
+
+  /// Toggle POI category selection
+  void togglePOICategory(String categoryId) {
+    if (_selectedPOICategories.contains(categoryId)) {
+      _selectedPOICategories.remove(categoryId);
+    } else {
+      _selectedPOICategories.add(categoryId);
+    }
+    notifyListeners();
+  }
+
+  /// Clear POI selections
+  void clearPOISelections() {
+    _selectedPOICategories.clear();
+    notifyListeners();
+  }
+
+  /// Fetch AI + POI combined recommendations
+  Future<void> fetchAIPOIRecommendations({
+    required double latitude,
+    required double longitude,
+    double? radius,
+    double? minPrice,
+    double? maxPrice,
+  }) async {
+    if (_isFetchingNearby) {
+      debugPrint('⚠️ Already fetching');
+      return;
+    }
+
+    _isFetchingNearby = true;
+    _isLoading = true;
+    _errorMessage = null;
+    notifyListeners();
+
+    try {
+      final result = await _poiService.getAIPOIRecommendations(
+        latitude: latitude,
+        longitude: longitude,
+        selectedCategories: _selectedPOICategories,
+        radius: radius ?? _currentRadius,
+        minPrice: minPrice ?? _currentMinPrice,
+        maxPrice: maxPrice ?? _currentMaxPrice,
+        limit: 20,
+      );
+
+      if (_isFetchingNearby) {
+        _nearbyRentals = [];
+        _nearbyRentals = result['rentals'] ?? [];
+        _isAIRecommendation = result['isAIRecommendation'] ?? false;
+        _aiRecommendationMessage = result['message'] ?? '';
+
+        debugPrint('✅ AI+POI: ${_nearbyRentals.length} rentals');
+        notifyListeners();
+      }
+    } catch (e) {
+      if (_isFetchingNearby) {
+        _errorMessage = 'Không thể tải gợi ý AI+POI: $e';
+        _nearbyRentals = [];
+        _isAIRecommendation = false;
+        notifyListeners();
+      }
+    } finally {
+      _isFetchingNearby = false;
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
 }

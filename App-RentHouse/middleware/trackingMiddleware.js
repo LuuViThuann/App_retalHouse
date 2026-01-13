@@ -244,7 +244,7 @@ const getUserAnalytics = async (req, res) => {
       .populate('rentalId', 'title price location images')
       .lean();
     
-    // Calculate stats
+    // Calculate stats    
     const totalInteractions = recentInteractions.length;
     const avgDuration = recentInteractions.reduce((sum, i) => sum + (i.duration || 0), 0) / totalInteractions || 0;
     const avgScrollDepth = recentInteractions.reduce((sum, i) => sum + (i.scrollDepth || 0), 0) / totalInteractions || 0;
