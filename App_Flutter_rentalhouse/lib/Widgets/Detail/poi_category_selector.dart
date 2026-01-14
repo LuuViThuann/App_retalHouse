@@ -22,6 +22,7 @@ class POICategorySelector extends StatefulWidget {
 class _POICategorySelectorState extends State<POICategorySelector> {
   bool _isLoading = false;
   String? _errorMessage;
+  static const int MAX_SELECTIONS = 2;
 
   @override
   void initState() {
@@ -306,23 +307,37 @@ class _POICategorySelectorState extends State<POICategorySelector> {
       bool isSelected,
       VoidCallback onTap,
       ) {
+    final viewModel = Provider.of<RentalViewModel>(context, listen: false);
+    final canSelect = isSelected || viewModel.selectedPOICategories.length < MAX_SELECTIONS;
+
     return Material(
-      color: isSelected ? Colors.blue[50] : Colors.white,
-      borderRadius: BorderRadius.circular(12),
-      child: InkWell(
-        onTap: onTap,
+        color: isSelected ? Colors.blue[50] : Colors.white,
         borderRadius: BorderRadius.circular(12),
-        child: Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            border: Border.all(
-              color: isSelected ? Colors.blue[400]! : Colors.grey[300]!,
-              width: isSelected ? 2 : 1,
-            ),
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
+        child: InkWell(
+          onTap: canSelect ? onTap : () {
+            // 🔥 HIỂN THỊ THÔNG BÁO KHI ĐÃ ĐẦY
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Chỉ được chọn tối đa $MAX_SELECTIONS tiện ích'),
+                backgroundColor: Colors.orange[700],
+                duration: const Duration(seconds: 2),
+              ),
+            );
+          },
+          borderRadius: BorderRadius.circular(12),
+          child: Opacity(
+            opacity: canSelect ? 1.0 : 0.5, // 🔥 LÀM MỜ KHI KHÔNG THỂ CHỌN
+            child: Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                border: Border.all(
+                  color: isSelected ? Colors.blue[400]! : Colors.grey[300]!,
+                  width: isSelected ? 2 : 1,
+                ),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
             children: [
               // Icon
               Container(
@@ -371,6 +386,7 @@ class _POICategorySelectorState extends State<POICategorySelector> {
           ),
         ),
       ),
+    ),
     );
   }
 
@@ -430,12 +446,12 @@ class _POICategorySelectorState extends State<POICategorySelector> {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Icon(Icons.search, size: 20, color: Colors.white,),
+                  const Icon(Icons.search, size: 20, color: Colors.white),
                   const SizedBox(width: 8),
                   Text(
                     viewModel.selectedPOICategories.isEmpty
                         ? 'Chọn ít nhất 1 tiện ích'
-                        : 'Tìm kiếm (${viewModel.selectedPOICategories.length})',
+                        : 'Tìm kiếm (${viewModel.selectedPOICategories.length}/$MAX_SELECTIONS)', // 🔥 HIỂN THỊ X/2
                     style: const TextStyle(
                         fontWeight: FontWeight.bold,
                         fontSize: 15,

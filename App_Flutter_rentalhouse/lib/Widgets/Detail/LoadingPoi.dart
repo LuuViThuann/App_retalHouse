@@ -16,6 +16,9 @@ class LazyLoadPOIDialog extends StatefulWidget {
 
 class _LazyLoadPOIDialogState extends State<LazyLoadPOIDialog>
     with SingleTickerProviderStateMixin {
+  // ✅ FIX: Thêm flag kiểm tra widget mounted
+  late bool _mounted;
+
   final ScrollController _scrollController = ScrollController();
   final int _itemsPerPage = 10;
   int _currentPage = 1;
@@ -31,6 +34,10 @@ class _LazyLoadPOIDialogState extends State<LazyLoadPOIDialog>
   @override
   void initState() {
     super.initState();
+
+    // ✅ FIX: Đặt _mounted = true tại initState
+    _mounted = true;
+
     _categorizeData();
     _loadInitialData();
     _scrollController.addListener(_onScroll);
@@ -38,9 +45,24 @@ class _LazyLoadPOIDialogState extends State<LazyLoadPOIDialog>
 
   @override
   void dispose() {
+    // ✅ FIX: Đặt _mounted = false TRƯỚC tiên
+    _mounted = false;
+
+    // ✅ FIX: Remove listener trước dispose
+    _scrollController.removeListener(_onScroll);
     _scrollController.dispose();
+
+    // ✅ FIX: Dispose TabController
     _tabController.dispose();
+
     super.dispose();
+  }
+
+  // ✅ FIX: Helper function cho safe setState
+  void _safeSetState(VoidCallback callback) {
+    if (_mounted && mounted) {
+      setState(callback);
+    }
   }
 
   void _categorizeData() {
@@ -56,11 +78,14 @@ class _LazyLoadPOIDialogState extends State<LazyLoadPOIDialog>
     // Tạo danh sách categories
     _categories = ['ALL', ..._categorizedPOIs.keys.toList()..sort()];
 
+    // ✅ FIX: Kiểm tra _mounted trước khi tạo TabController
+    if (!_mounted) return;
+
     // Khởi tạo TabController
     _tabController = TabController(length: _categories.length, vsync: this);
     _tabController.addListener(() {
-      if (!_tabController.indexIsChanging) {
-        setState(() {
+      if (!_tabController.indexIsChanging && _mounted && mounted) {
+        _safeSetState(() {
           _selectedCategory = _categories[_tabController.index];
           _currentPage = 1;
         });
@@ -79,7 +104,7 @@ class _LazyLoadPOIDialogState extends State<LazyLoadPOIDialog>
     final currentPOIs = _getCurrentPOIs();
     final initialData = currentPOIs.take(_itemsPerPage).toList();
 
-    setState(() {
+    _safeSetState(() {
       _displayedPOIs[_selectedCategory] = initialData;
       _hasMoreData[_selectedCategory] = currentPOIs.length > _itemsPerPage;
       _currentPage = 1;
@@ -98,6 +123,9 @@ class _LazyLoadPOIDialogState extends State<LazyLoadPOIDialog>
   }
 
   void _onScroll() {
+    // ✅ FIX: Kiểm tra _mounted trước khi xử lý scroll
+    if (!_mounted || !mounted) return;
+
     if (_scrollController.position.pixels >=
         _scrollController.position.maxScrollExtent * 0.8) {
       if (!(_isLoadingMore[_selectedCategory] ?? false) &&
@@ -108,14 +136,27 @@ class _LazyLoadPOIDialogState extends State<LazyLoadPOIDialog>
   }
 
   Future<void> _loadMorePOIs() async {
+    // ✅ FIX: Kiểm tra tất cả conditions trước khi tiếp tục
+    if (!_mounted || !mounted) {
+      print('⚠️ Widget disposed, cancelling _loadMorePOIs');
+      return;
+    }
+
     if (_isLoadingMore[_selectedCategory] ?? false) return;
     if (!(_hasMoreData[_selectedCategory] ?? true)) return;
 
-    setState(() {
+    _safeSetState(() {
       _isLoadingMore[_selectedCategory] = true;
     });
 
+    // ✅ FIX: Simulate delay nhưng kiểm tra _mounted sau delay
     await Future.delayed(const Duration(milliseconds: 500));
+
+    // ✅ FIX: Kiểm tra _mounted sau async operation
+    if (!_mounted || !mounted) {
+      print('⚠️ Widget disposed, cancelling after delay');
+      return;
+    }
 
     final currentPOIs = _getCurrentPOIs();
     final currentDisplayed = _getCurrentDisplayedPOIs();
@@ -124,7 +165,7 @@ class _LazyLoadPOIDialogState extends State<LazyLoadPOIDialog>
     final endIndex = math.min(startIndex + _itemsPerPage, currentPOIs.length);
 
     if (startIndex >= currentPOIs.length) {
-      setState(() {
+      _safeSetState(() {
         _isLoadingMore[_selectedCategory] = false;
         _hasMoreData[_selectedCategory] = false;
       });
@@ -133,11 +174,20 @@ class _LazyLoadPOIDialogState extends State<LazyLoadPOIDialog>
 
     final newPOIs = currentPOIs.sublist(startIndex, endIndex);
 
-    setState(() {
-      _displayedPOIs[_selectedCategory] = [...currentDisplayed, ...newPOIs];
-      _isLoadingMore[_selectedCategory] = false;
-      _hasMoreData[_selectedCategory] = endIndex < currentPOIs.length;
-    });
+    // ✅ FIX: Final check trước setState
+    if (_mounted && mounted) {
+      _safeSetState(() {
+        _displayedPOIs[_selectedCategory] = [...currentDisplayed, ...newPOIs];
+        _isLoadingMore[_selectedCategory] = false;
+        _hasMoreData[_selectedCategory] = endIndex < currentPOIs.length;
+      });
+    }
+  }
+
+  // ✅ FIX: Thêm method để refresh data
+  Future<void> _refreshPOIs() async {
+    if (!_mounted || !mounted) return;
+    _loadInitialData();
   }
 
   @override
@@ -169,19 +219,22 @@ class _LazyLoadPOIDialogState extends State<LazyLoadPOIDialog>
             Flexible(
               child: displayedPOIs.isEmpty
                   ? _buildEmptyState()
-                  : ListView.separated(
-                controller: _scrollController,
-                padding: const EdgeInsets.all(16),
-                itemCount: displayedPOIs.length +
-                    ((_hasMoreData[_selectedCategory] ?? false) ? 1 : 0),
-                separatorBuilder: (context, index) =>
-                const SizedBox(height: 8),
-                itemBuilder: (context, index) {
-                  if (index == displayedPOIs.length) {
-                    return _buildLoadingIndicator();
-                  }
-                  return _buildPOIItem(displayedPOIs[index], index);
-                },
+                  : RefreshIndicator(
+                onRefresh: _refreshPOIs,
+                child: ListView.separated(
+                  controller: _scrollController,
+                  padding: const EdgeInsets.all(16),
+                  itemCount: displayedPOIs.length +
+                      ((_hasMoreData[_selectedCategory] ?? false) ? 1 : 0),
+                  separatorBuilder: (context, index) =>
+                  const SizedBox(height: 8),
+                  itemBuilder: (context, index) {
+                    if (index == displayedPOIs.length) {
+                      return _buildLoadingIndicator();
+                    }
+                    return _buildPOIItem(displayedPOIs[index], index);
+                  },
+                ),
               ),
             ),
 
@@ -239,7 +292,11 @@ class _LazyLoadPOIDialogState extends State<LazyLoadPOIDialog>
             ),
           ),
           IconButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () {
+              // ✅ FIX: Ensure _mounted = false trước pop
+              _mounted = false;
+              Navigator.pop(context);
+            },
             icon: Icon(Icons.close, color: Colors.grey[700], size: 22),
             padding: EdgeInsets.zero,
             constraints: const BoxConstraints(),
@@ -389,7 +446,7 @@ class _LazyLoadPOIDialogState extends State<LazyLoadPOIDialog>
                 Icon(Icons.near_me, color: Colors.blue[600], size: 14),
                 const SizedBox(width: 4),
                 Text(
-                  '${poi['distance']} km',
+                  _formatDistance(poi['distance']),
                   style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
@@ -402,6 +459,23 @@ class _LazyLoadPOIDialogState extends State<LazyLoadPOIDialog>
         ],
       ),
     );
+  }
+
+  String _formatDistance(dynamic distanceValue) {
+    double distance;
+
+    if (distanceValue is String) {
+      distance = double.tryParse(distanceValue) ?? 0.0;
+    } else if (distanceValue is num) {
+      distance = distanceValue.toDouble();
+    } else {
+      return '0 m';
+    }
+
+    if (distance < 1) {
+      return '${(distance * 1000).toInt()} m';
+    }
+    return '${distance.toStringAsFixed(2)} km';
   }
 
   Widget _buildLoadingIndicator() {

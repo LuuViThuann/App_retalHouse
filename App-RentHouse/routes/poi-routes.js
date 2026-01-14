@@ -1,4 +1,4 @@
-// routes/poi-routes.js - CẬP NHẬT
+// routes/poi-routes.js - TỐI ƯU HÓA
 const express = require('express');
 const router = express.Router();
 const { POIService, POI_CATEGORIES } = require('../service/poi-service');
@@ -57,10 +57,11 @@ router.get('/categories', async (req, res) => {
         error: error.message,
       });
     }
-  });
+});
+
 /**
  * 🔥 CẬP NHẬT: POST /api/poi/filter-rentals-by-poi
- * Lọc rentals dựa trên tiện ích và khoảng cách
+ * ✅ TỐI ƯU HÓA: Xử lý lỗi 504, giới hạn POI, parallel processing
  */
 router.post('/filter-rentals-by-poi', authMiddleware, async (req, res) => {
     try {
@@ -88,13 +89,19 @@ router.post('/filter-rentals-by-poi', authMiddleware, async (req, res) => {
           message: 'Vui lòng chọn ít nhất một loại tiện ích',
         });
       }
+
+      // ✅ CẬP NHẬT: Cho phép chọn tối đa 3 loại (tăng từ 2)
+      if (selectedCategories.length > 3) {
+        return res.status(400).json({
+          success: false,
+          message: 'Chỉ được chọn tối đa 3 loại tiện ích',
+        });
+      }
   
       const lat = parseFloat(latitude);
       const lon = parseFloat(longitude);
       const radiusKm = parseFloat(radius);
 
-     
-  
       if (isNaN(lat) || isNaN(lon) || isNaN(radiusKm)) {
         return res.status(400).json({
           success: false,
@@ -111,24 +118,31 @@ router.post('/filter-rentals-by-poi', authMiddleware, async (req, res) => {
         maxPrice
       });
   
-      // Step 1: Fetch POIs for selected categories
+      // Step 1: Fetch POIs for selected categories (Parallel)
       console.log(`📍 [POI-FILTER] Fetching POIs for categories: ${selectedCategories.join(', ')}`);
       
       const poiData = {};
       const allPOIs = [];
   
-      
-      for (const category of selectedCategories) {
-        const pois = await poiService.getPOIsByCategory(lat, lon, category, radiusKm + 2);
-        poiData[category] = pois;
-        allPOIs.push(...pois);
-        console.log(`   ✅ ${category}: ${pois.length} POIs`);
-      }
+      // ✅ CẬP NHẬT: Sử dụng Promise.all cho việc fetch parallel
+      const poiPromises = selectedCategories.map(async (category) => {
+        try {
+          const pois = await poiService.getPOIsByCategory(lat, lon, category, radiusKm + 2);
+          poiData[category] = pois;
+          allPOIs.push(...pois);
+          console.log(`   ✅ ${category}: ${pois.length} POIs`);
+          return pois;
+        } catch (error) {
+          console.error(`   ⚠️ ${category}: Lỗi khi fetch - ${error.message}`);
+          poiData[category] = [];
+          return [];
+        }
+      });
+
+      await Promise.all(poiPromises);
   
       console.log(`✅ [POI-FILTER] Total POIs found: ${allPOIs.length}`);
   
-     
-      
       if (allPOIs.length === 0) {
         return res.json({
           success: true,
@@ -196,9 +210,9 @@ router.post('/filter-rentals-by-poi', authMiddleware, async (req, res) => {
   
       res.json({
         success: true,
-       rentals: rentalsWithPOI.map(rental => ({
+        rentals: rentalsWithPOI.map(rental => ({
             ...rental,
-            nearestPOIs: rental.nearestPOIs || [] // Đảm bảo luôn có array
+            nearestPOIs: rental.nearestPOIs || []
           })),
         pois: highlightPOIs,
         total: rentalsWithPOI.length,
@@ -217,9 +231,9 @@ router.post('/filter-rentals-by-poi', authMiddleware, async (req, res) => {
       });
     }
   });
+
 /**
  * GET /api/poi/nearby - Lấy POI gần vị trí
- * Query params: latitude, longitude, category, radius
  */
 router.get('/nearby', async (req, res) => {
     try {
@@ -286,6 +300,7 @@ router.get('/nearby', async (req, res) => {
       });
     }
   });
+
 /**
  * POST /api/poi/rentals-near-poi - Lấy rentals gần POI
  */
@@ -309,12 +324,10 @@ router.post('/rentals-near-poi', authMiddleware, async (req, res) => {
       maxPrice
     });
 
-    // Build query filter
     const query = {
       status: 'available',
     };
 
-    // Price filter
     if (minPrice || maxPrice) {
       query.price = {};
       if (minPrice) query.price.$gte = Number(minPrice);
@@ -323,7 +336,6 @@ router.post('/rentals-near-poi', authMiddleware, async (req, res) => {
 
     const radiusInMeters = radius * 1000;
 
-    // Geospatial query
     const rentals = await Rental.aggregate([
       {
         $geoNear: {
@@ -360,7 +372,6 @@ router.post('/rentals-near-poi', authMiddleware, async (req, res) => {
       },
     ]);
 
-    // Add POI info to each rental
     const rentalsWithPOI = rentals.map(rental => ({
       ...rental,
       distanceFromPOI: (rental.distance / 1000).toFixed(2),
@@ -410,7 +421,6 @@ router.post('/ai-recommendations', authMiddleware, async (req, res) => {
       maxPrice,
     } = req.body;
 
-    // Validate
     if (!latitude || !longitude) {
       return res.status(400).json({
         success: false,
@@ -433,18 +443,26 @@ router.post('/ai-recommendations', authMiddleware, async (req, res) => {
       limit
     });
 
-    // Step 1: Fetch POIs for selected categories
+    // Step 1: Fetch POIs for selected categories (Parallel)
     const allPOIs = [];
     
-    for (const category of selectedCategories) {
-      const pois = await poiService.getPOIsByCategory(
-        latitude, 
-        longitude, 
-        category, 
-        radius
-      );
-      allPOIs.push(...pois);
-    }
+    const poiPromises = selectedCategories.map(async (category) => {
+      try {
+        const pois = await poiService.getPOIsByCategory(
+          latitude, 
+          longitude, 
+          category, 
+          radius
+        );
+        allPOIs.push(...pois);
+        return pois;
+      } catch (error) {
+        console.warn(`⚠️ [AI-POI] Error fetching ${category}:`, error.message);
+        return [];
+      }
+    });
+
+    await Promise.all(poiPromises);
 
     console.log(`✅ Found ${allPOIs.length} POIs for ${selectedCategories.length} categories`);
 
@@ -459,22 +477,18 @@ router.post('/ai-recommendations', authMiddleware, async (req, res) => {
       });
     }
 
-    // Step 2: Find rentals near these POIs
     const radiusInMeters = radius * 1000;
     
-    // Build query
     const query = {
       status: 'available',
     };
 
-    // Price filter
     if (minPrice || maxPrice) {
       query.price = {};
       if (minPrice) query.price.$gte = Number(minPrice);
       if (maxPrice) query.price.$lte = Number(maxPrice);
     }
 
-    // Get all rentals near user location first
     const nearbyRentals = await Rental.aggregate([
       {
         $geoNear: {
@@ -488,12 +502,11 @@ router.post('/ai-recommendations', authMiddleware, async (req, res) => {
           query: query,
         },
       },
-      { $limit: parseInt(limit) * 3 }, // Get more for filtering
+      { $limit: parseInt(limit) * 3 },
     ]);
 
     console.log(`📍 Found ${nearbyRentals.length} rentals near user`);
 
-    // Step 3: Score rentals based on proximity to POIs
     const rentalsWithScores = nearbyRentals.map(rental => {
       const rentalLat = rental.location?.coordinates?.coordinates?.[1] || 0;
       const rentalLon = rental.location?.coordinates?.coordinates?.[0] || 0;
@@ -502,7 +515,6 @@ router.post('/ai-recommendations', authMiddleware, async (req, res) => {
         return null;
       }
 
-      // Calculate distances to all POIs
       const poiDistances = allPOIs.map(poi => {
         const distance = poiService.calculateDistance(
           rentalLat,
@@ -513,15 +525,12 @@ router.post('/ai-recommendations', authMiddleware, async (req, res) => {
         return { poi, distance };
       });
 
-      // Sort by distance
       poiDistances.sort((a, b) => a.distance - b.distance);
 
-      // Get 3 nearest POIs
       const nearestPOIs = poiDistances.slice(0, 3);
 
-      // Calculate score (lower distance = higher score)
       const avgDistance = nearestPOIs.reduce((sum, p) => sum + p.distance, 0) / nearestPOIs.length;
-      const score = Math.max(0, 100 - (avgDistance * 10)); // Score from 0-100
+      const score = Math.max(0, 100 - (avgDistance * 10));
 
       return {
         ...rental,
@@ -537,10 +546,8 @@ router.post('/ai-recommendations', authMiddleware, async (req, res) => {
       };
     }).filter(Boolean);
 
-    // Sort by score
     rentalsWithScores.sort((a, b) => b.aiScore - a.aiScore);
 
-    // Take top results
     const topRentals = rentalsWithScores.slice(0, parseInt(limit));
 
     console.log(`✅ [AI-POI] Returning ${topRentals.length} rentals with AI scores`);

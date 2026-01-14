@@ -20,7 +20,7 @@ const rentalSchema = new mongoose.Schema({
   location: {
     short: { type: String, required: true },
     fullAddress: { type: String, required: true },
-    formattedAddress: { type: String },
+    formattedAddress: { type: String }, 
     coordinates: {
       type: {
         type: String,

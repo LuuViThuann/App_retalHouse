@@ -4,5 +4,4 @@ Kiểm thử : ========
 
 - Khi tìm tiện ích và chuyển sang chế độ AI thì không xem được danh sách tất cả các tiện ích đã chọn
 
-- Giới hạn chỉ cho chọn 2 tiện ích
 

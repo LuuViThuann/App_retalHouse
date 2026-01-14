@@ -980,6 +980,10 @@ class _RentalMapViewState extends State<RentalMapView> {
       return '0 VNĐ';
     }
   }
+
+
+
+
   Widget _buildCustomInfoWindow() {
     if (!_showCustomInfo || _selectedRental == null) {
       return const SizedBox.shrink();
@@ -1005,6 +1009,11 @@ class _RentalMapViewState extends State<RentalMapView> {
     // ✅ CHỈ LẤY 3 POI GẦN NHẤT
     final displayPOIs = nearestPOIs.take(3).toList();
     final remainingCount = nearestPOIs.length - 3;
+
+    // 🔥 LOGIC HIỂN THỊ NÚT "XEM THÊM"
+
+    final showViewMoreButton = remainingCount > 0 && _isPOIFilterActive;
+
 
     return Positioned(
       top: 68,
@@ -1143,7 +1152,7 @@ class _RentalMapViewState extends State<RentalMapView> {
 
                     const SizedBox(height: 12),
 
-                    // ✅ HIỂN THỊ 3 POI GẦN NHẤT ==================================================================
+                    // ✅ HIỂN THỊ 3 POI GẦN NHẤT
                     if (hasNearbyPOIs) ...[
                       Container(
                         padding: const EdgeInsets.all(12),
@@ -1285,7 +1294,7 @@ class _RentalMapViewState extends State<RentalMapView> {
                                         ),
                                       ),
 
-                                      // Khoảng cách
+                                      // 🔥 Khoảng cách - SỬ DỤNG FORMAT MỚI
                                       Container(
                                         padding: const EdgeInsets.symmetric(
                                           horizontal: 8,
@@ -1317,7 +1326,7 @@ class _RentalMapViewState extends State<RentalMapView> {
                                             ),
                                             const SizedBox(width: 4),
                                             Text(
-                                              '${poi['distance']} km',
+                                              _formatDistance(poi['distance']), // 🔥 SỬ DỤNG HÀM FORMAT MỚI
                                               style: const TextStyle(
                                                 fontSize: 11,
                                                 fontWeight: FontWeight.bold,
@@ -1333,13 +1342,17 @@ class _RentalMapViewState extends State<RentalMapView> {
                               );
                             }).toList(),
 
-                            // ✅ NÚT "XEM THÊM" - HIỂN THỊ KHI CÓ > 3 POI
-                            if (remainingCount > 0) ...[
+                            // 🔥 NÚT "XEM THÊM"
+                            // Hiển thị khi:
+                            // - Chế độ thường + có > 3 POI
+                            // - Chế độ AI + POI filter + có > 3 POI
+                            // Ẩn khi:
+                            // - Chế độ AI thuần (không có POI filter)
+                            if (showViewMoreButton) ...[
                               const SizedBox(height: 12),
                               Center(
                                 child: Container(
                                   decoration: BoxDecoration(
-
                                     borderRadius: BorderRadius.circular(8),
                                     border: Border.all(color: Colors.blue[200]!),
                                   ),
@@ -1382,7 +1395,6 @@ class _RentalMapViewState extends State<RentalMapView> {
                         ),
                       ),
 
-                      // ===================================================================================
                       const SizedBox(height: 12),
                     ],
 
@@ -1456,6 +1468,25 @@ class _RentalMapViewState extends State<RentalMapView> {
         ),
       ),
     );
+  }
+
+// 🔥 HÀM FORMAT DISTANCE (nếu chưa có)
+  String _formatDistance(dynamic distanceValue) {
+    double distance;
+
+    if (distanceValue is String) {
+      distance = double.tryParse(distanceValue) ?? 0.0;
+    } else if (distanceValue is num) {
+      distance = distanceValue.toDouble();
+    } else {
+      return '0 m';
+    }
+
+    // 🔥 Nếu < 1km thì hiển thị mét, >= 1km thì hiển thị km
+    if (distance < 1) {
+      return '${(distance * 1000).toInt()} m';
+    }
+    return '${distance.toStringAsFixed(2)} km';
   }
 
 // ✅ THÊM HÀM: Hiển thị dialog tất cả POI từ _buildCustomInfoWindow

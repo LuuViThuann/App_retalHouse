@@ -23,3 +23,114 @@ POST,/change-password,User (có token),Đổi mật khẩu khi đã đăng nhậ
 POST,/update-profile,User (có token),"Cập nhật thông tin cá nhân: phone, address, username (đồng bộ MongoDB + Firestore)"
 POST,/upload-image,User (có token),Upload ảnh đại diện (lưu vào MongoDB)
 GET,/user/:id/avatar,User (chính chủ),Lấy avatarBase64 của chính mình
+
+--------------------
+- KIẾN TRÚC BAN ĐẦU : 
+
+    MongoDB (interaction)
+    ↓
+    CSV (daily)
+    ↓
+    Feature engineering
+    ↓
+    Train model (.pkl)
+    ↓
+    FastAPI
+    ↓
+    NodeJS gọi API
+    ↓
+    Flutter Map render
+
+
+------------------
+Cá nhân hóa từ AI : 
+
+- Cá nhân hóa gợi ý  =====================
+
+Gợi ý BĐS phù hợp nhất cho user
+
+Khác nhau giữa các user
+
+Thay đổi theo thời gian
+
+📌 Ví dụ:
+
+User A mở map → thấy trọ
+User B mở map → thấy nhà nguyên căn
+
+- Marker nào được ưu tiên ==============
+
+BĐS nào được gợi ý
+
+Khoảng giá mặc định
+
+Loại nhà ưu tiên
+
+- Map hiển thị cá nhân hóa ==================
+
+Marker size = score
+
+Marker color = top category user thích
+
+Marker priority = score
+
+Ví dụ:
+
+User thích trọ → marker trọ nổi hơn
+
+User hay xem giá rẻ → giá cao bị mờ
+
+- Gợi ý giá & đánh giá hợp lý ====================
+
+Giá này cao/thấp
+
+Giá hợp lý theo khu vực
+
+Khoảng tin cậy
+
+- Giải thích được (Explainable AI) ====================
+
+“Vì sao gợi ý nhà này?”
+
+Ví dụ:
+
+Gần vị trí bạn hay tìm
+
+Trong tầm giá bạn quan tâm
+
+Bạn đã xem 5 nhà tương tự
+
+=============================
+* CÁC DỮ LIỆU CẦN CÓ : 
+
+1. DỮ LIỆU HÀNH VI USER
+---------------------------------------------------
+| Trường               | Mô tả                   |
+| -------------------- | ----------------------- |
+| user_id / session_id | Định danh               |
+| action               | view, favorite, contact |
+| timestamp            | Thời gian               |
+| device               | mobile/desktop          |
+| duration             | thời gian xem           |
+
+
+2. DỮ LIỆU BẤT ĐỘNG SẢN
+---------------------------------------------------
+
+3. DỮ LIỆU NGỮ CẢNH
+---------------------------------------------------
+| Trường        | Mô tả      |
+| ------------- | ---------- |
+| map_center    | Tâm map    |
+| zoom_level    | Zoom       |
+| search_radius | Bán kính   |
+| time_of_day   | Sáng / tối |
+| weekday       | Thứ        |
+
+4. DỮ LIỆU TƯƠNG TÁC GIÁN TIẾP
+---------------------------------------------------
+| Trường       | Ví dụ              |
+| ------------ | ------------------ |
+| impression   | Marker đã hiển thị |
+| scroll       | Lướt list          |
+| click_marker | Click map          |
