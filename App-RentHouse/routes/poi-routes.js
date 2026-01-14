@@ -527,7 +527,7 @@ router.post('/ai-recommendations', authMiddleware, async (req, res) => {
 
       poiDistances.sort((a, b) => a.distance - b.distance);
 
-      const nearestPOIs = poiDistances.slice(0, 3);
+      const nearestPOIs = poiDistances.slice(0, 5);
 
       const avgDistance = nearestPOIs.reduce((sum, p) => sum + p.distance, 0) / nearestPOIs.length;
       const score = Math.max(0, 100 - (avgDistance * 10));

@@ -52,7 +52,31 @@ const POI_CATEGORIES = {
     icon: '💪',
     tags: ['fitness_centre', 'sports_centre'],
     query: 'node["leisure"~"fitness_centre|sports_centre"]'
-  }
+  },
+ VETERINARY: {
+    name: 'Thú y',
+    icon: '🐶',           // hoặc 🩺 nếu muốn nhấn mạnh y tế
+    tags: ['veterinary'],
+    query: 'node["amenity"~"veterinary"]'
+  },
+  FUEL: {
+    name: 'Cây xăng',
+    icon: '⛽',
+    tags: ['fuel'],
+    query: 'node["amenity"~"fuel"]'
+  },
+  HAIRDRESSER: {
+    name: 'Tiệm cắt tóc',
+    icon: '✂️',
+    tags: ['hairdresser'],
+    query: 'node["shop"~"hairdresser"]'
+  },
+  CAR_REPAIR: {
+    name: 'Sửa xe',
+    icon: '🔧',
+    tags: ['car_repair'],
+    query: 'node["shop"~"car_repair"]'
+  },
 };
 
 /**

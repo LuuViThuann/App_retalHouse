@@ -125,7 +125,7 @@ class _RentalMapViewState extends State<RentalMapView> {
                       const SizedBox(height: 12),
                       Text(
                         _isAIMode
-                            ? 'Đang tìm bài AI gần tiện ích'
+                            ? 'Trợ lý AI đang tìm bài gần với tiện ích của bạn...'
                             : 'Đang tìm bài gần tiện ích',
                         textAlign: TextAlign.center,
                         style: const TextStyle(
@@ -981,9 +981,6 @@ class _RentalMapViewState extends State<RentalMapView> {
     }
   }
 
-
-
-
   Widget _buildCustomInfoWindow() {
     if (!_showCustomInfo || _selectedRental == null) {
       return const SizedBox.shrink();
@@ -1012,7 +1009,8 @@ class _RentalMapViewState extends State<RentalMapView> {
 
     // 🔥 LOGIC HIỂN THỊ NÚT "XEM THÊM"
 
-    final showViewMoreButton = remainingCount > 0 && _isPOIFilterActive;
+    final showViewMoreButton = remainingCount > 0 &&
+        (_isPOIFilterActive || (_isAIMode && rental.nearestPOIs?.length != null && rental.nearestPOIs!.length > 3));
 
 
     return Positioned(
@@ -2321,7 +2319,7 @@ class _RentalMapViewState extends State<RentalMapView> {
                 style: const TextStyle(
                   color: Colors.white,
                   fontWeight: FontWeight.bold,
-                  fontSize: 12,
+                  fontSize: 14,
                 ),
               ),
             ),

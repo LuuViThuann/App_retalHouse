@@ -4,4 +4,4 @@ Kiểm thử : ========
 
 - Khi tìm tiện ích và chuyển sang chế độ AI thì không xem được danh sách tất cả các tiện ích đã chọn
 
-
+- AI-driven recommendation + POI tiện ích + theo dõi hành vi người dùng
