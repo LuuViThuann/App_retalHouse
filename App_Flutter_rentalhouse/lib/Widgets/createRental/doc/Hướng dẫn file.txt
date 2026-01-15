@@ -1,5 +1,12 @@
-Kiểm thử : ========
+Các thuật toán hỗ trợ xử lý quá trình thao tác trên bản đồ : ========
 
++ Thuật toán tìm kiếm gần (Approximate Nearest Neighbor Search - ANNS) : tìm kiếm các bài gần giống nhau trong một tập dữ liệu lớn để cải thiện hiệu suất tìm kiếm.
+
++ Thuật toán Haversine Formula – Tính khoảng cách địa lý (GIS / location-based services) :Tính khoảng cách ngắn nhất từ POI khi lọc bài đăng gần nhất
+
++ Thuật toán Greedy Screen-Space Clustering : Phân cụm các điểm dữ liệu trên màn hình để giảm thiểu sự chồng chéo và cải thiện khả năng hiển thị.
+
+======================================================================================================
 - bài toán GIS + filter
 
 - Khi tìm tiện ích và chuyển sang chế độ AI thì không xem được danh sách tất cả các tiện ích đã chọn

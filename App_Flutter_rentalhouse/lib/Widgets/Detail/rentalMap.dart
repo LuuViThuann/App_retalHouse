@@ -1,7 +1,10 @@
+import 'dart:async';
 import 'dart:math' as math;
 import 'dart:ui' as ui;
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_rentalhouse/Widgets/Detail/AIExplanationDialog.dart';
 import 'package:flutter_rentalhouse/Widgets/Detail/ClusterItem.dart';
 import 'package:flutter_rentalhouse/Widgets/Detail/FilterDialogWidget.dart';
 import 'package:flutter_rentalhouse/Widgets/Detail/HorizontalRentalList.dart';
@@ -25,6 +28,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../config/loading.dart';
 import '../../models/poi.dart';
+import '../../services/auth_service.dart';
 import '../../services/poi_service.dart';
 
 class RentalMapView extends StatefulWidget {
@@ -68,6 +72,12 @@ class _RentalMapViewState extends State<RentalMapView> {
   List<Cluster> _currentClusters = [];
   bool _useCluster = true;
 
+  // NEW: AI Context Tracking
+  List<String> _shownRentalIds = [];  // Track impressions để tránh duplicate
+  int _impressionCount = 0;
+  String? _currentUserId;
+  bool _isLoadingAIExplanation = false;
+
   // ============================================
   // HÀM KHỞI TẠO VÀ CẬP NHẬT
   // ============================================
@@ -77,9 +87,27 @@ class _RentalMapViewState extends State<RentalMapView> {
     _poiService = POIService();
     _isPOIFilterActive = false;
     _currentFilterResult = null;
+    //Lấy user ID từ AuthService
+    _getCurrentUser();
+
     _initializeMap();
   }
-
+  //  NEW: Helper method để lấy current user
+  Future<void> _getCurrentUser() async {
+    try {
+      final firebaseUser = FirebaseAuth.instance.currentUser;
+      if (firebaseUser != null) {
+        setState(() {
+          _currentUserId = firebaseUser.uid;
+        });
+        debugPrint('✅ Got user ID: $_currentUserId');
+      } else {
+        debugPrint('⚠️ No authenticated user');
+      }
+    } catch (e) {
+      debugPrint('⚠️ Error getting user: $e');
+    }
+  }
 // ============================================
 // HÀM: Áp dụng bộ lọc POI - CẬP NHẬT
 // ============================================
@@ -153,17 +181,17 @@ class _RentalMapViewState extends State<RentalMapView> {
       final userLon = _currentLatLng?.longitude ?? _rentalLatLng!.longitude;
 
       debugPrint(
-          '🔥 [POI-FILTER] Requesting: lat=$userLat, lon=$userLon, categories=${selectedCategories.join(", ")}, radius=$_poiFilterRadius km, AI mode: $_isAIMode');
+          '[POI-FILTER] Requesting: lat=$userLat, lon=$userLon, categories=${selectedCategories.join(", ")}, radius=$_poiFilterRadius km, AI mode: $_isAIMode');
 
       final apiRadius = _poiFilterRadius + 2;
 
-      // ✅ KHAI BÁO BIẾN VỚI TYPE RÕ RÀNG
+      //  KHAI BÁO BIẾN VỚI TYPE RÕ RÀNG
       final int poisTotal;
       final List<Rental> rentals;
       final String message;
 
       if (_isAIMode) {
-        // ✅ GỌI API AI+POI - TRẢ VỀ Map<String, dynamic>
+        //  GỌI API AI+POI - TRẢ VỀ Map<String, dynamic>
         final Map<String, dynamic> aiResult = await _poiService!.getAIPOIRecommendations(
           latitude: userLat,
           longitude: userLon,
@@ -793,22 +821,69 @@ class _RentalMapViewState extends State<RentalMapView> {
     return '${ApiRoutes.baseUrl.replaceAll('/api', '')}/$imagePath';
   }
 
+  Timer? _cameraDebounce;
+
   void _onCameraMove(CameraPosition position) {
-    final newZoom = position.zoom;
+    _currentZoom = position.zoom;
+    _cameraDebounce?.cancel();
+    _cameraDebounce = Timer(const Duration(milliseconds: 800), () {
+      _updateMarkersWithClustering();  // Gọi sau 500ms
+    });
+  }
 
-    // Chỉ update nếu zoom thay đổi đáng kể (> 0.5)
-    if ((newZoom - _currentZoom).abs() > 0.5) {
-      setState(() {
-        _currentZoom = newZoom;
-      });
 
-      // Debounce update markers
-      Future.delayed(const Duration(milliseconds: 300), () {
-        if (mounted && _currentZoom == newZoom) {
+  Timer? _aiRefreshDebounce;
+
+  Future<void> _refetchAIWithContextDebounced() async {
+    // 🔥 Hủy previous debounce timer
+    _aiRefreshDebounce?.cancel();
+
+    // 🔥 Chờ 500ms để chắc user hoàn thành zoom
+    _aiRefreshDebounce = Timer(const Duration(milliseconds: 500), () async {
+      if (!_isAIMode || _currentLatLng == null) return;
+
+      final rentalViewModel = Provider.of<RentalViewModel>(context, listen: false);
+
+      debugPrint('🔄 Re-fetching AI with new zoom level: $_currentZoom');
+
+      try {
+        await rentalViewModel.fetchAIRecommendationsWithContext(
+          latitude: _currentLatLng!.latitude,
+          longitude: _currentLatLng!.longitude,
+          zoomLevel: _currentZoom.toInt(),
+          timeOfDay: _getTimeOfDay(),
+          impressions: _shownRentalIds,
+          scrollDepth: 0.5,
+          radius: rentalViewModel.currentRadius,
+        );
+
+        if (mounted) {
+          setState(() {
+            _originalNearbyRentals = List.from(rentalViewModel.nearbyRentals);
+            _filteredNearbyRentals = List.from(rentalViewModel.nearbyRentals);
+          });
           _updateMarkersWithClustering();
         }
-      });
-    }
+      } catch (e) {
+        debugPrint('❌ Error refetching AI: $e');
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _cameraDebounce?.cancel();
+    _aiRefreshDebounce?.cancel();  // 🔥 Hủy debounce timer khi dispose
+    super.dispose();
+  }
+
+// 🔥 NEW: Helper method để xác định time of day
+  String _getTimeOfDay() {
+    final hour = DateTime.now().hour;
+    if (hour >= 5 && hour < 12) return 'morning';
+    if (hour >= 12 && hour < 17) return 'afternoon';
+    if (hour >= 17 && hour < 21) return 'evening';
+    return 'night';
   }
 
   Widget _buildClusterToggle() {
@@ -925,6 +1000,9 @@ class _RentalMapViewState extends State<RentalMapView> {
       return;
     }
 
+    // Track shown rental untuk impressions
+    _trackShownRental(rental);
+
     setState(() {
       _selectedRental = rental;
       _showCustomInfo = true;
@@ -1014,7 +1092,7 @@ class _RentalMapViewState extends State<RentalMapView> {
 
 
     return Positioned(
-      top: 68,
+      top: 14,
       left: 16,
       right: 16,
       child: Container(
@@ -1397,8 +1475,27 @@ class _RentalMapViewState extends State<RentalMapView> {
                     ],
 
                     // Buttons
+                    // Buttons
                     Row(
                       children: [
+                        // 🔥 NEW: Nút "Tại sao?" để xem AI explanation
+                        if (rental.isAIRecommended == true)
+                          Expanded(
+                            child: ElevatedButton.icon(
+                              onPressed: () => _showAIExplanation(rental),
+                              icon: const Icon(Icons.psychology, size: 18),
+                              label: const Text('Tại sao?'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.blue[400],
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(vertical: 10),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                              ),
+                            ),
+                          ),
+                        const SizedBox(width: 8),
                         Expanded(
                           child: ElevatedButton.icon(
                             onPressed: () {
@@ -1847,6 +1944,8 @@ class _RentalMapViewState extends State<RentalMapView> {
                     _isAIMode = false;
                     _isPOIFilterActive = false;
                     _currentFilterResult = null;
+
+                    _resetImpressions();
                   });
 
                   rentalViewModel.resetNearbyFilters();
@@ -1925,6 +2024,42 @@ class _RentalMapViewState extends State<RentalMapView> {
 
     // ===========
   }
+
+  // 🔥 NEW: Helper method để hiển thị AI Explanation Dialog
+  void _showAIExplanation(Rental rental) {
+    if (_currentUserId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Vui lòng đăng nhập để xem giải thích')),
+      );
+      return;
+    }
+
+    showAIExplanationDialog(
+      context: context,
+      userId: _currentUserId!,
+      rentalId: rental.id,
+      rentalTitle: rental.title,
+    );
+  }
+
+  // 🔥 NEW: Helper method để track shown rentals (impressions)
+  void _trackShownRental(Rental rental) {
+    if (!_shownRentalIds.contains(rental.id)) {
+      _shownRentalIds.add(rental.id);
+      _impressionCount++;
+
+      // Log impressions
+      debugPrint('📊 [IMPRESSIONS] Added ${rental.id}, total: $_impressionCount');
+    }
+  }
+
+  // 🔥 NEW: Helper method để reset impressions khi user refresh
+  void _resetImpressions() {
+    _shownRentalIds.clear();
+    _impressionCount = 0;
+    debugPrint('🔄 [IMPRESSIONS] Reset');
+  }
+
   void _showPOISelector() {
     final scaffoldMessenger = ScaffoldMessenger.of(context);
 

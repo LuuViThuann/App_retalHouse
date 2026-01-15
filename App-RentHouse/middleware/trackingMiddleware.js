@@ -16,7 +16,16 @@ const detectDeviceType = (userAgent) => {
   }
   return 'desktop';
 };
-
+/**
+ * Helper: Xác định time of day
+ */
+function _getTimeOfDay() {
+  const hour = new Date().getHours();
+  if (hour >= 5 && hour < 12) return 'morning';
+  if (hour >= 12 && hour < 17) return 'afternoon';
+  if (hour >= 17 && hour < 21) return 'evening';
+  return 'night';
+}
 /**
  * Track rental view automatically - 🔥 CẬP NHẬT lưu coordinates
  */
@@ -33,14 +42,49 @@ const trackRentalView = async (req, res, next) => {
         
         if (!rentalId) return;
         
-        // Get rental data for snapshot - 🔥 INCLUDE COORDINATES
         const rental = await Rental.findById(rentalId).lean();
         if (!rental) return;
         
-        // 🔥 EXTRACT COORDINATES
         const coordinates = rental.location?.coordinates?.coordinates || [0, 0];
 
-        // Create interaction record - 🔥 ADD coordinates FIELD
+        // 🔥 EXTRACT CONTEXT DATA
+        const contextData = {
+          mapCenter: req.body?.mapCenter ? {
+            longitude: req.body.mapCenter.longitude,
+            latitude: req.body.mapCenter.latitude
+          } : null,
+          zoomLevel: req.body?.zoomLevel,
+          searchRadius: req.body?.searchRadius ? parseInt(req.body.searchRadius) : 10,
+          timeOfDay: _getTimeOfDay(),
+          weekday: new Date().toLocaleDateString('en-US', { weekday: 'long' }),
+          hourOfDay: new Date().getHours(),
+          deviceType: detectDeviceType(req.headers['user-agent']),
+          scrollDepth: parseInt(req.body?.scrollDepth) || 0,
+          markerClicked: req.body?.markerClicked === 'true',
+          markerSize: req.body?.markerSize ? parseInt(req.body.markerSize) : null,
+          markerPriority: req.body?.markerPriority ? parseInt(req.body.markerPriority) : null,
+          impressionCount: req.body?.impressionCount ? parseInt(req.body.impressionCount) : null,
+          impressionPosition: req.body?.impressionPosition ? parseInt(req.body.impressionPosition) : null,
+          fromRecommendation: req.query.recommended === 'true',
+          recommendationType: req.query.recType,
+          recommendationScore: req.body?.recommendationScore ? parseFloat(req.body.recommendationScore) : null,
+          recommendationConfidence: req.body?.recommendationConfidence ? parseFloat(req.body.recommendationConfidence) : null,
+          isTopRecommendation: req.body?.isTopRecommendation === 'true',
+          searchQuery: req.query.search || req.query.q,
+          filterApplied: req.body?.filterApplied || null
+        };
+
+        // 🔥 EXTRACT MARKER ANALYTICS
+        const markerAnalytics = {
+          markerSize: req.body?.markerSize ? parseInt(req.body.markerSize) : null,
+          markerOpacity: req.body?.markerOpacity ? parseFloat(req.body.markerOpacity) : null,
+          markerColor: req.body?.markerColor,
+          markerLabel: req.body?.markerLabel,
+          wasHighlighted: req.body?.wasHighlighted === 'true',
+          hoverDuration: req.body?.hoverDuration ? parseInt(req.body.hoverDuration) : null,
+          clickedFromMap: req.body?.clickedFromMap === 'true'
+        };
+
         await UserInteraction.create({
           userId,
           rentalId,
@@ -49,40 +93,30 @@ const trackRentalView = async (req, res, next) => {
           deviceType: detectDeviceType(req.headers['user-agent']),
           duration: parseInt(req.body?.duration) || 0,
           scrollDepth: parseInt(req.body?.scrollDepth) || 0,
-          
-          // 🔥 NEW: Lưu coordinates trực tiếp
           coordinates: {
             type: 'Point',
             coordinates: coordinates
           },
-          
-          contextData: {
-            searchQuery: req.query.search || req.query.q,
-            priceRange: {
-              min: req.query.minPrice ? parseFloat(req.query.minPrice) : null,
-              max: req.query.maxPrice ? parseFloat(req.query.maxPrice) : null
-            },
-            propertyType: req.query.propertyType,
-            location: req.query.location,
-            fromRecommendation: req.query.recommended === 'true',
-            recommendationType: req.query.recType
-          },
+          contextData,  // 🔥 STORE CONTEXT
+          markerAnalytics,  // 🔥 STORE MARKER ANALYTICS
           rentalSnapshot: {
             price: rental.price,
             propertyType: rental.propertyType,
-            location: rental.location?.short || rental.location?.fullAddress,
-            area: rental.area?.total || 0,
+            location: rental.location?.short,
+            area: rental.area?.total,
             amenitiesCount: rental.amenities?.length || 0,
             furnitureCount: rental.furniture?.length || 0
           },
           userAgent: req.headers['user-agent'],
-          ipAddress: req.ip || req.headers['x-forwarded-for']
+          ipAddress: req.ip
         });
         
-        console.log(`✅ Tracked VIEW for rental ${rentalId} by user ${userId}`);
-        console.log(`   Coordinates: [${coordinates[0]}, ${coordinates[1]}]`);
+        console.log(`✅ Tracked VIEW with context: ${userId}`);
+        if (req.body?.markerClicked) {
+          console.log(`   📍 Marker size: ${req.body.markerSize}, Opacity: ${req.body.markerOpacity}`);
+        }
       } catch (err) {
-        console.error('❌ Error tracking view:', err.message);
+        console.error('Error tracking:', err.message);
       }
     });
   };

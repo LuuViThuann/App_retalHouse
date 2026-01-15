@@ -3,7 +3,7 @@ import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_facebook_auth/flutter_facebook_auth.dart';
-import 'package:flutter_rentalhouse/models/comments.dart';
+import 'package:flutter_rentalhouse/models/comments.dart' hide User;
 import 'package:flutter_rentalhouse/models/notification.dart';
 import 'package:flutter_rentalhouse/models/rental.dart';
 import 'package:flutter_rentalhouse/services/TokenExpirationManager.dart';
@@ -39,6 +39,21 @@ class AuthService {
   bool _isValidPassword(String password) => password.length >= 6;
   bool _isValidUsername(String username) => username.length >= 3;
   bool _isValidAddress(String address) => address.isNotEmpty;
+
+  User? getCurrentUser() {
+    return _auth.currentUser;
+  }
+
+// Hoặc async version
+  Future<User?> getCurrentUserAsync() async {
+    return _auth.currentUser;
+  }
+
+// Hoặc get user ID
+  String? getCurrentUserId() {
+    return _auth.currentUser?.uid;
+  }
+
   //  HELPER: Make HTTP request with retry logic
   Future<http.Response> _makeRequestWithRetry(
       Future<http.Response> Function() requestFn, {

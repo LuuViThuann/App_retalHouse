@@ -247,14 +247,31 @@ class DatasetExporter:
             raise
     
     def export_rentals(self, output_path='./data/rentals.csv'):
-        """Export rentals với coordinates"""
+        """Export rentals với coordinates - 🔥 FIXED"""
         print("🏠 Exporting rentals...\n")
         
         try:
             print("   Fetching rentals with status='available'...")
-            rentals = list(self.db.rentals.find({
-                'status': 'available'
-            }).limit(5000))
+            self.db.rentals.create_index([('status', 1), ('createdAt', -1)])
+            
+            # 🔥 FIX: INCLUDE 'area' field in projection
+            rentals = list(self.db.rentals.find(
+                {'status': 'available'},
+                {
+                    '_id': 1, 
+                    'price': 1, 
+                    'location': 1,
+                    'propertyType': 1, 
+                    'area': 1,  # 🔥 THÊM FIELD NÀY
+                    'amenities': 1,
+                    'furniture': 1,
+                    'images': 1,
+                    'videos': 1,
+                    'title': 1,
+                    'status': 1,
+                    'createdAt': 1
+                }
+            ).limit(5000))
             
             print(f"   Found {len(rentals)} available rentals")
             
@@ -268,19 +285,17 @@ class DatasetExporter:
                 print(f"   Collections in database: {self.db.list_collection_names()}")
                 return pd.DataFrame()
             
-            # ==================== DATA CLEANING ====================
-            
             df = pd.DataFrame(rentals)
             
-            # 1. Convert _id to string
+            # Convert _id to string
             if '_id' in df.columns:
                 df['_id'] = df['_id'].astype(str)
             
-            # 2. Convert userId
+            # Convert userId
             if 'userId' in df.columns:
                 df['userId'] = df['userId'].astype(str)
             
-            # 3. 🔥 EXTRACT COORDINATES
+            # 🔥 EXTRACT COORDINATES
             print("   📍 Extracting coordinates...")
             
             df['longitude'] = df['location'].apply(
@@ -292,13 +307,12 @@ class DatasetExporter:
                 if isinstance(x, dict) else 0
             )
             
-            # Check coordinates quality
             valid_coords = len(df[(df['longitude'] != 0) & (df['latitude'] != 0)])
             print(f"      Valid coordinates: {valid_coords}/{len(df)} ({100*valid_coords/len(df):.2f}%)")
             print(f"      Longitude range: {df['longitude'].min():.4f} to {df['longitude'].max():.4f}")
             print(f"      Latitude range: {df['latitude'].min():.4f} to {df['latitude'].max():.4f}\n")
             
-            # 4. Extract location text
+            # Extract location text
             df['location_short'] = df['location'].apply(
                 lambda x: x.get('short', '') if isinstance(x, dict) else ''
             )
@@ -306,19 +320,27 @@ class DatasetExporter:
                 lambda x: x.get('fullAddress', '') if isinstance(x, dict) else ''
             )
             
-            # 5. Extract area
+            # 🔥 FIX: Extract area with error handling
             print("   📏 Extracting area data...")
-            df['area_total'] = df['area'].apply(
-                lambda x: float(x.get('total', 0)) if isinstance(x, dict) else 0
-            )
-            df['area_bedrooms'] = df['area'].apply(
-                lambda x: int(x.get('bedrooms', 0)) if isinstance(x, dict) else 0
-            )
-            df['area_bathrooms'] = df['area'].apply(
-                lambda x: int(x.get('bathrooms', 0)) if isinstance(x, dict) else 0
-            )
             
-            # 6. Count features
+            # Check if 'area' column exists
+            if 'area' in df.columns:
+                df['area_total'] = df['area'].apply(
+                    lambda x: float(x.get('total', 0)) if isinstance(x, dict) and x else 0
+                )
+                df['area_bedrooms'] = df['area'].apply(
+                    lambda x: int(x.get('bedrooms', 0)) if isinstance(x, dict) and x else 0
+                )
+                df['area_bathrooms'] = df['area'].apply(
+                    lambda x: int(x.get('bathrooms', 0)) if isinstance(x, dict) and x else 0
+                )
+            else:
+                print("      ⚠️ 'area' field not found in data, using defaults")
+                df['area_total'] = 0
+                df['area_bedrooms'] = 0
+                df['area_bathrooms'] = 0
+            
+            # Count features
             print("   🎨 Counting features...")
             df['amenities_count'] = df['amenities'].apply(
                 lambda x: len(x) if isinstance(x, list) else 0
@@ -333,11 +355,11 @@ class DatasetExporter:
                 lambda x: len(x) if isinstance(x, list) else 0
             )
             
-            # 7. Select columns - 🔥 INCLUDE COORDINATES
+            # Select columns
             selected_columns = [
                 '_id', 'title', 'price', 'propertyType', 'status',
                 'location_short', 'location_full',
-                'longitude', 'latitude',  # 🔥 COORDINATES
+                'longitude', 'latitude',
                 'area_total', 'area_bedrooms', 'area_bathrooms',
                 'amenities_count', 'furniture_count', 'images_count', 'videos_count',
                 'createdAt'
@@ -346,7 +368,7 @@ class DatasetExporter:
             available_cols = [col for col in selected_columns if col in df.columns]
             df = df[available_cols]
             
-            # 8. Ensure price is numeric
+            # Ensure price is numeric
             df['price'] = pd.to_numeric(df['price'], errors='coerce').fillna(0)
             
             print(f"\n✅ Cleaned data: {len(df)} rentals, {len(df.columns)} columns")
@@ -354,7 +376,6 @@ class DatasetExporter:
             print(f"   Property types: {df['propertyType'].unique().tolist()}")
             print(f"   Price range: {df['price'].min():.0f} - {df['price'].max():.0f}\n")
             
-            # 9. Save CSV
             os.makedirs(os.path.dirname(output_path) or '.', exist_ok=True)
             df.to_csv(output_path, index=False)
             print(f"✅ Exported {len(df)} rentals to {output_path}\n")

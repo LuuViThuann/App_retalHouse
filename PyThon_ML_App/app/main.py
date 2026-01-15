@@ -1,14 +1,17 @@
 import os
 import sys
-from typing import List, Optional, Tuple
+from typing import List, Optional, Tuple, Dict, Any
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, HTTPException, BackgroundTasks
+from fastapi import FastAPI, HTTPException, BackgroundTasks, Query 
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 import redis
 import json
 from datetime import datetime, timedelta
 from dotenv import load_dotenv
+from pydantic import ConfigDict
+from functools import wraps
+import hashlib
 
 # Add parent directory to path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -16,7 +19,70 @@ from training.train_model import RecommendationModel
 
 load_dotenv()
 
+
 # ==================== PYDANTIC MODELS ====================
+
+class ContextData(BaseModel):
+    """Context khi user tương tác"""
+    map_center: Optional[tuple] = Field(None, description="Tâm map (lon, lat)")
+    zoom_level: Optional[int] = Field(None, description="Zoom level")
+    search_radius: Optional[int] = Field(10, description="Bán kính tìm kiếm (km)")
+    time_of_day: Optional[str] = Field("morning", description="morning|afternoon|evening|night")
+    weekday: Optional[str] = Field(None, description="Thứ trong tuần")
+    device_type: Optional[str] = Field("mobile", description="mobile|desktop|tablet")
+    impressions: Optional[List[str]] = Field([], description="Rentals đã hiển thị")
+    scroll_depth: Optional[float] = Field(0.5, description="0.0 - 1.0")
+
+class PersonalizedRecommendRequest(BaseModel):
+    """Request gợi ý cá nhân hóa"""
+    userId: str = Field(..., description="User ID")
+    n_recommendations: int = Field(default=10, ge=1, le=50)
+    exclude_items: Optional[List[str]] = Field(None)
+    use_location: bool = Field(default=True)
+    radius_km: int = Field(default=20)
+    context: Optional[ContextData] = None
+
+class ExplanationItem(BaseModel):
+    """Chi tiết giải thích gợi ý"""
+    reason: str
+    weight: Optional[float] = Field(None, description="Trọng số (0-1)")
+    detail: Optional[str] = None
+
+class PersonalizedRecommendationResponse(BaseModel):
+    """Single personalized recommendation"""
+    rentalId: str
+    score: float
+    locationBonus: Optional[float] = 1.0
+    preferenceBonus: Optional[float] = 1.0
+    timeBonus: Optional[float] = 1.0
+    finalScore: float
+    method: str
+    coordinates: Optional[Dict[str, float]] = None
+    distance_km: Optional[float] = None
+    explanation: Optional[Dict[str, Any]] = None  # 🔥 WHY gợi ý bài này?
+    confidence: Optional[float] = 0.5  # Độ tin cậy (0-1)
+    markers_priority: Optional[int] = None  # Thứ tự ưu tiên trên map
+
+class UserPreferencesResponse(BaseModel):
+    """Thông tin preferences của user"""
+    userId: str
+    total_interactions: int
+    property_type_distribution: Dict[str, int]
+    price_range: Dict[str, float]
+    top_locations: Dict[str, int]
+    interaction_types: Dict[str, int]
+    avg_search_radius: Optional[float] = None
+
+class PersonalizedResultResponse(BaseModel):
+    """Response với recommendations + metadata"""
+    success: bool
+    userId: str
+    recommendations: List[PersonalizedRecommendationResponse]
+    count: int
+    cached: bool = False
+    generated_at: str
+    user_preferences: Optional[UserPreferencesResponse] = None
+    personalization_info: Optional[Dict[str, Any]] = None
 
 class Coordinates(BaseModel):
     """Geographic coordinates"""
@@ -51,13 +117,15 @@ class RecommendationResponse(BaseModel):
 
 class RecommendationsResult(BaseModel):
     """API response with multiple recommendations"""
+    model_config = ConfigDict(protected_namespaces=())
+    
     success: bool
     userId: Optional[str] = None
     recommendations: List[RecommendationResponse]
     count: int
     cached: bool = False
     generated_at: str
-    model_info: Optional[dict] = Field(None, description="Model metadata")
+    model_info: Optional[dict] = Field(None, description="Model metadata")  # 🔥 Đổi từ model_info thành info
 
 # ==================== GLOBAL STATE ====================
 
@@ -66,6 +134,7 @@ redis_client: Optional[redis.Redis] = None
 
 # ==================== LIFESPAN EVENT HANDLERS ====================
 
+    
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Lifespan context manager for startup and shutdown events."""
@@ -226,32 +295,71 @@ async def health_check():
         "timestamp": datetime.now().isoformat()
     }
 
-@app.post("/recommend/personalized", response_model=RecommendationsResult)
-async def get_personalized_recommendations(request: RecommendRequest):
+def cache_response(ttl: int = 3600):
+    """Decorator để cache API responses"""
+    def decorator(func):
+        @wraps(func)
+        async def wrapper(*args, **kwargs):
+            # Tạo cache key từ function name + parameters
+            cache_key = f"{func.__name__}:{hashlib.sha256(str(kwargs).encode()).hexdigest()}"
+            
+            # Check cache
+            cached = get_from_cache(cache_key)
+            if cached:
+                print(f"✅ Cache HIT: {cache_key}")
+                return cached
+            
+            # Execute function
+            result = await func(*args, **kwargs)
+            
+            # Save cache
+            set_to_cache(cache_key, result, ttl)
+            return result
+        return wrapper
+    return decorator
+
+@app.post("/recommend/batch")
+async def batch_recommendations(requests: List[PersonalizedRecommendRequest]):
+    """Process nhiều user cùng lúc"""
+    recommendations = []
+    
+    # Process parallel
+    import asyncio
+    tasks = [
+        model.recommend_for_user(req.userId, req.n_recommendations)
+        for req in requests
+    ]
+    
+    results = await asyncio.gather(*tasks)
+    return results
+    
+@app.post("/recommend/personalized")
+@cache_response(ttl=1800)
+
+@app.post("/recommend/personalized", response_model=PersonalizedResultResponse)
+async def get_personalized_recommendations(request: PersonalizedRecommendRequest):
     """
-    🌍 Gợi ý cá nhân hóa với xem xét vị trí địa lý (Collaborative Filtering)
+    🎯 Gợi ý cá nhân hóa với Explainable AI
     
     **Features:**
     - Dựa trên user behavior & similar users
-    - Apply geographic proximity bonus (gần user → điểm cao)
-    - Show coordinates cho frontend hiển thị trên bản đồ
-    - Tính khoảng cách từ user centroid
+    - Cá nhân hóa theo preferences
+    - Giải thích được (WHY gợi ý bài này?)
+    - Marker priority cho map
+    - Confidence score
     
     **Request:**
     - userId: ID của user
-    - n_recommendations: 1-50 gợi ý
-    - use_location: áp dụng geographic filter (default: true)
-    - exclude_items: rental IDs cần loại trừ
+    - context: Map center, zoom, device, thời gian, etc.
     
     **Response:**
-    - coordinates: [longitude, latitude] để hiển thị marker
-    - locationBonus: 1.0 = no bonus, > 1.0 = nearby bonus
-    - finalScore: score đã apply location bonus
-    - distance_km: khoảng cách từ user centroid
+    - explanation: Lý do gợi ý (Collaborative, Location, Preference)
+    - confidence: Độ tin cậy (0-1)
+    - markers_priority: Thứ tự hiển thị trên map
     """
     
     if model is None:
-        raise HTTPException(status_code=503, detail="Model not loaded. Train the model first.")
+        raise HTTPException(status_code=503, detail="Model not loaded")
     
     # Check cache
     cache_key = get_cache_key("personalized", request.userId)
@@ -259,66 +367,241 @@ async def get_personalized_recommendations(request: RecommendRequest):
     
     if cached_data:
         print(f"✅ Cache HIT for user {request.userId}")
-        return RecommendationsResult(
+        return PersonalizedResultResponse(
             success=True,
             userId=request.userId,
-            recommendations=[RecommendationResponse(**r) for r in cached_data['recommendations']],
+            recommendations=[PersonalizedRecommendationResponse(**r) for r in cached_data['recommendations']],
             count=len(cached_data['recommendations']),
             cached=True,
-            generated_at=cached_data['generated_at']
+            generated_at=cached_data['generated_at'],
+            user_preferences=cached_data.get('user_preferences')
         )
     
-    # Generate recommendations
-    print(f"🔍 Generating personalized recommendations for user {request.userId}...")
-    print(f"   Use location: {request.use_location}")
+    print(f"🎯 Generating PERSONALIZED recommendations for user {request.userId}...")
+    print(f"   Context: {request.context}")
     
     try:
+        # Convert Pydantic model to dict for model.recommend_for_user
+        context = request.context.dict() if request.context else {}
+        
         recommendations = model.recommend_for_user(
             user_id=request.userId,
             n_recommendations=request.n_recommendations,
             exclude_items=request.exclude_items,
-            use_location=request.use_location
+            use_location=request.use_location,
+            radius_km=request.radius_km,
+            context=context  # 🔥 THÊM context
         )
         
         # Convert to API response format
-        response_recs = _convert_to_response(recommendations)
+        response_recs = []
+        for i, rec in enumerate(recommendations, 1):
+            rec_dict = rec.copy()
+            
+            # Add marker priority (rank)
+            rec_dict['markers_priority'] = i
+            
+            # Extract coordinates
+            coords = rec_dict.get('coordinates', (0, 0))
+            rec_dict['coordinates'] = {
+                'longitude': float(coords[0]),
+                'latitude': float(coords[1])
+            }
+            
+            # Convert distance
+            if 'distance_km' in rec_dict:
+                rec_dict['distance_km'] = float(rec_dict['distance_km']) if rec_dict['distance_km'] else None
+            
+            response_recs.append(PersonalizedRecommendationResponse(**rec_dict))
+        
+        # Get user preferences
+        user_prefs = model.get_user_preferences(request.userId)
+        user_prefs_response = None
+        
+        if user_prefs:
+            user_prefs_response = UserPreferencesResponse(
+                userId=request.userId,
+                total_interactions=user_prefs['total_interactions'],
+                property_type_distribution=user_prefs['property_type_distribution'],
+                price_range=user_prefs['price_range'],
+                top_locations=user_prefs['top_locations'],
+                interaction_types=user_prefs['interaction_types'],
+            )
         
         # Cache data
         result = {
             'recommendations': [r.dict() for r in response_recs],
-            'generated_at': datetime.now().isoformat()
+            'generated_at': datetime.now().isoformat(),
+            'user_preferences': user_prefs_response.dict() if user_prefs_response else None
         }
         set_to_cache(cache_key, result, ttl=3600)
         
-        # Get model info
-        model_info = {
-            "method": "collaborative_filtering_with_location",
-            "user_count": len(model.user_encoder.classes_),
-            "rental_count": len(model.item_encoder.classes_),
-            "user_location_known": request.userId in model.user_locations
+        # Personalization info
+        personalization_info = {
+            'method': 'collaborative_filtering_with_personalization',
+            'context_applied': bool(context),
+            'radius_km': request.radius_km,
+            'user_location_known': request.userId in model.user_locations,
+            'confidence_avg': sum(r.confidence or 0 for r in response_recs) / len(response_recs) if response_recs else 0,
         }
         
-        if request.userId in model.user_locations:
-            loc = model.user_locations[request.userId]
-            model_info["user_centroid"] = {
-                "longitude": float(loc[0]),
-                "latitude": float(loc[1])
-            }
-        
-        return RecommendationsResult(
+        return PersonalizedResultResponse(
             success=True,
             userId=request.userId,
             recommendations=response_recs,
             count=len(response_recs),
             cached=False,
             generated_at=result['generated_at'],
-            model_info=model_info
+            user_preferences=user_prefs_response,
+            personalization_info=personalization_info
         )
         
     except Exception as e:
-        print(f"❌ Error generating recommendations: {e}")
+        print(f"❌ Error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+# ==================== API ENDPOINT: User Preferences ====================
+@app.get("/user-preferences/{userId}")
+async def get_user_preferences(userId: str):
+    """
+    👤 Lấy thông tin preferences của user
+    
+    **Response:**
+    - property_type_distribution: Loại BĐS user thích
+    - price_range: Tầm giá user quan tâm
+    - top_locations: Các khu vực yêu thích
+    - avg_search_radius: Bán kính tìm kiếm trung bình
+    """
+    
+    if model is None:
+        raise HTTPException(status_code=503, detail="Model not loaded")
+    
+    try:
+        prefs = model.get_user_preferences(userId)
+        
+        if not prefs:
+            return {
+                'success': False,
+                'message': f'No preferences found for user {userId}',
+                'userId': userId
+            }
+        
+        return {
+            'success': True,
+            'userId': userId,
+            'preferences': prefs,
+            'timestamp': datetime.now().isoformat()
+        }
+    
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ==================== API ENDPOINT: Explain Recommendation ====================
+
+@app.post("/recommend/explain")
+async def explain_recommendation(
+    userId: str = Query(...),
+    rentalId: str = Query(...)
+):
+    """
+    🤔 Giải thích CHI TIẾT tại sao bài đăng này được gợi ý
+    
+    **Response:**
+    - collaborative_score: Điểm từ collaborative filtering
+    - location_analysis: Phân tích vị trí
+    - preference_match: Khớp với preferences của user
+    - final_explanation: Giải thích tổng hợp
+    """
+    
+    if model is None:
+        raise HTTPException(status_code=503, detail="Model not loaded")
+    
+    try:
+        # Generate recommendation
+        recs = model.recommend_for_user(userId, n_recommendations=100)
+        
+        # Find the rental
+        matched_rec = next((r for r in recs if r['rentalId'] == rentalId), None)
+        
+        if not matched_rec:
+            return {
+                'success': False,
+                'message': f'Rental {rentalId} not in recommendations',
+                'userId': userId,
+                'rentalId': rentalId
+            }
+        
+        # Get user preferences
+        user_prefs = model.get_user_preferences(userId)
+        
+        # Get rental info
+        if hasattr(model, 'item_features') and rentalId in model.item_features:
+            rental_features = model.item_features[rentalId]
+        else:
+            rental_features = {}
+        
+        explanation = {
+            'userId': userId,
+            'rentalId': rentalId,
+            'reasons': matched_rec.get('explanation', {}),
+            'scores': {
+                'collaborative_score': matched_rec['score'],
+                'location_bonus': matched_rec.get('locationBonus', 1.0),
+                'preference_bonus': matched_rec.get('preferenceBonus', 1.0),
+                'time_bonus': matched_rec.get('timeBonus', 1.0),
+                'final_score': matched_rec['finalScore'],
+                'confidence': matched_rec.get('confidence', 0.5),
+            },
+            'user_context': {
+                'total_interactions': user_prefs['total_interactions'] if user_prefs else 0,
+                'top_property_types': list(user_prefs['property_type_distribution'].keys())[:3] if user_prefs else [],
+                'price_preference': user_prefs['price_range'] if user_prefs else {},
+            },
+            'rental_features': {
+                'price': rental_features.get('price', 0),
+                'property_type': rental_features.get('propertyType', 'unknown'),
+                'location': rental_features.get('location_text', 'unknown'),
+                'distance_km': matched_rec.get('distance_km'),
+            },
+            'summary': _generate_explanation_summary(matched_rec, user_prefs)
+        }
+        
+        return {
+            'success': True,
+            'explanation': explanation
+        }
+    
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+# ==================== HELPER: Generate Explanation Summary ====================
+
+def _generate_explanation_summary(recommendation: dict, user_prefs: dict = None) -> str:
+    """Tạo giải thích dạng text"""
+    
+    reasons = []
+    
+    # Collaborative reason
+    if 'collaborative_filtering' in recommendation.get('explanation', {}):
+        reasons.append("💬 Người dùng tương tự đã xem")
+    
+    # Location reason
+    if recommendation.get('explanation', {}).get('location'):
+        reasons.append(f"📍 {recommendation['explanation']['location']}")
+    
+    # Preference reason
+    prefs = recommendation.get('explanation', {}).get('preference', [])
+    if prefs:
+        reasons.append(f"✨ {'; '.join(prefs)}")
+    
+    # Interaction reason
+    interaction = recommendation.get('explanation', {}).get('interaction_count')
+    if interaction:
+        reasons.append(f"👁️ {interaction}")
+    
+    return " • ".join(reasons) if reasons else "Bài đăng phù hợp cho bạn"        
+    
 @app.post("/recommend/similar", response_model=RecommendationsResult)
 async def get_similar_items(request: SimilarItemsRequest):
     """

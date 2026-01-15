@@ -3,10 +3,93 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_rentalhouse/services/rental_service.dart';
 import '../models/poi.dart';
+import '../services/ai_service.dart';
 import '../services/api_service.dart';
 import '../models/rental.dart';
 import '../services/auth_service.dart';
 import '../services/poi_service.dart';
+
+
+
+/// Class lưu trữ AI explanation data
+class AIExplanation {
+  final Map<String, double> scores;
+  final Map<String, String> reasons;
+  final Rental? rental;
+  final String? rawExplanation;
+
+  AIExplanation({
+    required this.scores,
+    required this.reasons,
+    this.rental,
+    this.rawExplanation,
+  });
+
+  String getPrimaryReason() {
+    if (reasons.isEmpty) return 'Phù hợp với tiêu chí của bạn';
+    return reasons.values.first;
+  }
+
+  String getFormattedReasons() {
+    return reasons.entries
+        .map((e) => '• ${e.key}: ${e.value}')
+        .join('\n');
+  }
+}
+
+/// Class lưu trữ user preferences
+class UserPreferences {
+  final String userId;
+  final int totalInteractions;
+  final double avgPrice;
+  final String priceRange;
+  final String favoritePropertyType;
+  final List<LocationCount> topLocations;
+  final Map<String, dynamic> detailed;
+
+  UserPreferences({
+    required this.userId,
+    required this.totalInteractions,
+    required this.avgPrice,
+    required this.priceRange,
+    required this.favoritePropertyType,
+    required this.topLocations,
+    required this.detailed,
+  });
+
+  factory UserPreferences.fromJson(Map<String, dynamic> json) {
+    final summary = json['summary'] as Map<String, dynamic>;
+
+    final topLocations = (summary['topLocations'] as List?)
+        ?.map((loc) {
+      if (loc is Map) {
+        return LocationCount(
+          location: loc['location'] as String? ?? '',
+          count: loc['count'] as int? ?? 0,
+        );
+      }
+      return LocationCount(location: '', count: 0);
+    })
+        .toList() ?? [];
+
+    return UserPreferences(
+      userId: json['userId'] ?? '',
+      totalInteractions: summary['totalInteractions'] as int? ?? 0,
+      avgPrice: (summary['avgPrice'] as num?)?.toDouble() ?? 0.0,
+      priceRange: summary['priceRange'] as String? ?? 'Unknown',
+      favoritePropertyType: summary['favoritePropertyType'] as String? ?? 'Unknown',
+      topLocations: topLocations,
+      detailed: json['detailed'] as Map<String, dynamic>? ?? {},
+    );
+  }
+}
+
+class LocationCount {
+  final String location;
+  final int count;
+
+  LocationCount({required this.location, required this.count});
+}
 
 class RentalViewModel extends ChangeNotifier {
   // Các thông tin gọi  =========================================================
@@ -43,6 +126,21 @@ class RentalViewModel extends ChangeNotifier {
   //  Cancellation tokens for ongoing requests =========================================================
   bool _isFetchingNearby = false;
 
+  // ==================== AI EXPLANATION STATE ====================
+  AIExplanation? _currentExplanation;
+  bool _isLoadingExplanation = false;
+  String? _explanationError;
+
+  // ==================== USER PREFERENCES STATE ====================
+  UserPreferences? _userPreferences;
+  bool _isLoadingPreferences = false;
+  String? _preferencesError;
+
+  // ==================== AI SERVICE ==========
+  final AIService _aiService = AIService();
+
+
+  //  ========================================================= =========================================================
   bool get isAIRecommendation => _isAIRecommendation;
   String? get aiRecommendationMessage => _aiRecommendationMessage;
 
@@ -65,7 +163,16 @@ class RentalViewModel extends ChangeNotifier {
   List<POI> get nearbyPOIs => _nearbyPOIs;
   List<String> get selectedPOICategories => _selectedPOICategories;
 
-  // ============================================
+  // ==================== AI EXPLANATION GETTERS ====================
+  AIExplanation? get currentExplanation => _currentExplanation;
+  bool get isLoadingExplanation => _isLoadingExplanation;
+  String? get explanationError => _explanationError;
+
+  // ==================== USER PREFERENCES GETTERS ====================
+  UserPreferences? get userPreferences => _userPreferences;
+  bool get isLoadingPreferences => _isLoadingPreferences;
+  String? get preferencesError => _preferencesError;
+
   //  LIFECYCLE METHODS
   @override
   void dispose() {
@@ -265,6 +372,274 @@ class RentalViewModel extends ChangeNotifier {
     }
   }
 
+  // ==================== FETCH AI EXPLANATION ====================
+  Future<void> fetchAIExplanation({
+    required String userId,
+    required String rentalId,
+  }) async {
+    _isLoadingExplanation = true;
+    _explanationError = null;
+    notifyListeners();
+
+    int retryCount = 0;
+    const maxRetries = 2;  // 🔥 Retry tối đa 2 lần
+
+    while (retryCount <= maxRetries) {
+      try {
+        final token = await AuthService().getIdToken();
+        if (token == null) {
+          throw Exception('Vui lòng đăng nhập');
+        }
+
+        debugPrint('🤔 [EXPLANATION] Attempt ${retryCount + 1}/$maxRetries for rental: $rentalId');
+
+        // 🔥 FIX: Tăng timeout lên 45s cho lần gọi này
+        final result = await _aiService.fetchAIExplanation(
+          userId: userId,
+          rentalId: rentalId,
+          token: token,
+        ).timeout(const Duration(seconds: 45));  // 🔥 Tăng timeout
+
+        if (result['success'] != null && result['success'] == true) {
+          final explanation = result['explanation'] as Map<String, dynamic>;
+
+          // Parse scores safely
+          final rawScores = (explanation['scores'] as Map?);
+          final Map<String, double> scores = {};
+
+          if (rawScores != null) {
+            rawScores.forEach((key, value) {
+              if (value is double) {
+                scores[key] = value;
+              } else if (value is int) {
+                scores[key] = value.toDouble();
+              } else if (value is String) {
+                scores[key] = double.tryParse(value) ?? 0.0;
+              } else {
+                scores[key] = 0.0;
+              }
+            });
+          }
+
+          // Parse reasons safely
+          final rawReasons = (explanation['reasons'] as Map?);
+          final Map<String, String> reasons = {};
+
+          if (rawReasons != null) {
+            rawReasons.forEach((key, value) {
+              reasons[key] = value?.toString() ?? '';
+            });
+          }
+
+          final rentalData = explanation['rental'] as Map<String, dynamic>?;
+          final rental = rentalData != null ? Rental.fromJson(rentalData) : null;
+
+          _currentExplanation = AIExplanation(
+            scores: scores,
+            reasons: reasons,
+            rental: rental,
+            rawExplanation: explanation.toString(),
+          );
+
+          debugPrint('✅ [EXPLANATION] Loaded successfully on attempt ${retryCount + 1}');
+          _isLoadingExplanation = false;
+          notifyListeners();
+          return;  // 🔥 Success - exit loop
+        } else {
+          throw Exception('Không thể tải giải thích');
+        }
+      } catch (e) {
+        final errorMsg = e.toString();
+
+        // 🔥 Check if timeout error
+        final isTimeoutError = errorMsg.contains('TimeoutException') ||
+            errorMsg.contains('timeout');
+
+        debugPrint('❌ [EXPLANATION] Error on attempt ${retryCount + 1}: $errorMsg');
+
+        // 🔥 Retry nếu timeout và còn lần retry
+        if (isTimeoutError && retryCount < maxRetries) {
+          debugPrint('🔄 [EXPLANATION] Retrying... (${retryCount + 1}/$maxRetries)');
+          retryCount++;
+
+          // Chờ 1 giây trước khi retry
+          await Future.delayed(const Duration(seconds: 1));
+          continue;  // 🔥 Retry
+        }
+
+        // 🔥 Không retry được - set error
+        _explanationError = isTimeoutError
+            ? 'Kết nối chậm. Vui lòng thử lại sau'
+            : errorMsg.replaceAll('Exception: ', '');
+
+        _isLoadingExplanation = false;
+        notifyListeners();
+        return;  // 🔥 Exit loop
+      }
+    }
+  }
+
+  // ==================== FETCH USER PREFERENCES ====================
+  Future<void> fetchUserPreferences({required String userId}) async {
+    _isLoadingPreferences = true;
+    _preferencesError = null;
+    notifyListeners();
+
+    try {
+      final token = await AuthService().getIdToken();
+      if (token == null) {
+        throw Exception('Vui lòng đăng nhập');
+      }
+
+      final result = await _aiService.fetchUserPreferences(
+        userId: userId,
+        token: token,
+      );
+
+      if (result['success'] == true && result['preferences'] != null) {
+        _userPreferences = UserPreferences.fromJson(result['preferences']);
+
+        debugPrint('✅ [USER-PREFS] Loaded successfully');
+        debugPrint('   Total interactions: ${_userPreferences!.totalInteractions}');
+        debugPrint('   Avg price: ${_userPreferences!.avgPrice}');
+        debugPrint('   Favorite type: ${_userPreferences!.favoritePropertyType}');
+      } else {
+        debugPrint('⚠️ [USER-PREFS] No preferences found');
+        _preferencesError = result['message'] as String?;
+      }
+    } catch (e) {
+      _preferencesError = e.toString().replaceAll('Exception: ', '');
+      debugPrint('❌ [USER-PREFS] Error: $_preferencesError');
+    } finally {
+      _isLoadingPreferences = false;
+      notifyListeners();
+    }
+  }
+
+  // ==================== FETCH AI RECOMMENDATIONS WITH CONTEXT ====================
+  Future<void> fetchAIRecommendationsWithContext({
+    required double latitude,
+    required double longitude,
+    double radius = 10.0,
+    int zoomLevel = 15,
+    String timeOfDay = 'morning',
+    String deviceType = 'mobile',
+    List<String> impressions = const [],
+    double scrollDepth = 0.5,
+  }) async {
+    if (_isFetchingNearby) {
+      debugPrint('⚠️ Already fetching, skipping...');
+      return;
+    }
+
+    _isFetchingNearby = true;
+    _isLoading = true;
+    _errorMessage = null;
+    notifyListeners();
+
+    if (latitude.abs() > 90 || longitude.abs() > 180) {
+      _errorMessage = 'Tọa độ không hợp lệ';
+      _isLoading = false;
+      _isFetchingNearby = false;
+      notifyListeners();
+      return;
+    }
+
+    try {
+      final token = await AuthService().getIdToken();
+      if (token == null) {
+        throw Exception('Vui lòng đăng nhập để xem gợi ý AI');
+      }
+
+      debugPrint('🎯 [AI-CONTEXT] Fetching with context:');
+      debugPrint('   Coords: ($latitude, $longitude)');
+      debugPrint('   Zoom: $zoomLevel, Time: $timeOfDay');
+      debugPrint('   Impressions: ${impressions.length}');
+
+      final result = await _aiService.fetchAIRecommendationsWithContext(
+        latitude: latitude,
+        longitude: longitude,
+        radius: radius,
+        zoomLevel: zoomLevel,
+        timeOfDay: timeOfDay,
+        deviceType: deviceType,
+        limit: 20,
+        impressions: impressions,
+        scrollDepth: scrollDepth,
+        minPrice: _currentMinPrice,
+        maxPrice: _currentMaxPrice,
+        token: token,
+      );
+
+      if (_isFetchingNearby && result['success'] == true) {
+        _nearbyRentals = result['rentals'] as List<Rental>? ?? [];
+        _isAIRecommendation = true;
+        _aiRecommendationMessage = 'Gợi ý được cá nhân hóa từ trợ lý AI';
+
+        debugPrint('✅ [AI-CONTEXT] Success: ${_nearbyRentals.length} rentals');
+
+        if (result['personalization'] != null) {
+          final personalization = result['personalization'];
+          debugPrint('   Avg Confidence: ${personalization['avgConfidence']}');
+          debugPrint('   Avg Marker Size: ${personalization['avgMarkerSize']}');
+        }
+
+        notifyListeners();
+      }
+    } catch (e) {
+      if (_isFetchingNearby) {
+        String errorMsg = e.toString();
+
+        if (errorMsg.contains('đăng nhập')) {
+          _errorMessage = 'Vui lòng đăng nhập để sử dụng gợi ý AI';
+        } else if (errorMsg.contains('Invalid coordinates')) {
+          _errorMessage = 'Tọa độ không hợp lệ';
+        } else if (errorMsg.contains('timeout')) {
+          _errorMessage = 'Quá thời gian chờ. Vui lòng thử lại.';
+        } else {
+          _errorMessage = 'Không thể tải gợi ý AI';
+        }
+
+        debugPrint('❌ [AI-CONTEXT] Error: $_errorMessage');
+
+        _nearbyRentals = [];
+        _isAIRecommendation = false;
+
+        notifyListeners();
+      }
+    } finally {
+      _isFetchingNearby = false;
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  // ==================== HELPER METHODS ====================
+
+  void clearAIData() {
+    _currentExplanation = null;
+    _userPreferences = null;
+    _explanationError = null;
+    _preferencesError = null;
+    notifyListeners();
+  }
+
+  String getPreferencesSummary() {
+    if (_userPreferences == null) return 'Chưa tải preferences';
+
+    final prefs = _userPreferences!;
+    return '${prefs.priceRange} • ${prefs.favoritePropertyType} • ${prefs.topLocations.isNotEmpty ? prefs.topLocations.first.location : 'Không xác định'}';
+  }
+
+  String getExplanationSummary() {
+    if (_currentExplanation == null) return 'Chưa có giải thích';
+
+    final exp = _currentExplanation!;
+    final confidence = (exp.scores['confidence'] ?? 0) * 100;
+    final reason = exp.getPrimaryReason();
+
+    return 'Tự tin ${confidence.toStringAsFixed(0)}% • $reason';
+  }
   // ============================================
   // FETCH NEARBY RENTALS METHODS
   Future<void> fetchNearbyRentals(

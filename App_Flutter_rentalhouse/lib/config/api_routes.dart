@@ -3,7 +3,7 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 class ApiRoutes {
   static const String rootUrl =
-      'http://192.168.1.177:3000'; // http://192.168.43.168:3000 - mạng dữ liệu
+      'http://192.168.1.104:3000'; // http://192.168.43.168:3000 - mạng dữ liệu
   static const String baseUrl = '$rootUrl/api';
   static const String serverBaseUrl = rootUrl;
   static const String socketUrl = serverBaseUrl;
@@ -38,6 +38,42 @@ class ApiRoutes {
   static const String rentalsNearPOI = '$baseUrl/poi/rentals-near-poi';
 
   // ====================  AI RECOMMENDATIONS ====================
+  /// 🔥 NEW: GET /api/ai/recommendations/personalized/context
+  /// Gợi ý cá nhân hóa với context (map center, zoom, device, impressions)
+  /// 📌 Thay thế cho /api/ai/recommendations/personalized
+  static String aiRecommendationsPersonalizedContext({
+    required double latitude,
+    required double longitude,
+    double radius = 10.0,
+    int zoomLevel = 15,
+    String timeOfDay = 'morning',
+    String deviceType = 'mobile',
+    int limit = 10,
+    String impressions = '', // Comma-separated rental IDs already shown
+    double scrollDepth = 0.5,
+  }) {
+    final params = <String, String>{
+      'latitude': latitude.toStringAsFixed(6),
+      'longitude': longitude.toStringAsFixed(6),
+      'radius': radius.toStringAsFixed(2),
+      'zoom_level': zoomLevel.toString(),
+      'time_of_day': timeOfDay,
+      'device_type': deviceType,
+      'limit': limit.toString(),
+      'scroll_depth': scrollDepth.toStringAsFixed(2),
+    };
+
+    if (impressions.isNotEmpty) {
+      params['impressions'] = impressions;
+    }
+    final uri = Uri.parse('$baseUrl/ai/recommendations/personalized/context')
+        .replace(queryParameters: params);
+
+    debugPrint('🎯 [AI-CONTEXT] URL: ${uri.toString()}');
+    return uri.toString();
+  }
+
+  // ----------------------------------
 
   static String aiRecommendationsPersonalized({
     int limit = 10,
@@ -79,7 +115,6 @@ class ApiRoutes {
 
   /// GET /api/ai/recommendations/nearby/:rentalId
   /// AI gợi ý nearby kết hợp với geospatial query
-  ///  Backend: ai-recommendations.js
   static String aiRecommendationsNearby({
     required String rentalId,
     int limit = 10,
@@ -100,6 +135,33 @@ class ApiRoutes {
         .replace(queryParameters: params);
 
     debugPrint('🤖 AI Nearby URL: ${uri.toString()}');
+    return uri.toString();
+  }
+
+  // ==================== AI EXPLAIN - NEW ====================
+
+  static String aiExplain({
+    required String userId,
+    required String rentalId,
+  }) {
+    if (userId.isEmpty || rentalId.isEmpty) {
+      throw ArgumentError('userId and rentalId are required');
+    }
+
+    final uri = Uri.parse('$baseUrl/ai/explain/$userId/$rentalId');
+    debugPrint('🤔 [AI-EXPLAIN] URL: ${uri.toString()}');
+    return uri.toString();
+  }
+
+  // ==================== USER PREFERENCES - NEW ====================
+
+  static String userPreferences({required String userId}) {
+    if (userId.isEmpty) {
+      throw ArgumentError('userId is required');
+    }
+
+    final uri = Uri.parse('$baseUrl/ai/user-preferences/$userId');
+    debugPrint('👤 [USER-PREFS] URL: ${uri.toString()}');
     return uri.toString();
   }
 
