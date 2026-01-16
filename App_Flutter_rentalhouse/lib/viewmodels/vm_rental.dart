@@ -18,11 +18,15 @@ class AIExplanation {
   final Rental? rental;
   final String? rawExplanation;
 
+  // 🔥 NEW: Store full explanation data for UI
+  Map<String, dynamic>? explanation;
+
   AIExplanation({
     required this.scores,
     required this.reasons,
     this.rental,
     this.rawExplanation,
+    this.explanation,
   });
 
   String getPrimaryReason() {
@@ -32,8 +36,51 @@ class AIExplanation {
 
   String getFormattedReasons() {
     return reasons.entries
-        .map((e) => '• ${e.key}: ${e.value}')
+        .map((e) => '• ${_formatReasonLabel(e.key)}: ${e.value}')
         .join('\n');
+  }
+
+  // 🔥 NEW: Get insights count
+  int getInsightsCount() {
+    if (explanation == null) return 0;
+    final insights = explanation!['insights'] as List?;
+    return insights?.length ?? 0;
+  }
+
+  // 🔥 NEW: Get confidence level text
+  String getConfidenceLevel() {
+    final confidence = scores['confidence'] ?? 0.5;
+    if (confidence >= 0.8) return 'Rất cao';
+    if (confidence >= 0.6) return 'Cao';
+    if (confidence >= 0.4) return 'Trung bình';
+    return 'Thấp';
+  }
+
+  // 🔥 NEW: Get score summary
+  String getScoreSummary() {
+    final priceMatch = ((scores['price_match'] ?? 0) * 100).toInt();
+    final locationMatch = ((scores['location_match'] ?? 0) * 100).toInt();
+    final typeMatch = ((scores['property_type_match'] ?? 0) * 100).toInt();
+
+    return 'Giá: $priceMatch% • Vị trí: $locationMatch% • Loại: $typeMatch%';
+  }
+
+  String _formatReasonLabel(String key) {
+    const labels = {
+      'collaborative': 'Người dùng tương tự',
+      'location': 'Vị trí',
+      'price': 'Giá',
+      'property_type': 'Loại BĐS',
+      'amenities': 'Tiện ích',
+      'timing': 'Thời điểm',
+      'engagement': 'Quan tâm',
+    };
+
+    return labels[key] ?? key
+        .replaceAll('_', ' ')
+        .split(' ')
+        .map((word) => word[0].toUpperCase() + word.substring(1))
+        .join(' ');
   }
 }
 
@@ -138,6 +185,7 @@ class RentalViewModel extends ChangeNotifier {
 
   // ==================== AI SERVICE ==========
   final AIService _aiService = AIService();
+
 
 
   //  ========================================================= =========================================================
@@ -382,7 +430,7 @@ class RentalViewModel extends ChangeNotifier {
     notifyListeners();
 
     int retryCount = 0;
-    const maxRetries = 2;  // 🔥 Retry tối đa 2 lần
+    const maxRetries = 3;  // 🔥 Tăng lên 3 lần retry
 
     while (retryCount <= maxRetries) {
       try {
@@ -391,19 +439,21 @@ class RentalViewModel extends ChangeNotifier {
           throw Exception('Vui lòng đăng nhập');
         }
 
-        debugPrint('🤔 [EXPLANATION] Attempt ${retryCount + 1}/$maxRetries for rental: $rentalId');
+        debugPrint('🤔 [EXPLANATION] Attempt ${retryCount + 1}/${maxRetries + 1} for rental: $rentalId');
 
-        // 🔥 FIX: Tăng timeout lên 45s cho lần gọi này
+        // 🔥 Tăng timeout dần dần: 30s -> 45s -> 60s
+        final timeoutDuration = Duration(seconds: 30 + (retryCount * 15));
+
         final result = await _aiService.fetchAIExplanation(
           userId: userId,
           rentalId: rentalId,
           token: token,
-        ).timeout(const Duration(seconds: 45));  // 🔥 Tăng timeout
+        ).timeout(timeoutDuration);
 
         if (result['success'] != null && result['success'] == true) {
           final explanation = result['explanation'] as Map<String, dynamic>;
 
-          // Parse scores safely
+          // 🔥 PARSE SCORES with better error handling
           final rawScores = (explanation['scores'] as Map?);
           final Map<String, double> scores = {};
 
@@ -421,7 +471,7 @@ class RentalViewModel extends ChangeNotifier {
             });
           }
 
-          // Parse reasons safely
+          // 🔥 PARSE REASONS with better error handling
           final rawReasons = (explanation['reasons'] as Map?);
           final Map<String, String> reasons = {};
 
@@ -431,8 +481,11 @@ class RentalViewModel extends ChangeNotifier {
             });
           }
 
-          final rentalData = explanation['rental'] as Map<String, dynamic>?;
-          final rental = rentalData != null ? Rental.fromJson(rentalData) : null;
+          // Parse rental data if available
+          final rentalData = explanation['rental_features'] as Map<String, dynamic>?;
+          final rental = rentalData != null && rentalData.containsKey('_id')
+              ? Rental.fromJson(rentalData)
+              : null;
 
           _currentExplanation = AIExplanation(
             scores: scores,
@@ -441,42 +494,70 @@ class RentalViewModel extends ChangeNotifier {
             rawExplanation: explanation.toString(),
           );
 
+          // 🔥 Store full explanation data for UI
+          if (_currentExplanation != null) {
+            _currentExplanation!.explanation = explanation;
+          }
+
           debugPrint('✅ [EXPLANATION] Loaded successfully on attempt ${retryCount + 1}');
+          debugPrint('   Confidence: ${scores['confidence']}');
+          debugPrint('   Reasons: ${reasons.length}');
+          debugPrint('   Insights: ${explanation['insights']?.length ?? 0}');
+
           _isLoadingExplanation = false;
           notifyListeners();
-          return;  // 🔥 Success - exit loop
+          return;  // ✅ Success - exit loop
         } else {
           throw Exception('Không thể tải giải thích');
         }
       } catch (e) {
         final errorMsg = e.toString();
 
-        // 🔥 Check if timeout error
+        // 🔥 Check error types
         final isTimeoutError = errorMsg.contains('TimeoutException') ||
             errorMsg.contains('timeout');
+        final isNetworkError = errorMsg.contains('SocketException') ||
+            errorMsg.contains('Failed host lookup');
+        final is404Error = errorMsg.contains('404') ||
+            errorMsg.contains('Not Found');
 
         debugPrint('❌ [EXPLANATION] Error on attempt ${retryCount + 1}: $errorMsg');
 
-        // 🔥 Retry nếu timeout và còn lần retry
-        if (isTimeoutError && retryCount < maxRetries) {
-          debugPrint('🔄 [EXPLANATION] Retrying... (${retryCount + 1}/$maxRetries)');
+        // 🔥 Retry logic
+        if ((isTimeoutError || isNetworkError) && retryCount < maxRetries) {
+          debugPrint('🔄 [EXPLANATION] Retrying... (${retryCount + 1}/${maxRetries})');
           retryCount++;
 
-          // Chờ 1 giây trước khi retry
-          await Future.delayed(const Duration(seconds: 1));
+          // Exponential backoff: 1s -> 2s -> 4s
+          final waitTime = Duration(seconds: 1 << retryCount);
+          debugPrint('⏳ Waiting ${waitTime.inSeconds}s before retry...');
+          await Future.delayed(waitTime);
           continue;  // 🔥 Retry
         }
 
-        // 🔥 Không retry được - set error
-        _explanationError = isTimeoutError
-            ? 'Kết nối chậm. Vui lòng thử lại sau'
-            : errorMsg.replaceAll('Exception: ', '');
+        // 🔥 Set user-friendly error message
+        if (is404Error) {
+          _explanationError = 'Bài đăng này chưa có giải thích. Có thể chưa được AI phân tích.';
+        } else if (isTimeoutError) {
+          _explanationError = 'Kết nối chậm. Vui lòng thử lại sau.';
+        } else if (isNetworkError) {
+          _explanationError = 'Lỗi kết nối mạng. Vui lòng kiểm tra internet.';
+        } else if (errorMsg.contains('đăng nhập')) {
+          _explanationError = 'Vui lòng đăng nhập để xem giải thích';
+        } else {
+          _explanationError = errorMsg.replaceAll('Exception: ', '');
+        }
 
         _isLoadingExplanation = false;
         notifyListeners();
-        return;  // 🔥 Exit loop
+        return;  // ❌ Exit loop
       }
     }
+
+    // 🔥 If we reach here, all retries failed
+    _explanationError = 'Không thể tải giải thích sau ${maxRetries + 1} lần thử. Vui lòng thử lại sau.';
+    _isLoadingExplanation = false;
+    notifyListeners();
   }
 
   // ==================== FETCH USER PREFERENCES ====================

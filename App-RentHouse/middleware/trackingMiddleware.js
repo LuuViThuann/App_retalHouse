@@ -74,7 +74,7 @@ const trackRentalView = async (req, res, next) => {
           filterApplied: req.body?.filterApplied || null
         };
 
-        // 🔥 EXTRACT MARKER ANALYTICS
+        // PHÂN TÍCH ĐÁNH DẤU HIỂN THỊ ====================================================
         const markerAnalytics = {
           markerSize: req.body?.markerSize ? parseInt(req.body.markerSize) : null,
           markerOpacity: req.body?.markerOpacity ? parseFloat(req.body.markerOpacity) : null,

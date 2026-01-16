@@ -78,6 +78,8 @@ class _RentalMapViewState extends State<RentalMapView> {
   String? _currentUserId;
   bool _isLoadingAIExplanation = false;
 
+
+
   // ============================================
   // HÀM KHỞI TẠO VÀ CẬP NHẬT
   // ============================================
