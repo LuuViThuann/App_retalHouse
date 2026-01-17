@@ -5,6 +5,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_rentalhouse/Widgets/Detail/AIExplanationDialog.dart';
+import 'package:flutter_rentalhouse/Widgets/Detail/AddressSearchResult.dart';
 import 'package:flutter_rentalhouse/Widgets/Detail/ClusterItem.dart';
 import 'package:flutter_rentalhouse/Widgets/Detail/FilterDialogWidget.dart';
 import 'package:flutter_rentalhouse/Widgets/Detail/HorizontalRentalList.dart';
@@ -40,7 +41,8 @@ class RentalMapView extends StatefulWidget {
   State<RentalMapView> createState() => _RentalMapViewState();
 }
 
-class _RentalMapViewState extends State<RentalMapView> {
+class _RentalMapViewState extends State<RentalMapView>
+    with TickerProviderStateMixin, WidgetsBindingObserver {
 
   // ============================================
   // BIẾN TRẠNG THÁI MỚI
@@ -78,8 +80,84 @@ class _RentalMapViewState extends State<RentalMapView> {
   String? _currentUserId;
   bool _isLoadingAIExplanation = false;
 
+  // 🔥 NEW: Address Search Variables
+  bool _showAddressSearch = false;
+  AddressSearchResult? _selectedAddress;
+
+  // 🔥 NEW: Tracking keyboard visibility
+  double _keyboardHeight = 0;
 
 
+// Hoặc tốt hơn là:
+  AnimationController? _controlsAnimationController;
+  Animation<Offset>? _controlsSlideAnimation;
+  Animation<double>? _controlsOpacityAnimation;
+
+  AnimationController? _badgeAnimationController;
+  Animation<double>? _badgeOpacityAnimation;
+  Animation<Offset>? _badgeSlideAnimation;
+
+  bool _showControls = true;
+
+ // THÊM HÀM INITIALIZE BADGE ANIMATION
+  void _initializeBadgeAnimationIfNeeded() {
+    if (_badgeAnimationController != null) return; // Đã init rồi
+
+    _badgeAnimationController = AnimationController(
+      duration: const Duration(milliseconds: 300),
+      vsync: this,
+    );
+
+    _badgeOpacityAnimation = Tween<double>(
+      begin: 1.0,
+      end: 0.0,
+    ).animate(
+      CurvedAnimation(parent: _badgeAnimationController!, curve: Curves.easeInOut),
+    );
+
+    _badgeSlideAnimation = Tween<Offset>(
+      begin: const Offset(0, 0),
+      end: const Offset(-0.3, 0),
+    ).animate(
+      CurvedAnimation(parent: _badgeAnimationController!, curve: Curves.easeInOut),
+    );
+
+    debugPrint('🎬 Badge animations initialized');
+  }
+
+  // 🔥 PHẦN 3: THÊM HÀM TOGGLE BADGE VISIBILITY
+  Future<void> _toggleBadgeVisibility(bool show) async {
+    _initializeBadgeAnimationIfNeeded(); // ✅ Đảm bảo animations đã init
+
+    if (show) {
+      await _badgeAnimationController!.reverse();
+    } else {
+      await _badgeAnimationController!.forward();
+    }
+  }
+
+  void _initializeAnimationsIfNeeded() {
+    if (_controlsAnimationController != null) return; // Đã init rồi
+
+    _controlsAnimationController = AnimationController(
+      duration: const Duration(milliseconds: 300),
+      vsync: this,
+    );
+
+    _controlsSlideAnimation = Tween<Offset>(
+      begin: const Offset(0, 0),
+      end: const Offset(-0.5, 0),
+    ).animate(
+      CurvedAnimation(parent: _controlsAnimationController!, curve: Curves.easeInOut),
+    );
+
+    _controlsOpacityAnimation = Tween<double>(
+      begin: 1.0,
+      end: 0.0,
+    ).animate(
+      CurvedAnimation(parent: _controlsAnimationController!, curve: Curves.easeInOut),
+    );
+  }
   // ============================================
   // HÀM KHỞI TẠO VÀ CẬP NHẬT
   // ============================================
@@ -92,7 +170,47 @@ class _RentalMapViewState extends State<RentalMapView> {
     //Lấy user ID từ AuthService
     _getCurrentUser();
 
+
+    _initializeAnimationsIfNeeded();
+    _initializeBadgeAnimationIfNeeded();
+
+    WidgetsBinding.instance.addObserver(this);
     _initializeMap();
+
+  }
+  // 🔥 HÀM: Lắng nghe keyboard
+  void _listenToKeyboard() {
+    // Lấy keyboard height từ MediaQuery
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final currentKeyboardHeight =
+          MediaQuery.of(context).viewInsets.bottom;
+      if (_keyboardHeight != currentKeyboardHeight) {
+        setState(() {
+          _keyboardHeight = currentKeyboardHeight;
+        });
+      }
+    });
+  }
+  @override
+  void didChangeMetrics() {
+    super.didChangeMetrics();
+    _listenToKeyboard();
+  }
+
+  Future<void> _toggleControlsVisibility(bool show) async {
+    if (show == _showControls) return;
+
+    _initializeAnimationsIfNeeded(); // ✅ Đảm bảo animations đã init
+
+    setState(() {
+      _showControls = show;
+    });
+
+    if (show) {
+      await _controlsAnimationController!.reverse();
+    } else {
+      await _controlsAnimationController!.forward();
+    }
   }
   //  NEW: Helper method để lấy current user
   Future<void> _getCurrentUser() async {
@@ -876,6 +994,10 @@ class _RentalMapViewState extends State<RentalMapView> {
   void dispose() {
     _cameraDebounce?.cancel();
     _aiRefreshDebounce?.cancel();  // 🔥 Hủy debounce timer khi dispose
+    _controlsAnimationController?.dispose();
+
+    _badgeAnimationController?.dispose(); // ✅ THÊM DÒNG NÀY
+    WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
 
@@ -1602,6 +1724,10 @@ class _RentalMapViewState extends State<RentalMapView> {
     final rentalViewModel =
     Provider.of<RentalViewModel>(context, listen: false);
 
+    // Hide controls khi mở filter dialog
+    _toggleControlsVisibility(false);
+    _toggleBadgeVisibility(false);
+
     showFilterDialog(
       context: context,
       initialRadius: rentalViewModel.currentRadius,
@@ -1657,6 +1783,8 @@ class _RentalMapViewState extends State<RentalMapView> {
             ),
           );
         }
+        _toggleControlsVisibility(true); // Show controls
+        _toggleBadgeVisibility(false);
       },
       onReset: () {
         setState(() {
@@ -1682,349 +1810,287 @@ class _RentalMapViewState extends State<RentalMapView> {
             ),
           );
         }
+        _toggleControlsVisibility(true); // Show controls
+        _toggleBadgeVisibility(false);
       },
-    );
+    ).whenComplete(() {
+      // Đảm bảo controls hiện lại khi đóng dialog
+      _toggleControlsVisibility(true);
+      _toggleBadgeVisibility(false);
+    });
   }
+  // 📍 REPLACE ENTIRE _buildTopLeftControls() METHOD
+
   Widget _buildTopLeftControls() {
     final rentalViewModel = Provider.of<RentalViewModel>(context);
-    // ✅ FIX: Ưu tiên hiển thị POI filter count nếu đang active
     final displayCount = _isPOIFilterActive
         ? _filteredNearbyRentals.length
         : (_isFilterApplied
         ? _filteredNearbyRentals.length
         : _originalNearbyRentals.length);
 
+    if (_controlsSlideAnimation == null || _controlsOpacityAnimation == null) {
+      _initializeAnimationsIfNeeded();
+    }
     return Positioned(
-      top: 16,
+      top: 60,
       left: 16,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // POI FILTER BUTTON
-          Container(
-            decoration: BoxDecoration(
-              color: _isPOIFilterActive ? Colors.green[50] : Colors.white,
-              borderRadius: BorderRadius.circular(12),
-              border: _isPOIFilterActive
-                  ? Border.all(color: Colors.green[400]!, width: 2)
-                  : null,
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.1),
-                  blurRadius: 8,
-                  offset: const Offset(0, 2),
-                ),
-              ],
-            ),
-            child: Material(
-              color: Colors.transparent,
-              child: InkWell(
+      child: SlideTransition(
+        position: _controlsSlideAnimation!,
+        child: FadeTransition(
+          opacity: _controlsOpacityAnimation!,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const SizedBox(height: 16),
+              // ============================================
+              // 1️⃣ POI FILTER BUTTON
+              // ============================================
+              _buildControlButton(
+                label: _isPOIFilterActive
+                    ? (_isAIMode ? 'AI + Tiện ích' : 'Đang lọc tiện ích')
+                    : 'Tìm gần tiện ích',
+                icon: Icons.location_city,
+                isActive: _isPOIFilterActive,
                 onTap: () {
+                  setState(() => _showAddressSearch = false);
                   if (_isPOIFilterActive) {
                     _clearPOIFilter();
                   } else {
                     _showPOISelector();
                   }
                 },
-                borderRadius: BorderRadius.circular(12),
-                child: Padding(
-                  padding: const EdgeInsets.all(12),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        Icons.location_city,
-                        color: _isPOIFilterActive
-                            ? Colors.green[700]
-                            : Colors.grey[700],
-                        size: 20,
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        _isPOIFilterActive
-                            ? (_isAIMode ? 'AI + Tiện ích' : 'Đang lọc tiện ích')
-                            : 'Tìm gần tiện ích',
-                        style: TextStyle(
-                          color: _isPOIFilterActive
-                              ? Colors.green[700]
-                              : Colors.grey[700],
-                          fontWeight: FontWeight.w600,
-                          fontSize: 14,
-                        ),
-                      ),
-                      if (_isPOIFilterActive)
-                        Padding(
-                          padding: const EdgeInsets.only(left: 6),
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 6,
-                              vertical: 2,
-                            ),
-                            decoration: BoxDecoration(
-                              color: Colors.green[600],
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            child: const Icon(
-                              Icons.close,
-                              color: Colors.white,
-                              size: 12,
-                            ),
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
               ),
-            ),
-          ),
-          const SizedBox(height: 12),
+              const SizedBox(height: 12),
 
-          // AI TOGGLE BUTTON
-          Container(
-            decoration: BoxDecoration(
-              color: _isAIMode ? Colors.blue[50] : Colors.white,
-              borderRadius: BorderRadius.circular(12),
-              border: _isAIMode
-                  ? Border.all(color: Colors.blue[400]!, width: 2)
-                  : null,
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.1),
-                  blurRadius: 8,
-                  offset: const Offset(0, 2),
-                ),
-              ],
-            ),
-            child: Material(
-              color: Colors.transparent,
-              child: InkWell(
-                onTap: rentalViewModel.isLoading ? null : _toggleAIMode,
-                borderRadius: BorderRadius.circular(12),
-                child: Padding(
-                  padding: const EdgeInsets.all(12),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        _isAIMode ? Icons.psychology : Icons.location_on,
-                        color: _isAIMode ? Colors.blue[700] : Colors.grey[700],
-                        size: 20,
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        _isAIMode
-                            ? (_isPOIFilterActive ? 'AI + POI' : 'AI đang bật')
-                            : 'Lọc thông minh AI',
-                        style: TextStyle(
-                          color: _isAIMode ? Colors.blue[700] : Colors.grey[700],
-                          fontWeight: FontWeight.w600,
-                          fontSize: 14,
-                        ),
-                      ),
-                      if (_isAIMode)
-                        Padding(
-                          padding: const EdgeInsets.only(left: 6),
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 6,
-                              vertical: 2,
-                            ),
-                            decoration: BoxDecoration(
-                              color: Colors.blue[700],
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            child: const Icon(
-                              Icons.check,
-                              color: Colors.white,
-                              size: 12,
-                            ),
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(height: 12),
-          _buildClusterToggle(),
-          const SizedBox(height: 12),
-
-          // ✅ FIX: FILTER BUTTON - Chỉ hiển thị khi không có POI Filter
-          if (!_isPOIFilterActive) // ✅ Ẩn nút FILTER khi có POI Filter
-            Container(
-              decoration: BoxDecoration(
-                color: _isFilterApplied ? Colors.blue[50] : Colors.white,
-                borderRadius: BorderRadius.circular(12),
-                border: _isFilterApplied
-                    ? Border.all(color: Colors.blue[400]!, width: 2)
-                    : null,
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.1),
-                    blurRadius: 8,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
-              ),
-              child: Material(
-                color: Colors.transparent,
-                child: InkWell(
-                  onTap: _showFilterDialog,
-                  borderRadius: BorderRadius.circular(12),
-                  child: Padding(
-                    padding: const EdgeInsets.all(12),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          Icons.tune_rounded,
-                          color: Colors.blue[700],
-                          size: 20,
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          _isFilterApplied ? 'Đang lọc' : 'Lọc',
-                          style: TextStyle(
-                            color: Colors.blue[700],
-                            fontWeight: FontWeight.w600,
-                            fontSize: 14,
-                          ),
-                        ),
-                        if (_isFilterApplied)
-                          Padding(
-                            padding: const EdgeInsets.only(left: 6),
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 6, vertical: 2),
-                              decoration: BoxDecoration(
-                                color: Colors.blue[600],
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                              child: const Text(
-                                'ON',
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ),
-                          ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          const SizedBox(height: 12),
-
-          // REFRESH BUTTON
-          Container(
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(12),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.1),
-                  blurRadius: 8,
-                  offset: const Offset(0, 2),
-                ),
-              ],
-            ),
-            child: Material(
-              color: Colors.transparent,
-              child: InkWell(
+              // ============================================
+              // 2️⃣ AI TOGGLE BUTTON
+              // ============================================
+              _buildControlButton(
+                label: _isAIMode
+                    ? (_isPOIFilterActive ? 'AI + POI' : 'AI đang bật')
+                    : 'Lọc thông minh AI',
+                icon: _isAIMode ? Icons.psychology : Icons.location_on,
+                isActive: _isAIMode,
                 onTap: rentalViewModel.isLoading
                     ? null
-                    : () async {
-                  debugPrint('🔄 REFRESH button tapped');
-
-                  setState(() {
-                    _filteredNearbyRentals = List.from(_originalNearbyRentals);
-                    _isFilterApplied = false;
-                    _isAIMode = false;
-                    _isPOIFilterActive = false;
-                    _currentFilterResult = null;
-
-                    _resetImpressions();
-                  });
-
-                  rentalViewModel.resetNearbyFilters();
-                  await _fetchNearbyRentals();
-
-                  if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Row(
-                          children: [
-                            const Icon(Icons.check_circle,
-                                color: Colors.white),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment:
-                                CrossAxisAlignment.start,
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  const Text(
-                                    'Đã làm mới danh sách',
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.w600,
-                                      fontSize: 14,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 2),
-                                  Text(
-                                    'Hiển thị ${_originalNearbyRentals.length} bài gợi ý',
-                                    style: const TextStyle(
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w400,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                        backgroundColor: Colors.green[700],
-                        behavior: SnackBarBehavior.floating,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        margin: const EdgeInsets.all(16),
-                        duration: const Duration(seconds: 2),
-                      ),
-                    );
-
-                    _updateMarkersWithClustering();
-                  }
+                    : () {
+                  setState(() => _showAddressSearch = false);
+                  _toggleAIMode();
                 },
-                borderRadius: BorderRadius.circular(12),
-                child: Padding(
-                  padding: const EdgeInsets.all(12),
-                  child: rentalViewModel.isLoading
-                      ? SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      valueColor: AlwaysStoppedAnimation<Color>(
-                        Colors.blue[700]!,
-                      ),
+              ),
+              const SizedBox(height: 12),
+
+              // ============================================
+              // 3️⃣ CLUSTER TOGGLE BUTTON
+              // ============================================
+              _buildClusterToggle(),
+              const SizedBox(height: 12),
+
+              // ============================================
+              // 4️⃣ FILTER BUTTON
+              // ============================================
+              if (!_isPOIFilterActive)
+                _buildControlButton(
+                  label: _isFilterApplied ? 'Đang lọc' : 'Lọc',
+                  icon: Icons.tune_rounded,
+                  isActive: _isFilterApplied,
+                  onTap: () {
+                    setState(() => _showAddressSearch = false);
+                    _showFilterDialog();
+                  },
+                ),
+              if (!_isPOIFilterActive) const SizedBox(height: 12),
+
+              // ============================================
+              // 5️⃣ REFRESH BUTTON
+              // ============================================
+              Container(
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.1),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
                     ),
-                  )
-                      : Icon(Icons.refresh_rounded,
-                      color: Colors.blue[700], size: 20),
+                  ],
+                ),
+                child: Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    onTap: rentalViewModel.isLoading
+                        ? null
+                        : () async {
+                      debugPrint('🔄 REFRESH button tapped');
+
+                      setState(() {
+                        _filteredNearbyRentals = List.from(_originalNearbyRentals);
+                        _isFilterApplied = false;
+                        _isAIMode = false;
+                        _isPOIFilterActive = false;
+                        _currentFilterResult = null;
+                        _showAddressSearch = false;
+                        _selectedAddress = null;
+                        _resetImpressions();
+                      });
+
+                      rentalViewModel.resetNearbyFilters();
+                      rentalViewModel.clearPOISelections();
+
+                      await _fetchNearbyRentals();
+
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Row(
+                              children: [
+                                const Icon(Icons.check_circle,
+                                    color: Colors.white),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                    CrossAxisAlignment.start,
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      const Text(
+                                        'Đã làm mới danh sách',
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.w600,
+                                          fontSize: 14,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        'Hiển thị ${_originalNearbyRentals.length} bài gợi ý',
+                                        style: const TextStyle(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w400,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                            backgroundColor: Colors.green[700],
+                            behavior: SnackBarBehavior.floating,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            margin: const EdgeInsets.all(16),
+                            duration: const Duration(seconds: 2),
+                          ),
+                        );
+
+                        _updateMarkersWithClustering();
+                      }
+                    },
+                    borderRadius: BorderRadius.circular(12),
+                    child: Padding(
+                      padding: const EdgeInsets.all(12),
+                      child: rentalViewModel.isLoading
+                          ? SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                            Colors.blue[700]!,
+                          ),
+                        ),
+                      )
+                          : Icon(Icons.refresh_rounded,
+                          color: Colors.blue[700], size: 20),
+                    ),
+                  ),
                 ),
               ),
-            ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+  Widget _buildControlButton({
+    required String label,
+    required IconData icon,
+    required bool isActive,
+    required VoidCallback? onTap,
+    bool isIconOnly = false,
+  }) {
+    return Container(
+      decoration: BoxDecoration(
+        color: isActive ? (icon == Icons.tune_rounded ? Colors.blue[50] :
+        (icon == Icons.psychology ? Colors.blue[50] : Colors.green[50]))
+            : Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: isActive ? Border.all(
+          color: icon == Icons.tune_rounded ? Colors.blue[400]! :
+          (icon == Icons.psychology ? Colors.blue[400]! : Colors.green[400]!),
+          width: 2,
+        ) : null,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.1),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
           ),
         ],
       ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(12),
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: isIconOnly
+                ? Icon(icon, color: Colors.blue[700], size: 20)
+                : Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  icon,
+                  color: isActive ? Colors.blue[700] : Colors.grey[700],
+                  size: 20,
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  label,
+                  style: TextStyle(
+                    color: isActive ? Colors.blue[700] : Colors.grey[700],
+                    fontWeight: FontWeight.w600,
+                    fontSize: 14,
+                  ),
+                ),
+                if (isActive)
+                  Padding(
+                    padding: const EdgeInsets.only(left: 6),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 6,
+                        vertical: 2,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.blue[700],
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Icon(
+                        Icons.check,
+                        color: Colors.white,
+                        size: 12,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
-
-    // ===========
   }
 
   // 🔥 NEW: Helper method để hiển thị AI Explanation Dialog
@@ -2065,6 +2131,10 @@ class _RentalMapViewState extends State<RentalMapView> {
   void _showPOISelector() {
     final scaffoldMessenger = ScaffoldMessenger.of(context);
 
+    // Hide controls khi mở POI selector
+    _toggleControlsVisibility(false);
+    _toggleBadgeVisibility(false);
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -2084,11 +2154,8 @@ class _RentalMapViewState extends State<RentalMapView> {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  // Header
                   _buildPOISelectorHeader(bottomSheetContext),
                   const Divider(),
-
-                  // Radius Selector
                   Padding(
                     padding: const EdgeInsets.symmetric(
                       horizontal: 16,
@@ -2097,8 +2164,6 @@ class _RentalMapViewState extends State<RentalMapView> {
                     child: _buildRadiusSelector(setStateSheet),
                   ),
                   const Divider(),
-
-                  // Category Selector
                   Padding(
                     padding: const EdgeInsets.symmetric(
                       horizontal: 16,
@@ -2108,8 +2173,14 @@ class _RentalMapViewState extends State<RentalMapView> {
                       onApply: (selectedCategories) {
                         Navigator.pop(bottomSheetContext);
                         _applyPOIFilter(selectedCategories);
+                        _toggleControlsVisibility(true); // Show controls
+                        _toggleBadgeVisibility(true);
                       },
-                      onClose: () => Navigator.pop(bottomSheetContext),
+                      onClose: () {
+                        Navigator.pop(bottomSheetContext);
+                        _toggleControlsVisibility(true); // Show controls
+                        _toggleBadgeVisibility(true);
+                      },
                       scaffoldMessenger: scaffoldMessenger,
                     ),
                   ),
@@ -2119,7 +2190,11 @@ class _RentalMapViewState extends State<RentalMapView> {
           ),
         ),
       ),
-    );
+    ).whenComplete(() {
+      // Đảm bảo controls hiện lại khi đóng modal
+      _toggleControlsVisibility(true);
+      _toggleBadgeVisibility(true);
+    });
   }
   // ============================================
 // HÀM HELPER: POI Selector Header
@@ -2275,7 +2350,10 @@ class _RentalMapViewState extends State<RentalMapView> {
         ? _filteredNearbyRentals.length
         : _originalNearbyRentals.length);
 
+    _keyboardHeight = MediaQuery.of(context).viewInsets.bottom;
+
     return Scaffold(
+      resizeToAvoidBottomInset: false,
       backgroundColor: Colors.white,
       appBar: AppBar(
         backgroundColor: Colors.white,
@@ -2383,6 +2461,106 @@ class _RentalMapViewState extends State<RentalMapView> {
             ],
           ),
 
+          // 🔥 Address Search Bar - Positioned at top
+          Positioned(
+            top: 16,
+            left: 16,
+            right: 16,
+            child: _showAddressSearch
+                ? AddressSearchWidget(
+              mapController: _controller,
+              onAddressSelected: (result) {
+                setState(() {
+                  _selectedAddress = result;
+                  _showAddressSearch = false;
+                });
+                debugPrint('📍 Selected address: ${result.displayName}');
+                _toggleControlsVisibility(true); // Show controls
+                _toggleBadgeVisibility(true);
+              },
+              onClose: () {
+                setState(() => _showAddressSearch = false);
+                _toggleControlsVisibility(true); // Show controls
+                _toggleBadgeVisibility(true);
+              },
+              onSearchStart: () {
+                _toggleControlsVisibility(false); // Hide controls
+                _toggleBadgeVisibility(false);
+              },
+              onSearchEnd: () {
+                _toggleControlsVisibility(true); // Show controls
+                _toggleBadgeVisibility(true);
+              },
+            )
+                : Container(
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.1),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  onTap: () {
+                    setState(() => _showAddressSearch = true);
+                    _toggleControlsVisibility(false); // Hide controls
+                  },
+                  borderRadius: BorderRadius.circular(12),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 12,
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.location_on,
+                          color: Colors.blue[600],
+                          size: 20,
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            _selectedAddress?.displayName ??
+                                'Tìm kiếm địa chỉ...',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: _selectedAddress != null
+                                  ? Colors.black87
+                                  : Colors.grey[500],
+                            ),
+                          ),
+                        ),
+                        if (_selectedAddress != null)
+                          GestureDetector(
+                            onTap: () {
+                              setState(() {
+                                _selectedAddress = null;
+                                _showAddressSearch = false;
+                              });
+                            },
+                            child: Icon(
+                              Icons.close,
+                              color: Colors.white,
+                              size: 18,
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+
           // Top left controls overlay
           _buildTopLeftControls(),
 
@@ -2391,7 +2569,7 @@ class _RentalMapViewState extends State<RentalMapView> {
 
           // Horizontal rental list at bottom
           Positioned(
-            bottom: 0,
+            bottom: _keyboardHeight,
             left: 0,
             right: 0,
             child: HorizontalRentalListWidget(
@@ -2420,45 +2598,63 @@ class _RentalMapViewState extends State<RentalMapView> {
 
           // ✅ Info badge ở dưới cùng bên trái - PHÍA TRÊN HorizontalRentalListWidget
           Positioned(
-            bottom: 230, // Điều chỉnh giá trị này tùy theo chiều cao của HorizontalRentalListWidget
+            bottom: 230 + _keyboardHeight,
             left: 16,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              decoration: BoxDecoration(
-                color: _isPOIFilterActive && _isAIMode
-                    ? Colors.blue[700]
-                    : (_isPOIFilterActive
-                    ? Colors.green[600]
-                    : (_isAIMode
-                    ? Colors.blue[700]
-                    : (_isFilterApplied
-                    ? Colors.orange[600]
-                    : Colors.green[600]))),
-                borderRadius: BorderRadius.circular(12),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.1),
-                    blurRadius: 8,
-                    offset: const Offset(0, 2),
+            child: Builder(
+              builder: (context) {
+                // ✅ FIX: Khởi tạo animation nếu cần
+                _initializeBadgeAnimationIfNeeded();
+
+                // ✅ Kiểm tra null trước khi sử dụng
+                if (_badgeSlideAnimation == null || _badgeOpacityAnimation == null) {
+                  return const SizedBox.shrink();
+                }
+
+                return SlideTransition(
+                  position: _badgeSlideAnimation!,
+                  child: FadeTransition(
+                    opacity: _badgeOpacityAnimation!,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: _isPOIFilterActive && _isAIMode
+                            ? Colors.blue[700]
+                            : (_isPOIFilterActive
+                            ? Colors.green[600]
+                            : (_isAIMode
+                            ? Colors.blue[700]
+                            : (_isFilterApplied
+                            ? Colors.orange[600]
+                            : Colors.green[600]))),
+                        borderRadius: BorderRadius.circular(12),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.1),
+                            blurRadius: 8,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: Text(
+                        _isPOIFilterActive && _isAIMode
+                            ? '$displayCount bài AI đã tìm gần tiện ích'
+                            : (_isPOIFilterActive
+                            ? '$displayCount bài gần tiện ích'
+                            : (_isAIMode
+                            ? '$displayCount gợi ý từ AI'
+                            : (_isFilterApplied
+                            ? '${_filteredNearbyRentals.length}/${_originalNearbyRentals.length} bài'
+                            : '$displayCount bài'))),
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                        ),
+                      ),
+                    ),
                   ),
-                ],
-              ),
-              child: Text(
-                _isPOIFilterActive && _isAIMode
-                    ? '$displayCount bài AI đã tìm gần tiện ích'
-                    : (_isPOIFilterActive
-                    ? '$displayCount bài gần tiện ích'
-                    : (_isAIMode
-                    ? '$displayCount gợi ý từ AI'
-                    : (_isFilterApplied
-                    ? '${_filteredNearbyRentals.length}/${_originalNearbyRentals.length} bài'
-                    : '$displayCount bài'))),
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 14,
-                ),
-              ),
+                );
+              },
             ),
           ),
         ],
