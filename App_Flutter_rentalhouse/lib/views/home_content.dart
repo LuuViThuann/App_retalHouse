@@ -29,6 +29,7 @@ import 'package:provider/provider.dart';
 import 'package:shimmer/shimmer.dart';
 import '../Widgets/Detail/analytics_screen.dart';
 import '../Widgets/Detail/rentalMap.dart';
+import '../Widgets/HomeMain/AllAIRecommendations.dart';
 import '../Widgets/Profile/PaymentHistoryView.dart';
 import '../config/loading.dart';
 import '../models/user.dart';
@@ -38,6 +39,7 @@ import 'package:http/http.dart' as http;
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 import '../utils/Snackbar_process.dart';
+
 
 class HomeContent extends StatefulWidget {
   const HomeContent({super.key});
@@ -61,6 +63,11 @@ class _HomeContentState extends State<HomeContent> {
   Timer? _bannerTimer;
   Timer? _notificationTimer;
 
+  // BIẾN GƠI Ý AI
+  late loc.Location _location;
+  bool _isLoadingAI = false;
+  List<Rental> _aiRecommendations = [];
+
   RentalFilter filter = const RentalFilter();
 
   @override
@@ -68,6 +75,7 @@ class _HomeContentState extends State<HomeContent> {
     super.initState();
     _currentBannerIndex = ValueNotifier<int>(0);
     _unreadNotificationCount = ValueNotifier<int>(0);
+    _location = loc.Location();
     fetchProvinces();
     fetchBanners();
 
@@ -85,9 +93,209 @@ class _HomeContentState extends State<HomeContent> {
           rentalViewModel.refreshAllRentals();
           _loadUnreadCount();
           _startNotificationTimer();
+          _loadAIRecommendations();
         }
       }
     });
+  }
+
+  // ============================================================
+// 🔥 THÊM PHƯƠNG THỨC LOAD AI RECOMMENDATIONS
+
+  Future<void> _loadAIRecommendations() async {
+    try {
+      final authViewModel = Provider.of<AuthViewModel>(context, listen: false);
+      final rentalViewModel = Provider.of<RentalViewModel>(context, listen: false);
+
+      if (authViewModel.currentUser == null) return;
+
+      // Kiểm tra quyền GPS
+      bool serviceEnabled = await _location.serviceEnabled();
+      if (!serviceEnabled) {
+        serviceEnabled = await _location.requestService();
+        if (!serviceEnabled) return;
+      }
+
+      var permissionGranted = await _location.hasPermission();
+      if (permissionGranted == loc.PermissionStatus.denied) {
+        permissionGranted = await _location.requestPermission();
+        if (permissionGranted != loc.PermissionStatus.granted) return;
+      }
+
+      // Lấy vị trí hiện tại
+      final currentLocation = await _location.getLocation();
+
+      if (currentLocation.latitude == null || currentLocation.longitude == null) {
+        return;
+      }
+
+      setState(() => _isLoadingAI = true);
+
+      // Gọi AI recommendations từ ViewModel
+      await rentalViewModel.fetchAIRecommendations(
+        latitude: currentLocation.latitude!,
+        longitude: currentLocation.longitude!,
+        radius: 10.0,
+      );
+
+      if (mounted) {
+        setState(() {
+          _aiRecommendations = rentalViewModel.nearbyRentals;
+          _isLoadingAI = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('❌ Error loading AI recommendations: $e');
+      if (mounted) {
+        setState(() => _isLoadingAI = false);
+      }
+    }
+  }
+
+  // 🔥 THÊM WIDGET BUILD AI SECTION
+  Widget _buildAIRecommendationsSection() {
+    if (_aiRecommendations.isEmpty && !_isLoadingAI) {
+      return const SizedBox.shrink();
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [
+                        Color(0xFF1E88E5),
+                        Color(0xFF42A5F5),
+                        Color(0xFF26C6DA),
+                      ],
+                    ),
+                    borderRadius: BorderRadius.circular(20),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.blue.withOpacity(0.3),
+                        blurRadius: 8,
+                        offset: Offset(0, 3),
+                      ),
+                    ],
+                  ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.auto_awesome, color: Colors.white, size: 16),
+                      SizedBox(width: 6),
+                      Text(
+                        'Trợ lý AI gợi ý cho bạn',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                )
+
+              ],
+            ),
+            TextButton(
+              onPressed: () async {
+                // Lấy vị trí hiện tại
+                final currentLocation = await _location.getLocation();
+
+                if (currentLocation.latitude != null && currentLocation.longitude != null) {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => AllAIRecommendationsScreen(
+                        initialLatitude: currentLocation.latitude,
+                        initialLongitude: currentLocation.longitude,
+                        initialRadius: 10.0,
+                      ),
+                    ),
+                  );
+                } else {
+                  // Nếu không lấy được vị trí, vẫn mở màn hình (sẽ tự lấy vị trí)
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const AllAIRecommendationsScreen()),
+                  );
+                }
+              },
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text('Xem tất cả',
+                    style: TextStyle(fontSize: 14, color: Colors.blue[700]),
+                  ),
+                  const SizedBox(width: 4),
+                  Icon(Icons.arrow_forward,
+                    size: 14,
+                    color: Colors.blue[700],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 10),
+        if (_isLoadingAI)
+          SizedBox(
+            height: 280,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              itemCount: 3,
+              separatorBuilder: (_, __) => const SizedBox(width: 12),
+              itemBuilder: (context, index) => Shimmer.fromColors(
+                baseColor: Colors.grey[300]!,
+                highlightColor: Colors.grey[100]!,
+                child: const RentalCardPlaceholder(),
+              ),
+            ),
+          )
+        else if (_aiRecommendations.isNotEmpty)
+          SizedBox(
+            height: 280,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              itemCount: _aiRecommendations.length,
+              separatorBuilder: (_, __) => const SizedBox(width: 12),
+              itemBuilder: (context, index) {
+                final rental = _aiRecommendations[index];
+                return Stack(
+                  children: [
+                    RentalCardHorizontal(rental: rental),
+                  ],
+                );
+              },
+            ),
+          )
+        else
+          Center(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 20),
+              child: Text(
+                'Không có gợi ý AI',
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Colors.grey[600],
+                ),
+              ),
+            ),
+          ),
+        const SizedBox(height: 20),
+      ],
+    );
   }
 
   Future<void> _getCurrentLocationAndNavigateToMap() async {
@@ -1605,6 +1813,7 @@ class _HomeContentState extends State<HomeContent> {
                   ),
                 ),
                 if (authViewModel.currentUser != null) _buildFavoriteSection(),
+                _buildAIRecommendationsSection(),
                 if (authViewModel.currentUser == null)
                   Padding(
                     padding: const EdgeInsets.symmetric(vertical: 50),
@@ -1693,6 +1902,7 @@ class _HomeContentState extends State<HomeContent> {
     );
   }
 
+
   Widget _buildCategoryItem(
       IconData icon, String label, BuildContext context, String propertyType) {
     return Container(
@@ -1732,6 +1942,58 @@ class _HomeContentState extends State<HomeContent> {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+// ======================== Rental Card Placeholder =============================
+class RentalCardPlaceholder extends StatelessWidget {
+  const RentalCardPlaceholder({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 300,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            height: 150,
+            decoration: BoxDecoration(
+              color: Colors.grey[300],
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(14)),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.all(12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  width: double.infinity,
+                  height: 16,
+                  color: Colors.grey[300],
+                ),
+                const SizedBox(height: 8),
+                Container(
+                  width: 120,
+                  height: 14,
+                  color: Colors.grey[300],
+                ),
+                const SizedBox(height: 8),
+                Container(
+                  width: 200,
+                  height: 12,
+                  color: Colors.grey[300],
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }

@@ -12,7 +12,7 @@ const ML_SERVICE_URL = process.env.PYTHON_ML_URL || 'http://python-ml:8001';
 const authMiddleware = async (req, res, next) => {
   const token = req.header('Authorization')?.replace('Bearer ', '');
   if (!token) return res.status(401).json({ message: 'No token provided' });
-  
+
   try {
     const decodedToken = await admin.auth().verifyIdToken(token);
     req.userId = decodedToken.uid;
@@ -29,7 +29,7 @@ function _getMarkerColorScheme(userPreferences) {
   // - User thích trọ rẻ → marker đỏ/cam (giá rẻ)
   // - User thích biệt thự cao cấp → marker xanh (cao cấp)
   // - User không có preference → marker xanh trung lập
-  
+
   return {
     primary: '#1E40AF',      // Xanh (recommended)
     secondary: '#DC2626',    // Đỏ (far/expensive)
@@ -46,38 +46,55 @@ function _getMarkerColorScheme(userPreferences) {
  */
 router.get('/recommendations/personalized', authMiddleware, async (req, res) => {
   try {
-    const { 
-      limit = 10, 
-      latitude, 
-      longitude, 
+    const {
+      limit = 10,  // Default 10
+      latitude,
+      longitude,
       radius = 10,
       minPrice,
-      maxPrice 
+      maxPrice
     } = req.query;
-    
+
     const userId = req.userId;
 
     console.log(`🤖 [AI-RECOMMEND] User: ${userId}`);
     console.log(`   Location: (${latitude}, ${longitude}), radius: ${radius}km`);
     console.log(`   Price: ${minPrice || 'any'} - ${maxPrice || 'any'}`);
 
-    // ✅ BƯỚC 1: Gọi Python ML service
+    // 🔥 FIX: Cap n_recommendations to max 50 for Python API
+    const n_recommendations = Math.min(parseInt(limit) || 10, 50);
+    const n_recommendations_fetch = Math.min(parseInt(limit) * 2 || 20, 50);  // For fallback diversity
+
+    console.log(`   Requesting ${n_recommendations} recommendations (capped at 50)`);
+
     let aiRecommendations = [];
     let isAIRecommendation = false;
-    
+
     try {
       console.log(`🔗 Calling ML service: ${ML_SERVICE_URL}/recommend/personalized`);
-      
-      // 🔥 FIX: Gửi request với đầy đủ thông tin
+
+      // 🔥 FIX: Send correct values within API limits
       const mlResponse = await axios.post(
         `${ML_SERVICE_URL}/recommend/personalized`,
         {
-          userId: userId,  // 🔥 SỬA: user_id -> userId (match Python API)
-          n_recommendations: parseInt(limit) * 3,
-          use_location: true  // 🔥 THÊM: enable geographic features
+          userId: userId,
+          user_id: userId,
+          n_recommendations: n_recommendations_fetch,  // 🔥 Capped at 50
+          use_location: true,
+          radius_km: parseInt(radius) || 20,
+          exclude_items: [],
+          context: {
+            map_center: latitude && longitude ? [parseFloat(longitude), parseFloat(latitude)] : null,
+            zoom_level: 15,
+            search_radius: parseInt(radius) || 10,
+            time_of_day: _getTimeOfDay(),
+            device_type: 'mobile',
+            impressions: [],
+            scroll_depth: 0.5
+          }
         },
         {
-          timeout: 5000,
+          timeout: 10000,
           headers: { 'Content-Type': 'application/json' }
         }
       );
@@ -86,41 +103,42 @@ router.get('/recommendations/personalized', authMiddleware, async (req, res) => 
         aiRecommendations = mlResponse.data.recommendations;
         isAIRecommendation = true;
         console.log(`✅ AI returned ${aiRecommendations.length} recommendations`);
-        
-        // 🔥 DEBUG: Log first recommendation structure
+
         if (aiRecommendations.length > 0) {
           const first = aiRecommendations[0];
-          console.log(`   Sample recommendation:`);
+          console.log(`   Top recommendation:`);
           console.log(`     - rentalId: ${first.rentalId}`);
-          console.log(`     - score: ${first.score}`);
-          console.log(`     - coordinates: ${JSON.stringify(first.coordinates)}`);
-          console.log(`     - locationBonus: ${first.locationBonus}`);
-          console.log(`     - finalScore: ${first.finalScore}`);
+          console.log(`     - finalScore: ${first.finalScore.toFixed(2)}`);
+          console.log(`     - distance: ${first.distance_km}km`);
         }
       }
     } catch (mlError) {
       console.error('⚠️ ML Service error:', mlError.message);
+      if (mlError.response?.status === 422) {
+        console.error('   🔴 Request validation error (422)');
+        console.error('   Request body:', mlError.config?.data);
+        console.error('   Response:', mlError.response?.data);
+      }
       console.log('⚠️ Falling back to popularity-based recommendations');
       isAIRecommendation = false;
     }
 
-    // ✅ BƯỚC 2: Xây dựng query MongoDB
+    // Build MongoDB query
     let rentalIds = [];
-    
+
     if (isAIRecommendation && aiRecommendations.length > 0) {
-      // Dùng AI recommendations
       rentalIds = aiRecommendations.map(r => r.rentalId);
       console.log(`📌 Using AI recommendations: ${rentalIds.length} items`);
     } else {
-      // Fallback: Lấy popular posts
-      console.log('📊 Using popularity fallback');
+      // Fallback: Popularity-based
       const popularRentals = await Rental.find({ status: 'available' })
         .sort({ views: -1, createdAt: -1 })
-        .limit(parseInt(limit) * 3)
+        .limit(Math.min(parseInt(limit) * 3, 50))  // 🔥 Also cap fallback
         .select('_id')
         .lean();
-      
+
       rentalIds = popularRentals.map(r => r._id.toString());
+      console.log(`📊 Using popularity fallback: ${rentalIds.length} items`);
     }
 
     if (rentalIds.length === 0) {
@@ -133,9 +151,9 @@ router.get('/recommendations/personalized', authMiddleware, async (req, res) => 
       });
     }
 
-    // ✅ BƯỚC 3: Lọc theo vị trí (nếu có)
+    // Location filter
     let geoFilter = {};
-    
+
     if (latitude && longitude) {
       const lat = parseFloat(latitude);
       const lon = parseFloat(longitude);
@@ -153,7 +171,7 @@ router.get('/recommendations/personalized', authMiddleware, async (req, res) => 
       }
     }
 
-    // ✅ BƯỚC 4: Lọc theo giá (nếu có)
+    // Price filter
     let priceFilter = {};
     if (minPrice || maxPrice) {
       priceFilter.price = {};
@@ -162,7 +180,7 @@ router.get('/recommendations/personalized', authMiddleware, async (req, res) => 
       console.log(`💰 Price filter:`, priceFilter.price);
     }
 
-    // ✅ BƯỚC 5: Query MongoDB
+    // Query MongoDB - 🔥 Return only requested limit
     const query = {
       _id: { $in: rentalIds },
       status: 'available',
@@ -170,29 +188,25 @@ router.get('/recommendations/personalized', authMiddleware, async (req, res) => 
       ...priceFilter
     };
 
-    console.log(`🔍 MongoDB query with ${rentalIds.length} rental IDs`);
-
     const rentals = await Rental.find(query)
-      .limit(parseInt(limit))
+      .limit(n_recommendations)  // 🔥 Respect original limit
       .lean();
 
     console.log(`✅ Found ${rentals.length} rentals matching criteria`);
 
-    // ✅ BƯỚC 6: Merge AI metadata + coordinates
+    // Merge AI metadata
     const rentalsWithScore = rentals.map(rental => {
       const aiRec = aiRecommendations.find(
         r => r.rentalId === rental._id.toString()
       );
-      
-      // 🔥 THÊM: Extract coordinates từ MongoDB hoặc từ AI response
+
       const coords = aiRec?.coordinates || {
         longitude: rental.location?.coordinates?.coordinates?.[0] || 0,
         latitude: rental.location?.coordinates?.coordinates?.[1] || 0
       };
-      
+
       return {
         ...rental,
-        // 🔥 THÊM: Coordinates cho frontend map
         location: {
           ...rental.location,
           longitude: coords.longitude,
@@ -203,17 +217,17 @@ router.get('/recommendations/personalized', authMiddleware, async (req, res) => 
           }
         },
         aiScore: aiRec?.score || 0,
-        locationBonus: aiRec?.locationBonus || 1.0,  // 🔥 THÊM
-        finalScore: aiRec?.finalScore || aiRec?.score || 0,  // 🔥 THÊM
+        locationBonus: aiRec?.locationBonus || 1.0,
+        finalScore: aiRec?.finalScore || aiRec?.score || 0,
+        confidence: aiRec?.confidence || 0.5,
         isAIRecommended: isAIRecommendation,
         recommendationReason: aiRec?.method || 'Popular'
       };
     });
 
-    // Sort by finalScore (cao -> thấp)
     rentalsWithScore.sort((a, b) => (b.finalScore || 0) - (a.finalScore || 0));
 
-    console.log(`✅ Response ready: ${rentalsWithScore.length} rentals with AI metadata`);
+    console.log(`✅ Response ready: ${rentalsWithScore.length} rentals`);
 
     res.json({
       success: true,
@@ -224,7 +238,7 @@ router.get('/recommendations/personalized', authMiddleware, async (req, res) => 
         location: latitude && longitude ? { latitude, longitude, radius } : null,
         price: { minPrice, maxPrice }
       },
-      message: isAIRecommendation 
+      message: isAIRecommendation
         ? '🤖 Gợi ý riêng cho bạn từ trợ lý AI'
         : '📊 Gợi ý phổ biến'
     });
@@ -238,6 +252,15 @@ router.get('/recommendations/personalized', authMiddleware, async (req, res) => 
     });
   }
 });
+
+// Helper function
+function _getTimeOfDay() {
+  const hour = new Date().getHours();
+  if (hour >= 5 && hour < 12) return 'morning';
+  if (hour >= 12 && hour < 17) return 'afternoon';
+  if (hour >= 17 && hour < 21) return 'evening';
+  return 'night';
+}
 
 /**
  * GET /api/ai/recommendations/nearby
@@ -255,9 +278,9 @@ router.get('/recommendations/nearby/:rentalId', authMiddleware, async (req, res)
     // Lấy rental chính
     const mainRental = await Rental.findById(rentalId).lean();
     if (!mainRental) {
-      return res.status(404).json({ 
-        success: false, 
-        message: 'Rental not found' 
+      return res.status(404).json({
+        success: false,
+        message: 'Rental not found'
       });
     }
 
@@ -278,7 +301,7 @@ router.get('/recommendations/nearby/:rentalId', authMiddleware, async (req, res)
 
     try {
       console.log(`🔗 Calling ML service: ${ML_SERVICE_URL}/recommend/similar`);
-      
+
       // 🔥 FIX: Gửi rentalId và enable location
       const mlResponse = await axios.post(
         `${ML_SERVICE_URL}/recommend/similar`,
@@ -287,9 +310,9 @@ router.get('/recommendations/nearby/:rentalId', authMiddleware, async (req, res)
           n_recommendations: parseInt(limit) * 2,
           use_location: true  // 🔥 THÊM: enable geographic proximity
         },
-        { 
-          timeout: 5000, 
-          headers: { 'Content-Type': 'application/json' } 
+        {
+          timeout: 5000,
+          headers: { 'Content-Type': 'application/json' }
         }
       );
 
@@ -297,7 +320,7 @@ router.get('/recommendations/nearby/:rentalId', authMiddleware, async (req, res)
         aiRecommendations = mlResponse.data.recommendations;
         isAIRecommendation = true;
         console.log(`✅ AI returned ${aiRecommendations.length} similar recommendations`);
-        
+
         // 🔥 DEBUG: Log sample
         if (aiRecommendations.length > 0) {
           const first = aiRecommendations[0];
@@ -338,13 +361,13 @@ router.get('/recommendations/nearby/:rentalId', authMiddleware, async (req, res)
       const aiRec = aiRecommendations.find(
         r => r.rentalId === rental._id.toString()
       );
-      
+
       // 🔥 THÊM: Coordinates từ AI atau MongoDB
       const coords = aiRec?.coordinates || {
         longitude: rental.location?.coordinates?.coordinates?.[0] || 0,
         latitude: rental.location?.coordinates?.coordinates?.[1] || 0
       };
-      
+
       return {
         ...rental,
         // 🔥 THÊM: Coordinates cho frontend map
@@ -389,7 +412,7 @@ router.get('/recommendations/nearby/:rentalId', authMiddleware, async (req, res)
         title: mainRental.title,
         coordinates: [lon, lat]  // 🔥 THÊM
       },
-      message: isAIRecommendation 
+      message: isAIRecommendation
         ? '🤖 Gợi ý thông minh dành riêng cho bạn'
         : '📍 Gợi ý gần đây'
     });
@@ -429,7 +452,7 @@ router.get('/recommendations/personalized/context', authMiddleware, async (req, 
     console.log(`   Impressions: ${impressions.split(',').length} items`);
 
     // Parse impressions
-    const impressionList = impressions 
+    const impressionList = impressions
       ? impressions.split(',').filter(id => id.trim())
       : [];
 
@@ -510,7 +533,7 @@ router.get('/recommendations/personalized/context', authMiddleware, async (req, 
       // 🔥 MERGE WITH AI METADATA
       const rentalsWithPersonalization = rentals.map((rental, idx) => {
         const aiRec = aiRecommendations.find(r => r.rentalId === rental._id.toString());
-        
+
         const coords = aiRec?.coordinates || {
           longitude: rental.location?.coordinates?.coordinates?.[0] || 0,
           latitude: rental.location?.coordinates?.coordinates?.[1] || 0
@@ -555,7 +578,7 @@ router.get('/recommendations/personalized/context', authMiddleware, async (req, 
         personalization: {
           isPersonalized: true,
           method: 'collaborative_filtering_with_preferences',
-          avgConfidence: rentalsWithPersonalization.length > 0 
+          avgConfidence: rentalsWithPersonalization.length > 0
             ? rentalsWithPersonalization.reduce((s, r) => s + (r.confidence || 0), 0) / rentalsWithPersonalization.length
             : 0,
           avgMarkerSize: rentalsWithPersonalization.length > 0
@@ -573,7 +596,7 @@ router.get('/recommendations/personalized/context', authMiddleware, async (req, 
 
     } catch (mlError) {
       console.error('⚠️ ML Service error:', mlError.message);
-      
+
       // FALLBACK: popularity-based
       const popularRentals = await Rental.find({ status: 'available' })
         .sort({ views: -1, createdAt: -1 })
@@ -776,9 +799,9 @@ router.get('/recommendations/paginated', async (req, res) => {
   const page = parseInt(req.query.page) || 1;
   const limit = parseInt(req.query.limit) || 10;
   const skip = (page - 1) * limit;
-  
+
   const recommendations = aiRecommendations.slice(skip, skip + limit);
-  
+
   res.json({
     data: recommendations,
     pagination: {

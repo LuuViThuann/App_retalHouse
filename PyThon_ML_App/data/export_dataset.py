@@ -7,6 +7,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+
 class DatasetExporter:
     def __init__(self):
         self.mongo_uri = os.getenv('MONGODB_URI', 'mongodb://localhost:27017/renthouse')
@@ -33,7 +34,6 @@ class DatasetExporter:
             print("   Using fallback: rental_app")
             return self.client['rental_app']
     
-    # 🔥 NEW: Hàm lấy coordinates từ rental
     def _get_rental_coordinates(self, rental_id):
         """Lấy coordinates từ rental bằng rentalId"""
         try:
@@ -62,61 +62,32 @@ class DatasetExporter:
             return {'longitude': 0, 'latitude': 0}
     
     def export_interactions(self, output_path='./data/interactions.csv', days=180):
-        """Export user interactions với coordinates"""
+        """Export user interactions với tất cả fields cần thiết"""
         print(f"📊 Exporting interactions (last {days} days)...\n")
         
         cutoff_date = datetime.utcnow() - timedelta(days=days)
         
-        print(f"   Current UTC time: {datetime.utcnow()}")
-        print(f"   Cutoff date: {cutoff_date}\n")
-        
         try:
-            # Query ALL records (không filter timestamp trước)
-            print("   🔍 Query 1: Fetching ALL interactions (no filter)...")
-            all_interactions = list(self.db.userinteractions.find())
-            print(f"      Total records in collection: {len(all_interactions)}")
-            
-            if len(all_interactions) > 0:
-                print("      📌 Sample timestamps:")
-                for i, record in enumerate(all_interactions[:3]):
-                    ts = record.get('timestamp', 'N/A')
-                    print(f"         [{i+1}] {ts} (type: {type(ts).__name__})")
-            
-            # Query với timestamp filter
-            print(f"\n   🔍 Query 2: Fetching interactions since {cutoff_date}...")
-            filtered_interactions = list(self.db.userinteractions.find({
+            # Query interactions
+            print("   🔍 Fetching interactions...")
+            interactions = list(self.db.userinteractions.find({
                 'timestamp': {'$gte': cutoff_date}
-            }).sort('timestamp', -1))
-            print(f"      Filtered records: {len(filtered_interactions)}")
+            }).sort('timestamp', -1).limit(10000))
             
-            # Nếu filtered = 0 nhưng all > 0, dùng ALL data
-            if len(filtered_interactions) == 0 and len(all_interactions) > 0:
-                print("\n   ⚠️ Timestamp filter returned 0 records!")
-                print("   📌 Using ALL interactions instead...")
-                interactions = all_interactions
-            else:
-                interactions = filtered_interactions
-            
-            print(f"\n   ✅ Using {len(interactions)} interaction records\n")
+            print(f"      ✅ Found {len(interactions)} interactions\n")
             
             if len(interactions) == 0:
                 print("⚠️ No interactions found!")
-                print("   Make sure userinteractions collection has data")
-                print(f"   Collections in database: {self.db.list_collection_names()}")
                 return pd.DataFrame()
-            
-            # ==================== BUILD DATAFRAME ====================
             
             # Thêm coordinates cho mỗi interaction
             print("   🔄 Adding coordinates to each interaction...")
             
             enriched_interactions = []
             for i, interaction in enumerate(interactions):
-                # Lấy coordinates từ rental
                 rental_id = interaction.get('rentalId')
                 coords = self._get_rental_coordinates(rental_id)
                 
-                # Thêm vào interaction
                 interaction['longitude'] = coords['longitude']
                 interaction['latitude'] = coords['latitude']
                 
@@ -125,49 +96,25 @@ class DatasetExporter:
                 if (i + 1) % 500 == 0:
                     print(f"      ⏳ Processed {i+1}/{len(interactions)}...")
             
-            print(f"      ✅ Added coordinates to all {len(enriched_interactions)} records\n")
-            
-            # Convert to DataFrame
             df = pd.DataFrame(enriched_interactions)
-            
-            print(f"   Columns in raw data: {df.columns.tolist()}\n")
             
             # ==================== DATA CLEANING ====================
             
-            # 1. Xóa _id MongoDB
             if '_id' in df.columns:
                 df = df.drop('_id', axis=1)
             
-            # 2. Chuẩn hóa IDs
             df['userId'] = df['userId'].astype(str)
             df['rentalId'] = df['rentalId'].astype(str)
             df['timestamp'] = pd.to_datetime(df['timestamp'])
             
-            # 3. Ensure coordinates là numeric
+            # Ensure coordinates
             df['longitude'] = pd.to_numeric(df['longitude'], errors='coerce').fillna(0)
             df['latitude'] = pd.to_numeric(df['latitude'], errors='coerce').fillna(0)
             
-            print(f"   📊 Coordinates statistics:")
-            print(f"      Longitude range: {df['longitude'].min():.4f} to {df['longitude'].max():.4f}")
-            print(f"      Latitude range: {df['latitude'].min():.4f} to {df['latitude'].max():.4f}")
+            # Extract rental snapshot - 🔥 CRITICAL
+            print(f"   📸 Extracting rental snapshot data...")
             
-            valid_coords = len(df[(df['longitude'] != 0) & (df['latitude'] != 0)])
-            print(f"      Valid coordinates: {valid_coords}/{len(df)} ({100*valid_coords/len(df):.2f}%)\n")
-            
-            # 4. Ensure interactionScore
-            if 'interactionScore' not in df.columns:
-                print("   ⚠️ interactionScore missing, using interactionType mapping")
-                score_map = {
-                    'view': 1, 'click': 2, 'favorite': 5, 'unfavorite': -3,
-                    'share': 3, 'contact': 8, 'call': 10
-                }
-                df['interactionScore'] = df['interactionType'].map(score_map).fillna(1)
-            else:
-                df['interactionScore'] = pd.to_numeric(df['interactionScore'], errors='coerce').fillna(1)
-            
-            # 5. Extract rental snapshot nếu có
             if 'rentalSnapshot' in df.columns:
-                print("   📸 Extracting rental snapshot data...")
                 df['price'] = df['rentalSnapshot'].apply(
                     lambda x: x.get('price', 0) if isinstance(x, dict) else 0
                 )
@@ -181,59 +128,76 @@ class DatasetExporter:
                     lambda x: x.get('area', 0) if isinstance(x, dict) else 0
                 )
             else:
-                print("   ⚠️ rentalSnapshot not found, using defaults")
+                print("      ⚠️ rentalSnapshot not found, using defaults")
                 df['price'] = 0
                 df['propertyType'] = 'unknown'
                 df['location_text'] = 'unknown'
                 df['area'] = 0
             
-            # 6. Extract context data
+            # Extract context data - 🔥 IMPORTANT
+            print(f"   🔍 Extracting context data...")
+            
             if 'contextData' in df.columns:
-                print("   🔍 Extracting context data...")
-                df['searchQuery'] = df['contextData'].apply(
-                    lambda x: x.get('searchQuery', '') if isinstance(x, dict) else ''
+                df['timeOfDay'] = df['contextData'].apply(
+                    lambda x: x.get('timeOfDay', 'morning') if isinstance(x, dict) else 'morning'
                 )
-                df['fromRecommendation'] = df['contextData'].apply(
-                    lambda x: x.get('fromRecommendation', False) if isinstance(x, dict) else False
+                df['deviceType'] = df['contextData'].apply(
+                    lambda x: x.get('deviceType', 'mobile') if isinstance(x, dict) else 'mobile'
                 )
-                df['recommendationType'] = df['contextData'].apply(
-                    lambda x: x.get('recommendationType', '') if isinstance(x, dict) else ''
+                df['searchRadius'] = df['contextData'].apply(
+                    lambda x: x.get('searchRadius', 10) if isinstance(x, dict) else 10
                 )
             else:
-                df['searchQuery'] = ''
-                df['fromRecommendation'] = False
-                df['recommendationType'] = ''
+                df['timeOfDay'] = 'morning'
+                df['deviceType'] = 'mobile'
+                df['searchRadius'] = 10
             
-            # 7. Select final columns - 🔥 INCLUDE COORDINATES
+            # Add default fields if missing - 🔥 FIX
+            if 'interactionScore' not in df.columns:
+                score_map = {
+                    'view': 1, 'click': 2, 'favorite': 5, 'unfavorite': -3,
+                    'share': 3, 'contact': 8, 'call': 10
+                }
+                df['interactionScore'] = df['interactionType'].map(score_map).fillna(1)
+            
+            if 'duration' not in df.columns:
+                df['duration'] = 0
+            
+            if 'scrollDepth' not in df.columns:
+                df['scrollDepth'] = 0
+            
+            # Ensure numeric columns
+            df['duration'] = pd.to_numeric(df['duration'], errors='coerce').fillna(0)
+            df['scrollDepth'] = pd.to_numeric(df['scrollDepth'], errors='coerce').fillna(0)
+            df['area'] = pd.to_numeric(df['area'], errors='coerce').fillna(0)
+            df['price'] = pd.to_numeric(df['price'], errors='coerce').fillna(0)
+            df['searchRadius'] = pd.to_numeric(df['searchRadius'], errors='coerce').fillna(10)
+            
+            # Select final columns - 🔥 ENSURE ALL REQUIRED FIELDS
             required_columns = [
                 'userId', 'rentalId', 'interactionType', 'interactionScore',
                 'price', 'propertyType', 'location_text', 'area', 'timestamp',
-                'longitude', 'latitude',  # 🔥 COORDINATES
-                'duration', 'scrollDepth', 'deviceType'
+                'longitude', 'latitude',
+                'duration', 'scrollDepth', 'deviceType',
+                'timeOfDay', 'searchRadius'
             ]
-            
-            optional_columns = [
-                'sessionId', 'searchQuery', 'fromRecommendation', 'recommendationType'
-            ]
-            
-            for col in optional_columns:
-                if col in df.columns:
-                    required_columns.append(col)
             
             available_cols = [col for col in required_columns if col in df.columns]
             df = df[available_cols]
             
-            # 8. Remove invalid rows
-            df = df.dropna(subset=['userId', 'rentalId'])
+            # Remove invalid rows
+            df = df.dropna(subset=['userId', 'rentalId', 'interactionType'])
             
-            print(f"\n✅ Cleaned data: {len(df)} records, {len(df.columns)} columns")
-            print(f"   Columns: {df.columns.tolist()}\n")
-            print(f"   Date range: {df['timestamp'].min()} to {df['timestamp'].max()}")
+            print(f"\n✅ Cleaned data: {len(df)} records")
+            print(f"   Columns: {df.columns.tolist()}")
             print(f"   Unique users: {df['userId'].nunique()}")
             print(f"   Unique rentals: {df['rentalId'].nunique()}")
             print(f"   Interaction types: {df['interactionType'].unique().tolist()}\n")
             
-            # 9. Save CSV
+            valid_coords = len(df[(df['longitude'] != 0) & (df['latitude'] != 0)])
+            print(f"   ✅ Valid coordinates: {valid_coords}/{len(df)} ({100*valid_coords/len(df):.2f}%)\n")
+            
+            # Save CSV
             os.makedirs(os.path.dirname(output_path) or '.', exist_ok=True)
             df.to_csv(output_path, index=False)
             print(f"✅ Exported {len(df)} interactions to {output_path}\n")
@@ -241,7 +205,7 @@ class DatasetExporter:
             return df
             
         except Exception as e:
-            print(f"❌ Error exporting interactions: {e}")
+            print(f"❌ Error: {e}")
             import traceback
             traceback.print_exc()
             raise
@@ -262,7 +226,7 @@ class DatasetExporter:
                     'price': 1, 
                     'location': 1,
                     'propertyType': 1, 
-                    'area': 1,  # 🔥 THÊM FIELD NÀY
+                    'area': 1,
                     'amenities': 1,
                     'furniture': 1,
                     'images': 1,
@@ -402,7 +366,7 @@ class DatasetExporter:
         print(f"   Date range: {interactions_df['timestamp'].min()} to {interactions_df['timestamp'].max()}")
         print(f"   Score range: {interactions_df['interactionScore'].min():.2f} to {interactions_df['interactionScore'].max():.2f}")
         
-        # 🔥 NEW: Coordinates validation
+        # 🔥 Coordinates validation
         valid_coords = len(interactions_df[(interactions_df['longitude'] != 0) & (interactions_df['latitude'] != 0)])
         print(f"   ✅ Coordinates: {valid_coords}/{len(interactions_df)} ({100*valid_coords/len(interactions_df):.2f}% valid)")
         
@@ -412,7 +376,7 @@ class DatasetExporter:
         print(f"   Price range: {rentals_df['price'].min():.0f} - {rentals_df['price'].max():.0f}")
         print(f"   Avg price: {rentals_df['price'].mean():.0f}")
         
-        # 🔥 NEW: Coordinates validation for rentals
+        # 🔥 Coordinates validation for rentals
         valid_rental_coords = len(rentals_df[(rentals_df['longitude'] != 0) & (rentals_df['latitude'] != 0)])
         print(f"   ✅ Coordinates: {valid_rental_coords}/{len(rentals_df)} ({100*valid_rental_coords/len(rentals_df):.2f}% valid)")
         
@@ -471,6 +435,7 @@ class DatasetExporter:
             import traceback
             traceback.print_exc()
             return None, None
+
 
 if __name__ == '__main__':
     try:

@@ -241,38 +241,82 @@ class RecommendationModel:
         print("🚀 STARTING MODEL TRAINING WITH GEOGRAPHIC FEATURES")
         print("="*70)
         
-        # 1. Prepare data
+        # 1. Data validation - 🔥 CRITICAL
+        print("\n📊 DATA VALIDATION:")
+        print(f"   Total interactions: {len(interactions_df)}")
+        print(f"   Unique users: {interactions_df['userId'].nunique()}")
+        print(f"   Unique rentals: {interactions_df['rentalId'].nunique()}")
+        
+        min_users = 5
+        min_interactions = 20
+        min_rentals = 10
+        
+        if interactions_df['userId'].nunique() < min_users:
+            print(f"\n⚠️ WARNING: Too few users ({interactions_df['userId'].nunique()} < {min_users})")
+            print("   Model may not provide good personalization")
+            response = input("Continue anyway? (y/n): ")
+            if response.lower() != 'y':
+                print("Training cancelled.")
+                return
+        
+        if len(interactions_df) < min_interactions:
+            print(f"\n⚠️ WARNING: Too few interactions ({len(interactions_df)} < {min_interactions})")
+            print("   Consider collecting more data first")
+        
+        # 2. Prepare data
         interactions_df, rentals_df = self.prepare_data(interactions_df, rentals_df)
         
-        # 2. Build matrices
+        # 3. Build matrices
         self.build_user_item_matrix(interactions_df)
         
-        # 3. Compute similarities
+        # 4. 🔥 IMPROVED: Compute similarities dengan better normalization
+        print("\n🧮 Computing Similarities...")
         self.compute_user_similarity()
         self.compute_item_similarity()
         
-        # 4. Compute popularity
+        # 5. Compute popularity
         self.compute_popularity_scores(interactions_df)
+        
+        # 6. 🔥 NEW: Extract item features for personalization
+        print("\n📋 Extracting item features...")
+        self.item_features = {}
+        
+        # 🔥 FIX: Use iterrows() instead of itertuples()
+        for idx, row in rentals_df.iterrows():
+            try:
+                rental_id = str(row['_id'])
+                
+                self.item_features[rental_id] = {
+                    'price': float(row['price']) if pd.notna(row['price']) else 0,
+                    'propertyType': str(row['propertyType']) if pd.notna(row['propertyType']) else 'unknown',
+                    'location_text': str(row.get('location_short', 'unknown')) if 'location_short' in row and pd.notna(row.get('location_short')) else 'unknown',
+                    'area': float(row.get('area_total', 0)) if 'area_total' in row and pd.notna(row.get('area_total')) else 0,
+                    'amenities': row.get('amenities', []) if 'amenities' in row and isinstance(row.get('amenities'), list) else [],
+                }
+            except Exception as e:
+                print(f"      ⚠️ Error extracting features for rental {idx}: {e}")
+                continue
+        
+        print(f"   ✅ Extracted features for {len(self.item_features)} items")
         
         print("\n" + "="*70)
         print("✅ TRAINING COMPLETED")
         print("="*70 + "\n")
+        
+        # Summary
+        print("📊 MODEL SUMMARY:")
+        print(f"   Users: {len(self.user_encoder.classes_)}")
+        print(f"   Items: {len(self.item_encoder.classes_)}")
+        print(f"   User-Item interactions: {self.user_item_matrix.nnz}")
+        print(f"   Sparsity: {100 * (1 - self.user_item_matrix.nnz / (len(self.user_encoder.classes_) * len(self.item_encoder.classes_))):.2f}%")
+        print(f"   Rental coordinates: {len(self.rental_coordinates)}")
+        print(f"   User locations: {len(self.user_locations)}")
+        print(f"   Item features: {len(self.item_features)}\n")
     
     def recommend_for_user(self, user_id, n_recommendations=10, exclude_items=None, 
                           use_location=True, radius_km=20, context=None):
         """
-        🎯 Gợi ý cá nhân hóa với Explainable AI
-        
-        context = {
-            'map_center': (lon, lat),
-            'zoom_level': 15,
-            'search_radius': 10,
-            'time_of_day': 'morning',
-            'weekday': 'Monday',
-            'device_type': 'mobile',
-            'impressions': [],
-            'scroll_depth': 0.8,
-        }
+        🎯 Improved personalized recommendation - 🔥 BETTER ALGORITHM
         """
         context = context or {}
         user_location = self.user_locations.get(user_id)
@@ -285,29 +329,48 @@ class RecommendationModel:
         user_idx = self.user_encoder.transform([user_id])[0]
         user_prefs = self.get_user_preferences(user_id)
         
-        # Get similar users
+        # Get similar users - 🔥 IMPROVED
         user_similarities = self.user_similarity[user_idx].toarray().flatten()
-        similar_users_idx = np.argsort(user_similarities)[::-1][1:51]
+        similar_users_idx = np.argsort(user_similarities)[::-1][1:min(101, len(user_similarities))]  # Top 100 similar users
+        
+        # Filter by minimum similarity
+        min_similarity_threshold = 0.1
+        valid_similar_users = [idx for idx in similar_users_idx if user_similarities[idx] > min_similarity_threshold]
+        
+        print(f"   Found {len(valid_similar_users)} similar users (threshold: {min_similarity_threshold})")
         
         # Get items from similar users
         candidate_scores = defaultdict(float)
-        candidate_reasons = defaultdict(list)
+        candidate_metadata = defaultdict(lambda: {'reasons': [], 'scores': {}})
         
-        for similar_user_idx in similar_users_idx:
+        for similar_user_idx in valid_similar_users[:50]:  # Top 50 to avoid too much data
             similarity_score = user_similarities[similar_user_idx]
-            
-            if similarity_score <= 0:
-                continue
-            
             user_items = self.user_item_matrix[similar_user_idx].toarray().flatten()
             
             for item_idx, interaction_score in enumerate(user_items):
                 if interaction_score > 0:
+                    # Skip if user already interacted
                     if self.user_item_matrix[user_idx, item_idx] > 0:
                         continue
                     
-                    candidate_scores[item_idx] += similarity_score * interaction_score
-                    candidate_reasons[item_idx].append('collaborative_filtering')
+                    # Calculate weighted score
+                    weighted_score = similarity_score * interaction_score
+                    candidate_scores[item_idx] += weighted_score
+                    candidate_metadata[item_idx]['reasons'].append(f"Similar user interaction ({interaction_score:.1f})")
+                    candidate_metadata[item_idx]['scores']['collaborative'] = weighted_score
+        
+        # 🔥 ADD: Content-based filtering
+        user_item_vector = self.user_item_matrix[user_idx].toarray().flatten()
+        
+        # Find items similar to what user likes
+        if user_item_vector.sum() > 0:
+            item_similarities = cosine_similarity([user_item_vector], self.item_similarity)[0]
+            
+            for item_idx, sim_score in enumerate(item_similarities):
+                if sim_score > 0.2 and self.user_item_matrix[user_idx, item_idx] == 0:
+                    weighted_sim = sim_score * 0.5  # Weight it less than collaborative
+                    candidate_scores[item_idx] += weighted_sim
+                    candidate_metadata[item_idx]['reasons'].append(f"Similar to liked items ({sim_score:.2f})")
         
         # Sort by score
         sorted_items = sorted(candidate_scores.items(), key=lambda x: x[1], reverse=True)
@@ -319,14 +382,12 @@ class RecommendationModel:
             if exclude_items and rental_id in exclude_items:
                 continue
             
-            # Skip if already shown (impression)
             if context.get('impressions') and rental_id in context.get('impressions'):
                 continue
             
-            # LOCATION BONUS
+            # LOCATION BONUS - 🔥 IMPROVED
             location_bonus = 1.0
             distance = None
-            location_reason = None
             
             if use_location and user_location and rental_id in self.rental_coordinates:
                 rental_coords = self.rental_coordinates[rental_id]
@@ -337,53 +398,43 @@ class RecommendationModel:
                         rental_coords[0], rental_coords[1]
                     )
                     
-                    # Gần hơn → điểm cao hơn
+                    # Better distance scoring
                     if distance <= radius_km:
-                        location_bonus = 1.0 + (1.0 - distance / radius_km) * 0.5
-                        location_reason = f'Gần vị trí bạn hay tìm ({distance:.1f}km)'
+                        # Closer = exponential boost
+                        location_bonus = 1.0 + (1.0 - (distance / radius_km)) ** 2
                     else:
-                        location_bonus = 0.5
+                        location_bonus = 0.3  # Heavier penalty for far items
             
-            # PREFERENCE MATCHING
+            # PREFERENCE MATCHING - 🔥 IMPROVED
             preference_bonus = 1.0
-            preference_reasons = []
             
             if user_prefs:
-                # Price preference matching
+                # Price matching
                 if 'price_range' in user_prefs:
-                    price_min = user_prefs['price_range']['min']
-                    price_max = user_prefs['price_range']['max']
+                    price_min = user_prefs['price_range'].get('min', 0)
+                    price_max = user_prefs['price_range'].get('max', float('inf'))
+                    avg_price = user_prefs['price_range'].get('avg', 0)
                     
-                    # Lấy rental price từ item_features nếu có
-                    if hasattr(self, 'item_features') and rental_id in self.item_features:
-                        rental_price = self.item_features[rental_id].get('price', 0)
+                    if str(rental_id) in self.item_features:
+                        rental_price = self.item_features[str(rental_id)].get('price', 0)
                         
                         if price_min <= rental_price <= price_max:
-                            preference_bonus *= 1.2
-                            preference_reasons.append('Trong tầm giá bạn quan tâm')
-                        elif abs(rental_price - user_prefs['price_range']['avg']) < 500000:
-                            preference_bonus *= 1.1
-                            preference_reasons.append('Giá gần với lịch sử xem của bạn')
+                            # Perfect match gets bonus
+                            price_diff = abs(rental_price - avg_price)
+                            max_diff = max(avg_price - price_min, price_max - avg_price)
+                            price_match = 1.0 - (price_diff / max_diff) if max_diff > 0 else 1.0
+                            preference_bonus *= (0.9 + 0.2 * price_match)
             
-            # TIME-BASED BOOST
+            # TIME BONUS - 🔥 NEW
             time_bonus = 1.0
-            if context.get('time_of_day') == 'morning' and user_prefs and \
-               user_prefs.get('avg_duration', 0) > 30:
+            time_of_day = context.get('time_of_day', 'morning')
+            
+            if user_prefs and user_prefs.get('total_interactions', 0) > 10:
+                # Boost if user is typically active at this time
                 time_bonus = 1.05
             
-            # Apply all bonuses
+            # Calculate final score
             final_score = score * location_bonus * preference_bonus * time_bonus
-            
-            # Build explanation
-            explanation = {
-                'collaborative': 'Người dùng tương tự đã xem bài này',
-                'location': location_reason,
-                'preference': preference_reasons,
-                'interaction_count': f'Bạn đã xem {user_prefs["total_interactions"] if user_prefs else 0} bài tương tự' if user_prefs else None,
-            }
-            
-            # Filter out None reasons
-            explanation = {k: v for k, v in explanation.items() if v}
             
             recommendations.append({
                 'rentalId': rental_id,
@@ -395,9 +446,11 @@ class RecommendationModel:
                 'method': 'collaborative_personalized',
                 'coordinates': self.rental_coordinates.get(rental_id, (0, 0)),
                 'distance_km': distance,
-                'explanation': explanation,
-                'confidence': min(1.0, float(user_similarities[similar_users_idx[0]]) * preference_bonus) if len(similar_users_idx) > 0 else 0.5,
+                'confidence': min(1.0, float(score / 10.0)) if score > 0 else 0.5,
             })
+            
+            if len(recommendations) >= n_recommendations * 2:
+                break
         
         # Sort by final score
         recommendations.sort(key=lambda x: x['finalScore'], reverse=True)

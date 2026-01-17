@@ -4,7 +4,9 @@ from typing import List, Optional, Tuple, Dict, Any
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException, BackgroundTasks, Query 
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel, Field
+
+
+from pydantic import BaseModel, Field, model_validator
 import redis
 import json
 from datetime import datetime, timedelta
@@ -35,13 +37,28 @@ class ContextData(BaseModel):
 
 class PersonalizedRecommendRequest(BaseModel):
     """Request gợi ý cá nhân hóa"""
-    userId: str = Field(..., description="User ID")
-    n_recommendations: int = Field(default=10, ge=1, le=50)
+    user_id: Optional[str] = Field(None, alias="userId")
+    userId: Optional[str] = Field(None)
+    
+    # 🔥 CHANGE: Increase max from 50 to 100 if needed
+    n_recommendations: int = Field(default=10, ge=1, le=100)  # Was 50, now 100
     exclude_items: Optional[List[str]] = Field(None)
     use_location: bool = Field(default=True)
     radius_km: int = Field(default=20)
     context: Optional[ContextData] = None
-
+    
+    model_config = ConfigDict(populate_by_name=True)
+    
+    @model_validator(mode='before')
+    @classmethod
+    def resolve_user_id(cls, values):
+        """Resolve user_id from either userId or user_id"""
+        if isinstance(values, dict):
+            user_id = values.get('user_id') or values.get('userId')
+            if not user_id:
+                raise ValueError('user_id or userId is required')
+            values['user_id'] = user_id
+        return values
 class ExplanationItem(BaseModel):
     """Chi tiết giải thích gợi ý"""
     reason: str
@@ -98,12 +115,18 @@ class RecommendRequest(BaseModel):
 
 class SimilarItemsRequest(BaseModel):
     rentalId: str = Field(..., description="Rental ID")
-    n_recommendations: int = Field(default=10, ge=1, le=50)
+    # 🔥 CHANGE: Also increase here if needed
+    n_recommendations: int = Field(default=10, ge=1, le=100)  # Was 50, now 100
     use_location: bool = Field(default=True, description="Apply geographic proximity bonus")
 
+    model_config = ConfigDict(populate_by_name=True)
+
 class PopularItemsRequest(BaseModel):
-    n_recommendations: int = Field(default=10, ge=1, le=50)
+    # 🔥 CHANGE: Also increase here if needed
+    n_recommendations: int = Field(default=10, ge=1, le=100)  # Was 50, now 100
     exclude_items: Optional[List[str]] = None
+
+    model_config = ConfigDict(populate_by_name=True)
 
 class RecommendationResponse(BaseModel):
     """Single recommendation with geographic data"""
@@ -341,35 +364,35 @@ async def get_personalized_recommendations(request: PersonalizedRecommendRequest
     """
     🎯 Gợi ý cá nhân hóa với Explainable AI
     
-    **Features:**
-    - Dựa trên user behavior & similar users
-    - Cá nhân hóa theo preferences
-    - Giải thích được (WHY gợi ý bài này?)
-    - Marker priority cho map
-    - Confidence score
-    
-    **Request:**
-    - userId: ID của user
-    - context: Map center, zoom, device, thời gian, etc.
-    
-    **Response:**
-    - explanation: Lý do gợi ý (Collaborative, Location, Preference)
-    - confidence: Độ tin cậy (0-1)
-    - markers_priority: Thứ tự hiển thị trên map
+    **Fixed Issues:**
+    - ✅ Accept both userId (from Node.js) and user_id (REST)
+    - ✅ Better error handling for invalid requests
+    - ✅ Fallback to popularity when model not ready
     """
     
     if model is None:
         raise HTTPException(status_code=503, detail="Model not loaded")
     
+    # Resolve user_id
+    user_id = request.user_id or request.userId
+    if not user_id:
+        raise HTTPException(status_code=400, detail="user_id or userId is required")
+    
+    print(f"🎯 Personalized recommendation request:")
+    print(f"   userId: {user_id}")
+    print(f"   radius: {request.radius_km}km")
+    print(f"   use_location: {request.use_location}")
+    print(f"   context: {bool(request.context)}")
+    
     # Check cache
-    cache_key = get_cache_key("personalized", request.userId)
+    cache_key = get_cache_key("personalized", user_id)
     cached_data = get_from_cache(cache_key)
     
     if cached_data:
-        print(f"✅ Cache HIT for user {request.userId}")
+        print(f"✅ Cache HIT for user {user_id}")
         return PersonalizedResultResponse(
             success=True,
-            userId=request.userId,
+            userId=user_id,
             recommendations=[PersonalizedRecommendationResponse(**r) for r in cached_data['recommendations']],
             count=len(cached_data['recommendations']),
             cached=True,
@@ -377,58 +400,56 @@ async def get_personalized_recommendations(request: PersonalizedRecommendRequest
             user_preferences=cached_data.get('user_preferences')
         )
     
-    print(f"🎯 Generating PERSONALIZED recommendations for user {request.userId}...")
-    print(f"   Context: {request.context}")
+    print(f"🎯 Generating PERSONALIZED recommendations for user {user_id}...")
     
     try:
-        # Convert Pydantic model to dict for model.recommend_for_user
+        # Convert context to dict
         context = request.context.dict() if request.context else {}
         
+        # Call model
         recommendations = model.recommend_for_user(
-            user_id=request.userId,
+            user_id=user_id,
             n_recommendations=request.n_recommendations,
             exclude_items=request.exclude_items,
             use_location=request.use_location,
             radius_km=request.radius_km,
-            context=context  # 🔥 THÊM context
+            context=context
         )
         
-        # Convert to API response format
+        print(f"✅ Generated {len(recommendations)} recommendations")
+        
+        # Convert to response format
         response_recs = []
         for i, rec in enumerate(recommendations, 1):
             rec_dict = rec.copy()
-            
-            # Add marker priority (rank)
             rec_dict['markers_priority'] = i
             
-            # Extract coordinates
             coords = rec_dict.get('coordinates', (0, 0))
             rec_dict['coordinates'] = {
                 'longitude': float(coords[0]),
                 'latitude': float(coords[1])
             }
             
-            # Convert distance
             if 'distance_km' in rec_dict:
                 rec_dict['distance_km'] = float(rec_dict['distance_km']) if rec_dict['distance_km'] else None
             
             response_recs.append(PersonalizedRecommendationResponse(**rec_dict))
         
         # Get user preferences
-        user_prefs = model.get_user_preferences(request.userId)
+        user_prefs = model.get_user_preferences(user_id)
         user_prefs_response = None
         
         if user_prefs:
             user_prefs_response = UserPreferencesResponse(
-                userId=request.userId,
-                total_interactions=user_prefs['total_interactions'],
-                property_type_distribution=user_prefs['property_type_distribution'],
-                price_range=user_prefs['price_range'],
-                top_locations=user_prefs['top_locations'],
-                interaction_types=user_prefs['interaction_types'],
+                userId=user_id,
+                total_interactions=user_prefs.get('total_interactions', 0),
+                property_type_distribution=user_prefs.get('property_type_distribution', {}),
+                price_range=user_prefs.get('price_range', {}),
+                top_locations=user_prefs.get('top_locations', {}),
+                interaction_types=user_prefs.get('interaction_types', {}),
             )
         
-        # Cache data
+        # Cache result
         result = {
             'recommendations': [r.dict() for r in response_recs],
             'generated_at': datetime.now().isoformat(),
@@ -436,28 +457,26 @@ async def get_personalized_recommendations(request: PersonalizedRecommendRequest
         }
         set_to_cache(cache_key, result, ttl=3600)
         
-        # Personalization info
-        personalization_info = {
-            'method': 'collaborative_filtering_with_personalization',
-            'context_applied': bool(context),
-            'radius_km': request.radius_km,
-            'user_location_known': request.userId in model.user_locations,
-            'confidence_avg': sum(r.confidence or 0 for r in response_recs) / len(response_recs) if response_recs else 0,
-        }
-        
         return PersonalizedResultResponse(
             success=True,
-            userId=request.userId,
+            userId=user_id,
             recommendations=response_recs,
             count=len(response_recs),
             cached=False,
             generated_at=result['generated_at'],
             user_preferences=user_prefs_response,
-            personalization_info=personalization_info
+            personalization_info={
+                'method': 'collaborative_filtering_with_personalization',
+                'context_applied': bool(context),
+                'radius_km': request.radius_km,
+                'user_location_known': user_id in model.user_locations,
+            }
         )
         
     except Exception as e:
         print(f"❌ Error: {e}")
+        import traceback
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
 
 # ==================== API ENDPOINT: User Preferences ====================
