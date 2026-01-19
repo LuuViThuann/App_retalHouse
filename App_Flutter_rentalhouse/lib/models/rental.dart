@@ -300,185 +300,197 @@ class Rental {
 
   factory Rental.fromJson(Map<String, dynamic> json) {
     try {
-      // 🔥 FIX: Kiểm tra cả 'id' và '_id' (backend có thể trả về bất kỳ cái nào)
-      String? rentalId = json['_id'] as String?;
+      // Validate rental ID
+      String? rentalId = json['_id'] as String? ?? json['id'] as String?;
       if (rentalId == null || rentalId.isEmpty) {
-        rentalId = json['id'] as String?;  // 🔥 THÊM: Kiểm tra 'id'
+        throw Exception('Rental ID is missing');
       }
 
-      if (rentalId == null || rentalId.isEmpty) {
-        throw Exception('Rental ID is missing in JSON response. Got: ${json.keys.toList()}');
+      // ===== SAFE PARSE FUNCTIONS =====
+
+      Map<String, dynamic> _safeParseMap(dynamic value, Map<String, dynamic> defaultValue) {
+        if (value == null) return defaultValue;
+        if (value is Map) return Map<String, dynamic>.from(value);
+        return defaultValue;
       }
 
-      // Parse area
-      Map<String, dynamic> areaData = {};
-      if (json['area'] != null && json['area'] is Map) {
-        areaData = {
-          'total': _parseDouble(json['area']['total'], 'area.total') ?? 0.0,
-          'livingRoom':
-          _parseDouble(json['area']['livingRoom'], 'area.livingRoom') ?? 0.0,
-          'bedrooms':
-          _parseDouble(json['area']['bedrooms'], 'area.bedrooms') ?? 0.0,
-          'bathrooms':
-          _parseDouble(json['area']['bathrooms'], 'area.bathrooms') ?? 0.0,
-        };
-      } else {
-        areaData = {
-          'total': 0.0,
-          'livingRoom': 0.0,
-          'bedrooms': 0.0,
-          'bathrooms': 0.0,
-        };
+      List<String> _safeParseStringList(dynamic value) {
+        if (value == null) return [];
+        if (value is List) {
+          return value.map((e) => e.toString()).where((s) => s.isNotEmpty).toList();
+        }
+        if (value is String) return [value];
+        return [];
       }
 
-      // Parse location with comprehensive coordinate handling
+      double _safeParseDouble(dynamic value) {
+        if (value == null) return 0.0;
+        if (value is num) return value.toDouble();
+        if (value is String) {
+          final trimmed = value.trim().replaceAll(',', '.');
+          return double.tryParse(trimmed) ?? 0.0;
+        }
+        return 0.0;
+      }
+
+      // ===== PARSE AREA =====
+      final areaData = _safeParseMap(json['area'], {
+        'total': 0.0,
+        'livingRoom': 0.0,
+        'bedrooms': 0.0,
+        'bathrooms': 0.0,
+      });
+
+      final parsedArea = {
+        'total': _safeParseDouble(areaData['total']),
+        'livingRoom': _safeParseDouble(areaData['livingRoom']),
+        'bedrooms': _safeParseDouble(areaData['bedrooms']),
+        'bathrooms': _safeParseDouble(areaData['bathrooms']),
+      };
+
+      // ===== PARSE LOCATION =====
       Map<String, dynamic> locationData = {};
-      if (json['location'] != null && json['location'] is Map) {
-        locationData['short'] = json['location']['short'] as String? ?? '';
-        locationData['fullAddress'] =
-            json['location']['fullAddress'] as String? ?? '';
+      final locationRaw = json['location'];
 
-        // Priority 1: GeoJSON coordinates format
-        if (json['location']['coordinates'] != null &&
-            json['location']['coordinates']['coordinates'] != null) {
-          var coords = json['location']['coordinates']['coordinates'];
-          if (coords is List && coords.length >= 2) {
-            final lat = _parseDouble(coords[1], 'location.coordinates[1]');
-            final lng = _parseDouble(coords[0], 'location.coordinates[0]');
-            locationData['longitude'] = lng ?? 0.0;
-            locationData['latitude'] = lat ?? 0.0;
-          } else {
-            locationData['longitude'] = 0.0;
-            locationData['latitude'] = 0.0;
+      if (locationRaw != null && locationRaw is Map) {
+        locationData['short'] = locationRaw['short']?.toString() ?? '';
+        locationData['fullAddress'] = locationRaw['fullAddress']?.toString() ??
+            locationRaw['full']?.toString() ?? '';
+
+        // Parse coordinates (multiple formats)
+        double lat = 0.0;
+        double lng = 0.0;
+
+        // Format 1: GeoJSON nested coordinates
+        if (locationRaw['coordinates'] is Map &&
+            locationRaw['coordinates']['coordinates'] is List) {
+          final coords = locationRaw['coordinates']['coordinates'] as List;
+          if (coords.length >= 2) {
+            lng = _safeParseDouble(coords[0]);
+            lat = _safeParseDouble(coords[1]);
           }
         }
-        // Priority 2: Direct latitude/longitude fields
-        else if (json['location']['longitude'] != null &&
-            json['location']['latitude'] != null) {
-          locationData['longitude'] =
-              _parseDouble(json['location']['longitude'], 'location.longitude') ??
-                  0.0;
-          locationData['latitude'] =
-              _parseDouble(json['location']['latitude'], 'location.latitude') ??
-                  0.0;
+        // Format 2: Direct lat/lng
+        else if (locationRaw['latitude'] != null && locationRaw['longitude'] != null) {
+          lat = _safeParseDouble(locationRaw['latitude']);
+          lng = _safeParseDouble(locationRaw['longitude']);
         }
-        // Priority 3: Root-level coordinates array
-        else if (json['coordinates'] is List &&
-            json['coordinates'].length >= 2) {
-          locationData['longitude'] =
-              _parseDouble(json['coordinates'][0], 'coordinates[0]') ?? 0.0;
-          locationData['latitude'] =
-              _parseDouble(json['coordinates'][1], 'coordinates[1]') ?? 0.0;
-        } else {
-          locationData['longitude'] = 0.0;
-          locationData['latitude'] = 0.0;
+        // Format 3: Coordinates object
+        else if (locationRaw['coordinates'] is Map) {
+          lat = _safeParseDouble(locationRaw['coordinates']['latitude']);
+          lng = _safeParseDouble(locationRaw['coordinates']['longitude']);
         }
+
+        locationData['latitude'] = lat;
+        locationData['longitude'] = lng;
       } else {
         locationData = {
           'short': '',
           'fullAddress': '',
-          'longitude': 0.0,
           'latitude': 0.0,
+          'longitude': 0.0,
         };
       }
 
-      // Parse rentalTerms
-      Map<String, dynamic> rentalTermsData = {};
-      if (json['rentalTerms'] != null && json['rentalTerms'] is Map) {
-        rentalTermsData = {
-          'minimumLease':
-          json['rentalTerms']['minimumLease'] as String? ?? '',
-          'deposit': json['rentalTerms']['deposit'] as String? ?? '',
-          'paymentMethod':
-          json['rentalTerms']['paymentMethod'] as String? ?? '',
-          'renewalTerms':
-          json['rentalTerms']['renewalTerms'] as String? ?? '',
-        };
-      } else {
-        rentalTermsData = {
-          'minimumLease': '',
-          'deposit': '',
-          'paymentMethod': '',
-          'renewalTerms': '',
-        };
-      }
+      // ===== PARSE RENTAL TERMS =====
+      final rentalTermsData = _safeParseMap(json['rentalTerms'], {
+        'minimumLease': '',
+        'deposit': '',
+        'paymentMethod': '',
+        'renewalTerms': '',
+      });
 
-      // Parse contactInfo
-      Map<String, dynamic> contactInfoData = {};
-      if (json['contactInfo'] != null && json['contactInfo'] is Map) {
-        contactInfoData = {
-          'name': json['contactInfo']['name'] as String? ?? '',
-          'phone': json['contactInfo']['phone'] as String? ?? '',
-          'availableHours':
-          json['contactInfo']['availableHours'] as String? ?? '',
-        };
-      } else {
-        contactInfoData = {
-          'name': '',
-          'phone': '',
-          'availableHours': '',
-        };
-      }
+      // ===== PARSE CONTACT INFO =====
+      final contactInfoData = _safeParseMap(json['contactInfo'], {
+        'name': '',
+        'phone': '',
+        'availableHours': '',
+      });
 
-      // Parse nearestPOIs
+      // ===== PARSE NEAREST POIs =====
       List<Map<String, dynamic>>? poisData;
-      if (json['nearestPOIs'] != null && json['nearestPOIs'] is List) {
+      if (json['nearestPOIs'] is List) {
         poisData = (json['nearestPOIs'] as List).map((poi) {
+          if (poi is! Map) return <String, dynamic>{};
           return {
-            'name': poi['name'] as String? ?? '',
-            'category': poi['category'] as String? ?? '',
-            'icon': poi['icon'] as String? ?? '📍',
+            'name': poi['name']?.toString() ?? '',
+            'category': poi['category']?.toString() ?? '',
+            'icon': poi['icon']?.toString() ?? '📍',
             'distance': poi['distance']?.toString() ?? '0',
           };
         }).toList();
       }
 
-      final price = _parseDouble(json['price'], 'price') ?? 0.0;
+      // ===== 🔥 FIX: PARSE EXPLANATION (String or Map) =====
+      Map<String, dynamic>? explanationData;
+      final explanationRaw = json['explanation'];
 
+      if (explanationRaw != null) {
+        if (explanationRaw is Map) {
+          // Already a Map - use it
+          explanationData = Map<String, dynamic>.from(explanationRaw);
+        } else if (explanationRaw is String) {
+          // String - wrap it in a Map
+          explanationData = {
+            'text': explanationRaw,
+            'reason': explanationRaw,
+          };
+        }
+      }
+
+      // ===== PARSE LISTS =====
+      final furniture = _safeParseStringList(json['furniture']);
+      final amenities = _safeParseStringList(json['amenities']);
+      final surroundings = _safeParseStringList(json['surroundings']);
+      final images = _safeParseStringList(json['images']);
+      final videos = _safeParseStringList(json['videos']);
+
+      // ===== CREATE RENTAL INSTANCE =====
       return Rental(
-        id: rentalId,  // 🔥 FIXED: Sử dụng rentalId đã validate
-        title: json['title'] as String? ?? '',
-        price: price,
-        area: areaData,
+        id: rentalId,
+        title: json['title']?.toString() ?? '',
+        price: _safeParseDouble(json['price']),
+        area: parsedArea,
         location: locationData,
         nearestPOIs: poisData,
-        propertyType: json['propertyType'] as String? ?? 'Khác',
-        furniture: List<String>.from(json['furniture'] as List? ?? []),
-        amenities: List<String>.from(json['amenities'] as List? ?? []),
-        surroundings: List<String>.from(json['surroundings'] as List? ?? []),
+        propertyType: json['propertyType']?.toString() ?? 'Khác',
+        furniture: furniture,
+        amenities: amenities,
+        surroundings: surroundings,
         rentalTerms: rentalTermsData,
         contactInfo: contactInfoData,
-        userId: json['userId'] as String? ?? '',
-        images: List<String>.from(json['images'] as List? ?? []),
-        videos: List<String>.from(json['videos'] as List? ?? []),
-        status: json['status'] as String? ?? 'available',
-        createdAt: DateTime.parse(
-            json['createdAt'] as String? ?? DateTime.now().toIso8601String()),
-        landlord: json['userId'] as String? ?? '',
+        userId: json['userId']?.toString() ?? '',
+        images: images,
+        videos: videos,
+        status: json['status']?.toString() ?? 'available',
+        createdAt: DateTime.tryParse(json['createdAt']?.toString() ?? '') ?? DateTime.now(),
+        landlord: json['userId']?.toString() ?? '',
+
         // PAYMENT FIELDS
-        paymentTransactionCode:
-        json['paymentInfo']?['transactionCode'] as String?,
-        paymentInfo: json['paymentInfo'] != null
+        paymentTransactionCode: json['paymentInfo']?['transactionCode']?.toString(),
+        paymentInfo: json['paymentInfo'] is Map
             ? Map<String, dynamic>.from(json['paymentInfo'] as Map)
             : null,
         publishedAt: json['publishedAt'] != null
-            ? DateTime.parse(json['publishedAt'] as String)
+            ? DateTime.tryParse(json['publishedAt'].toString())
             : null,
+
         // AI RECOMMENDATION FIELDS
         isAIRecommended: json['isAIRecommended'] as bool?,
-        aiScore: (json['aiScore'] as num?)?.toDouble(),
-        recommendationReason: json['recommendationReason'] as String?,
-        distanceKm: json['distanceKm']?.toString(),
-        locationBonus: (json['locationBonus'] as num?)?.toDouble(),
-        finalScore: (json['finalScore'] as num?)?.toDouble(),
-        // 🔥 NEW: Additional AI Fields
-        preferenceBonus: (json['preferenceBonus'] as num?)?.toDouble(),
-        timeBonus: (json['timeBonus'] as num?)?.toDouble(),
-        confidence: (json['confidence'] as num?)?.toDouble(),
+        aiScore: _safeParseDouble(json['aiScore']),
+        recommendationReason: json['recommendationReason']?.toString(),
+        distanceKm: json['distanceKm']?.toString() ?? json['distance_km']?.toString(),
+        locationBonus: _safeParseDouble(json['locationBonus']),
+        finalScore: _safeParseDouble(json['finalScore']),
+
+        // ADDITIONAL AI FIELDS
+        preferenceBonus: _safeParseDouble(json['preferenceBonus']),
+        timeBonus: _safeParseDouble(json['timeBonus']),
+        confidence: _safeParseDouble(json['confidence']),
         markerPriority: json['markerPriority'] as int?,
-        explanation: json['explanation'] as Map<String, dynamic>?,
-        markerSize: (json['markerSize'] as num?)?.toDouble(),
-        markerOpacity: (json['markerOpacity'] as num?)?.toDouble(),
+        explanation: explanationData,  // 🔥 FIXED
+        markerSize: _safeParseDouble(json['markerSize']),
+        markerOpacity: _safeParseDouble(json['markerOpacity']),
       );
     } catch (e, stackTrace) {
       debugPrint('❌ Error parsing Rental from JSON: $e');
@@ -488,6 +500,7 @@ class Rental {
     }
   }
 
+// Keep existing _parseDouble method
   static double? _parseDouble(dynamic value, String fieldName) {
     if (value == null) return null;
     if (value is num) return value.toDouble();

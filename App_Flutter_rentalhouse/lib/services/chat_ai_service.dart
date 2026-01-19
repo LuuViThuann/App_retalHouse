@@ -1,15 +1,13 @@
-import 'dart:convert';
+
 import 'package:flutter/material.dart';
-import 'package:flutter_rentalhouse/services/AISuggestService.dart'; // ✅ FIX: Bỏ khoảng trắng
-import 'package:flutter_rentalhouse/views/rental_detail_view.dart';
-import 'package:http/http.dart' as http;
-import 'package:intl/intl.dart';
 import 'package:flutter_rentalhouse/models/rental.dart';
+import 'package:flutter_rentalhouse/services/AI_Chat_service.dart';
+import 'package:flutter_rentalhouse/services/chat_ai_service.dart';
+import 'package:flutter_rentalhouse/views/rental_detail_view.dart';
+import 'package:intl/intl.dart';
 
 class ChatAIBottomSheet extends StatefulWidget {
-  final String apiKey;
-
-  const ChatAIBottomSheet({super.key, required this.apiKey});
+  const ChatAIBottomSheet({super.key});
 
   @override
   State<ChatAIBottomSheet> createState() => _ChatAIBottomSheetState();
@@ -20,21 +18,13 @@ class _ChatAIBottomSheetState extends State<ChatAIBottomSheet> {
   final TextEditingController _controller = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   bool isLoading = false;
+  String? conversationId;
+  List<String> suggestions = [];
 
   @override
   void initState() {
     super.initState();
-    messages.add({
-      'role': 'ai',
-      'text':
-      ' Xin chào! Tôi là trợ lý AI chuyên về bất động sản. Tôi có thể giúp bạn:\n\n'
-          '- Tìm kiếm nhà theo loại hình (căn hộ, nhà riêng, phòng trọ...)\n'
-          '- Tìm nhà theo mức giá phù hợp\n'
-          '- Tìm theo vị trí cụ thể\n'
-          '- Tìm theo diện tích mong muốn\n'
-          '- Tư vấn về tiện nghi và lựa chọn phù hợp\n\n'
-          'Hãy cho tôi biết bạn đang tìm kiếm gì nhé!',
-    });
+    _initializeConversation();
   }
 
   @override
@@ -44,32 +34,86 @@ class _ChatAIBottomSheetState extends State<ChatAIBottomSheet> {
     super.dispose();
   }
 
+  /// 🆕 Khởi tạo cuộc hội thoại
+  Future<void> _initializeConversation() async {
+    try {
+      print('🆕 Initializing conversation...');
+
+      final response = await ChatAIService.startConversation(
+        initialContext: {
+          'device': 'mobile',
+          'platform': 'flutter',
+        },
+      );
+
+      setState(() {
+        conversationId = response.conversationId;
+        messages.add({
+          'role': 'assistant',
+          'text': response.greeting,
+        });
+      });
+
+      print('✅ Conversation initialized: $conversationId');
+      _loadSuggestions();
+    } catch (e) {
+      print('❌ Error initializing conversation: $e');
+
+      setState(() {
+        messages.add({
+          'role': 'assistant',
+          'text': '👋 Xin chào! Tôi là trợ lý AI chuyên về bất động sản. '
+              'Tôi có thể giúp bạn tìm nhà trọ/căn hộ phù hợp. '
+              'Bạn đang tìm kiếm gì nhé?',
+        });
+      });
+    }
+  }
+
+  /// 💡 Load suggestions
+  Future<void> _loadSuggestions() async {
+    try {
+      const userId = 'current_user';
+      final loadedSuggestions = await ChatAIService.getSuggestions(userId);
+      setState(() {
+        suggestions = loadedSuggestions;
+      });
+    } catch (e) {
+      print('⚠️ Error loading suggestions: $e');
+    }
+  }
+
   String formatCurrency(double amount) {
-    final formatter =
-    NumberFormat.currency(locale: 'vi_VN', symbol: '₫', decimalDigits: 0);
+    final formatter = NumberFormat.currency(
+      locale: 'vi_VN',
+      symbol: '₫',
+      decimalDigits: 0,
+    );
     return formatter.format(amount);
   }
 
   void _scrollToBottom() {
     if (_scrollController.hasClients) {
-      Future.delayed(const Duration(milliseconds: 100), () {
-        _scrollController.animateTo(
-          _scrollController.position.maxScrollExtent,
-          duration: const Duration(milliseconds: 300),
-          curve: Curves.easeOut,
-        );
+      Future.delayed(const Duration(milliseconds: 150), () {
+        if (_scrollController.hasClients) {
+          _scrollController.animateTo(
+            _scrollController.position.maxScrollExtent,
+            duration: const Duration(milliseconds: 300),
+            curve: Curves.easeOut,
+          );
+        }
       });
     }
   }
 
+  /// 💬 Send message - FIXED VERSION
   Future<void> sendMessage() async {
     final userInput = _controller.text.trim();
 
-    // ✅ ADD DEBUG LOG
     print('═════════════════════════════════════════════');
     print('💬 CHAT AI MESSAGE SENT');
     print('📝 Input: "$userInput"');
-    print('📏 Length: ${userInput.length}');
+    print('🆔 Conversation ID: $conversationId');
     print('═════════════════════════════════════════════');
 
     if (userInput.isEmpty) return;
@@ -83,216 +127,236 @@ class _ChatAIBottomSheetState extends State<ChatAIBottomSheet> {
     _scrollToBottom();
 
     try {
-      // ✅ Gọi API AI Suggest trước
-      List<Rental> suggestedRentals = [];
+      final conversationHistory = messages
+          .where((msg) => msg['role'] == 'user' || msg['role'] == 'assistant')
+          .map((msg) => ChatMessage(
+        role: msg['role'],
+        content: msg['text'],
+      ))
+          .toList();
 
-      try {
-        print('🔄 Calling getAdvancedSuggestions...');
-        suggestedRentals = await AISuggestService.getAdvancedSuggestions(
-          query: userInput,
-        );
-        print('✅ Advanced returned ${suggestedRentals.length} rentals');
+      final response = await ChatAIService.chat(
+        message: userInput,
+        conversationHistory: conversationHistory,
+        conversationId: conversationId,
+        includeRecommendations: true,
+      );
 
-        // ✅ DEBUG: Print rental list
-        if (suggestedRentals.isNotEmpty) {
-          print('📋 Rentals found:');
-          for (var r in suggestedRentals) {
-            print('  - ${r.title} (${r.price})');
-          }
-        }
-      } catch (e) {
-        print('⚠️ Advanced failed: $e');
-        // Nếu advanced fails, thử basic suggest
-        try {
-          print('🔄 Calling getSuggestions (basic)...');
-          suggestedRentals = await AISuggestService.getSuggestions(
-            query: userInput,
-            limit: 3,
-          );
-          print('✅ Basic returned ${suggestedRentals.length} rentals');
-        } catch (e2) {
-          print('❌ Basic also failed: $e2');
-        }
-      }
-
-      print('🏠 Total suggested rentals: ${suggestedRentals.length}');
-
-      // Tạo context từ các bài đăng tìm được
-      String rentalContext = _buildRentalContext(suggestedRentals);
-
-      // Gọi OpenAI
-      await _callOpenAI(userInput, rentalContext, suggestedRentals);
+      print('✅ Chat response received');
+      print('📄 Message: ${response.message}');
+      print('🏠 Recommendations: ${response.recommendations?.length ?? 0}');
+      print('🎯 Should recommend: ${response.shouldRecommend}');
 
       setState(() {
         isLoading = false;
+
+        // Add AI response message
+        messages.add({
+          'role': 'assistant',
+          'text': response.message,
+        });
+
+        // 🔥 FIX: ALWAYS show cards if recommendations exist
+        if (response.recommendations != null &&
+            response.recommendations!.isNotEmpty) {
+          print(
+              '🏠 Processing ${response.recommendations!.length} rental cards...');
+
+          // Add header with proper type
+          messages.add({
+            'role': 'system',
+            'type': 'rental_header',
+            'count': response.recommendations!.length,
+          });
+
+          // Add cards (max 5)
+          for (var rental in response.recommendations!.take(5)) {
+            messages.add({
+              'role': 'system',
+              'type': 'rental_card',
+              'rental': rental,
+            });
+            print('  ✅ Added card: ${rental.title}');
+          }
+
+          // Add explanation if available
+          if (response.explanation != null &&
+              response.explanation!.isNotEmpty) {
+            messages.add({
+              'role': 'assistant',
+              'text': '💡 ${response.explanation}',
+            });
+          }
+        } else {
+          print('⚠️ No recommendations to display');
+        }
+
+        // Update conversationId
+        if (response.conversationId != null) {
+          conversationId = response.conversationId;
+        }
       });
+
       _scrollToBottom();
     } catch (e) {
       print('❌ Error in sendMessage: $e');
       setState(() {
         isLoading = false;
         messages.add({
-          'role': 'ai',
-          'text': '❌ Đã xảy ra lỗi: ${e.toString()}'
+          'role': 'assistant',
+          'text': '❌ Xin lỗi, tôi gặp chút vấn đề kỹ thuật. '
+              'Bạn có thể thử lại không? 🙏',
         });
       });
       _scrollToBottom();
     }
   }
 
-  String _buildRentalContext(List<Rental> rentals) {
-    if (rentals.isEmpty) return '';
-
-    StringBuffer context = StringBuffer();
-    context.writeln('🏠 Dữ liệu bất động sản có sẵn:');
-
-    for (int i = 0; i < rentals.length && i < 5; i++) {
-      final rental = rentals[i];
-      context.writeln('\n${i + 1}. ${rental.title}');
-      context.writeln('   • Loại: ${rental.propertyType}');
-      context.writeln('   • Giá: ${formatCurrency(rental.price)}/tháng');
-      context.writeln('   • Diện tích: ${rental.area['total']}m²');
-      context.writeln('   • Vị trí: ${rental.location['short']}');
-      if (rental.amenities.isNotEmpty) {
-        context.writeln('   • Tiện nghi: ${rental.amenities.take(3).join(', ')}');
-      }
-      if (rental.area['bedrooms'] != null) {
-        context.writeln('   • Phòng ngủ: ${rental.area['bedrooms']}');
-      }
-    }
-
-    return context.toString();
+  /// 💡 Handle suggestion tap
+  void _onSuggestionTap(String suggestion) {
+    _controller.text = suggestion;
+    sendMessage();
   }
 
-  Future<void> _callOpenAI(String userInput, String rentalContext,
-      List<Rental> suggestedRentals) async {
-    try {
-      final url = Uri.parse('https://api.openai.com/v1/chat/completions');
-
-      String systemPrompt = '''Bạn là trợ lý AI chuyên về bất động sản tại Việt Nam, đặc biệt là khu vực Cần Thơ.
-
-Nhiệm vụ:
-1. Tư vấn và giải đáp câu hỏi về thuê nhà, mua nhà
-2. Phân tích và đề xuất các lựa chọn phù hợp
-3. Giải thích thuật ngữ bất động sản dễ hiểu
-4. Đưa lời khuyên hữu ích
-
-Hãy trả lời ngắn gọn (2-3 dòng), thân thiện và chuyên nghiệp. Sử dụng emoji phù hợp.
-Nếu có bài đăng phù hợp, hãy giới thiệu chúng một cách tự nhiên và thuyết phục.''';
-
-      String userMessage = userInput;
-
-      if (rentalContext.isNotEmpty) {
-        systemPrompt +=
-        '\n\n📋 Dữ liệu bất động sản có sẵn để tham khảo (hãy đề xuất những bài phù hợp):';
-        userMessage = '$rentalContext\n\n👤 Yêu cầu khách hàng: $userInput';
-      }
-
-      final headers = {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer ${widget.apiKey}',
-      };
-
-      final body = jsonEncode({
-        'model': 'gpt-4o-mini',
-        'messages': [
-          {'role': 'system', 'content': systemPrompt},
-          {'role': 'user', 'content': userMessage}
-        ],
-        'temperature': 0.7,
-        'max_tokens': 300,
-        'top_p': 0.9,
-      });
-
-      print('🤖 Calling OpenAI API...');
-      final response = await http.post(url, headers: headers, body: body)
-          .timeout(const Duration(seconds: 15));
-
-      print('📊 OpenAI Response Status: ${response.statusCode}');
-
-      if (response.statusCode == 200) {
-        final result = jsonDecode(utf8.decode(response.bodyBytes));
-        final aiReply = result['choices']?[0]?['message']?['content'] ??
-            "🤖 Xin lỗi, tôi không thể tạo phản hồi lúc này.";
-
-        print('✅ OpenAI response received');
-        print('📝 AI Reply: $aiReply');
-
-        setState(() {
-          messages.add({'role': 'ai', 'text': aiReply.trim()});
-
-          // ✅ Hiển thị thẻ gợi ý bài đăng
-          if (suggestedRentals.isNotEmpty) {
-            print('🏠 Adding ${suggestedRentals.length} rental cards...');
-
-            // Header
-            messages.add({
-              'role': 'rental_header',
-              'type': 'rental_header',
-              'count': suggestedRentals.length,
-            });
-
-            // Cards
-            for (var rental in suggestedRentals.take(3)) {
-              messages.add({
-                'role': 'rental_card',
-                'type': 'rental_card',
-                'rental': rental,
-              });
-              print('  ✅ Added card: ${rental.title}');
-            }
-          } else {
-            print('⚠️ No rentals to display');
-          }
-        });
-      } else {
-        final errorBody = jsonDecode(response.body);
-        String errorMessage = '❌ Lỗi API: ${response.statusCode}';
-
-        if (errorBody['error'] != null) {
-          errorMessage +=
-          '\n${errorBody['error']['message'] ?? 'Unknown error'}';
-        }
-
-        print('❌ OpenAI Error: $errorMessage');
-
-        setState(() {
-          messages.add({'role': 'ai', 'text': errorMessage});
-        });
-      }
-    } catch (e) {
-      print('❌ OpenAI Exception: $e');
-      setState(() {
-        messages.add({
-          'role': 'ai',
-          'text': '❌ Lỗi kết nối: ${e.toString()}'
-        });
-      });
+  /// Build message item - FIXED
+  Widget _buildMessageItem(BuildContext context, Map<String, dynamic> msg) {
+    // 🏠 RENTAL HEADER
+    if (msg['type'] == 'rental_header') {
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 8),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.blue[700],
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(Icons.home, color: Colors.white, size: 24),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Gợi Ý Bài Đăng Phù Hợp',
+                        style:
+                        Theme.of(context).textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.bold,
+                          color: Colors.blue[700],
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Tôi tìm thấy ${msg['count']} bài đăng phù hợp nhất',
+                        style: Theme.of(context)
+                            .textTheme
+                            .bodySmall
+                            ?.copyWith(color: Colors.grey[600]),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Container(
+              height: 3,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [Colors.blue[700]!, Colors.blue[100]!],
+                ),
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+          ],
+        ),
+      );
     }
+
+    // 🏠 RENTAL CARD
+    if (msg['type'] == 'rental_card' && msg['rental'] != null) {
+      final rentalData = msg['rental'] as Rental;
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
+        child: _RentalSuggestionCard(
+          rental: rentalData,
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => RentalDetailScreen(rental: rentalData),
+              ),
+            );
+          },
+        ),
+      );
+    }
+
+    // 💬 TEXT MESSAGES
+    final isUser = msg['role'] == 'user';
+
+    return Container(
+      alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Container(
+        constraints: BoxConstraints(
+          maxWidth: MediaQuery.of(context).size.width * 0.75,
+        ),
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: isUser ? Colors.blue[700] : Colors.grey[100],
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: isUser
+                  ? Colors.blue.withOpacity(0.2)
+                  : Colors.grey.withOpacity(0.1),
+              blurRadius: 4,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Text(
+          msg['text'] ?? '',
+          style: TextStyle(
+            color: isUser ? Colors.white : Colors.black87,
+            fontSize: 15,
+            height: 1.4,
+          ),
+        ),
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     return Padding(
       padding: EdgeInsets.only(
-          bottom: MediaQuery.of(context).viewInsets.bottom),
+        bottom: MediaQuery.of(context).viewInsets.bottom,
+      ),
       child: Container(
         color: Colors.white,
         padding: const EdgeInsets.all(16),
-        height: 800,
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.of(context).size.height * 0.95, // 95% chiều cao màn hình
+        ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
           children: [
+            // ===== HEADER =====
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Row(
                   children: [
-                    Image.asset(
-                      "assets/img/chatbox.png",
-                      width: 45,
-                      height: 45,
-                    ),
+                    Image.asset("assets/img/chatbox.png",
+                        width: 45, height: 45),
                     const SizedBox(width: 10),
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -300,12 +364,16 @@ Nếu có bài đăng phù hợp, hãy giới thiệu chúng một cách tự nh
                         const Text(
                           "Trợ lý AI Bất Động Sản",
                           style: TextStyle(
-                              fontSize: 18, fontWeight: FontWeight.bold),
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                         Text(
-                          "Thông tin được cung cấp bởi trợ lý AI",
+                          "Giải đáp và tư vấn tìm kiếm bất động sản",
                           style: TextStyle(
-                              fontSize: 11, color: Colors.grey[600]),
+                            fontSize: 11,
+                            color: Colors.grey[600],
+                          ),
                         ),
                       ],
                     ),
@@ -319,104 +387,70 @@ Nếu có bài đăng phù hợp, hãy giới thiệu chúng một cách tự nh
             ),
             const Divider(),
             const SizedBox(height: 12),
+
+            // ===== SUGGESTIONS =====
+            if (suggestions.isNotEmpty && messages.length <= 2)
+              Container(
+                margin: const EdgeInsets.only(bottom: 12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '💡 Gợi ý câu hỏi:',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey[700],
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: suggestions.take(4).map((suggestion) {
+                        return InkWell(
+                          onTap: () => _onSuggestionTap(suggestion),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 8,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.blue[50],
+                              borderRadius: BorderRadius.circular(20),
+                              border: Border.all(
+                                color: Colors.blue[200]!,
+                                width: 1,
+                              ),
+                            ),
+                            child: Text(
+                              suggestion,
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.blue[700],
+                              ),
+                            ),
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                  ],
+                ),
+              ),
+
+            // ===== MESSAGES - USING _buildMessageItem =====
             Expanded(
               child: ListView.builder(
                 controller: _scrollController,
                 shrinkWrap: true,
                 itemCount: messages.length,
                 itemBuilder: (context, index) {
-                  final msg = messages[index];
-                  final isUser = msg['role'] == 'user';
-
-                  // Header gợi ý
-                  if (msg['type'] == 'rental_header') {
-                    return Padding(
-                      padding: const EdgeInsets.symmetric(
-                          vertical: 16, horizontal: 8),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            '🏠 Gợi Ý Bài Đăng Phù Hợp',
-                            style: Theme.of(context)
-                                .textTheme
-                                .titleMedium
-                                ?.copyWith(
-                              fontWeight: FontWeight.bold,
-                              color: Colors.blue[700],
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            'Tôi tìm thấy ${msg['count']} bài đăng phù hợp nhất',
-                            style: Theme.of(context)
-                                .textTheme
-                                .bodySmall
-                                ?.copyWith(color: Colors.grey[600]),
-                          ),
-                        ],
-                      ),
-                    );
-                  }
-
-                  // Rental Card
-                  if (msg['type'] == 'rental_card' &&
-                      msg['rental'] != null) {
-                    final rentalData = msg['rental'] as Rental;
-                    return Padding(
-                      padding: const EdgeInsets.symmetric(
-                          vertical: 8, horizontal: 8),
-                      child: _RentalSuggestionCard(
-                        rental: rentalData,
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) =>
-                                  RentalDetailScreen(rental: rentalData),
-                            ),
-                          );
-                        },
-                      ),
-                    );
-                  }
-
-                  // Text messages
-                  return Container(
-                    alignment:
-                    isUser ? Alignment.centerRight : Alignment.centerLeft,
-                    padding: const EdgeInsets.symmetric(vertical: 4),
-                    child: Container(
-                      constraints: BoxConstraints(
-                        maxWidth: MediaQuery.of(context).size.width * 0.75,
-                      ),
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: isUser ? Colors.blue[700] : Colors.grey[100],
-                        borderRadius: BorderRadius.circular(16),
-                        boxShadow: [
-                          BoxShadow(
-                            color: isUser
-                                ? Colors.blue.withOpacity(0.2)
-                                : Colors.grey.withOpacity(0.1),
-                            blurRadius: 4,
-                            offset: const Offset(0, 2),
-                          ),
-                        ],
-                      ),
-                      child: Text(
-                        msg['text'] ?? '',
-                        style: TextStyle(
-                          color: isUser ? Colors.white : Colors.black87,
-                          fontSize: 15,
-                          height: 1.4,
-                        ),
-                      ),
-                    ),
-                  );
+                  return _buildMessageItem(context, messages[index]);
                 },
               ),
             ),
+
+            // ===== LOADING INDICATOR =====
             if (isLoading)
               Padding(
                 padding: const EdgeInsets.symmetric(vertical: 8),
@@ -437,14 +471,17 @@ Nếu có bài đăng phù hợp, hãy giới thiệu chúng một cách tự nh
                             child: CircularProgressIndicator(
                               strokeWidth: 2,
                               valueColor: AlwaysStoppedAnimation<Color>(
-                                  Colors.blue[700]!),
+                                Colors.blue[700]!,
+                              ),
                             ),
                           ),
                           const SizedBox(width: 10),
                           Text(
                             'AI đang xử lý...',
                             style: TextStyle(
-                                color: Colors.grey[700], fontSize: 14),
+                              color: Colors.grey[700],
+                              fontSize: 14,
+                            ),
                           ),
                         ],
                       ),
@@ -452,9 +489,13 @@ Nếu có bài đăng phù hợp, hãy giới thiệu chúng một cách tự nh
                   ],
                 ),
               ),
+
+            // ===== INPUT FIELD =====
             Padding(
-              padding:
-              const EdgeInsets.symmetric(horizontal: 9.0, vertical: 10.0),
+              padding: const EdgeInsets.symmetric(
+                horizontal: 9.0,
+                vertical: 10.0,
+              ),
               child: Container(
                 decoration: BoxDecoration(
                   color: Colors.white,
@@ -473,7 +514,9 @@ Nếu có bài đăng phù hợp, hãy giới thiệu chúng một cách tự nh
                   textInputAction: TextInputAction.send,
                   decoration: InputDecoration(
                     contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 20, vertical: 14),
+                      horizontal: 20,
+                      vertical: 14,
+                    ),
                     hintText: "Tôi cần tìm nhà...",
                     hintStyle: TextStyle(color: Colors.grey[500]),
                     border: InputBorder.none,
@@ -485,9 +528,7 @@ Nếu có bài đăng phù hợp, hãy giới thiệu chúng một cách tự nh
                         isLoading ? Colors.grey : Colors.blue[700],
                         child: IconButton(
                           icon: Icon(
-                            isLoading
-                                ? Icons.hourglass_empty
-                                : Icons.send,
+                            isLoading ? Icons.hourglass_empty : Icons.send,
                             color: Colors.white,
                             size: 20,
                           ),
@@ -496,8 +537,7 @@ Nếu có bài đăng phù hợp, hãy giới thiệu chúng một cách tự nh
                       ),
                     ),
                   ),
-                  onSubmitted: (_) =>
-                  isLoading ? null : sendMessage(),
+                  onSubmitted: (_) => isLoading ? null : sendMessage(),
                 ),
               ),
             ),
@@ -508,7 +548,7 @@ Nếu có bài đăng phù hợp, hãy giới thiệu chúng một cách tự nh
   }
 }
 
-// ============== RENTAL SUGGESTION CARD WIDGET ==============
+// ============== MODERN RENTAL SUGGESTION CARD ==============
 class _RentalSuggestionCard extends StatelessWidget {
   final Rental rental;
   final VoidCallback? onTap;
@@ -520,282 +560,380 @@ class _RentalSuggestionCard extends StatelessWidget {
 
   String formatCurrency(double amount) {
     final formatter = NumberFormat.currency(
-        locale: 'vi_VN', symbol: '₫', decimalDigits: 0);
+      locale: 'vi_VN',
+      symbol: '₫',
+      decimalDigits: 0,
+    );
     return formatter.format(amount);
+  }
+
+  String formatPrice(double price) {
+    if (price >= 1000000000) {
+      return '${(price / 1000000000).toStringAsFixed(1)} tỷ';
+    } else if (price >= 1000000) {
+      return '${(price / 1000000).toStringAsFixed(1)} triệu';
+    }
+    return formatCurrency(price);
   }
 
   @override
   Widget build(BuildContext context) {
     final imageUrl = rental.images.isNotEmpty
         ? rental.images[0]
-        : 'https://via.placeholder.com/300x200?text=No+Image';
+        : 'https://via.placeholder.com/400x250?text=No+Image';
+
+    final area = rental.area['total']?.toString() ?? '0';
+    final bedrooms = rental.area['bedrooms']?.toString() ?? '0';
+    final bathrooms = rental.area['bathrooms']?.toString() ?? '0';
 
     return GestureDetector(
       onTap: onTap,
-      child: Card(
-        elevation: 4,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // ===== IMAGE SECTION =====
-            Stack(
-              children: [
-                Container(
-                  height: 200,
-                  decoration: BoxDecoration(
-                    borderRadius: const BorderRadius.only(
-                      topLeft: Radius.circular(16),
-                      topRight: Radius.circular(16),
-                    ),
-                    image: DecorationImage(
-                      image: NetworkImage(imageUrl),
-                      fit: BoxFit.cover,
-                    ),
-                    color: Colors.grey[300],
-                  ),
-                ),
-                // Property Type Badge
-                Positioned(
-                  top: 12,
-                  left: 12,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 12, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: Colors.blue[700],
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Text(
-                      rental.propertyType,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 11,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                ),
-                // Price Overlay
-                Positioned(
-                  bottom: 0,
-                  left: 0,
-                  right: 0,
-                  child: Container(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [
-                          Colors.black.withOpacity(0.7),
-                          Colors.black.withOpacity(0.3),
-                        ],
-                        begin: Alignment.bottomCenter,
-                        end: Alignment.topCenter,
-                      ),
-                    ),
-                    padding: const EdgeInsets.all(12),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          formatCurrency(rental.price),
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const Text(
-                          '/tháng',
-                          style: TextStyle(
-                            color: Colors.white70,
-                            fontSize: 12,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
+      child: Container(
+        margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.08),
+              blurRadius: 12,
+              offset: const Offset(0, 4),
             ),
-
-            // ===== CONTENT SECTION =====
-            Padding(
-              padding: const EdgeInsets.all(12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+          ],
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // ===== IMAGE SECTION =====
+              Stack(
                 children: [
-                  // Title
-                  Text(
-                    rental.title,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.black87,
+                  // Main Image
+                  Container(
+                    height: 180,
+                    width: double.infinity,
+                    decoration: BoxDecoration(
+                      color: Colors.grey[200],
+                      image: DecorationImage(
+                        image: NetworkImage(imageUrl),
+                        fit: BoxFit.cover,
+                      ),
                     ),
                   ),
-                  const SizedBox(height: 8),
 
-                  // Location
-                  Row(
-                    children: [
-                      Icon(Icons.location_on,
-                          size: 14, color: Colors.blue[700]),
-                      const SizedBox(width: 4),
-                      Expanded(
-                        child: Text(
-                          rental.location['short'] ?? 'Chưa cập nhật',
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Colors.grey[700],
-                          ),
+                  // Gradient Overlay
+                  Positioned(
+                    bottom: 0,
+                    left: 0,
+                    right: 0,
+                    child: Container(
+                      height: 100,
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [
+                            Colors.transparent,
+                            Colors.black.withOpacity(0.7),
+                          ],
                         ),
                       ),
-                    ],
+                    ),
                   ),
-                  const SizedBox(height: 8),
 
-                  // Area & Rooms
-                  Row(
-                    children: [
-                      Expanded(
+                  // Property Type Badge - Top Left
+                  Positioned(
+                    top: 12,
+                    left: 12,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 5,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.blue[700]?.withOpacity(0.95),
+                        borderRadius: BorderRadius.circular(8),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.2),
+                            blurRadius: 4,
+                          ),
+                        ],
+                      ),
+                      child: Text(
+                        rental.propertyType,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 10,
+                          fontWeight: FontWeight.w600,
+                          letterSpacing: 0.3,
+                        ),
+                      ),
+                    ),
+                  ),
+
+                  // AI Badge - Top Right (if AI recommended)
+                  if (rental.isAIRecommended == true)
+                    Positioned(
+                      top: 12,
+                      right: 12,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.purple[600]?.withOpacity(0.95),
+                          borderRadius: BorderRadius.circular(8),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.2),
+                              blurRadius: 4,
+                            ),
+                          ],
+                        ),
                         child: Row(
-                          children: [
-                            Icon(Icons.square_foot,
-                                size: 14, color: Colors.orange[700]),
-                            const SizedBox(width: 4),
+                          mainAxisSize: MainAxisSize.min,
+                          children: const [
+                            Icon(Icons.psychology, size: 12, color: Colors.white),
+                            SizedBox(width: 3),
                             Text(
-                              '${rental.area['total'] ?? 0}m²',
+                              'AI',
                               style: TextStyle(
-                                fontSize: 11,
-                                color: Colors.grey[700],
-                                fontWeight: FontWeight.w600,
+                                color: Colors.white,
+                                fontSize: 9,
+                                fontWeight: FontWeight.bold,
                               ),
                             ),
                           ],
                         ),
                       ),
-                      if (rental.area['bedrooms'] != null)
-                        Expanded(
-                          child: Row(
-                            children: [
-                              Icon(Icons.bed,
-                                  size: 14, color: Colors.purple[700]),
-                              const SizedBox(width: 4),
-                              Text(
-                                '${rental.area['bedrooms']} PN',
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  color: Colors.grey[700],
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-
-                  // Amenities
-                  if (rental.amenities.isNotEmpty)
-                    Wrap(
-                      spacing: 6,
-                      runSpacing: 4,
-                      children: rental.amenities
-                          .take(3)
-                          .map((amenity) => Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 8, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: Colors.blue[50],
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Text(
-                          '✓ $amenity',
-                          style: TextStyle(
-                            fontSize: 10,
-                            color: Colors.blue[700],
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ))
-                          .toList(),
                     ),
 
-                  const SizedBox(height: 12),
-
-                  // Contact Info
-                  if (rental.contactInfo != null)
-                    Container(
-                      padding: const EdgeInsets.all(10),
+                  // Price Tag - Bottom Left
+                  Positioned(
+                    bottom: 12,
+                    left: 12,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 6,
+                      ),
                       decoration: BoxDecoration(
-                        color: Colors.blue[50],
-                        borderRadius: BorderRadius.circular(10),
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(8),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.15),
+                            blurRadius: 6,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
                       ),
                       child: Row(
+                        mainAxisSize: MainAxisSize.min,
                         children: [
-                          const Icon(Icons.person_outline,
-                              size: 16, color: Colors.blue),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  rental.contactInfo!['name'] ?? 'Chủ nhà',
-                                  style: const TextStyle(
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.blue,
-                                  ),
-                                ),
-                                Text(
-                                  rental.contactInfo!['phone'] ?? '',
-                                  style: TextStyle(
-                                    fontSize: 10,
-                                    color: Colors.blue[700],
-                                  ),
-                                ),
-                              ],
+                          Text(
+                            formatPrice(rental.price),
+                            style: TextStyle(
+                              color: Colors.red[700],
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
                             ),
                           ),
                         ],
                       ),
                     ),
-
-                  const SizedBox(height: 12),
-
-                  // View Details Button
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: onTap,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.blue[700],
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        padding: const EdgeInsets.symmetric(vertical: 10),
-                      ),
-                      child: const Text(
-                        'Xem Chi Tiết',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 13,
-                        ),
-                      ),
-                    ),
                   ),
                 ],
               ),
-            ),
-          ],
+
+              // ===== CONTENT SECTION =====
+              Padding(
+                padding: const EdgeInsets.all(12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Title
+                    Text(
+                      rental.title,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF1a1a1a),
+                        height: 1.3,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+
+                    // Location
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.location_on_rounded,
+                          size: 15,
+                          color: Colors.grey[600],
+                        ),
+                        const SizedBox(width: 4),
+                        Expanded(
+                          child: Text(
+                            rental.location['short'] ?? 'Chưa cập nhật',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.grey[700],
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+
+                    // Amenities Row
+                    Row(
+                      children: [
+                        if (area != '0') ...[
+                          _InfoChip(
+                            icon: Icons.square_foot,
+                            label: '${area}m²',
+                          ),
+                          const SizedBox(width: 6),
+                        ],
+                        if (bedrooms != '0') ...[
+                          _InfoChip(
+                            icon: Icons.bed_rounded,
+                            label: '$bedrooms PN',
+                          ),
+                          const SizedBox(width: 6),
+                        ],
+                        if (bathrooms != '0') ...[
+                          _InfoChip(
+                            icon: Icons.bathroom_rounded,
+                            label: '$bathrooms WC',
+                          ),
+                        ],
+                      ],
+                    ),
+
+                    // AI Confidence (if available)
+                    if (rental.confidence != null && rental.confidence! > 0)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 8),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.blue[50],
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.verified,
+                                size: 13,
+                                color: Colors.blue[700],
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                'Độ phù hợp: ${(rental.confidence! * 100).toStringAsFixed(0)}%',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.blue[700],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+
+                    const SizedBox(height: 10),
+
+                    // Action Button
+                    SizedBox(
+                      width: double.infinity,
+                      height: 38,
+                      child: ElevatedButton(
+                        onPressed: onTap,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.blue[700],
+                          foregroundColor: Colors.white,
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          padding: EdgeInsets.zero,
+                        ),
+                        child: const Text(
+                          'Xem Chi Tiết',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            letterSpacing: 0.3,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
+      ),
+    );
+  }
+}
+
+// ============== INFO CHIP WIDGET ==============
+class _InfoChip extends StatelessWidget {
+  final IconData icon;
+  final String label;
+
+  const _InfoChip({
+    required this.icon,
+    required this.label,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: Colors.grey[100],
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(
+          color: Colors.grey[300]!,
+          width: 1,
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            icon,
+            size: 13,
+            color: Colors.grey[700],
+          ),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              color: Colors.grey[700],
+            ),
+          ),
+        ],
       ),
     );
   }

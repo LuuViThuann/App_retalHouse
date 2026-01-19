@@ -485,15 +485,21 @@ class RecommendationModel:
                 continue
             
             base_score = float(item_similarities[idx])
+
+            rental_coords = self.rental_coordinates.get(rental_id, (0, 0))
+
+            if not isinstance(rental_coords, (tuple, list)):
+                rental_coords = (0, 0)
+            elif len(rental_coords) < 2:
+                rental_coords = (0, 0)
+            else:
+                rental_coords = (float(rental_coords[0]), float(rental_coords[1]))
             
             # LOCATION PROXIMITY BONUS
             location_bonus = 1.0
             distance = None
-            location_reason = None
-            
+        
             if use_location and ref_location[0] != 0 and ref_location[1] != 0:
-                rental_coords = self.rental_coordinates.get(rental_id, (0, 0))
-                
                 if rental_coords[0] != 0 and rental_coords[1] != 0:
                     distance = self._haversine_distance(
                         ref_location[0], ref_location[1],
@@ -503,32 +509,22 @@ class RecommendationModel:
                     # Gần nhất có bonus cao hơn
                     if distance <= 5:  # 5km
                         location_bonus = 1.0 + (1.0 - distance / 5.0) * 0.3
-                        location_reason = f'Gần bài đăng gốc ({distance:.1f}km)'
                     else:
                         location_bonus = max(0.7, 1.0 - distance / 50.0)
-            
+        
             final_score = base_score * location_bonus
-            
-            # Build explanation
-            explanation = {
-                'content': 'Có nội dung tương tự bài bạn đang xem',
-                'location': location_reason,
-            }
-            
-            explanation = {k: v for k, v in explanation.items() if v}
-            
+        
             recommendations.append({
                 'rentalId': rental_id,
                 'score': base_score,
                 'locationBonus': location_bonus,
                 'finalScore': final_score,
                 'method': 'content_based_similar',
-                'coordinates': self.rental_coordinates.get(rental_id, (0, 0)),
+                'coordinates': rental_coords,  # 🔥 Always valid tuple
                 'distance_km': distance,
-                'explanation': explanation,
                 'confidence': min(1.0, base_score * location_bonus),
             })
-        
+    
         # Sort by final score
         recommendations.sort(key=lambda x: x['finalScore'], reverse=True)
         
@@ -629,7 +625,9 @@ def main():
     print("🤖 RENTAL RECOMMENDATION MODEL TRAINING WITH GEO FEATURES")
     print("="*70 + "\n")
     
-    # 1. Load data
+    # ========================================
+    # BƯỚC 1: LOAD DATA
+    # ========================================
     print("📂 Loading datasets...")
     
     if not os.path.exists('./data/interactions.csv'):
@@ -667,11 +665,15 @@ def main():
             print("Training cancelled.")
             return
     
-    # 2. Train model
+    # ========================================
+    # BƯỚC 2: TRAIN MODEL
+    # ========================================
     model = RecommendationModel()
     model.train(interactions_df, rentals_df)
     
-    # 3. Test recommendations
+    # ========================================
+    # BƯỚC 3: TEST RECOMMENDATIONS
+    # ========================================
     print("\n📊 Testing recommendations...\n")
     
     if len(interactions_df) > 0:
@@ -704,16 +706,131 @@ def main():
             if 'explanation' in rec and rec['explanation']:
                 print(f"      Explanation: {rec['explanation']}")
     
-    # 4. Save model
+    # ========================================
+    # BƯỚC 4: SAVE MODEL
+    # ========================================
     model.save('./models/recommendation_model.pkl')
     
+    # ========================================
+    # ✨ BƯỚC 5: TỰ ĐỘNG TẠO VISUALIZATION
+    # ========================================
+    print("\n" + "="*70)
+    print("🎨 GENERATING MODEL VISUALIZATIONS")
+    print("="*70 + "\n")
+    
+    try:
+        # Import ModelVisualizer từ cùng thư mục
+        import sys
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        sys.path.insert(0, current_dir)
+        
+        from model_visualizer import ModelVisualizer
+        
+        # Tạo thư mục reports
+        reports_dir = './reports'
+        os.makedirs(reports_dir, exist_ok=True)
+        print(f"📁 Reports directory: {os.path.abspath(reports_dir)}\n")
+        
+        # Khởi tạo visualizer
+        visualizer = ModelVisualizer(model_path='./models/recommendation_model.pkl')
+        
+        # Tạo từng biểu đồ
+        print("📊 Creating visualizations...")
+        print("-" * 70)
+        
+        stats = visualizer.plot_matrix_heatmap()
+        visualizer.plot_interaction_distribution()
+        visualizer.plot_user_similarity_heatmap()
+        visualizer.plot_popularity_chart()
+        visualizer.plot_geographic_distribution()
+        visualizer.plot_interactions_per_user()
+        visualizer.plot_interactions_per_item()
+        
+        print("-" * 70)
+        print("\n" + "="*70)
+        print("✅ VISUALIZATION COMPLETED SUCCESSFULLY")
+        print("="*70 + "\n")
+        
+        # Liệt kê file đã tạo
+        print("📊 Generated Visualization Reports:")
+        print(f"   📁 Location: {os.path.abspath(reports_dir)}/")
+        print("\n   Files created:")
+        
+        report_files = [
+            ('1_user_item_matrix.png', 'User-Item Interaction Matrix'),
+            ('2_interaction_distribution.png', 'Interaction Score Distribution'),
+            ('3_user_similarity.png', 'User-User Similarity Heatmap'),
+            ('4_popularity_ranking.png', 'Top 10 Most Popular Rentals'),
+            ('5_geographic_distribution.png', 'Geographic Distribution Map'),
+            ('6_interactions_per_user.png', 'Interactions per User'),
+            ('7_interactions_per_item.png', 'Interactions per Rental'),
+        ]
+        
+        for filename, description in report_files:
+            filepath = os.path.join(reports_dir, filename)
+            if os.path.exists(filepath):
+                size_kb = os.path.getsize(filepath) / 1024
+                print(f"   ✅ {filename:<35} | {size_kb:>6.1f} KB | {description}")
+            else:
+                print(f"   ⚠️  {filename:<35} | MISSING")
+        
+        print()
+        
+        # In thống kê chi tiết
+        print("=" * 70)
+        print("📈 MODEL STATISTICS SUMMARY")
+        print("=" * 70)
+        print(f"   👥 Total Users:           {stats['n_users']:>6,}")
+        print(f"   🏠 Total Rentals:         {stats['n_items']:>6,}")
+        print(f"   📊 Matrix Size:           {stats['n_users']:>6,} × {stats['n_items']:<6,} = {stats['total_cells']:>10,} cells")
+        print(f"   💾 Non-zero Cells:        {stats['nnz']:>10,}")
+        print(f"   📉 Matrix Sparsity:       {stats['sparsity']:>9.2f}%")
+        print(f"   📈 Matrix Density:        {stats['density']:>9.2f}%")
+        print("=" * 70)
+        print()
+        
+        # Hướng dẫn xem báo cáo
+        print("💡 HOW TO VIEW REPORTS:")
+        print("   Option 1 (Docker): docker cp python-ml:/app/reports ./local_reports")
+        print("   Option 2 (Local):  Open files in ./reports/ folder")
+        print("   Option 3 (VSCode): Click on files in Explorer panel")
+        print()
+        
+    except ImportError as e:
+        print(f"\n⚠️ WARNING: Cannot import ModelVisualizer")
+        print(f"   Error: {e}")
+        print(f"   Make sure model_visualizer.py is in: {current_dir}/")
+        print(f"   Training completed successfully, but visualizations skipped.")
+        
+    except FileNotFoundError as e:
+        print(f"\n⚠️ WARNING: Model file not found")
+        print(f"   Error: {e}")
+        print(f"   Make sure model is saved at: ./models/recommendation_model.pkl")
+        
+    except Exception as e:
+        print(f"\n⚠️ WARNING: Failed to generate visualizations")
+        print(f"   Error: {e}")
+        print(f"   Training completed successfully, but visualizations skipped.")
+        print(f"\n   🐛 Debug info:")
+        import traceback
+        traceback.print_exc()
+        
+    # ========================================
+    # BƯỚC 6: KẾT THÚC
+    # ========================================
     print("\n" + "="*70)
     print("✅ TRAINING PIPELINE COMPLETED")
     print("="*70 + "\n")
-    print("Next steps:")
-    print("1. Start FastAPI server: python app/main.py")
-    print("2. Test API: curl http://localhost:8001/health")
-    print("3. Get recommendations: POST http://localhost:8001/recommend/personalized")
+    
+    print("🚀 NEXT STEPS:")
+    print("   1. ✅ Model trained and saved")
+    print("   2. ✅ Visualizations generated")
+    print("   3. 📊 View reports in ./reports/ folder")
+    print("   4. 🚀 Start API: python app/main.py")
+    print("   5. 🧪 Test API: curl http://localhost:8001/health")
+    print("   6. 🎯 Get recommendations: POST http://localhost:8001/recommend/personalized")
+    print()
+    print("=" * 70)
     print()
 
 

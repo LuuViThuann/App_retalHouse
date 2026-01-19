@@ -5,7 +5,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException, BackgroundTasks, Query 
 from fastapi.middleware.cors import CORSMiddleware
 
-
+from openai_chat_service import RentalChatAssistant
 from pydantic import BaseModel, Field, model_validator
 import redis
 import json
@@ -133,10 +133,22 @@ class RecommendationResponse(BaseModel):
     rentalId: str
     score: float
     method: str
-    coordinates: Coordinates = Field(default=None, description="Rental coordinates for map display")
-    locationBonus: float = Field(default=1.0, description="Geographic proximity bonus factor")
-    finalScore: float = Field(default=None, description="Score after applying location bonus")
-    distance_km: Optional[float] = Field(None, description="Distance from reference location in km")
+    coordinates: Optional[Coordinates] = None  # 🔥 MAKE IT OPTIONAL
+    locationBonus: float = 1.0
+    finalScore: float = 0
+    distance_km: Optional[float] = None
+
+    @model_validator(mode='after')
+    def validate_coordinates(self):
+        """Ensure coordinates are valid if provided"""
+        if self.coordinates:
+            # Validate longitude range
+            if not (-180 <= self.coordinates.longitude <= 180):
+                self.coordinates = None
+            # Validate latitude range
+            elif not (-90 <= self.coordinates.latitude <= 90):
+                self.coordinates = None
+        return self
 
 class RecommendationsResult(BaseModel):
     """API response with multiple recommendations"""
@@ -154,18 +166,17 @@ class RecommendationsResult(BaseModel):
 
 model: Optional[RecommendationModel] = None
 redis_client: Optional[redis.Redis] = None
-
+chat_assistant: Optional[RentalChatAssistant] = None
 # ==================== LIFESPAN EVENT HANDLERS ====================
 
-    
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Lifespan context manager for startup and shutdown events."""
-    global model, redis_client
+    global model, redis_client, chat_assistant
     
     # ============ STARTUP ============
     print("\n" + "="*70)
-    print("🚀 STARTING FASTAPI ML SERVICE WITH GEOGRAPHIC FEATURES")
+    print("🚀 STARTING FASTAPI ML SERVICE WITH OPENAI CHAT")
     print("="*70 + "\n")
     
     # Load ML model
@@ -174,16 +185,8 @@ async def lifespan(app: FastAPI):
     try:
         model = RecommendationModel.load(model_path)
         print("✅ ML Model loaded successfully")
-        print(f"   - Users: {len(model.user_encoder.classes_)}")
-        print(f"   - Rentals: {len(model.item_encoder.classes_)}")
-        print(f"   - Rental coordinates: {len(model.rental_coordinates)}")
-        print(f"   - User locations: {len(model.user_locations)}\n")
-    except FileNotFoundError:
-        print(f"⚠️ Model file not found: {model_path}")
-        print("   Train the model first: python training/train_model.py\n")
-        model = None
     except Exception as e:
-        print(f"❌ Error loading model: {e}\n")
+        print(f"⚠️ ML Model not available: {e}")
         model = None
     
     # Connect to Redis
@@ -194,12 +197,20 @@ async def lifespan(app: FastAPI):
         redis_client.ping()
         print("✅ Connected to Redis\n")
     except Exception as e:
-        print(f"⚠️ Redis connection failed: {e}")
-        print("   Continuing without cache\n")
+        print(f"⚠️ Redis not available: {e}\n")
         redis_client = None
     
+    # 🔥 INITIALIZE CHAT ASSISTANT
+    try:
+        chat_assistant = RentalChatAssistant(model=model)
+        print("✅ OpenAI Chat Assistant initialized\n")
+    except Exception as e:
+        print(f"⚠️ Chat Assistant not available: {e}\n")
+        print("   Make sure GROQ_API_KEY is set in .env\n")
+        chat_assistant = None
+    
     print("="*70)
-    print("✅ SERVICE READY FOR GEOGRAPHIC RECOMMENDATIONS")
+    print("✅ SERVICE READY")
     print("="*70 + "\n")
     
     yield  # Application runs here
@@ -208,6 +219,43 @@ async def lifespan(app: FastAPI):
     if redis_client:
         redis_client.close()
         print("✅ Redis connection closed")
+
+
+# ==================== PYDANTIC MODELS FOR CHAT ====================
+
+class ChatMessage(BaseModel):
+    """Single chat message"""
+    role: str = Field(..., description="user or assistant")
+    content: str = Field(..., description="Message content")
+    timestamp: Optional[str] = None
+
+class ChatRequest(BaseModel):
+    """Chat request"""
+    userId: str = Field(..., description="User ID")
+    message: str = Field(..., description="User message")
+    conversationHistory: Optional[List[ChatMessage]] = Field(default=[], description="Previous messages")
+    userContext: Optional[Dict[str, Any]] = Field(default=None, description="User context (location, preferences)")
+    includeRecommendations: bool = Field(default=True, description="Include rental recommendations if applicable")
+
+class ChatResponse(BaseModel):
+    """Chat response"""
+    success: bool
+    message: str
+    intent: str
+    extractedPreferences: Optional[Dict[str, Any]] = None
+    shouldRecommend: bool = False
+    recommendations: Optional[List[PersonalizedRecommendationResponse]] = None
+    explanation: Optional[str] = None
+    usage: Optional[Dict[str, int]] = None
+
+class RentalExplanationRequest(BaseModel):
+    """Request to explain a specific rental"""
+    userId: str
+    rentalId: str
+    conversationContext: Optional[str] = ""
+
+
+
 
 # ==================== FASTAPI APP ====================
 
@@ -271,22 +319,47 @@ def set_to_cache(key: str, data: dict, ttl: int = 3600):
 def _convert_to_response(recommendations: List[dict]) -> List[RecommendationResponse]:
     """Convert model recommendations to API responses"""
     responses = []
+    
     for rec in recommendations:
+        # 🔥 FIX 1: Safely extract coordinates
         coords = rec.get('coordinates', (0, 0))
+        
+        # Handle different coordinate formats
+        if coords is None:
+            coords = (0, 0)
+        elif isinstance(coords, dict):
+            coords = (coords.get('longitude', 0), coords.get('latitude', 0))
+        elif not isinstance(coords, (list, tuple)):
+            coords = (0, 0)
+        
+        # Ensure we have a valid tuple
+        if len(coords) < 2:
+            coords = (0, 0)
+        
+        lon = float(coords[0]) if coords[0] else 0
+        lat = float(coords[1]) if coords[1] else 0
+        
+        # 🔥 FIX 2: Only create Coordinates object if valid
+        coordinates_obj = None
+        if lon != 0 or lat != 0:
+            coordinates_obj = Coordinates(
+                longitude=lon,
+                latitude=lat
+            )
+        
+        # 🔥 FIX 3: Safe field extraction with defaults
         responses.append(
             RecommendationResponse(
-                rentalId=rec['rentalId'],
-                score=rec.get('score', 0),
-                method=rec.get('method', 'unknown'),
-                coordinates=Coordinates(
-                    longitude=float(coords[0]),
-                    latitude=float(coords[1])
-                ) if coords[0] != 0 or coords[1] != 0 else None,
-                locationBonus=rec.get('locationBonus', 1.0),
-                finalScore=rec.get('finalScore', rec.get('score', 0)),
-                distance_km=rec.get('distance_km')
+                rentalId=str(rec.get('rentalId', '')),
+                score=float(rec.get('score', 0)),
+                method=str(rec.get('method', 'unknown')),
+                coordinates=coordinates_obj,  # Can be None
+                locationBonus=float(rec.get('locationBonus', 1.0)),
+                finalScore=float(rec.get('finalScore', rec.get('score', 0))),
+                distance_km=float(rec.get('distance_km')) if rec.get('distance_km') is not None else None
             )
         )
+    
     return responses
 
 # ==================== API ENDPOINTS ====================
@@ -306,6 +379,255 @@ async def root():
         ],
         "model_loaded": model is not None,
         "redis_connected": redis_client is not None
+    }
+
+# ==================== CHAT ENDPOINTS ====================
+
+@app.post("/chat", response_model=ChatResponse)
+async def chat_with_ai(request: ChatRequest):
+    """
+    🤖 Chat với AI về nhu cầu thuê nhà
+    
+    **Features:**
+    - Chat tự nhiên về tìm nhà
+    - Tự động phân tích preferences
+    - Gợi ý rentals khi đủ thông tin
+    - Giải thích chi tiết
+    
+    **Example:**
+    ```
+    POST /chat
+    {
+        "userId": "user123",
+        "message": "Tôi cần tìm phòng trọ khoảng 3 triệu gần trường",
+        "conversationHistory": [],
+        "includeRecommendations": true
+    }
+    ```
+    """
+    
+    if chat_assistant is None:
+        raise HTTPException(
+            status_code=503, 
+            detail="Chat service not available. Check GROQ_API_KEY in environment."
+        )
+    
+    print(f"\n🤖 [CHAT] User: {request.userId}")
+    print(f"   Message: {request.message[:100]}...")
+    
+    try:
+        # Convert Pydantic models to dicts
+        conversation_history = [
+            {"role": msg.role, "content": msg.content}
+            for msg in request.conversationHistory
+        ] if request.conversationHistory else []
+        
+        # Chat with AI
+        chat_result = chat_assistant.chat(
+            user_message=request.message,
+            conversation_history=conversation_history,
+            user_context=request.userContext
+        )
+        
+        print(f"   Intent: {chat_result['intent']}")
+        print(f"   Should recommend: {chat_result['should_recommend']}")
+        
+        # Get recommendations if needed
+        recommendations = None
+        explanation = None
+        
+        if (request.includeRecommendations and 
+            chat_result['should_recommend'] and 
+            chat_result['extracted_preferences']):
+            
+            print(f"   🎯 Getting recommendations...")
+            
+            rec_result = chat_assistant.get_rental_recommendations_with_chat(
+                user_id=request.userId,
+                preferences=chat_result['extracted_preferences'],
+                conversation_context=request.message,
+                n_recommendations=5
+            )
+            
+            if rec_result['recommendations']:
+                # Convert to response format
+                recommendations = []
+                for rec in rec_result['recommendations']:
+                    coords = rec.get('coordinates', (0, 0))
+                    recommendations.append(
+                        PersonalizedRecommendationResponse(
+                            rentalId=rec['rentalId'],
+                            score=rec.get('score', 0),
+                            locationBonus=rec.get('locationBonus', 1.0),
+                            preferenceBonus=rec.get('preferenceBonus', 1.0),
+                            timeBonus=rec.get('timeBonus', 1.0),
+                            finalScore=rec.get('finalScore', 0),
+                            method=rec.get('method', 'chat_based'),
+                            coordinates={'longitude': coords[0], 'latitude': coords[1]},
+                            distance_km=rec.get('distance_km'),
+                            confidence=rec.get('confidence', 0.5)
+                        )
+                    )
+                
+                explanation = rec_result.get('explanation')
+                
+                print(f"   ✅ Added {len(recommendations)} recommendations")
+        
+        return ChatResponse(
+            success=True,
+            message=chat_result['message'],
+            intent=chat_result['intent'],
+            extractedPreferences=chat_result.get('extracted_preferences'),
+            shouldRecommend=chat_result['should_recommend'],
+            recommendations=recommendations,
+            explanation=explanation,
+            usage=chat_result.get('usage')
+        )
+        
+    except Exception as e:
+        print(f"❌ Error in chat: {e}")
+        import traceback
+        traceback.print_exc()
+        
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/chat/explain-rental")
+async def explain_rental_with_ai(request: RentalExplanationRequest):
+    """
+    🤔 Giải thích chi tiết 1 bài đăng bằng AI
+    
+    **Example:**
+    ```
+    POST /chat/explain-rental
+    {
+        "userId": "user123",
+        "rentalId": "rental456",
+        "conversationContext": "Tôi đang tìm phòng trọ gần trường"
+    }
+    ```
+    """
+    
+    if chat_assistant is None:
+        raise HTTPException(
+            status_code=503,
+            detail="Chat service not available"
+        )
+    
+    print(f"\n🤔 [EXPLAIN] Rental: {request.rentalId} for User: {request.userId}")
+    
+    try:
+        # Get user preferences
+        user_prefs = None
+        if model:
+            user_prefs = model.get_user_preferences(request.userId)
+        
+        # Generate explanation
+        explanation = chat_assistant.explain_rental_detail(
+            rental_id=request.rentalId,
+            user_preferences=user_prefs,
+            conversation_context=request.conversationContext
+        )
+        
+        print(f"   ✅ Explanation generated")
+        
+        return {
+            'success': True,
+            'rentalId': request.rentalId,
+            'explanation': explanation,
+            'userPreferences': user_prefs
+        }
+        
+    except Exception as e:
+        print(f"❌ Error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/chat/conversation/{userId}")
+async def get_conversation_suggestions(userId: str):
+    """
+    💡 Lấy gợi ý câu hỏi tiếp theo cho user
+    
+    **Features:**
+    - Suggest next questions based on current state
+    - Help guide the conversation
+    """
+    
+    if chat_assistant is None:
+        raise HTTPException(status_code=503, detail="Chat service not available")
+    
+    try:
+        # Get user preferences to determine what to ask next
+        user_prefs = model.get_user_preferences(userId) if model else None
+        
+        # Generate suggestions using AI
+        prompt = f"""Dựa trên thông tin hiện tại của khách hàng:
+{json.dumps(user_prefs, ensure_ascii=False, indent=2) if user_prefs else 'Chưa có'}
+
+Hãy đề xuất 3-4 câu hỏi mà tư vấn viên nên hỏi tiếp để hiểu rõ hơn nhu cầu.
+
+Format: JSON array of strings
+["Câu hỏi 1?", "Câu hỏi 2?", ...]
+
+CHỈ trả về JSON array."""
+
+        response = chat_assistant.client.chat.completions.create(
+            model="gpt-3.5-turbo",
+            messages=[
+                {"role": "system", "content": "Bạn là tư vấn viên bất động sản. Chỉ trả về JSON."},
+                {"role": "user", "content": prompt}
+            ],
+            temperature=0.7,
+            max_tokens=200
+        )
+        
+        suggestions_text = response.choices[0].message.content.strip()
+        
+        # Parse JSON
+        if suggestions_text.startswith('```'):
+            suggestions_text = suggestions_text.split('```')[1]
+            if suggestions_text.startswith('json'):
+                suggestions_text = suggestions_text[4:]
+        
+        suggestions = json.loads(suggestions_text.strip())
+        
+        return {
+            'success': True,
+            'userId': userId,
+            'suggestions': suggestions,
+            'userPreferences': user_prefs
+        }
+        
+    except Exception as e:
+        print(f"❌ Error: {e}")
+        # Fallback suggestions
+        return {
+            'success': True,
+            'userId': userId,
+            'suggestions': [
+                "Bạn muốn thuê nhà ở khu vực nào?",
+                "Tầm giá bao nhiêu là phù hợp với bạn?",
+                "Bạn cần bao nhiêu phòng ngủ?",
+                "Có tiện ích nào quan trọng với bạn không?"
+            ],
+            'fallback': True
+        }
+
+
+# ==================== USAGE STATS ====================
+
+@app.get("/chat/stats")
+async def get_chat_stats():
+    """📊 Lấy thống kê sử dụng OpenAI API"""
+    
+    if chat_assistant is None:
+        raise HTTPException(status_code=503, detail="Chat service not available")
+    
+    return {
+        'success': True,
+        'chat_model': chat_assistant.chat_model,
+        'ml_model_loaded': chat_assistant.model is not None,
+        'status': 'active'
     }
 
 @app.get("/health")
@@ -1113,11 +1435,7 @@ async def get_similar_items(request: SimilarItemsRequest):
     """
     🏘️ Tìm các bài đăng tương tự (Content-Based) + vị trí gần nhau
     
-    **Features:**
-    - Dựa trên content similarity (price, type, amenities)
-    - Geographic proximity bonus (gần rental gốc → điểm cao)
-    - Show distance_km so với rental reference
-    - Perfect cho "Show similar properties nearby"
+    🔥 FIXED: Proper coordinates handling
     """
     
     if model is None:
@@ -1140,14 +1458,29 @@ async def get_similar_items(request: SimilarItemsRequest):
     print(f"   Use location proximity: {request.use_location}")
     
     try:
+        # Get recommendations from model
         recommendations = model.recommend_similar_items(
             item_id=request.rentalId,
             n_recommendations=request.n_recommendations,
             use_location=request.use_location
         )
         
+        print(f"✅ Model returned {len(recommendations)} recommendations")
+        
+        # 🔥 DEBUG: Log sample before conversion
+        if recommendations:
+            sample = recommendations[0]
+            print(f"   Sample recommendation:")
+            print(f"     rentalId: {sample.get('rentalId')}")
+            print(f"     coordinates: {sample.get('coordinates')}")
+            print(f"     distance_km: {sample.get('distance_km')}")
+        
+        # 🔥 FIX: Convert with proper error handling
         response_recs = _convert_to_response(recommendations)
         
+        print(f"✅ Converted to {len(response_recs)} response objects")
+        
+        # Cache the result
         result = {
             'recommendations': [r.dict() for r in response_recs],
             'generated_at': datetime.now().isoformat()
@@ -1164,6 +1497,8 @@ async def get_similar_items(request: SimilarItemsRequest):
         
     except Exception as e:
         print(f"❌ Error finding similar items: {e}")
+        import traceback
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/recommend/popular", response_model=RecommendationsResult)

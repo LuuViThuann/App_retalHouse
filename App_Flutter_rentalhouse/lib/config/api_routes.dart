@@ -3,11 +3,70 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 class ApiRoutes {
   static const String rootUrl =
-      'http://192.168.1.46:3000'; // http://192.168.43.168:3000 - mạng dữ liệu
+      'http://192.168.1.130:3000'; // http://192.168.43.168:3000 - mạng dữ liệu
   static const String baseUrl = '$rootUrl/api';
   static const String serverBaseUrl = rootUrl;
   static const String socketUrl = serverBaseUrl;
 
+
+// ==================== AI CHAT ENDPOINTS (NEW) ====================
+
+  /// POST /api/ai/chat - Chat với AI assistant
+  static const String aiChat = '$baseUrl/ai/chat';
+
+  /// POST /api/ai/chat/recommendations-with-details - Lấy gợi ý chi tiết
+  static const String aiChatRecommendationsWithDetails =
+      '$baseUrl/ai/chat/recommendations-with-details';
+
+  /// POST /api/ai/chat/explain-rental - Giải thích chi tiết 1 bài đăng
+  static const String aiChatExplainRental = '$baseUrl/ai/chat/explain-rental';
+
+  /// GET /api/ai/chat/suggestions/:userId - Lấy gợi ý câu hỏi tiếp theo
+  static String aiChatSuggestions(String userId) {
+    return '$baseUrl/ai/chat/suggestions/$userId';
+  }
+
+  /// POST /api/ai/chat/conversation/start - Bắt đầu cuộc hội thoại mới
+  static const String aiChatConversationStart =
+      '$baseUrl/ai/chat/conversation/start';
+
+  /// GET /api/ai/chat/conversation/:conversationId - Lấy lịch sử chat
+  static String aiChatConversation(String conversationId) {
+    return '$baseUrl/ai/chat/conversation/$conversationId';
+  }
+
+  /// DELETE /api/ai/chat/conversation/:conversationId - Kết thúc chat
+  static String aiChatConversationDelete(String conversationId) {
+    return '$baseUrl/ai/chat/conversation/$conversationId';
+  }
+
+  /// GET /api/ai/chat/user-preferences/:userId - Lấy user preferences
+  static String aiChatUserPreferences(String userId) {
+    return '$baseUrl/ai/chat/user-preferences/$userId';
+  }
+
+  /// GET /api/ai/chat/stats - Thống kê chat service
+  static const String aiChatStats = '$baseUrl/ai/chat/stats';
+
+  /// POST /api/ai/chat/feedback - Log feedback trên gợi ý
+  static const String aiChatFeedback = '$baseUrl/ai/chat/feedback';
+
+  /// POST /api/ai/chat/search-with-ai - Tìm kiếm với AI interpretation
+  static const String aiChatSearchWithAI = '$baseUrl/ai/chat/search-with-ai';
+
+  /// POST /api/ai/chat/compare-rentals - So sánh rentals bằng AI
+  static const String aiChatCompareRentals = '$baseUrl/ai/chat/compare-rentals';
+
+  /// GET /api/ai/chat/conversation-list/:userId - Danh sách conversations
+  static String aiChatConversationList(String userId, {int limit = 10, int skip = 0}) {
+    return '$baseUrl/ai/chat/conversation-list/$userId?limit=$limit&skip=$skip';
+  }
+
+  /// POST /api/ai/chat/rating - Rating gợi ý/conversation
+  static const String aiChatRating = '$baseUrl/ai/chat/rating';
+
+  /// GET /api/ai/chat/health - Health check
+  static const String aiChatHealth = '$baseUrl/ai/chat/health';
   // ==================== POI ENDPOINTS ====================
   /// GET /api/poi/categories - Lấy danh sách categories
   static const String poiCategories = '$baseUrl/poi/categories';
@@ -624,13 +683,6 @@ class ApiRoutes {
   static Uri getWards(String districtCode) =>
       Uri.parse('$baseUrlAddress/d/$districtCode?depth=2');
 
-  static String get openAIApiKey {
-    final key = dotenv.env['OPENAI_API_KEY'];
-    if (key == null || key.isEmpty) {
-      throw Exception('OPENAI_API_KEY không được tìm thấy trong .env');
-    }
-    return key;
-  }
 
   // ==================== ADMIN DASHBOARD ====================
 

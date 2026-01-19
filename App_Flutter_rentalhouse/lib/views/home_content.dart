@@ -1859,27 +1859,20 @@ class _HomeContentState extends State<HomeContent> {
         ),
       ),
       // ========================= NÚT CHAT AI ======================================
+
       floatingActionButton: Column(
         mainAxisAlignment: MainAxisAlignment.end,
         children: [
           RawMaterialButton(
             onPressed: () {
-              final apiKey = dotenv.env['OPENAI_API_KEY'] ?? '';
-
-              if (apiKey.isEmpty) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('API Key không tồn tại!')),
-                );
-                return;
-              }
-
+              // ✅ SIMPLE: Just open the chat - no API key needed
               showModalBottomSheet(
                 context: context,
                 isScrollControlled: true,
                 shape: const RoundedRectangleBorder(
                   borderRadius: BorderRadius.vertical(top: Radius.circular(25)),
                 ),
-                builder: (_) => ChatAIBottomSheet(apiKey: ApiRoutes.openAIApiKey),
+                builder: (_) => const ChatAIBottomSheet(),
               );
             },
             constraints: const BoxConstraints.tightFor(width: 145, height: 145),

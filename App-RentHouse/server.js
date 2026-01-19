@@ -25,7 +25,7 @@ const newsRoutes = require('./routes/news');
 const aboutUsFeedbackRoutes = require('./routes/aboutus');
 const notificationRoutes = require('./routes/notifications');
 const analyticsRoutes = require('./routes/analytics');
-
+const aiChatRoutes = require('./routes/ai-chat');
 
 require('./models/conversation');
 require('./models/message');
@@ -133,6 +133,7 @@ waitForRedis.then(() => {
 });
 
 app.use('/api/ai', aiRecommendationRoutes);
+app.use('/api/ai', aiChatRoutes);
 app.use('/api/poi', poiRoutes);
 
 app.use('/api/auth', authRoutes);
@@ -166,7 +167,7 @@ io.use(async (socket, next) => {
     socket.userId = decodedToken.uid;
     console.log(`✅ Socket authenticated: User ${socket.userId}, Socket ${socket.id}`);
     next();
-  } catch (err) { 
+  } catch (err) {
     console.error('❌ Socket authentication error:', err.message);
     next(new Error('Authentication error: Invalid token'));
   }
@@ -208,11 +209,11 @@ io.on('connection', (socket) => {
 // ==================== ERROR HANDLING ====================
 app.use((err, req, res, next) => {
   console.error('❌ Error:', err.stack);
-  
+
   if (err.type === 'entity.too.large') {
     return res.status(413).json({ message: 'File hoặc dữ liệu gửi lên quá lớn!' });
   }
-  
+
   res.status(500).json({ message: 'Có lỗi xảy ra từ server!' });
 });
 

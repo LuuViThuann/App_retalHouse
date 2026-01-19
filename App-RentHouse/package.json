@@ -19,6 +19,7 @@
     "mongoose": "^8.14.2",
     "multer": "^2.0.2",
     "multer-storage-cloudinary": "^4.0.0",
+    "node-cache": "^5.1.2",
     "node-geocoder": "^4.4.1",
     "nodemailer": "^7.0.3",
     "rate-limiter-flexible": "^7.3.0",

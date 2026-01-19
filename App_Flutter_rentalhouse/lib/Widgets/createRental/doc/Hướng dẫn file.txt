@@ -7,9 +7,15 @@ Các thuật toán hỗ trợ xử lý quá trình thao tác trên bản đồ :
 + Thuật toán Greedy Screen-Space Clustering : Phân cụm các điểm dữ liệu trên màn hình để giảm thiểu sự chồng chéo và cải thiện khả năng hiển thị.
 
 ======================================================================================================
-- bài toán GIS + filter
 
-- Khi tìm tiện ích và chuyển sang chế độ AI thì không xem được danh sách tất cả các tiện ích đã chọn
+- Các lỗi nhỏ còn :
++ Lỗi khi chưa nhắn gì vẫn tạo conversation
++ Lỗi xóa mục yêu thích
++Chưa chuyển ảnh commet sang cloud
 
-- AI-driven recommendation + POI tiện ích + theo dõi hành vi người dùng
+--- THÊM
+ + Điều chỉnh chatbox gợi ý từ vị trí
+ + Lỗi tài khoản mới ko nhận đc lý do gợi ý
+ + Lỗi AI lọc gợi ý bài + tiện ích giống nhau
+=====================
 
