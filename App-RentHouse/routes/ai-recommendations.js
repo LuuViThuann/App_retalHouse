@@ -47,7 +47,7 @@ function _getMarkerColorScheme(userPreferences) {
 router.get('/recommendations/personalized', authMiddleware, async (req, res) => {
   try {
     const {
-      limit = 10,  // Default 10
+      limit = 10,
       latitude,
       longitude,
       radius = 10,
@@ -61,30 +61,51 @@ router.get('/recommendations/personalized', authMiddleware, async (req, res) => 
     console.log(`   Location: (${latitude}, ${longitude}), radius: ${radius}km`);
     console.log(`   Price: ${minPrice || 'any'} - ${maxPrice || 'any'}`);
 
-    // 🔥 FIX: Cap n_recommendations to max 50 for Python API
     const n_recommendations = Math.min(parseInt(limit) || 10, 50);
-    const n_recommendations_fetch = Math.min(parseInt(limit) * 2 || 20, 50);  // For fallback diversity
+    const n_recommendations_fetch = Math.min(parseInt(limit) * 2 || 20, 50);
 
     console.log(`   Requesting ${n_recommendations} recommendations (capped at 50)`);
 
     let aiRecommendations = [];
     let isAIRecommendation = false;
 
+    // 🔥 STEP 1: Get user's own rental IDs to exclude
+    let userOwnRentalIds = [];
+    try {
+      const userRentals = await Rental.find({
+        userId: userId,
+        status: { $in: ['available', 'rented'] }  // All active rentals
+      })
+        .select('_id')
+        .lean();
+
+      userOwnRentalIds = userRentals.map(r => r._id.toString());
+
+      if (userOwnRentalIds.length > 0) {
+        console.log(`   🚫 Found ${userOwnRentalIds.length} own rentals to exclude`);
+      }
+    } catch (err) {
+      console.error('⚠️ Error fetching user rentals:', err.message);
+      // Continue anyway, just won't exclude
+    }
+
+    // 🔥 STEP 2: Call Python ML Service
     try {
       console.log(`🔗 Calling ML service: ${ML_SERVICE_URL}/recommend/personalized`);
 
-      // 🔥 FIX: Send correct values within API limits
       const mlResponse = await axios.post(
         `${ML_SERVICE_URL}/recommend/personalized`,
         {
           userId: userId,
           user_id: userId,
-          n_recommendations: n_recommendations_fetch,  // 🔥 Capped at 50
+          n_recommendations: n_recommendations_fetch,
           use_location: true,
           radius_km: parseInt(radius) || 20,
-          exclude_items: [],
+          exclude_items: userOwnRentalIds,  // 🔥 PASS OWN RENTAL IDS
           context: {
-            map_center: latitude && longitude ? [parseFloat(longitude), parseFloat(latitude)] : null,
+            map_center: latitude && longitude
+              ? [parseFloat(longitude), parseFloat(latitude)]
+              : null,
             zoom_level: 15,
             search_radius: parseInt(radius) || 10,
             time_of_day: _getTimeOfDay(),
@@ -123,17 +144,20 @@ router.get('/recommendations/personalized', authMiddleware, async (req, res) => 
       isAIRecommendation = false;
     }
 
-    // Build MongoDB query
+    // 🔥 STEP 3: Build MongoDB query
     let rentalIds = [];
 
     if (isAIRecommendation && aiRecommendations.length > 0) {
       rentalIds = aiRecommendations.map(r => r.rentalId);
       console.log(`📌 Using AI recommendations: ${rentalIds.length} items`);
     } else {
-      // Fallback: Popularity-based
-      const popularRentals = await Rental.find({ status: 'available' })
+      // Fallback: Popularity-based (exclude own rentals)
+      const popularRentals = await Rental.find({
+        status: 'available',
+        userId: { $ne: userId }  // 🔥 EXCLUDE OWN RENTALS
+      })
         .sort({ views: -1, createdAt: -1 })
-        .limit(Math.min(parseInt(limit) * 3, 50))  // 🔥 Also cap fallback
+        .limit(Math.min(parseInt(limit) * 3, 50))
         .select('_id')
         .lean();
 
@@ -153,7 +177,6 @@ router.get('/recommendations/personalized', authMiddleware, async (req, res) => 
 
     // Location filter
     let geoFilter = {};
-
     if (latitude && longitude) {
       const lat = parseFloat(latitude);
       const lon = parseFloat(longitude);
@@ -180,21 +203,22 @@ router.get('/recommendations/personalized', authMiddleware, async (req, res) => 
       console.log(`💰 Price filter:`, priceFilter.price);
     }
 
-    // Query MongoDB - 🔥 Return only requested limit
+    // 🔥 STEP 4: Query MongoDB with DOUBLE-CHECK exclusion
     const query = {
       _id: { $in: rentalIds },
       status: 'available',
+      userId: { $ne: userId },  // 🔥 DOUBLE-CHECK: Exclude own rentals
       ...geoFilter,
       ...priceFilter
     };
 
     const rentals = await Rental.find(query)
-      .limit(n_recommendations)  // 🔥 Respect original limit
+      .limit(n_recommendations)
       .lean();
 
     console.log(`✅ Found ${rentals.length} rentals matching criteria`);
 
-    // Merge AI metadata
+    // 🔥 STEP 5: Merge AI metadata
     const rentalsWithScore = rentals.map(rental => {
       const aiRec = aiRecommendations.find(
         r => r.rentalId === rental._id.toString()
@@ -228,6 +252,7 @@ router.get('/recommendations/personalized', authMiddleware, async (req, res) => 
     rentalsWithScore.sort((a, b) => (b.finalScore || 0) - (a.finalScore || 0));
 
     console.log(`✅ Response ready: ${rentalsWithScore.length} rentals`);
+    console.log(`   🚫 Excluded ${userOwnRentalIds.length} own rentals`);
 
     res.json({
       success: true,
@@ -426,6 +451,8 @@ router.get('/recommendations/nearby/:rentalId', authMiddleware, async (req, res)
     });
   }
 });
+
+
 /**
  * 🎯 GET /api/ai/recommendations/personalized/context
  * Gợi ý cá nhân hóa với context (map center, zoom, device, etc.)
@@ -640,6 +667,293 @@ router.get('/recommendations/personalized/context', authMiddleware, async (req, 
     });
   }
 });
+
+router.post('/recommendations/personalized/with-poi', authMiddleware, async (req, res) => {
+  try {
+    const userId = req.userId;
+    const {
+      latitude,
+      longitude,
+      selectedCategories = [],
+      radius = 10,
+      poiRadius = 3,
+      limit = 10,
+      minPrice,
+      maxPrice
+    } = req.body;
+
+    if (!latitude || !longitude) {
+      return res.status(400).json({
+        success: false,
+        message: 'Thiếu latitude và longitude'
+      });
+    }
+
+    if (!selectedCategories || selectedCategories.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Vui lòng chọn ít nhất một POI category'
+      });
+    }
+
+    console.log(`🤖🏢 [AI-POI-PERSONALIZED] User: ${userId}`);
+    console.log(`   Location: (${latitude}, ${longitude}), radius: ${radius}km`);
+    console.log(`   POI Categories: ${selectedCategories.join(', ')}`);
+    console.log(`   POI Radius: ${poiRadius}km`);
+
+    // =====================================================
+    // STEP 1: Lấy AI personalized recommendations
+    // =====================================================
+    let aiRecommendations = [];
+    let isAIRecommendation = false;
+
+    try {
+      console.log(`🔗 [AI-POI] Calling ML service for personalized recommendations...`);
+
+      const mlResponse = await axios.post(
+        `${ML_SERVICE_URL}/recommend/personalized`,
+        {
+          userId: userId,
+          n_recommendations: Math.min(parseInt(limit) * 3, 50), // Fetch 3x limit từ ML
+          use_location: true,
+          radius_km: parseInt(radius),
+          exclude_items: [],
+          context: {
+            map_center: [parseFloat(longitude), parseFloat(latitude)],
+            zoom_level: 15,
+            search_radius: parseInt(radius),
+            time_of_day: _getTimeOfDay(),
+            device_type: 'mobile',
+            impressions: [],
+            scroll_depth: 0.5
+          }
+        },
+        { timeout: 10000, headers: { 'Content-Type': 'application/json' } }
+      );
+
+      if (mlResponse.data?.recommendations) {
+        aiRecommendations = mlResponse.data.recommendations;
+        isAIRecommendation = true;
+        console.log(`✅ AI returned ${aiRecommendations.length} personalized recommendations`);
+      }
+    } catch (mlError) {
+      console.error('⚠️ ML Service error:', mlError.message);
+      isAIRecommendation = false;
+    }
+
+    // =====================================================
+    // STEP 2: Lấy POI cho các categories đã chọn
+    // =====================================================
+    console.log(`📍 [AI-POI] Fetching POIs for selected categories...`);
+
+    const poiService = new (require('../service/poi-service')).POIService();
+    const poiData = {};
+    const allPOIs = [];
+
+    // Parallel fetch POIs
+    const poiPromises = selectedCategories.map(async (category) => {
+      try {
+        const pois = await poiService.getPOIsByCategory(
+          latitude,
+          longitude,
+          category,
+          poiRadius + 1
+        );
+        poiData[category] = pois;
+        allPOIs.push(...pois);
+        console.log(`   ✅ ${category}: ${pois.length} POIs`);
+        return pois;
+      } catch (error) {
+        console.error(`   ⚠️ ${category}: ${error.message}`);
+        poiData[category] = [];
+        return [];
+      }
+    });
+
+    await Promise.all(poiPromises);
+    console.log(`✅ Total POIs found: ${allPOIs.length}`);
+
+    if (allPOIs.length === 0) {
+      return res.json({
+        success: true,
+        rentals: [],
+        total: 0,
+        message: 'Không tìm thấy tiện ích nào trong khu vực'
+      });
+    }
+
+    // =====================================================
+    // STEP 3: 🔥 CALCULATE POI PROXIMITY SCORES
+    // =====================================================
+    // Cho mỗi POI, tính score dựa trên gần nhất/đặc biệt
+    console.log(`🎯 [AI-POI] Calculating POI proximity scores...`);
+
+    const poiProximityScores = {};
+
+    // Gọi rental để tính distance đến mỗi POI
+    const rentalIds = aiRecommendations.map(r => r.rentalId);
+    const rentals = await Rental.find({
+      _id: { $in: rentalIds },
+      status: 'available'
+    }).lean();
+
+    for (const rental of rentals) {
+      const rentalId = rental._id.toString();
+      const rentalLat = rental.location?.coordinates?.coordinates?.[1] || 0;
+      const rentalLon = rental.location?.coordinates?.coordinates?.[0] || 0;
+
+      if (rentalLat === 0 || rentalLon === 0) continue;
+
+      // 🔥 Tính distance đến từng POI
+      const poiDistances = [];
+
+      for (const poi of allPOIs) {
+        const distance = _haversineDistance(rentalLon, rentalLat, poi.longitude, poi.latitude);
+
+        // Chỉ count nếu trong poiRadius
+        if (distance <= poiRadius) {
+          poiDistances.push({
+            category: poi.category,
+            name: poi.name,
+            distance: distance
+          });
+        }
+      }
+
+      // 🔥 Tính POI proximity score
+      if (poiDistances.length > 0) {
+        // Score = số POI gần + weighted by distance
+        const poiProximityScore = poiDistances.length * 10 + // Base: số POI
+          (1 - (poiDistances[0].distance / poiRadius)) * 5; // Bonus: gần nhất
+
+        poiProximityScores[rentalId] = {
+          proximityScore: poiProximityScore,
+          nearestPOIs: poiDistances.slice(0, 3),
+          poiCount: poiDistances.length,
+          nearestDistance: poiDistances[0].distance
+        };
+      }
+    }
+
+    console.log(`✅ Calculated POI proximity for ${Object.keys(poiProximityScores).length} rentals`);
+
+    // =====================================================
+    // STEP 4: 🔥 COMBINE AI + POI SCORES
+    // =====================================================
+    console.log(`🔀 [AI-POI] Combining AI + POI scores...`);
+
+    const combinedScores = aiRecommendations.map(aiRec => {
+      const rentalId = aiRec.rentalId;
+      const poiScore = poiProximityScores[rentalId] || {
+        proximityScore: 0,
+        nearestPOIs: [],
+        poiCount: 0
+      };
+
+      // 🔥 COMBINED SCORE = AI score (70%) + POI proximity (30%)
+      const combinedScore = (aiRec.finalScore * 0.7) + (poiScore.proximityScore * 0.3);
+
+      return {
+        ...aiRec,
+        poiScore: poiScore.proximityScore,
+        poiCount: poiScore.poiCount,
+        nearestPOIs: poiScore.nearestPOIs,
+        nearestDistance: poiScore.nearestDistance,
+        combinedScore: combinedScore, // 🔥 NEW: Combined score
+        method: 'ai_personalized_with_poi'
+      };
+    });
+
+    // =====================================================
+    // STEP 5: Sort by combined score (không phải AI score)
+    // =====================================================
+    combinedScores.sort((a, b) => (b.combinedScore || 0) - (a.combinedScore || 0));
+
+    // =====================================================
+    // STEP 6: Fetch rental details từ MongoDB
+    // =====================================================
+    const topRentalIds = combinedScores.slice(0, limit).map(r => r.rentalId);
+    const topRentals = await Rental.find({
+      _id: { $in: topRentalIds },
+      status: 'available'
+    }).lean();
+
+    // =====================================================
+    // STEP 7: Merge scores vào rental details
+    // =====================================================
+    const finalRentals = topRentalIds.map(rentalId => {
+      const rental = topRentals.find(r => r._id.toString() === rentalId);
+      const score = combinedScores.find(s => s.rentalId === rentalId);
+
+      if (!rental || !score) return null;
+
+      return {
+        ...rental,
+        aiScore: score.score || 0,
+        poiScore: score.poiScore || 0,
+        combinedScore: score.combinedScore || 0,
+        finalScore: score.combinedScore, // 🔥 Use combined score
+        confidence: score.confidence || 0.5,
+        poiCount: score.poiCount || 0,
+        nearestPOIs: score.nearestPOIs || [],
+        nearestDistance: score.nearestDistance || null,
+        // For visualization
+        markerSize: Math.max(1, Math.min(5, (score.combinedScore || 0) / 20)),
+        markerOpacity: (score.confidence || 0.5) * 0.9 + 0.1,
+        isAIRecommended: isAIRecommendation,
+        recommendationMethod: 'ai_poi_personalized'
+      };
+    }).filter(Boolean);
+
+    console.log(`✅ Final rentals: ${finalRentals.length}`);
+    console.log(`   Sample: ${finalRentals.length > 0 ? `Score: ${finalRentals[0].combinedScore?.toFixed(2)}, POI Count: ${finalRentals[0].poiCount}` : 'N/A'}`);
+
+    // =====================================================
+    // STEP 8: Return response
+    // =====================================================
+    res.json({
+      success: true,
+      rentals: finalRentals,
+      total: finalRentals.length,
+      isAIRecommendation,
+      method: 'ai_personalized_with_poi_filter',
+      selectedCategories,
+      poiStats: {
+        totalPOIsFound: allPOIs.length,
+        poiRadius: poiRadius,
+        categories: selectedCategories.length
+      },
+      filters: {
+        location: { latitude, longitude, radius },
+        price: { minPrice, maxPrice }
+      },
+      message: `🤖🏢 Gợi ý cá nhân hóa kết hợp tiện ích: ${finalRentals.length} bài gần ${allPOIs.length} địa điểm`
+    });
+
+  } catch (err) {
+    console.error('❌ Error in AI+POI recommendations:', err);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to get personalized recommendations with POI',
+      error: err.message
+    });
+  }
+});
+
+function _haversineDistance(lon1, lat1, lon2, lat2) {
+  const R = 6371; // Earth radius in km
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+
+  const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+    Math.sin(dLon / 2) * Math.sin(dLon / 2);
+
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+}
+
+
 
 /**
  * 🤔 GET /api/ai/explain/:userId/:rentalId

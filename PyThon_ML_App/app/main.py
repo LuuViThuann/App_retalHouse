@@ -74,11 +74,11 @@ class PersonalizedRecommendationResponse(BaseModel):
     timeBonus: Optional[float] = 1.0
     finalScore: float
     method: str
-    coordinates: Optional[Dict[str, float]] = None
+    coordinates: Optional[Dict[str, float]] = None  # ✅ Expect dict, not tuple
     distance_km: Optional[float] = None
-    explanation: Optional[Dict[str, Any]] = None  # 🔥 WHY gợi ý bài này?
-    confidence: Optional[float] = 0.5  # Độ tin cậy (0-1)
-    markers_priority: Optional[int] = None  # Thứ tự ưu tiên trên map
+    explanation: Optional[Dict[str, Any]] = None
+    confidence: Optional[float] = 0.5
+    markers_priority: Optional[int] = None
 
 class UserPreferencesResponse(BaseModel):
     """Thông tin preferences của user"""
@@ -685,11 +685,6 @@ async def batch_recommendations(requests: List[PersonalizedRecommendRequest]):
 async def get_personalized_recommendations(request: PersonalizedRecommendRequest):
     """
     🎯 Gợi ý cá nhân hóa với Explainable AI
-    
-    **Fixed Issues:**
-    - ✅ Accept both userId (from Node.js) and user_id (REST)
-    - ✅ Better error handling for invalid requests
-    - ✅ Fallback to popularity when model not ready
     """
     
     if model is None:
@@ -740,22 +735,42 @@ async def get_personalized_recommendations(request: PersonalizedRecommendRequest
         
         print(f"✅ Generated {len(recommendations)} recommendations")
         
-        # Convert to response format
+        # 🔥 FIX: Convert coordinates properly
         response_recs = []
         for i, rec in enumerate(recommendations, 1):
             rec_dict = rec.copy()
             rec_dict['markers_priority'] = i
             
+            # 🔥 CRITICAL FIX: Convert tuple to dict
             coords = rec_dict.get('coordinates', (0, 0))
-            rec_dict['coordinates'] = {
-                'longitude': float(coords[0]),
-                'latitude': float(coords[1])
-            }
+            if isinstance(coords, tuple) and len(coords) >= 2:
+                rec_dict['coordinates'] = {
+                    'longitude': float(coords[0]),
+                    'latitude': float(coords[1])
+                }
+            elif isinstance(coords, dict):
+                # Already a dict, ensure proper keys
+                rec_dict['coordinates'] = {
+                    'longitude': float(coords.get('longitude', 0)),
+                    'latitude': float(coords.get('latitude', 0))
+                }
+            else:
+                # Invalid format, default to zero
+                rec_dict['coordinates'] = {
+                    'longitude': 0.0,
+                    'latitude': 0.0
+                }
             
+            # Ensure distance_km is float or None
             if 'distance_km' in rec_dict:
                 rec_dict['distance_km'] = float(rec_dict['distance_km']) if rec_dict['distance_km'] else None
             
-            response_recs.append(PersonalizedRecommendationResponse(**rec_dict))
+            try:
+                response_recs.append(PersonalizedRecommendationResponse(**rec_dict))
+            except Exception as e:
+                print(f"❌ Error creating response for {rec_dict['rentalId']}: {e}")
+                print(f"   rec_dict: {rec_dict}")
+                continue
         
         # Get user preferences
         user_prefs = model.get_user_preferences(user_id)

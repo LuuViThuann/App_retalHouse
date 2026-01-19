@@ -210,19 +210,20 @@ class DatasetExporter:
             traceback.print_exc()
             raise
     
-    def export_rentals(self, output_path='./data/rentals.csv'):
-        """Export rentals với coordinates - 🔥 FIXED"""
-        print("🏠 Exporting rentals...\n")
+    def export_rentals(self, output_path='./data/rentals.csv'):  # ← 4 spaces
+        """Export rentals với coordinates và userId - 🔥 UPDATED"""  # ← 8 spaces
+        print("🏠 Exporting rentals...\n")  # ← 8 spaces
         
-        try:
+        try:  # ← 8 spaces
             print("   Fetching rentals with status='available'...")
             self.db.rentals.create_index([('status', 1), ('createdAt', -1)])
             
-            # 🔥 FIX: INCLUDE 'area' field in projection
+            # 🔥 FIX: INCLUDE 'userId' field in projection
             rentals = list(self.db.rentals.find(
                 {'status': 'available'},
                 {
                     '_id': 1, 
+                    'userId': 1,  # 🔥 ADD userId
                     'price': 1, 
                     'location': 1,
                     'propertyType': 1, 
@@ -255,9 +256,13 @@ class DatasetExporter:
             if '_id' in df.columns:
                 df['_id'] = df['_id'].astype(str)
             
-            # Convert userId
+            # 🔥 NEW: Convert userId to string
             if 'userId' in df.columns:
                 df['userId'] = df['userId'].astype(str)
+                print(f"   ✅ userId field processed: {df['userId'].nunique()} unique owners")
+            else:
+                print("   ⚠️ No userId field in data, creating empty column")
+                df['userId'] = ''
             
             # 🔥 EXTRACT COORDINATES
             print("   📍 Extracting coordinates...")
@@ -284,10 +289,9 @@ class DatasetExporter:
                 lambda x: x.get('fullAddress', '') if isinstance(x, dict) else ''
             )
             
-            # 🔥 FIX: Extract area with error handling
+            # Extract area with error handling
             print("   📏 Extracting area data...")
             
-            # Check if 'area' column exists
             if 'area' in df.columns:
                 df['area_total'] = df['area'].apply(
                     lambda x: float(x.get('total', 0)) if isinstance(x, dict) and x else 0
@@ -319,9 +323,9 @@ class DatasetExporter:
                 lambda x: len(x) if isinstance(x, list) else 0
             )
             
-            # Select columns
+            # 🔥 UPDATE: Select columns including userId
             selected_columns = [
-                '_id', 'title', 'price', 'propertyType', 'status',
+                '_id', 'userId', 'title', 'price', 'propertyType', 'status',
                 'location_short', 'location_full',
                 'longitude', 'latitude',
                 'area_total', 'area_bedrooms', 'area_bathrooms',
@@ -338,7 +342,8 @@ class DatasetExporter:
             print(f"\n✅ Cleaned data: {len(df)} rentals, {len(df.columns)} columns")
             print(f"   Columns: {df.columns.tolist()}\n")
             print(f"   Property types: {df['propertyType'].unique().tolist()}")
-            print(f"   Price range: {df['price'].min():.0f} - {df['price'].max():.0f}\n")
+            print(f"   Price range: {df['price'].min():.0f} - {df['price'].max():.0f}")
+            print(f"   🔥 Unique owners: {df['userId'].nunique()}\n")
             
             os.makedirs(os.path.dirname(output_path) or '.', exist_ok=True)
             df.to_csv(output_path, index=False)
@@ -352,7 +357,7 @@ class DatasetExporter:
             traceback.print_exc()
             raise
     
-    def validate_data(self, interactions_df, rentals_df):
+    def validate_data(self, interactions_df, rentals_df):  # ← 4 spaces
         """Validate dữ liệu sau export"""
         print("=" * 70)
         print("📋 DATA VALIDATION")
@@ -404,7 +409,7 @@ class DatasetExporter:
         
         print("\n" + "=" * 70 + "\n")
     
-    def export_all(self):
+    def export_all(self):  # ← 4 spaces (PHẢI cùng level với validate_data)
         """Export tất cả dữ liệu"""
         print("\n" + "=" * 70)
         print("🚀 STARTING DATA EXPORT WITH COORDINATES")
@@ -437,7 +442,7 @@ class DatasetExporter:
             return None, None
 
 
-if __name__ == '__main__':
+if __name__ == '__main__':  # ← 0 spaces (no indentation)
     try:
         exporter = DatasetExporter()
         exporter.export_all()

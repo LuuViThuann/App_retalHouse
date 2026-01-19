@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter_rentalhouse/services/poi_service.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'dart:io';
@@ -819,6 +820,43 @@ class RentalService {
     _client.close();
   }
 
+  /// 🤖🏢 Fetch AI Personalized + POI combined
+  Future<Map<String, dynamic>> fetchAIPersonalizedWithPOI({
+    required double latitude,
+    required double longitude,
+    required List<String> selectedCategories,
+    required double radius,
+    required double poiRadius,
+    double? minPrice,
+    double? maxPrice,
+    int limit = 10,
+    required String token,
+  }) async {
+    try {
+      // ✅ Gọi endpoint mới
+      final poiService = POIService();
+      final result = await poiService.getAIPersonalizedWithPOI(
+        latitude: latitude,
+        longitude: longitude,
+        selectedCategories: selectedCategories,
+        radius: radius,
+        poiRadius: poiRadius,
+        minPrice: minPrice,
+        maxPrice: maxPrice,
+        limit: limit,
+      );
+
+      return result;
+    } catch (e) {
+      debugPrint('❌ [RENTAL-SERVICE] Error in fetchAIPersonalizedWithPOI: $e');
+      return {
+        'rentals': <Rental>[],
+        'total': 0,
+        'poisTotal': 0,
+        'success': false,
+      };
+    }
+  }
   /// Fetch AI-powered personalized recommendations
 
 

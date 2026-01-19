@@ -444,55 +444,7 @@ class _AllAIRecommendationsScreenState extends State<AllAIRecommendationsScreen>
                   children: [
                     RentalItemWidget(rental: rental),
 
-                    // AI Badge
-                    if (rental.isAIRecommended)
-                      Positioned(
-                        top: 8,
-                        left: 8,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 10,
-                            vertical: 6,
-                          ),
-                          decoration: BoxDecoration(
-                            gradient: const LinearGradient(
-                              colors: [
-                                Color(0xFF1E88E5),
-                                Color(0xFF42A5F5),
-                              ],
-                            ),
-                            borderRadius: BorderRadius.circular(20),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.blue.withOpacity(0.3),
-                                blurRadius: 8,
-                                offset: const Offset(0, 3),
-                              ),
-                            ],
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              const Icon(
-                                Icons.auto_awesome,
-                                color: Colors.white,
-                                size: 14,
-                              ),
-                              const SizedBox(width: 4),
-                              Text(
-                                rental.aiScore != null
-                                    ? 'AI ${(rental.aiScore! * 100).toStringAsFixed(0)}%'
-                                    : 'AI Gợi ý',
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
+
                   ],
                 );
               },

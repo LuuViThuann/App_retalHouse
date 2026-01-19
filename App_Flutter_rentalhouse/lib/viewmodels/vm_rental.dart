@@ -186,6 +186,8 @@ class RentalViewModel extends ChangeNotifier {
   // ==================== AI SERVICE ==========
   final AIService _aiService = AIService();
 
+  // Property để lưu poisTotal từ AI+POI response
+  int _lastPoisTotal = 0;
 
 
   //  ========================================================= =========================================================
@@ -220,6 +222,9 @@ class RentalViewModel extends ChangeNotifier {
   UserPreferences? get userPreferences => _userPreferences;
   bool get isLoadingPreferences => _isLoadingPreferences;
   String? get preferencesError => _preferencesError;
+
+  //  Getter
+  int get lastPoisTotal => _lastPoisTotal;
 
   //  LIFECYCLE METHODS
   @override
@@ -1252,7 +1257,126 @@ class RentalViewModel extends ChangeNotifier {
     _selectedPOICategories.clear();
     notifyListeners();
   }
+  /// 🤖🏢 Fetch AI Personalized Recommendations WITH POI Filter
+  Future<void> fetchAIPersonalizedWithPOI({
+    required double latitude,
+    required double longitude,
+    required List<String> selectedCategories,
+    double radius = 10.0,
+    double poiRadius = 3.0,
+    double? minPrice,
+    double? maxPrice,
+  }) async {
+    // Cancel if already fetching
+    if (_isFetchingNearby) {
+      debugPrint('⚠️ Already fetching, skipping AI+POI...');
+      return;
+    }
 
+    _isFetchingNearby = true;
+    _isLoading = true;
+    _errorMessage = null;
+    _warningMessage = null;
+    _isAIRecommendation = false;
+    _aiRecommendationMessage = null;
+    notifyListeners();
+
+    // Validate coordinates
+    if (latitude.abs() > 90 || longitude.abs() > 180) {
+      _errorMessage = 'Tọa độ không hợp lệ (lat: [-90,90], lon: [-180,180])';
+      _isLoading = false;
+      _isFetchingNearby = false;
+      notifyListeners();
+      return;
+    }
+
+    // Validate categories
+    if (selectedCategories.isEmpty) {
+      _errorMessage = 'Vui lòng chọn ít nhất một loại tiện ích';
+      _isLoading = false;
+      _isFetchingNearby = false;
+      notifyListeners();
+      return;
+    }
+
+    try {
+      final token = await AuthService().getIdToken();
+
+      if (token == null) {
+        throw Exception('Vui lòng đăng nhập để xem gợi ý AI + POI');
+      }
+
+      debugPrint('🤖🏢 [AI+POI-VM] Fetching:');
+      debugPrint('   Categories: ${selectedCategories.join(", ")}');
+      debugPrint('   Radius: ${radius}km, POI Radius: ${poiRadius}km');
+
+      final result = await _rentalService.fetchAIPersonalizedWithPOI(
+        latitude: latitude,
+        longitude: longitude,
+        selectedCategories: selectedCategories,
+        radius: radius,
+        poiRadius: poiRadius,
+        minPrice: minPrice,
+        maxPrice: maxPrice,
+        limit: 20,
+        token: token,
+      );
+
+      if (_isFetchingNearby) {
+        if (result['success'] == true) {
+          _nearbyRentals = [];
+          _nearbyRentals = result['rentals'] ?? [];
+          _isAIRecommendation = true; // 🔥 SET TRUE vì là AI recommendation
+          _aiRecommendationMessage = result['message'] ?? 'Gợi ý AI + POI';
+
+          _lastPoisTotal = result['poisTotal'] ?? 0;
+
+          debugPrint('✅ [AI+POI-VM] Success:');
+          debugPrint('   Rentals: ${_nearbyRentals.length}');
+          debugPrint('   POIs: ${result['poisTotal']}');
+          debugPrint('   Method: ${result['method']}');
+
+          notifyListeners();
+        } else {
+          throw Exception(result['message'] ?? 'API returned error');
+        }
+      }
+    } catch (e) {
+      if (_isFetchingNearby) {
+        String errorMsg = e.toString();
+
+        if (errorMsg.contains('Invalid coordinates')) {
+          _errorMessage = 'Tọa độ không hợp lệ. Vui lòng thử lại.';
+        } else if (errorMsg.contains('chọn')) {
+          _errorMessage = 'Vui lòng chọn ít nhất một loại tiện ích';
+        } else if (errorMsg.contains('đăng nhập')) {
+          _errorMessage = 'Vui lòng đăng nhập để xem gợi ý AI';
+        } else if (errorMsg.contains('401')) {
+          _errorMessage = 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.';
+        } else if (errorMsg.contains('timeout')) {
+          _errorMessage = 'Quá thời gian chờ. Hãy thử lại hoặc giảm khoảng cách.';
+        } else if (errorMsg.contains('connection')) {
+          _errorMessage = 'Lỗi kết nối mạng. Vui lòng kiểm tra internet.';
+        } else if (errorMsg.contains('không tìm thấy tiện ích')) {
+          _errorMessage = 'Không tìm thấy tiện ích trong khoảng cách này';
+        } else {
+          _errorMessage = 'Không thể tải gợi ý AI + POI: $errorMsg';
+        }
+
+        debugPrint('❌ [AI+POI-VM] Error: $_errorMessage');
+        debugPrint('   Original: $e');
+
+        _nearbyRentals = [];
+        _isAIRecommendation = false;
+
+        notifyListeners();
+      }
+    } finally {
+      _isFetchingNearby = false;
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
   /// Fetch AI + POI combined recommendations
   Future<void> fetchAIPOIRecommendations({
     required double latitude,

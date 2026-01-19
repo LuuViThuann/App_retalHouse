@@ -36,6 +36,8 @@ class RecommendationModel:
         self.rental_coordinates = {}  # {rental_id: (longitude, latitude)}
         self.user_locations = {}      # {user_id: (longitude, latitude)}
 
+        self.rental_owners = {}  # {rental_id: user_id}
+
         # Popularity scores
         self.popularity_scores = {}
 
@@ -68,8 +70,13 @@ class RecommendationModel:
             lon = float(row.get('longitude', 0))
             lat = float(row.get('latitude', 0))
             self.rental_coordinates[rental_id] = (lon, lat)
+            
+            # 🔥 NEW: Store rental ownership
+            if 'userId' in row and pd.notna(row['userId']):
+                self.rental_owners[rental_id] = str(row['userId'])
         
         print(f"      Stored {len(self.rental_coordinates)} rental coordinates")
+        print(f"      🔥 Stored {len(self.rental_owners)} rental ownerships")
         
         # Calculate user location centroids from interactions
         print("   👥 Calculating user location centroids...")
@@ -107,6 +114,7 @@ class RecommendationModel:
         except Exception as e:
             print(f"      ⚠️ Error calculating user locations: {e}")
     
+
     def build_user_item_matrix(self, interactions_df):
         """Xây dựng User-Item Interaction Matrix"""
         print("\n🔨 Building User-Item Matrix...")
@@ -126,7 +134,17 @@ class RecommendationModel:
             shape=(n_users, n_items)
         )
         
-        print(f"   Sparsity: {100 * (1 - self.user_item_matrix.nnz / (n_users * n_items)):.2f}%")
+        # 🔥 FIX: Calculate sparsity correctly
+        total_cells = n_users * n_items
+        non_zero_cells = self.user_item_matrix.nnz
+        
+        # Sparsity = % of zero cells
+        sparsity = 100 * (1 - non_zero_cells / max(total_cells, 1))
+        
+        print(f"   Non-zero cells: {non_zero_cells:,}")
+        print(f"   Total cells: {total_cells:,}")
+        print(f"   Sparsity: {sparsity:.2f}%")
+        print(f"   Density: {100 - sparsity:.2f}%")
     
     def compute_user_similarity(self):
         """Tính User-User Similarity (Collaborative Filtering)"""
@@ -260,8 +278,12 @@ class RecommendationModel:
                 return
         
         if len(interactions_df) < min_interactions:
-            print(f"\n⚠️ WARNING: Too few interactions ({len(interactions_df)} < {min_interactions})")
-            print("   Consider collecting more data first")
+            print(f"\n⚠️ WARNING: Few interactions ({len(interactions_df)} < {min_interactions})")
+            print("   Consider collecting more data, but continuing for development...")
+        
+        if interactions_df['rentalId'].nunique() < min_rentals:
+            print(f"\n⚠️ WARNING: Few rentals ({interactions_df['rentalId'].nunique()} < {min_rentals})")
+            print("   Content-based filtering may have limited effectiveness")
         
         # 2. Prepare data
         interactions_df, rentals_df = self.prepare_data(interactions_df, rentals_df)
@@ -269,7 +291,7 @@ class RecommendationModel:
         # 3. Build matrices
         self.build_user_item_matrix(interactions_df)
         
-        # 4. 🔥 IMPROVED: Compute similarities dengan better normalization
+        # 4. 🔥 IMPROVED: Compute similarities with better normalization
         print("\n🧮 Computing Similarities...")
         self.compute_user_similarity()
         self.compute_item_similarity()
@@ -281,7 +303,6 @@ class RecommendationModel:
         print("\n📋 Extracting item features...")
         self.item_features = {}
         
-        # 🔥 FIX: Use iterrows() instead of itertuples()
         for idx, row in rentals_df.iterrows():
             try:
                 rental_id = str(row['_id'])
@@ -308,10 +329,32 @@ class RecommendationModel:
         print(f"   Users: {len(self.user_encoder.classes_)}")
         print(f"   Items: {len(self.item_encoder.classes_)}")
         print(f"   User-Item interactions: {self.user_item_matrix.nnz}")
-        print(f"   Sparsity: {100 * (1 - self.user_item_matrix.nnz / (len(self.user_encoder.classes_) * len(self.item_encoder.classes_))):.2f}%")
+        
+        # 🔥 FIX: Correct sparsity calculation
+        total_cells = len(self.user_encoder.classes_) * len(self.item_encoder.classes_)
+        sparsity = 100 * (1 - self.user_item_matrix.nnz / max(total_cells, 1))
+        print(f"   Sparsity: {sparsity:.2f}%")
+        print(f"   Density: {100 - sparsity:.2f}%")
+        
         print(f"   Rental coordinates: {len(self.rental_coordinates)}")
         print(f"   User locations: {len(self.user_locations)}")
-        print(f"   Item features: {len(self.item_features)}\n")
+        print(f"   Item features: {len(self.item_features)}")
+        
+        # 🔥 NEW: Recommendations for improvement
+        print("\n💡 RECOMMENDATIONS:")
+        if len(interactions_df) < 50:
+            print("   • Collect more user interactions (views, favorites, contacts)")
+        if interactions_df['userId'].nunique() < 10:
+            print("   • Encourage more users to interact with rentals")
+        if interactions_df['rentalId'].nunique() < 20:
+            print("   • Add more rental listings")
+        if sparsity > 99:
+            print("   • Very sparse matrix - diversity is good but more interactions needed")
+        
+        print()
+
+
+
     
     def recommend_for_user(self, user_id, n_recommendations=10, exclude_items=None, 
                           use_location=True, radius_km=20, context=None):
@@ -329,9 +372,28 @@ class RecommendationModel:
         user_idx = self.user_encoder.transform([user_id])[0]
         user_prefs = self.get_user_preferences(user_id)
         
+        # 🔥 NEW: Get user's own rentals from interactions to exclude
+        user_own_rentals = set()
+        if self.rental_owners:
+            user_own_rentals = {
+                rental_id for rental_id, owner_id in self.rental_owners.items()
+                if owner_id == user_id
+            }
+                
+            if user_own_rentals:
+                print(f"   🚫 Found {len(user_own_rentals)} own rentals for user {user_id}")
+            
+        # 🔥 FIX: Combine với exclude_items
+        if exclude_items:
+            exclude_items = set(exclude_items) | user_own_rentals
+        else:
+            exclude_items = user_own_rentals
+        
+        print(f"   🚫 Total excluded items: {len(exclude_items) if exclude_items else 0}")
+        
         # Get similar users - 🔥 IMPROVED
         user_similarities = self.user_similarity[user_idx].toarray().flatten()
-        similar_users_idx = np.argsort(user_similarities)[::-1][1:min(101, len(user_similarities))]  # Top 100 similar users
+        similar_users_idx = np.argsort(user_similarities)[::-1][1:min(101, len(user_similarities))]
         
         # Filter by minimum similarity
         min_similarity_threshold = 0.1
@@ -343,14 +405,19 @@ class RecommendationModel:
         candidate_scores = defaultdict(float)
         candidate_metadata = defaultdict(lambda: {'reasons': [], 'scores': {}})
         
-        for similar_user_idx in valid_similar_users[:50]:  # Top 50 to avoid too much data
+        for similar_user_idx in valid_similar_users[:50]:
             similarity_score = user_similarities[similar_user_idx]
             user_items = self.user_item_matrix[similar_user_idx].toarray().flatten()
             
             for item_idx, interaction_score in enumerate(user_items):
                 if interaction_score > 0:
-                    # Skip if user already interacted
+                    rental_id = self.item_encoder.inverse_transform([item_idx])[0]
+                    
+                    # 🔥 CRITICAL: Skip if user already interacted OR if it's their own rental
                     if self.user_item_matrix[user_idx, item_idx] > 0:
+                        continue
+                    
+                    if exclude_items and rental_id in exclude_items:
                         continue
                     
                     # Calculate weighted score
@@ -362,13 +429,18 @@ class RecommendationModel:
         # 🔥 ADD: Content-based filtering
         user_item_vector = self.user_item_matrix[user_idx].toarray().flatten()
         
-        # Find items similar to what user likes
         if user_item_vector.sum() > 0:
             item_similarities = cosine_similarity([user_item_vector], self.item_similarity)[0]
             
             for item_idx, sim_score in enumerate(item_similarities):
                 if sim_score > 0.2 and self.user_item_matrix[user_idx, item_idx] == 0:
-                    weighted_sim = sim_score * 0.5  # Weight it less than collaborative
+                    rental_id = self.item_encoder.inverse_transform([item_idx])[0]
+                    
+                    # 🔥 CRITICAL: Skip own rentals
+                    if exclude_items and rental_id in exclude_items:
+                        continue
+                    
+                    weighted_sim = sim_score * 0.5
                     candidate_scores[item_idx] += weighted_sim
                     candidate_metadata[item_idx]['reasons'].append(f"Similar to liked items ({sim_score:.2f})")
         
@@ -379,13 +451,14 @@ class RecommendationModel:
         for item_idx, score in sorted_items:
             rental_id = self.item_encoder.inverse_transform([item_idx])[0]
             
+            # 🔥 DOUBLE CHECK: Skip excluded items
             if exclude_items and rental_id in exclude_items:
                 continue
             
             if context.get('impressions') and rental_id in context.get('impressions'):
                 continue
             
-            # LOCATION BONUS - 🔥 IMPROVED
+            # LOCATION BONUS
             location_bonus = 1.0
             distance = None
             
@@ -398,18 +471,15 @@ class RecommendationModel:
                         rental_coords[0], rental_coords[1]
                     )
                     
-                    # Better distance scoring
                     if distance <= radius_km:
-                        # Closer = exponential boost
                         location_bonus = 1.0 + (1.0 - (distance / radius_km)) ** 2
                     else:
-                        location_bonus = 0.3  # Heavier penalty for far items
+                        location_bonus = 0.3
             
-            # PREFERENCE MATCHING - 🔥 IMPROVED
+            # PREFERENCE MATCHING
             preference_bonus = 1.0
             
             if user_prefs:
-                # Price matching
                 if 'price_range' in user_prefs:
                     price_min = user_prefs['price_range'].get('min', 0)
                     price_max = user_prefs['price_range'].get('max', float('inf'))
@@ -419,18 +489,16 @@ class RecommendationModel:
                         rental_price = self.item_features[str(rental_id)].get('price', 0)
                         
                         if price_min <= rental_price <= price_max:
-                            # Perfect match gets bonus
                             price_diff = abs(rental_price - avg_price)
                             max_diff = max(avg_price - price_min, price_max - avg_price)
                             price_match = 1.0 - (price_diff / max_diff) if max_diff > 0 else 1.0
                             preference_bonus *= (0.9 + 0.2 * price_match)
             
-            # TIME BONUS - 🔥 NEW
+            # TIME BONUS
             time_bonus = 1.0
             time_of_day = context.get('time_of_day', 'morning')
             
             if user_prefs and user_prefs.get('total_interactions', 0) > 10:
-                # Boost if user is typically active at this time
                 time_bonus = 1.05
             
             # Calculate final score
@@ -550,11 +618,17 @@ class RecommendationModel:
             if context.get('impressions') and rental_id in context.get('impressions'):
                 continue
             
+            # 🔥 FIX: Add all required fields for PersonalizedRecommendationResponse
             recommendations.append({
                 'rentalId': rental_id,
                 'score': float(score),
+                'locationBonus': 1.0,        # 🔥 ADD: Default location bonus
+                'preferenceBonus': 1.0,      # 🔥 ADD: Default preference bonus
+                'timeBonus': 1.0,            # 🔥 ADD: Default time bonus
+                'finalScore': float(score),  # 🔥 FIX: ADD finalScore (same as score)
                 'method': 'popularity',
                 'coordinates': self.rental_coordinates.get(rental_id, (0, 0)),
+                'distance_km': None,         # 🔥 ADD: No distance for popularity
                 'explanation': {
                     'popularity': f'Được {int(score)} người quan tâm'
                 },
@@ -581,6 +655,7 @@ class RecommendationModel:
             'popularity_scores': self.popularity_scores,
             'rental_coordinates': self.rental_coordinates,
             'user_locations': self.user_locations,
+            'rental_owners': self.rental_owners,  # 🔥 NEW
             'trained_at': datetime.now().isoformat()
         }
         
@@ -590,7 +665,9 @@ class RecommendationModel:
         print(f"   File size: {os.path.getsize(filepath) / (1024*1024):.2f} MB")
         print(f"   Rental coordinates stored: {len(self.rental_coordinates)}")
         print(f"   User locations calculated: {len(self.user_locations)}")
-    
+        print(f"   🔥 Rental ownerships stored: {len(self.rental_owners)}")
+
+    # 🔥 UPDATE: load method to include rental_owners (line ~530)
     @classmethod
     def load(cls, filepath='./models/recommendation_model.pkl'):
         """Load model từ file"""
@@ -610,11 +687,13 @@ class RecommendationModel:
         model.popularity_scores = model_data['popularity_scores']
         model.rental_coordinates = model_data.get('rental_coordinates', {})
         model.user_locations = model_data.get('user_locations', {})
+        model.rental_owners = model_data.get('rental_owners', {})  # 🔥 NEW
         
         print(f"✅ Model loaded successfully")
         print(f"   Trained at: {model_data.get('trained_at', 'unknown')}")
         print(f"   Rental coordinates loaded: {len(model.rental_coordinates)}")
         print(f"   User locations loaded: {len(model.user_locations)}")
+        print(f"   🔥 Rental ownerships loaded: {len(model.rental_owners)}")
         
         return model
 

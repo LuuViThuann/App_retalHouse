@@ -3,7 +3,7 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 class ApiRoutes {
   static const String rootUrl =
-      'http://192.168.1.130:3000'; // http://192.168.43.168:3000 - mạng dữ liệu
+      'http://192.168.1.183:3000'; // http://192.168.43.168:3000 - mạng dữ liệu
   static const String baseUrl = '$rootUrl/api';
   static const String serverBaseUrl = rootUrl;
   static const String socketUrl = serverBaseUrl;
@@ -97,6 +97,45 @@ class ApiRoutes {
   static const String rentalsNearPOI = '$baseUrl/poi/rentals-near-poi';
 
   // ====================  AI RECOMMENDATIONS ====================
+//   /recommend/personalized/with-poi
+
+  static String aiRecommendationsPersonalizedWithPOI({
+    required double latitude,
+    required double longitude,
+    required List<String> selectedCategories,
+    double radius = 10.0,
+    double poiRadius = 3.0,
+    int limit = 10,
+    double? minPrice,
+    double? maxPrice,
+  }) {
+    final params = <String, String>{
+      'latitude': latitude.toStringAsFixed(6),
+      'longitude': longitude.toStringAsFixed(6),
+      'radius': radius.toStringAsFixed(2),
+      'poiRadius': poiRadius.toStringAsFixed(2),
+      'limit': limit.toString(),
+    };
+
+    // 🔥 THÊM selectedCategories theo cách safe
+    for (int i = 0; i < selectedCategories.length; i++) {
+      params['selectedCategories[$i]'] = selectedCategories[i];
+    }
+
+    if (minPrice != null && minPrice > 0) {
+      params['minPrice'] = minPrice.toStringAsFixed(0);
+    }
+
+    if (maxPrice != null && maxPrice > 0) {
+      params['maxPrice'] = maxPrice.toStringAsFixed(0);
+    }
+
+    final uri = Uri.parse('$baseUrl/ai/recommendations/personalized/with-poi')
+        .replace(queryParameters: params);
+
+    debugPrint('🤖🏢 [AI+POI-URL] ${uri.toString()}');
+    return uri.toString();
+  }
   /// 🔥 NEW: GET /api/ai/recommendations/personalized/context
   /// Gợi ý cá nhân hóa với context (map center, zoom, device, impressions)
   /// 📌 Thay thế cho /api/ai/recommendations/personalized

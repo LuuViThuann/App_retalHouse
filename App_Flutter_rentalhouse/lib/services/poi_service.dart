@@ -41,7 +41,92 @@ class POIService {
       rethrow;
     }
   }
+  Future<Map<String, dynamic>> getAIPersonalizedWithPOI({
+    required double latitude,
+    required double longitude,
+    required List<String> selectedCategories,
+    double radius = 10.0,
+    double poiRadius = 3.0,
+    double? minPrice,
+    double? maxPrice,
+    int limit = 10,
+  }) async {
+    try {
+      final token = await AuthService().getIdToken();
 
+      if (token == null) {
+        throw Exception('Vui lòng đăng nhập để xem gợi ý AI + POI');
+      }
+
+      final body = {
+        'latitude': latitude,
+        'longitude': longitude,
+        'selectedCategories': selectedCategories,
+        'radius': radius,
+        'poiRadius': poiRadius,
+        'limit': limit,
+        if (minPrice != null) 'minPrice': minPrice,
+        if (maxPrice != null) 'maxPrice': maxPrice,
+      };
+
+      debugPrint('🤖🏢 [AI+POI-SERVICE] Request:');
+      debugPrint('   Categories: ${selectedCategories.join(", ")}');
+      debugPrint('   Radius: ${radius}km, POI Radius: ${poiRadius}km');
+      debugPrint('   Coordinates: ($latitude, $longitude)');
+
+      final response = await _client.post(
+        Uri.parse(ApiRoutes.aiPOIRecommendations),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode(body),
+      ).timeout(_timeout);
+
+      debugPrint('🤖🏢 [AI+POI-SERVICE] Response: ${response.statusCode}');
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+
+        if (data['success'] != true) {
+          throw Exception(data['message'] ?? 'API returned error');
+        }
+
+        // ✅ Parse rentals
+        final List<dynamic> rentalsData = data['rentals'] ?? [];
+        final rentals = rentalsData
+            .map((json) => Rental.fromJson(json))
+            .toList();
+
+        debugPrint('🤖🏢 [AI+POI-SERVICE] Success:');
+        debugPrint('   Rentals: ${rentals.length}');
+        debugPrint('   POIs found: ${data['poiStats']?['totalPOIsFound'] ?? 0}');
+        debugPrint('   Method: ${data['method']}');
+
+        return {
+          'rentals': rentals,
+          'total': data['total'] ?? rentals.length,
+          'poisTotal': data['poiStats']?['totalPOIsFound'] ?? 0,
+          'selectedCategories': selectedCategories,
+          'message': data['message'] ?? 'Gợi ý AI + POI',
+          'method': data['method'] ?? 'ai_poi_combined',
+          'success': true,
+        };
+      } else {
+        throw Exception('Failed: ${response.statusCode}');
+      }
+    } catch (e) {
+      debugPrint('❌ [AI+POI-SERVICE] Error: $e');
+      return {
+        'rentals': <Rental>[],
+        'total': 0,
+        'poisTotal': 0,
+        'selectedCategories': selectedCategories,
+        'message': 'Lỗi: $e',
+        'success': false,
+      };
+    }
+  }
   /// 📍 Lấy POI theo category và vị trí
   Future<List<POI>> getPOIsNearby({
     required double latitude,

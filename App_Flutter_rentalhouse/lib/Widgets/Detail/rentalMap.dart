@@ -300,53 +300,51 @@ class _RentalMapViewState extends State<RentalMapView>
       final userLat = _currentLatLng?.latitude ?? _rentalLatLng!.latitude;
       final userLon = _currentLatLng?.longitude ?? _rentalLatLng!.longitude;
 
-      debugPrint(
-          '[POI-FILTER] Requesting: lat=$userLat, lon=$userLon, categories=${selectedCategories.join(", ")}, radius=$_poiFilterRadius km, AI mode: $_isAIMode');
+      debugPrint('[POI-FILTER] Request: lat=$userLat, lon=$userLon, categories=${selectedCategories.join(", ")}, AI: $_isAIMode');
 
-      final apiRadius = _poiFilterRadius + 2;
-
-      //  KHAI BÁO BIẾN VỚI TYPE RÕ RÀNG
       final int poisTotal;
       final List<Rental> rentals;
       final String message;
 
       if (_isAIMode) {
-        //  GỌI API AI+POI - TRẢ VỀ Map<String, dynamic>
-        final Map<String, dynamic> aiResult = await _poiService!.getAIPOIRecommendations(
+        // 🔥 SỬ DỤNG ENDPOINT MỚI: AI + POI COMBINED
+        debugPrint('🤖🏢 [POI-FILTER] Using NEW AI+POI endpoint');
+
+        final rentalViewModel = Provider.of<RentalViewModel>(context, listen: false);
+
+        await rentalViewModel.fetchAIPersonalizedWithPOI(
           latitude: userLat,
           longitude: userLon,
           selectedCategories: selectedCategories,
-          radius: apiRadius,
-          minPrice: Provider.of<RentalViewModel>(context, listen: false).currentMinPrice,
-          maxPrice: Provider.of<RentalViewModel>(context, listen: false).currentMaxPrice,
+          radius: 20.0, // Default radius từ API
+          poiRadius: _poiFilterRadius,
+          minPrice: rentalViewModel.currentMinPrice,
+          maxPrice: rentalViewModel.currentMaxPrice,
         );
 
-        // Parse kết quả từ AI API
-        final List<dynamic> aiRentalsData = aiResult['rentals'] as List? ?? [];
-        rentals = aiRentalsData.whereType<Rental>().toList();
+        rentals = rentalViewModel.nearbyRentals;
+        message = rentalViewModel.aiRecommendationMessage ?? 'Gợi ý AI + POI';
+        poisTotal = rentalViewModel.lastPoisTotal;
 
-        // ✅ FIX: Lấy đúng poisTotal từ response
-        poisTotal = aiResult['poisTotal'] as int? ?? 0;
-        message = aiResult['message'] as String? ?? 'Gợi ý AI gần tiện ích';
-
-        debugPrint('🤖 [AI+POI] Result: ${rentals.length} rentals, $poisTotal POIs');
+        debugPrint('🤖🏢 [POI-FILTER] AI+POI Result: ${rentals.length} rentals, $poisTotal POIs');
       } else {
-        // ✅ GỌI API POI FILTER - TRẢ VỀ POIFilterResult
+        // ✅ GỌI API POI FILTER THUẦN (không AI)
+        debugPrint('📍 [POI-FILTER] Using POI-only filter');
+
         final POIFilterResult poiResult = await _poiService!.filterRentalsByPOI(
           latitude: userLat,
           longitude: userLon,
           selectedCategories: selectedCategories,
-          radius: apiRadius,
+          radius: _poiFilterRadius + 2,
           minPrice: Provider.of<RentalViewModel>(context, listen: false).currentMinPrice,
           maxPrice: Provider.of<RentalViewModel>(context, listen: false).currentMaxPrice,
         );
 
-        // Parse kết quả từ POI filter API
         rentals = poiResult.rentals.whereType<Rental>().toList();
-        poisTotal = poiResult.poisTotal; // ✅ FIX: Lấy từ POIFilterResult
+        poisTotal = poiResult.poisTotal;
         message = poiResult.message;
 
-        debugPrint('📍 [POI-FILTER] Result: ${rentals.length} rentals, $poisTotal POIs');
+        debugPrint('📍 [POI-FILTER] POI Result: ${rentals.length} rentals, $poisTotal POIs');
       }
 
       // Close loading dialog
@@ -356,11 +354,8 @@ class _RentalMapViewState extends State<RentalMapView>
 
       if (!mounted) return;
 
-      debugPrint('📊 [POI-FILTER] Final result: ${rentals.length} rentals, $poisTotal POIs, AI: $_isAIMode');
-
-      // ✅ FIX: Kiểm tra poisTotal chính xác
-      // Không xóa bộ lọc nếu poisTotal > 0, dù rentals.isEmpty
-      if (poisTotal == 0) {
+      // ✅ Check POIs
+      if (poisTotal == 0 && !_isAIMode) {
         _showSnackbar(
           message: 'Không tìm thấy tiện ích trong ${_poiFilterRadius.toStringAsFixed(1)}km\n'
               '💡 Hãy tăng khoảng cách tìm kiếm',
@@ -369,14 +364,24 @@ class _RentalMapViewState extends State<RentalMapView>
         return;
       }
 
-      // ✅ TẠO POIFilterResult CHO CẢ HAI TRƯỜNG HỢP
+      // ✅ Check rentals
+      if (rentals.isEmpty) {
+        _showSnackbar(
+          message: _isAIMode
+              ? 'Không tìm thấy bài gần tiện ích này. Hãy thử chọn tiện ích khác.'
+              : 'Không tìm thấy bài gần tiện ích này',
+          backgroundColor: Colors.orange[700],
+        );
+        return;
+      }
+
+      // ✅ Update state
       setState(() {
         _isPOIFilterActive = true;
-        // ✅ FIX: TẮT _isFilterApplied để tránh conflict với filter dialog
         _isFilterApplied = false;
         _currentFilterResult = POIFilterResult(
           rentals: rentals,
-          pois: [], // Không cần hiển thị POI markers riêng
+          pois: [],
           total: rentals.length,
           poisTotal: poisTotal,
           selectedCategories: selectedCategories,
@@ -388,14 +393,14 @@ class _RentalMapViewState extends State<RentalMapView>
         _filteredNearbyRentals = rentals;
       });
 
-      debugPrint('✅ [POI-FILTER] State updated successfully');
+      debugPrint('✅ [POI-FILTER] State updated: ${rentals.length} rentals');
 
       await _updateMarkersWithClustering();
 
       if (mounted) {
         _showSnackbar(
           message: _isAIMode
-              ? 'Tìm thấy ${rentals.length} được AI gợi ý gần $poisTotal tiện ích...'
+              ? 'Tìm thấy ${rentals.length} được AI gợi ý gần tiện ích...'
               : 'Tìm thấy ${rentals.length} bài gần $poisTotal tiện ích...',
           backgroundColor: Colors.green[700],
         );

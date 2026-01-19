@@ -11,7 +11,7 @@ Các thuật toán hỗ trợ xử lý quá trình thao tác trên bản đồ :
 - Các lỗi nhỏ còn :
 + Lỗi khi chưa nhắn gì vẫn tạo conversation
 + Lỗi xóa mục yêu thích
-+Chưa chuyển ảnh commet sang cloud
++Chưa chuyển ảnh commet sang cloudr
 
 --- THÊM
  + Điều chỉnh chatbox gợi ý từ vị trí

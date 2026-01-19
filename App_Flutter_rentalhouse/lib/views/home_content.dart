@@ -152,9 +152,32 @@ class _HomeContentState extends State<HomeContent> {
     }
   }
 
-  // 🔥 THÊM WIDGET BUILD AI SECTION
   Widget _buildAIRecommendationsSection() {
     if (_aiRecommendations.isEmpty && !_isLoadingAI) {
+      return const SizedBox.shrink();
+    }
+
+    final authViewModel = Provider.of<AuthViewModel>(context, listen: false);
+    final currentUserId = authViewModel.currentUser?.id;
+
+    // 🔥 FIX: Filter out user's own rentals BEFORE displaying
+    final filteredRecommendations = _aiRecommendations.where((rental) {
+      // Skip if rental.userId is null
+      if (rental.userId == null || rental.userId!.isEmpty) {
+        return true; // Keep it if we don't know the owner
+      }
+
+      // Skip if it's user's own rental
+      if (currentUserId != null && rental.userId == currentUserId) {
+        debugPrint('🚫 Filtered out own rental: ${rental.id}');
+        return false;
+      }
+
+      return true;
+    }).toList();
+
+    // If after filtering, no recommendations left
+    if (filteredRecommendations.isEmpty && !_isLoadingAI) {
       return const SizedBox.shrink();
     }
 
@@ -173,7 +196,7 @@ class _HomeContentState extends State<HomeContent> {
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
                       colors: [
-                        Color(0xFF1E88E5),
+                        Color(0xFF1E40AF),
                         Color(0xFF42A5F5),
                         Color(0xFF26C6DA),
                       ],
@@ -183,7 +206,7 @@ class _HomeContentState extends State<HomeContent> {
                       BoxShadow(
                         color: Colors.blue.withOpacity(0.3),
                         blurRadius: 8,
-                        offset: Offset(0, 3),
+                        offset: const Offset(0, 3),
                       ),
                     ],
                   ),
@@ -203,15 +226,14 @@ class _HomeContentState extends State<HomeContent> {
                     ],
                   ),
                 )
-
               ],
             ),
             TextButton(
               onPressed: () async {
-                // Lấy vị trí hiện tại
                 final currentLocation = await _location.getLocation();
 
-                if (currentLocation.latitude != null && currentLocation.longitude != null) {
+                if (currentLocation.latitude != null &&
+                    currentLocation.longitude != null) {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
@@ -223,21 +245,24 @@ class _HomeContentState extends State<HomeContent> {
                     ),
                   );
                 } else {
-                  // Nếu không lấy được vị trí, vẫn mở màn hình (sẽ tự lấy vị trí)
                   Navigator.push(
                     context,
-                    MaterialPageRoute(builder: (_) => const AllAIRecommendationsScreen()),
+                    MaterialPageRoute(
+                      builder: (_) => const AllAIRecommendationsScreen(),
+                    ),
                   );
                 }
               },
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text('Xem tất cả',
+                  Text(
+                    'Xem tất cả',
                     style: TextStyle(fontSize: 14, color: Colors.blue[700]),
                   ),
                   const SizedBox(width: 4),
-                  Icon(Icons.arrow_forward,
+                  Icon(
+                    Icons.arrow_forward,
                     size: 14,
                     color: Colors.blue[700],
                   ),
@@ -247,6 +272,8 @@ class _HomeContentState extends State<HomeContent> {
           ],
         ),
         const SizedBox(height: 10),
+
+        // 🔥 LOADING STATE
         if (_isLoadingAI)
           SizedBox(
             height: 280,
@@ -262,24 +289,31 @@ class _HomeContentState extends State<HomeContent> {
               ),
             ),
           )
-        else if (_aiRecommendations.isNotEmpty)
+
+        // 🔥 SUCCESS STATE with filtered recommendations
+        else if (filteredRecommendations.isNotEmpty)
           SizedBox(
             height: 280,
             child: ListView.separated(
               scrollDirection: Axis.horizontal,
               padding: const EdgeInsets.symmetric(horizontal: 16),
-              itemCount: _aiRecommendations.length,
+              itemCount: filteredRecommendations.length,
               separatorBuilder: (_, __) => const SizedBox(width: 12),
               itemBuilder: (context, index) {
-                final rental = _aiRecommendations[index];
+                final rental = filteredRecommendations[index];
+
                 return Stack(
                   children: [
                     RentalCardHorizontal(rental: rental),
+
+
                   ],
                 );
               },
             ),
           )
+
+        // 🔥 EMPTY STATE
         else
           Center(
             child: Padding(
@@ -293,11 +327,11 @@ class _HomeContentState extends State<HomeContent> {
               ),
             ),
           ),
+
         const SizedBox(height: 20),
       ],
     );
   }
-
   Future<void> _getCurrentLocationAndNavigateToMap() async {
     try {
       final location = loc.Location();

@@ -53,7 +53,7 @@ const POI_CATEGORIES = {
     tags: ['fitness_centre', 'sports_centre'],
     query: 'node["leisure"~"fitness_centre|sports_centre"]'
   },
- VETERINARY: {
+  VETERINARY: {
     name: 'Thú y',
     icon: '🐶',           // hoặc 🩺 nếu muốn nhấn mạnh y tế
     tags: ['veterinary'],
@@ -99,7 +99,7 @@ class POIService {
    */
   async getPOIsByCategory(latitude, longitude, category, radiusKm = 5) {
     const cacheKey = `${category}_${latitude}_${longitude}_${radiusKm}`;
-    
+
     // Check cache
     if (this.cache.has(cacheKey)) {
       const cached = this.cache.get(cacheKey);
@@ -115,7 +115,7 @@ class POIService {
     }
 
     let lastError;
-    
+
     // ✅ RETRY LOGIC: Thử lại tối đa maxRetries lần
     for (let attempt = 1; attempt <= this.maxRetries + 1; attempt++) {
       try {
@@ -159,10 +159,10 @@ class POIService {
 
       } catch (error) {
         lastError = error;
-        
+
         if (error.response?.status === 504 || error.code === 'ECONNABORTED') {
           console.warn(`⚠️ [POI-SERVICE] Attempt ${attempt} failed (${error.response?.status || error.code}), retrying...`);
-          
+
           // ✅ BACKOFF: Chờ 2s trước khi retry
           if (attempt <= this.maxRetries) {
             await new Promise(resolve => setTimeout(resolve, 2000));
@@ -195,7 +195,7 @@ class POIService {
       .map(element => {
         const poiLat = element.lat;
         const poiLon = element.lon;
-        
+
         // 🔥 TÍNH KHOẢNG CÁCH TỪ USER ĐẾN POI
         const distanceFromUser = this.calculateDistance(
           userLat,
@@ -322,27 +322,27 @@ class POIService {
   filterRentalsByMultiplePOIs(selectedCategories, poiData, rentals, radiusKm = 3) {
     const filteredRentals = [];
     const processedRentalIds = new Set();
-    
+
     // 🔥 BƯỚC 1: THU THẬP TẤT CẢ POI TỪ CÁC CATEGORIES ĐÃ CHỌN
     const allPOIs = [];
-    
+
     for (const categoryId of selectedCategories) {
       const pois = poiData[categoryId] || [];
       allPOIs.push(...pois);
     }
-    
+
     console.log(`📊 [FILTER-POI] Total POIs from ${selectedCategories.length} categories: ${allPOIs.length}`);
-    
+
     // ✅ CẬP NHẬT: Không còn lấy 100 POI, mà dùng tất cả POI đã giới hạn
     // (mỗi category tối đa 50 POI, vậy tối đa 100 POI nếu 2 categories)
     allPOIs.sort((a, b) => a.distanceFromUser - b.distanceFromUser);
-    
+
     console.log(`✂️ [FILTER-POI] Using ${allPOIs.length} POIs for filtering`);
-    
+
     // 🔥 BƯỚC 2: XỬ LÝ VỚI TẤT CẢ POI
     for (const poi of allPOIs) {
       const rentalsNearPOI = this.filterRentalsByPOIDistance(poi, rentals, radiusKm);
-  
+
       for (const rental of rentalsNearPOI) {
         if (!processedRentalIds.has(rental._id.toString())) {
           rental.nearestPOIs = [{
@@ -351,7 +351,7 @@ class POIService {
             icon: poi.categoryIcon,
             distance: this.formatDistance(rental.distanceFromPOI)
           }];
-          
+
           filteredRentals.push(rental);
           processedRentalIds.add(rental._id.toString());
         } else {
@@ -367,7 +367,7 @@ class POIService {
         }
       }
     }
-  
+
     // ✅ Sort rentals theo khoảng cách gần nhất
     return filteredRentals.sort((a, b) => {
       const minDistA = Math.min(...(a.nearestPOIs?.map(p => parseFloat(p.distance)) || [Infinity]));
@@ -375,7 +375,7 @@ class POIService {
       return minDistA - minDistB;
     });
   }
-  
+
   /**
    * 🔥 FORMAT DISTANCE
    */
