@@ -1,0 +1,35 @@
+1. Bài toán tổng quát của đoạn code
+
+    Đoạn code giải quyết 4 bài toán chính:
+
+    Chuyển đổi hệ tọa độ địa lý
+
+    WGS84 (Lat, Lon) ⇄ VN2000 (Easting, Northing)
+
+    Xác định múi chiếu VN2000 dựa trên kinh độ
+
+    Kiểm tra tính hợp lệ tọa độ
+
+    Tính khoảng cách giữa 2 điểm trên Trái Đất
+
+    Nền tảng toán học:
+
+    Ellipsoid WGS84
+
+    Phép chiếu Transverse Mercator (TM)
+
+    Chuỗi Taylor & khai triển ellipsoid
+
+    Công thức Haversine
+
+2. Các hằng số & mô hình Trái Đất (Ellipsoid WGS84)
+
+2.1. Tham số ellipsoid
+
+| Ký hiệu | Ý nghĩa                  | Giá trị            |
+| ------- | ------------------------ | ------------------ |
+| `a`     | Bán trục lớn             | 6,378,137 m        |
+| `b`     | Bán trục nhỏ             | 6,356,752.314245 m |
+| `e²`    | Bình phương độ lệch tâm  | 0.00669438         |
+| `e'²`   | Bình phương lệch tâm phụ | 0.00673949         |
+

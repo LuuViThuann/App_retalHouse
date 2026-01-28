@@ -2496,6 +2496,7 @@ class _RentalMapViewState extends State<RentalMapView>
                 _toggleControlsVisibility(true); // Show controls
                 _toggleBadgeVisibility(true);
               },
+              currentLocation: _currentLatLng,
             )
                 : Container(
               decoration: BoxDecoration(

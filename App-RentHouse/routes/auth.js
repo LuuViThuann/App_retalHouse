@@ -22,14 +22,14 @@ const upload = multer({
   fileFilter: (req, file, cb) => {
     // Kiểm tra extension file
     const allowedExtensions = /\.(jpeg|jpg|png|webp)$/i;
-    const extname = allowedExtensions.test(file.originalname); 
-    
+    const extname = allowedExtensions.test(file.originalname);
+
     // Kiểm tra MIME type
     const allowedMimeTypes = /^image\/(jpeg|jpg|png|webp|octet-stream)/i;
     const mimetype = allowedMimeTypes.test(file.mimetype);
-    
+
     console.log('File:', file.originalname, 'Extension:', extname, 'MIME:', file.mimetype, 'MIMEValid:', mimetype);
-    
+
     if (extname) {
       return cb(null, true);
     }
@@ -143,7 +143,7 @@ router.get('/admin/users/:id', verifyAdmin, async (req, res) => {
 
     if (!user) {
       console.log('❌ User not found');
-      return res.status(404).json({ 
+      return res.status(404).json({
         message: 'Không tìm thấy người dùng',
         userId: userId
       });
@@ -171,15 +171,15 @@ router.get('/admin/users/:id', verifyAdmin, async (req, res) => {
     console.log('═══════════════════════════════════════════');
 
     res.json(response);
-    
+
   } catch (err) {
     console.error('❌ ERROR in GET /admin/users/:id');
     console.error('Error name:', err.name);
     console.error('Error message:', err.message);
     console.error('Error stack:', err.stack);
     console.log('═══════════════════════════════════════════');
-    
-    res.status(500).json({ 
+
+    res.status(500).json({
       message: 'Lỗi server',
       error: err.message,
       errorName: err.name
@@ -211,7 +211,7 @@ router.put('/admin/users/:id/avatar', verifyAdmin, upload.single('avatar'), asyn
     // Cập nhật MongoDB
     const updatedUser = await User.findByIdAndUpdate(
       req.params.id,
-      { 
+      {
         avatarUrl,
         avatarPublicId,
       },
@@ -257,7 +257,7 @@ router.put('/admin/users/:id', verifyAdmin, async (req, res) => {
     console.log('📝 Received data:', { username, email, phoneNumber, address, role });
 
     const updateFields = {};
-    
+
     // ✅ FIX: Thêm xử lý address
     if (username !== undefined) updateFields.username = username;
     if (email !== undefined) updateFields.email = email;
@@ -326,7 +326,7 @@ router.put('/admin/users/:id', verifyAdmin, async (req, res) => {
   } catch (err) {
     console.error('❌ Lỗi cập nhật người dùng:', err.message);
     console.error('Stack:', err.stack);
-    res.status(500).json({ 
+    res.status(500).json({
       message: 'Cập nhật thất bại',
       error: err.message
     });
@@ -374,7 +374,7 @@ router.delete('/admin/users/:id', verifyAdmin, async (req, res) => {
   }
 });
 
-// ============================== USER AUTHENTICATION ========================================= //
+// ============================== USER AUTHENTICATION ========================================= // 
 
 // ✅ ĐĂNG KÝ - Upload avatar (form-data)
 router.post('/register', upload.single('avatar'), async (req, res) => {
@@ -468,7 +468,7 @@ router.post('/register', upload.single('avatar'), async (req, res) => {
 
   } catch (err) {
     console.error('Registration error:', err);
-    
+
     // Xóa ảnh nếu có lỗi
     if (req.file?.filename) {
       await deleteImage(req.file.filename).catch(e => console.log('Cleanup failed:', e));
@@ -546,12 +546,12 @@ router.post('/login', async (req, res) => {
 // ✅ Upload profile image - Form-data
 router.post('/upload-image', upload.single('avatar'), async (req, res) => {
   const { idToken } = req.body;
-  
+
   if (!idToken) {
     if (req.file?.filename) await deleteImage(req.file.filename);
     return res.status(400).json({ message: 'Missing ID token' });
   }
-  
+
   if (!req.file) {
     return res.status(400).json({ message: 'Missing avatar file' });
   }
@@ -601,8 +601,8 @@ router.post('/upload-image', upload.single('avatar'), async (req, res) => {
       })
       .catch(err => console.log(`Firestore update failed: ${err.message}`));
 
-    res.json({ 
-      message: 'Image uploaded successfully', 
+    res.json({
+      message: 'Image uploaded successfully',
       avatarUrl
     });
   } catch (err) {

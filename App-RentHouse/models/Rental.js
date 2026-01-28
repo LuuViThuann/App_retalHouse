@@ -20,7 +20,7 @@ const rentalSchema = new mongoose.Schema({
   location: {
     short: { type: String, required: true },
     fullAddress: { type: String, required: true },
-    formattedAddress: { type: String }, 
+    formattedAddress: { type: String },
     coordinates: {
       type: {
         type: String,
@@ -70,7 +70,7 @@ const rentalSchema = new mongoose.Schema({
     renewalTerms: { type: String },
   },
   contactInfo: {
-    name: { type: String }, 
+    name: { type: String },
     phone: { type: String },
     availableHours: { type: String },
   },
@@ -84,9 +84,9 @@ const rentalSchema = new mongoose.Schema({
     type: [String],
     default: [],
     validate: {
-      validator: function(v) {
-        return v.every(url => 
-          typeof url === 'string' && 
+      validator: function (v) {
+        return v.every(url =>
+          typeof url === 'string' &&
           (url.includes('cloudinary.com') || url.startsWith('http'))
         );
       },
@@ -97,9 +97,9 @@ const rentalSchema = new mongoose.Schema({
     type: [String],
     default: [],
     validate: {
-      validator: function(v) {
-        return v.every(url => 
-          typeof url === 'string' && 
+      validator: function (v) {
+        return v.every(url =>
+          typeof url === 'string' &&
           (url.includes('cloudinary.com') || url.startsWith('http'))
         );
       },
@@ -117,13 +117,13 @@ const rentalSchema = new mongoose.Schema({
     enum: ['success', 'failed', 'pending', 'manual'],
     default: 'pending',
   },
-  
+
   // Payment Information
   paymentInfo: {
     transactionCode: {
       type: String,
       sparse: true,
-     
+
     },
     paymentId: {
       type: mongoose.Schema.Types.ObjectId,
@@ -138,30 +138,41 @@ const rentalSchema = new mongoose.Schema({
       type: String,
       enum: ['pending', 'completed', 'failed'],
       default: 'pending',
-     
+
     },
     paidAt: {
       type: Date,
       sparse: true,
     },
   },
-  
+
   //  Publication Status
   publishedAt: {
     type: Date,
     sparse: true,
   },
-  
+
   createdAt: {
     type: Date,
     default: Date.now,
     index: true,
   },
-  
+
   updatedAt: {
     type: Date,
     default: Date.now,
   },
+
+
+  addressComponents: {
+    street: { type: String, default: '' },
+    ward: { type: String, default: '' },
+    district: { type: String, default: '' },
+    city: { type: String, default: '' },
+    province: { type: String, default: '' },
+    country: { type: String, default: 'Vietnam' },
+  },
+
 }, { timestamps: true });
 
 // ==================== INDEXES ====================
@@ -181,22 +192,22 @@ rentalSchema.index({ 'paymentInfo.status': 1, createdAt: -1 });
 rentalSchema.index({ 'paymentInfo.transactionCode': 1, 'paymentInfo.status': 1 }, { sparse: true });
 
 // ==================== VIRTUALS ====================
-rentalSchema.virtual('isPaid').get(function() {
+rentalSchema.virtual('isPaid').get(function () {
   return this.paymentInfo?.status === 'completed';
 });
 
-rentalSchema.virtual('isPublished').get(function() {
+rentalSchema.virtual('isPublished').get(function () {
   return this.publishedAt !== null && this.publishedAt !== undefined;
 });
 
 // ==================== MIDDLEWARE ====================
-rentalSchema.pre('save', function(next) {
+rentalSchema.pre('save', function (next) {
   this.updatedAt = new Date();
-  
+
   if (this.paymentInfo?.status === 'completed' && !this.publishedAt) {
     this.publishedAt = new Date();
   }
-  
+
   next();
 });
 
@@ -204,7 +215,7 @@ rentalSchema.pre('save', function(next) {
 /**
  * Mark rental as paid
  */
-rentalSchema.methods.markAsPaid = function(paymentId, transactionCode) {
+rentalSchema.methods.markAsPaid = function (paymentId, transactionCode) {
   this.paymentInfo = {
     transactionCode,
     paymentId,
@@ -219,7 +230,7 @@ rentalSchema.methods.markAsPaid = function(paymentId, transactionCode) {
 /**
  * Mark rental as unpaid
  */
-rentalSchema.methods.markAsUnpaid = function(reason = 'Payment failed') {
+rentalSchema.methods.markAsUnpaid = function (reason = 'Payment failed') {
   this.paymentInfo = {
     ...this.paymentInfo,
     status: 'failed',
@@ -232,14 +243,14 @@ rentalSchema.methods.markAsUnpaid = function(reason = 'Payment failed') {
 /**
  * Check if rental needs payment
  */
-rentalSchema.methods.requiresPayment = function() {
+rentalSchema.methods.requiresPayment = function () {
   return this.paymentInfo?.status !== 'completed';
 };
 
 /**
  * Get payment status
  */
-rentalSchema.methods.getPaymentStatus = function() {
+rentalSchema.methods.getPaymentStatus = function () {
   return {
     isPaid: this.isPaid,
     isPublished: this.isPublished,

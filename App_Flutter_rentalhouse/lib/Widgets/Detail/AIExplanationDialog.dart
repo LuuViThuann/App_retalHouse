@@ -252,8 +252,14 @@ class _AIExplanationDialogState extends State<AIExplanationDialog> {
 
   // ==================== CONFIDENCE CARD ====================
   Widget _buildConfidenceCard(AIExplanation explanation) {
+    // 🔥 FIX: Confidence đã là 0-1 từ backend
     final confidence = _safeParseDouble(explanation.scores['confidence']) ?? 0.5;
     final confidencePercent = (confidence * 100).toStringAsFixed(0);
+
+    // 🔥 ADD: Detailed confidence breakdown
+    final contentScore = _safeParseDouble(explanation.scores['content_score']) ?? 0.0;
+    final cfScore = _safeParseDouble(explanation.scores['cf_score']) ?? 0.0;
+    final popularityScore = _safeParseDouble(explanation.scores['popularity_score']) ?? 0.0;
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -262,57 +268,117 @@ class _AIExplanationDialogState extends State<AIExplanationDialog> {
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: Colors.blue[100]!),
       ),
-      child: Row(
+      child: Column(
         children: [
-          Container(
-            width: 56,
-            height: 56,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              gradient: LinearGradient(
-                colors: _getConfidenceGradient(confidence),
-              ),
-            ),
-            child: Center(
-              child: Text(
-                confidencePercent,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 16,
+          // Main confidence circle
+          Row(
+            children: [
+              Container(
+                width: 56,
+                height: 56,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: LinearGradient(
+                    colors: _getConfidenceGradient(confidence),
+                  ),
+                ),
+                child: Center(
+                  child: Text(
+                    confidencePercent,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                    ),
+                  ),
                 ),
               ),
-            ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      _getConfidenceText(confidence),
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.blue[800],
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(3),
+                      child: LinearProgressIndicator(
+                        value: confidence,
+                        minHeight: 4,
+                        backgroundColor: Colors.blue[200],
+                        valueColor: AlwaysStoppedAnimation<Color>(Colors.blue[700]!),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
-          const SizedBox(width: 14),
-          Expanded(
+
+          // 🔥 NEW: Score breakdown
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: Colors.grey[200]!),
+            ),
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  _getConfidenceText(confidence),
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.blue[800],
-                  ),
-                ),
-                const SizedBox(height: 6),
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(3),
-                  child: LinearProgressIndicator(
-                    value: confidence,
-                    minHeight: 4,
-                    backgroundColor: Colors.blue[200],
-                    valueColor:
-                    AlwaysStoppedAnimation<Color>(Colors.blue[700]!),
-                  ),
-                ),
+                _buildScoreRow('Phù hợp sở thích', contentScore, Colors.purple),
+                const SizedBox(height: 4),
+                _buildScoreRow('Người dùng tương tự', cfScore, Colors.orange),
+                const SizedBox(height: 4),
+                _buildScoreRow('Độ phổ biến', popularityScore, Colors.green),
               ],
             ),
           ),
         ],
       ),
+    );
+  }
+
+// Helper widget
+  Widget _buildScoreRow(String label, double score, Color color) {
+    return Row(
+      children: [
+        Expanded(
+          flex: 3,
+          child: Text(
+            label,
+            style: TextStyle(fontSize: 11, color: Colors.grey[700]),
+          ),
+        ),
+        Expanded(
+          flex: 2,
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(2),
+            child: LinearProgressIndicator(
+              value: score,
+              minHeight: 3,
+              backgroundColor: Colors.grey[200],
+              valueColor: AlwaysStoppedAnimation<Color>(color),
+            ),
+          ),
+        ),
+        const SizedBox(width: 8),
+        Text(
+          '${(score * 100).toStringAsFixed(0)}%',
+          style: TextStyle(
+            fontSize: 10,
+            fontWeight: FontWeight.bold,
+            color: color,
+          ),
+        ),
+      ],
     );
   }
 

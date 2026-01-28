@@ -2,10 +2,12 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_rentalhouse/Widgets/Profile/enter_new_address.dart';
+import 'package:flutter_rentalhouse/Widgets/createRental/CoordinateConverter.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:http/http.dart' as http;
 
-// ====================== LOCATION FORM CẢI TIẾN ======================
+
+// ====================== LOCATION FORM CẢI TIẾN V2 ======================
 class LocationForm extends StatefulWidget {
   final TextEditingController shortController;
   final TextEditingController fullAddressController;
@@ -30,8 +32,12 @@ class _LocationFormState extends State<LocationForm> {
   LatLng? _previewPosition;
   Set<Marker> _previewMarkers = {};
   Timer? _debounce;
-  String? _geocodedAddressDisplay; // Địa chỉ đã geocode thành công
-  String? _lastGeocodedInput; // Lưu input cuối cùng đã geocode
+  String? _geocodedAddressDisplay;
+  String? _lastGeocodedInput;
+
+  // 🔥 NEW: Lưu thông tin địa chỉ chi tiết
+  Map<String, String>? _addressComponents;
+  String? _geocodingStatus; // 'success', 'partial', 'failed'
 
   @override
   void initState() {
@@ -49,7 +55,7 @@ class _LocationFormState extends State<LocationForm> {
 
   void _onAddressChanged() {
     if (_debounce?.isActive ?? false) _debounce!.cancel();
-    _debounce = Timer(const Duration(milliseconds: 1500), () { // Tăng lên 1.5s
+    _debounce = Timer(const Duration(milliseconds: 1500), () {
       final address = widget.fullAddressController.text.trim();
       if (address.isNotEmpty &&
           address.length > 15 &&
@@ -61,23 +67,31 @@ class _LocationFormState extends State<LocationForm> {
     });
   }
 
-  /// Chuẩn hóa địa chỉ Việt Nam theo đúng format backend
+  /// 🔥 CHUẨN HÓA ĐỊA CHỈ VIỆT NAM - CẢI TIẾN
   String _normalizeVietnameseAddress(String addr) {
     String normalized = addr.trim().replaceAll(RegExp(r'\s+'), ' ');
 
-    // Chuẩn hóa các viết tắt
-    normalized = normalized.replaceAll(
-        RegExp(r'\bP\.?\s*', caseSensitive: false), 'Phường ');
-    normalized = normalized.replaceAll(
-        RegExp(r'\bQ\.?\s*', caseSensitive: false), 'Quận ');
-    normalized = normalized.replaceAll(
-        RegExp(r'\bTP\.?\s*', caseSensitive: false), 'Thành phố ');
-    normalized = normalized.replaceAll(
-        RegExp(r'\bH\.?\s*', caseSensitive: false), 'Huyện ');
-    normalized = normalized.replaceAll(
-        RegExp(r'\bTX\.?\s*', caseSensitive: false), 'Thị xã ');
+    // Danh sách viết tắt phổ biến ở Việt Nam
+    final abbreviations = {
+      r'\bP\.?\s': 'Phường ',
+      r'\bQ\.?\s': 'Quận ',
+      r'\bTP\.?\s': 'Thành phố ',
+      r'\bH\.?\s': 'Huyện ',
+      r'\bTX\.?\s': 'Thị xã ',
+      r'\bSO\.?\s': 'Số ',
+      r'\bĐ\.?\s': 'Đường ',
+      r'\bTr\.?\s': 'Trạm ',
+      r'\bKP\.?\s': 'Khu phố ',
+    };
 
-    // Thêm "Việt Nam" nếu chưa có
+    abbreviations.forEach((pattern, replacement) {
+      normalized = normalized.replaceAll(RegExp(pattern, caseSensitive: false), replacement);
+    });
+
+    // Xóa các ký tự đặc biệt không cần thiết
+    normalized = normalized.replaceAll(RegExp(r'[<>\[\]{}|]'), '');
+
+    // Đảm bảo kết thúc bằng "Việt Nam" nếu là địa chỉ Việt Nam
     if (!normalized.toLowerCase().contains('việt nam') &&
         !normalized.toLowerCase().contains('vietnam')) {
       normalized += ', Việt Nam';
@@ -86,129 +100,234 @@ class _LocationFormState extends State<LocationForm> {
     return normalized;
   }
 
-  /// Geocoding với Nominatim OSM (giống backend) - ĐỘ CHÍNH XÁC CAO
+  /// 🔥 KIỂM TRA ĐỊA CHỈ HỢP LỆ - CẢI TIẾN
+  bool _isValidVietnamAddress(String addr) {
+    // Phải chứa ít nhất: Đường + Phường/Huyện + Quận/Tỉnh
+    final parts = addr.toLowerCase().split(',').map((e) => e.trim()).toList();
+
+    if (parts.length < 3) {
+      return false; // Quá thiếu thông tin
+    }
+
+    // Kiểm tra xem có các từ khóa địa chỉ Việt Nam không
+    final vietnamKeywords = [
+      'phường', 'huyện', 'quận', 'tỉnh', 'thành phố', 'thị xã',
+      'đường', 'khu phố', 'xã', 'hẻm'
+    ];
+
+    final fullAddr = addr.toLowerCase();
+    final hasVietnamKeywords =
+    vietnamKeywords.any((keyword) => fullAddr.contains(keyword));
+
+    if (!hasVietnamKeywords) {
+      return false; // Không có keywords địa chỉ Việt Nam
+    }
+
+    return true;
+  }
+
+  /// 🔥 EXTRACT ĐỊA CHỈ CHI TIẾT - CẢI TIẾN
+  Map<String, String> _extractAddressComponents(String fullAddress, Map<String, dynamic> nominatimData) {
+    try {
+      final displayName = nominatimData['display_name'] as String? ?? '';
+      final addressObj = nominatimData['address'] as Map<String, dynamic>? ?? {};
+
+      return {
+        'street': addressObj['road'] ?? addressObj['street'] ?? '',
+        'ward': addressObj['suburb'] ?? addressObj['hamlet'] ?? '',
+        'district': addressObj['city_district'] ?? addressObj['county'] ?? '',
+        'city': addressObj['city'] ?? addressObj['town'] ?? '',
+        'province': addressObj['state'] ?? '',
+        'country': addressObj['country'] ?? 'Vietnam',
+        'displayName': displayName,
+        'osmType': nominatimData['osm_type'] ?? '',
+        'osmId': nominatimData['osm_id']?.toString() ?? '',
+      };
+    } catch (e) {
+      debugPrint('Error extracting address components: $e');
+      return {};
+    }
+  }
+
+  /// 🔥 GEOCODING CẢI TIẾN - Thử nhiều phương pháp
   Future<void> _geocodeAddress(String rawAddress) async {
+    if (!_isValidVietnamAddress(rawAddress)) {
+      _showError('❌ Địa chỉ không hợp lệ. Phải gồm: Đường + Phường/Huyện + Quận/Tỉnh');
+      _clearPreview();
+      return;
+    }
+
     setState(() {
       _isLoading = true;
       _geocodedAddressDisplay = null;
+      _geocodingStatus = 'pending';
     });
 
     try {
       final normalized = _normalizeVietnameseAddress(rawAddress);
       _lastGeocodedInput = rawAddress;
 
-      // Tạo nhiều phiên bản địa chỉ để thử (giống backend)
-      final addressVariants = _createAddressVariants(normalized);
+      // 🔥 Phương pháp 1: Nominatim với địa chỉ đầy đủ
+      debugPrint('🔍 [GEO-1] Trying full address: $normalized');
+      var result = await _tryGeocode(normalized);
 
-      // Thử geocode với từng phiên bản
-      for (final addressToTry in addressVariants) {
-        final result = await _tryGeocode(addressToTry);
-        if (result != null) {
-          final lat = result['lat'];
-          final lon = result['lon'];
-          final displayName = result['display_name'];
-
-          setState(() {
-            _previewPosition = LatLng(lat, lon);
-            _geocodedAddressDisplay = displayName;
-            _previewMarkers = {
-              Marker(
-                markerId: const MarkerId('preview'),
-                position: _previewPosition!,
-                infoWindow: InfoWindow(
-                  title: 'Vị trí chính xác',
-                  snippet: _formatAddressSnippet(displayName),
-                ),
-              ),
-            };
-          });
-
-          widget.latitudeNotifier.value = lat;
-          widget.longitudeNotifier.value = lon;
-
-          // Animate camera với zoom phù hợp
-          _previewMapController?.animateCamera(
-            CameraUpdate.newCameraPosition(
-              CameraPosition(target: _previewPosition!, zoom: 17),
-            ),
-          );
-
-          setState(() => _isLoading = false);
-          return; // Thành công, dừng vòng lặp
-        }
+      if (result == null) {
+        // 🔥 Phương pháp 2: Nominatim với địa chỉ rút gọn
+        final simplified = _createSimplifiedAddress(normalized);
+        debugPrint('🔍 [GEO-2] Trying simplified: $simplified');
+        result = await _tryGeocode(simplified);
       }
 
-      _clearPreview();
+      if (result == null) {
+        // 🔥 Phương pháp 3: Nominatim với chỉ Quận/Tỉnh
+        final minimal = _createMinimalAddress(normalized);
+        debugPrint('🔍 [GEO-3] Trying minimal: $minimal');
+        result = await _tryGeocode(minimal);
+      }
+
+      if (result != null) {
+        await _processGeocodeResult(result);
+      } else {
+        _showError('❌ Không tìm thấy địa chỉ này. Vui lòng kiểm tra lại.');
+        _clearPreview();
+      }
     } catch (e) {
-      _showError('Lỗi kết nối: $e');
+      _showError('❌ Lỗi kết nối: $e');
       _clearPreview();
     } finally {
       setState(() => _isLoading = false);
     }
   }
 
-  /// Tạo các phiên bản địa chỉ để thử (giống backend logic)
-  List<String> _createAddressVariants(String normalized) {
+  /// 🔥 Tạo địa chỉ rút gọn: Đường + Quận + Tỉnh
+  String _createSimplifiedAddress(String normalized) {
     final parts = normalized
         .split(',')
         .map((e) => e.trim())
         .where((e) => e.isNotEmpty)
         .toList();
 
-    List<String> variants = [normalized]; // Full address
-
-    if (parts.length >= 4) {
-      // Simplified: Đường + Quận + Thành phố + Việt Nam
-      final road = parts[0];
-      final district = parts.length > 2 ? parts[2] : parts[1];
-      final city = parts[parts.length - 2];
-      variants.add('$road, $district, $city, Việt Nam');
-    }
-
     if (parts.length >= 3) {
-      // Minimal: Quận + Thành phố + Việt Nam
-      final district = parts[parts.length - 3];
-      final city = parts[parts.length - 2];
-      variants.add('$district, $city, Việt Nam');
+      return '${parts[0]}, ${parts[parts.length - 2]}, ${parts[parts.length - 1]}';
     }
-
-    return variants;
+    return normalized;
   }
 
-  /// Thử geocode với một địa chỉ cụ thể
+  /// 🔥 Tạo địa chỉ tối thiểu: Quận + Tỉnh
+  String _createMinimalAddress(String normalized) {
+    final parts = normalized
+        .split(',')
+        .map((e) => e.trim())
+        .where((e) => e.isNotEmpty)
+        .toList();
+
+    if (parts.length >= 2) {
+      return '${parts[parts.length - 2]}, ${parts[parts.length - 1]}';
+    }
+    return normalized;
+  }
+
+  /// 🔥 Thử geocode với Nominatim OSM
   Future<Map<String, dynamic>?> _tryGeocode(String address) async {
     try {
       final uri = Uri.parse(
         'https://nominatim.openstreetmap.org/search'
-        '?format=json'
-        '&q=${Uri.encodeComponent(address)}'
-        '&limit=1'
-        '&countrycodes=vn'
-        '&addressdetails=1'
-        '&accept-language=vi',
+            '?format=json'
+            '&q=${Uri.encodeComponent(address)}'
+            '&limit=5'
+            '&countrycodes=vn'
+            '&addressdetails=1'
+            '&accept-language=vi',
       );
 
       final response = await http.get(
         uri,
         headers: {
-          'User-Agent': 'RentalHouseApp/1.0 (+https://rentalhouse.app)'
+          'User-Agent': 'RentalHouseApp/1.0 (+https://rentalhouse.app)',
+          'Accept-Language': 'vi-VN,vi;q=0.9',
         },
-      ).timeout(const Duration(seconds: 10));
+      ).timeout(const Duration(seconds: 12));
 
       if (response.statusCode == 200) {
-        final List data = json.decode(response.body);
+        final List<dynamic> data = jsonDecode(response.body);
+
         if (data.isNotEmpty) {
-          return {
-            'lat': double.parse(data[0]['lat']),
-            'lon': double.parse(data[0]['lon']),
-            'display_name': data[0]['display_name'],
-          };
+          // 🔥 Lựa chọn kết quả tốt nhất: ưu tiên là đường hoặc phường
+          for (var item in data) {
+            final osmType = item['osm_type'] as String? ?? '';
+            final osmClass = item['class'] as String? ?? '';
+            final type = item['type'] as String? ?? '';
+
+            // Ưu tiên: place/quarter, place/village, highway, building
+            if ((osmClass == 'place' &&
+                (type == 'quarter' || type == 'village' || type == 'neighborhood')) ||
+                osmClass == 'highway' ||
+                osmClass == 'building') {
+              return item as Map<String, dynamic>;
+            }
+          }
+
+          // Nếu không tìm được ưu tiên, lấy kết quả đầu tiên
+          return data.first as Map<String, dynamic>;
         }
       }
     } catch (e) {
-      print('Geocode attempt failed: $e');
+      debugPrint('Geocode attempt failed: $e');
     }
     return null;
+  }
+
+  /// 🔥 Xử lý kết quả geocoding
+  Future<void> _processGeocodeResult(Map<String, dynamic> result) async {
+    try {
+      final lat = double.parse(result['lat']);
+      final lon = double.parse(result['lon']);
+      final displayName = result['display_name'] as String? ?? '';
+
+      // 🔥 KIỂM TRA: Có nằm trong Việt Nam không?
+      if (!CoordinateConverter.isInVietnam(lat, lon)) {
+        _showError('⚠️ Vị trí này không nằm ở Việt Nam. Vui lòng kiểm tra lại.');
+        _clearPreview();
+        return;
+      }
+
+      // 🔥 Extract chi tiết
+      final addressComponents = _extractAddressComponents(displayName, result);
+
+      setState(() {
+        _previewPosition = LatLng(lat, lon);
+        _geocodedAddressDisplay = displayName;
+        _addressComponents = addressComponents;
+        _geocodingStatus = 'success';
+        _previewMarkers = {
+          Marker(
+            markerId: const MarkerId('preview'),
+            position: _previewPosition!,
+            infoWindow: InfoWindow(
+              title: 'Vị trí xác định',
+              snippet: _formatAddressSnippet(displayName),
+            ),
+          ),
+        };
+      });
+
+      widget.latitudeNotifier.value = lat;
+      widget.longitudeNotifier.value = lon;
+
+      _previewMapController?.animateCamera(
+        CameraUpdate.newCameraPosition(
+          CameraPosition(target: _previewPosition!, zoom: 17),
+        ),
+      );
+
+      debugPrint('✅ Geocoded successfully');
+      debugPrint('   Address: $displayName');
+      debugPrint('   Lat: $lat, Lon: $lon');
+      debugPrint('   Components: $addressComponents');
+    } catch (e) {
+      _showError('❌ Lỗi xử lý tọa độ: $e');
+      _clearPreview();
+    }
   }
 
   String _formatAddressSnippet(String fullAddress) {
@@ -222,6 +341,8 @@ class _LocationFormState extends State<LocationForm> {
       _previewMarkers.clear();
       _geocodedAddressDisplay = null;
       _lastGeocodedInput = null;
+      _addressComponents = null;
+      _geocodingStatus = null;
     });
     widget.latitudeNotifier.value = null;
     widget.longitudeNotifier.value = null;
@@ -244,27 +365,20 @@ class _LocationFormState extends State<LocationForm> {
     );
   }
 
-  /// Chọn địa chỉ từ form thủ công
   Future<void> _pickAddressManually() async {
     final result = await Navigator.push(
       context,
       MaterialPageRoute(builder: (context) => const NewAddressPage()),
     );
 
-    if (result != null &&
-        result is String &&
-        result.trim().isNotEmpty &&
-        mounted) {
+    if (result != null && result is String && result.trim().isNotEmpty && mounted) {
       final selectedAddress = result.trim();
       widget.fullAddressController.text = selectedAddress;
-
-      // Trigger geocoding ngay lập tức
       await Future.delayed(const Duration(milliseconds: 300));
       _geocodeAddress(selectedAddress);
     }
   }
 
-  /// Chọn vị trí trực tiếp trên bản đồ
   Future<void> _pickLocationOnMap() async {
     final result = await Navigator.push(
       context,
@@ -285,11 +399,12 @@ class _LocationFormState extends State<LocationForm> {
       setState(() {
         _previewPosition = latLng;
         _geocodedAddressDisplay = result['address'];
+        _geocodingStatus = 'manual';
         _previewMarkers = {
           Marker(
             markerId: const MarkerId('preview'),
             position: latLng,
-            infoWindow: InfoWindow(title: 'Vị trí đã chọn'),
+            infoWindow: InfoWindow(title: '📍 Vị trí đã chọn'),
           ),
         };
       });
@@ -319,35 +434,32 @@ class _LocationFormState extends State<LocationForm> {
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(
-                '✅ Địa chỉ CHÍNH XÁC (khuyên dùng):',
-                style:
-                    TextStyle(fontWeight: FontWeight.bold, color: Colors.green),
+                '✅ Định dạng CHÍNH XÁC:',
+                style: TextStyle(fontWeight: FontWeight.bold, color: Colors.green),
               ),
               SizedBox(height: 8),
-              Text(
-                  '• 86/41 Lê Hồng Phong, Phường Thắng Lợi, Quận Ninh Kiều, Cần Thơ'),
-              Text(
-                  '• 123 Trần Hưng Đạo, Phường An Phú, Quận Ninh Kiều, TP Cần Thơ'),
+              Text('• Lê Hồng Phong, Phường Thắng Lợi, Quận Ninh Kiều, Cần Thơ'),
+              Text('• Trần Hưng Đạo, Phường An Phú, Quận Ninh Kiều, TP Cần Thơ'),
+              Text('• Đường Hùng Vương, Xã Tân Hưng, Huyện Hồng Dân, Bạc Liêu'),
               SizedBox(height: 16),
               Text(
-                '⚠️ Địa chỉ KHÔNG CHÍNH XÁC (tránh):',
-                style: TextStyle(
-                    fontWeight: FontWeight.bold, color: Colors.orange),
+                '❌ Format KHÔNG HỢP LỆ (tránh):',
+                style: TextStyle(fontWeight: FontWeight.bold, color: Colors.orange),
               ),
               SizedBox(height: 8),
               Text('• Gần chợ Ninh Kiều (quá mơ hồ)'),
               Text('• Đường 3/2 (thiếu phường/quận)'),
+              Text('• Cần Thơ (quá rộng)'),
               SizedBox(height: 16),
               Text(
-                '💡 Mẹo:',
-                style:
-                    TextStyle(fontWeight: FontWeight.bold, color: Colors.blue),
+                '💡 Mẹo quan trọng:',
+                style: TextStyle(fontWeight: FontWeight.bold, color: Colors.blue),
               ),
               SizedBox(height: 8),
-              Text(
-                  '• Dùng nút "Chọn địa chỉ nhanh" để chọn đúng theo cấp hành chính'),
-              Text(
-                  '• Hoặc dùng nút "Chọn trên bản đồ" để chọn trực tiếp vị trí'),
+              Text('1️⃣ Nhất định phải có: Đường + Phường/Xã + Quận/Huyện + Tỉnh'),
+              Text('2️⃣ Dùng nút "Chọn địa chỉ nhanh" để tránh lỗi'),
+              Text('3️⃣ Hoặc dùng "Chọn trên bản đồ" để xác định chính xác'),
+              Text('4️⃣ Nếu lỗi, thử xóa số nhà rồi thử lại'),
             ],
           ),
         ),
@@ -378,7 +490,7 @@ class _LocationFormState extends State<LocationForm> {
           isRequired: true,
         ),
 
-        // Địa chỉ đầy đủ với các nút action
+        // Địa chỉ đầy đủ
         Padding(
           padding: const EdgeInsets.symmetric(vertical: 8.0),
           child: Column(
@@ -392,8 +504,7 @@ class _LocationFormState extends State<LocationForm> {
                       context: context,
                       controller: widget.fullAddressController,
                       labelText: 'Địa chỉ đầy đủ',
-                      hintText:
-                          '123 Nguyễn Văn Cừ, An Khánh, Ninh Kiều, Cần Thơ',
+                      hintText: '123 Nguyễn Văn Cừ, Phường An Khánh, Quận Ninh Kiều, Cần Thơ',
                       prefixIcon: Icons.home_outlined,
                       isRequired: true,
                       maxLines: 3,
@@ -402,15 +513,14 @@ class _LocationFormState extends State<LocationForm> {
                   const SizedBox(width: 8),
                   Column(
                     children: [
-                      // Nút chọn địa chỉ từ form
+                      // Nút chọn địa chỉ
                       Container(
                         decoration: BoxDecoration(
                           color: Colors.blue[50],
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: IconButton(
-                          icon: const Icon(Icons.location_searching,
-                              color: Colors.blue, size: 28),
+                          icon: const Icon(Icons.location_searching, color: Colors.blue, size: 28),
                           tooltip: 'Chọn địa chỉ nhanh',
                           onPressed: _pickAddressManually,
                         ),
@@ -419,8 +529,7 @@ class _LocationFormState extends State<LocationForm> {
 
                       // Nút hướng dẫn
                       IconButton(
-                        icon: const Icon(Icons.help_outline,
-                            color: Colors.orange, size: 28),
+                        icon: const Icon(Icons.help_outline, color: Colors.orange, size: 28),
                         tooltip: 'Hướng dẫn',
                         onPressed: _showAddressGuide,
                       ),
@@ -429,69 +538,36 @@ class _LocationFormState extends State<LocationForm> {
                 ],
               ),
 
-              // Gợi ý nhập
               Padding(
                 padding: const EdgeInsets.only(top: 4, left: 12),
                 child: Text(
-                  'Nhập: Số nhà + Đường + Phường + Quận + Tỉnh',
+                  'Mẫu địa chỉ như sau : Đường + Phường/Xã + Quận/Huyện + Tỉnh',
                   style: TextStyle(fontSize: 12, color: Colors.grey[600]),
                 ),
               ),
 
-              // Loading indicator
               if (_isLoading)
                 const Padding(
                   padding: EdgeInsets.only(top: 12),
                   child: LinearProgressIndicator(),
                 ),
 
-              // Preview Map với thông tin chi tiết
+              // 🔥 Preview Map & Address Details
               if (_previewPosition != null && !_isLoading) ...[
                 const SizedBox(height: 12),
-                // Thông tin tọa độ
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Colors.green[50],
-                    border: Border.all(color: Colors.green[300]!),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Icon(Icons.check_circle,
-                              color: Colors.green[700], size: 20),
-                          const SizedBox(width: 8),
-                          const Text(
-                            'Đã xác định vị trí chính xác',
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              color: Colors.green,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        'Tọa độ: ${_previewPosition!.latitude.toStringAsFixed(6)}, ${_previewPosition!.longitude.toStringAsFixed(6)}',
-                        style: TextStyle(fontSize: 12, color: Colors.grey[700]),
-                      ),
-                      if (_geocodedAddressDisplay != null) ...[
-                        const SizedBox(height: 4),
-                        Text(
-                          'Địa chỉ: $_geocodedAddressDisplay',
-                          style:
-                              TextStyle(fontSize: 12, color: Colors.grey[700]),
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
+
+                // Status badge
+                _buildStatusBadge(),
+
+                // Chi tiết tọa độ
+                _buildCoordinateInfo(),
+
+                // Chi tiết địa chỉ từ Nominatim
+                if (_addressComponents != null && _addressComponents!.isNotEmpty)
+                  _buildAddressComponentsCard(),
+
                 const SizedBox(height: 8),
+
                 // Bản đồ preview
                 SizedBox(
                   height: 250,
@@ -502,8 +578,7 @@ class _LocationFormState extends State<LocationForm> {
                         target: _previewPosition!,
                         zoom: 17,
                       ),
-                      onMapCreated: (controller) =>
-                          _previewMapController = controller,
+                      onMapCreated: (controller) => _previewMapController = controller,
                       markers: _previewMarkers,
                       zoomControlsEnabled: true,
                       myLocationButtonEnabled: false,
@@ -517,6 +592,154 @@ class _LocationFormState extends State<LocationForm> {
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildStatusBadge() {
+    final status = _geocodingStatus;
+    final colors = {
+      'success': (Colors.green, Icons.check_circle),
+      'manual': (Colors.blue, Icons.edit_location),
+      'partial': (Colors.orange, Icons.warning),
+      'failed': (Colors.red, Icons.error),
+    };
+
+    final (bgColor, icon) = colors[status] ?? (Colors.grey, Icons.info);
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: bgColor.withOpacity(0.1),
+        border: Border.all(color: bgColor.withOpacity(0.5)),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, color: bgColor, size: 18),
+          const SizedBox(width: 8),
+          Text(
+            status == 'success' ? 'Vị trí đã xác định' :
+            status == 'manual' ? '📍 Vị trí chọn thủ công' :
+            status == 'partial' ? '⚠️ Vị trí gần đúng' :
+            '❌ Lỗi xác định vị trí',
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: bgColor,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCoordinateInfo() {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      margin: const EdgeInsets.only(top: 8),
+      decoration: BoxDecoration(
+        color: Colors.green[50],
+        border: Border.all(color: Colors.green[300]!),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.location_on, color: Colors.green[700], size: 18),
+              const SizedBox(width: 8),
+              const Text(
+                'Tọa độ WGS84',
+                style: TextStyle(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 13,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          RichText(
+            text: TextSpan(
+              style: const TextStyle(fontSize: 12, color: Colors.black87),
+              children: [
+                const TextSpan(
+                  text: 'Latitude: ',
+                  style: TextStyle(fontWeight: FontWeight.w600),
+                ),
+                TextSpan(text: '${_previewPosition!.latitude.toStringAsFixed(6)}'),
+                const TextSpan(text: '\n'),
+                const TextSpan(
+                  text: 'Longitude: ',
+                  style: TextStyle(fontWeight: FontWeight.w600),
+                ),
+                TextSpan(text: '${_previewPosition!.longitude.toStringAsFixed(6)}'),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAddressComponentsCard() {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      margin: const EdgeInsets.only(top: 8),
+      decoration: BoxDecoration(
+        color: Colors.blue[50],
+        border: Border.all(color: Colors.blue[300]!),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.info_outline, color: Colors.blue[700], size: 18),
+              const SizedBox(width: 8),
+              const Text(
+                'Chi tiết địa chỉ',
+                style: TextStyle(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 13,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          _buildComponentRow('Đường:', _addressComponents!['street']),
+          _buildComponentRow('Phường/Xã:', _addressComponents!['ward']),
+          _buildComponentRow('Quận/Huyện:', _addressComponents!['district']),
+          _buildComponentRow('Tỉnh/TP:', _addressComponents!['city']),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildComponentRow(String label, String? value) {
+    if (value == null || value.isEmpty) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 4),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 12),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              value,
+              style: const TextStyle(fontSize: 12),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -549,24 +772,17 @@ class _LocationFormState extends State<LocationForm> {
       decoration: InputDecoration(
         labelText: isRequired ? '$labelText *' : labelText,
         hintText: hintText,
-        prefixIcon: prefixIcon != null
-            ? Icon(
-                prefixIcon,
-                color: Colors.grey[600],
-              )
-            : null,
+        prefixIcon: prefixIcon != null ? Icon(prefixIcon, color: Colors.grey[600]) : null,
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(10.0)),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(10.0),
-          borderSide:
-              BorderSide(color: Theme.of(context).primaryColor, width: 1.5),
+          borderSide: BorderSide(color: Theme.of(context).primaryColor, width: 1.5),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(10.0),
           borderSide: BorderSide(color: Colors.grey[400]!, width: 1.0),
         ),
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       ),
       minLines: minLines,
       maxLines: maxLines,
@@ -610,21 +826,24 @@ class _AdvancedMapPickerState extends State<AdvancedMapPicker> {
     try {
       final uri = Uri.parse(
         'https://nominatim.openstreetmap.org/reverse'
-        '?format=json'
-        '&lat=${latLng.latitude}'
-        '&lon=${latLng.longitude}'
-        '&zoom=18'
-        '&addressdetails=1'
-        '&accept-language=vi',
+            '?format=json'
+            '&lat=${latLng.latitude}'
+            '&lon=${latLng.longitude}'
+            '&zoom=18'
+            '&addressdetails=1'
+            '&accept-language=vi',
       );
 
       final response = await http.get(
         uri,
-        headers: {'User-Agent': 'RentalHouseApp/1.0'},
+        headers: {
+          'User-Agent': 'RentalHouseApp/1.0 (+https://rentalhouse.app)',
+          'Accept-Language': 'vi-VN,vi;q=0.9',
+        },
       ).timeout(const Duration(seconds: 10));
 
       if (response.statusCode == 200) {
-        final data = json.decode(response.body);
+        final data = jsonDecode(response.body);
         if (data['display_name'] != null) {
           setState(() {
             _selectedAddress = data['display_name'];
@@ -636,7 +855,7 @@ class _AdvancedMapPickerState extends State<AdvancedMapPicker> {
 
       setState(() {
         _selectedAddress =
-            'Lat: ${latLng.latitude.toStringAsFixed(6)}, Lon: ${latLng.longitude.toStringAsFixed(6)}';
+        'Lat: ${latLng.latitude.toStringAsFixed(6)}, Lon: ${latLng.longitude.toStringAsFixed(6)}';
         _isLoading = false;
       });
     } catch (e) {
@@ -657,15 +876,14 @@ class _AdvancedMapPickerState extends State<AdvancedMapPicker> {
             onPressed: _isLoading
                 ? null
                 : () {
-                    Navigator.pop(context, {
-                      'address': _selectedAddress,
-                      'latitude': _selectedLocation.latitude,
-                      'longitude': _selectedLocation.longitude,
-                    });
-                  },
+              Navigator.pop(context, {
+                'address': _selectedAddress,
+                'latitude': _selectedLocation.latitude,
+                'longitude': _selectedLocation.longitude,
+              });
+            },
             icon: const Icon(Icons.check, color: Colors.white),
-            label:
-                const Text('Xác nhận', style: TextStyle(color: Colors.white)),
+            label: const Text('Xác nhận', style: TextStyle(color: Colors.white)),
           ),
         ],
       ),
@@ -697,7 +915,6 @@ class _AdvancedMapPickerState extends State<AdvancedMapPicker> {
             zoomControlsEnabled: true,
           ),
 
-          // Thông tin địa chỉ
           Positioned(
             bottom: 16,
             left: 16,
@@ -712,14 +929,10 @@ class _AdvancedMapPickerState extends State<AdvancedMapPicker> {
                   children: [
                     Row(
                       children: [
-                        Icon(Icons.location_on,
-                            color: Theme.of(context).primaryColor),
+                        Icon(Icons.location_on, color: Theme.of(context).primaryColor),
                         const SizedBox(width: 8),
-                        const Text(
-                          'Địa chỉ đã chọn',
-                          style: TextStyle(
-                              fontWeight: FontWeight.bold, fontSize: 16),
-                        ),
+                        const Text('Địa chỉ đã chọn',
+                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                       ],
                     ),
                     const SizedBox(height: 8),
@@ -727,9 +940,7 @@ class _AdvancedMapPickerState extends State<AdvancedMapPicker> {
                       const LinearProgressIndicator()
                     else
                       Text(
-                        _selectedAddress.isEmpty
-                            ? 'Nhấn vào bản đồ để chọn'
-                            : _selectedAddress,
+                        _selectedAddress.isEmpty ? 'Nhấn vào bản đồ để chọn' : _selectedAddress,
                         style: const TextStyle(fontSize: 14),
                       ),
                     const SizedBox(height: 8),

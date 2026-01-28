@@ -7,21 +7,13 @@ from datetime import datetime
 from sklearn.metrics.pairwise import cosine_similarity
 from sklearn.preprocessing import StandardScaler, LabelEncoder
 from scipy.sparse import csr_matrix
-from collections import defaultdict
 from math import radians, sin, cos, sqrt, atan2
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 class RecommendationModel:
-    _instance = None
-
-    @classmethod
-    def get_instance(cls):
-        """Singleton pattern - load model 1 lần"""
-        if cls._instance is None:
-            cls._instance = cls.load('./models/recommendation_model.pkl')
-        return cls._instance
-
+    """🎯 Improved Recommendation Engine with Hybrid Approach"""
+    
     def __init__(self):
         self.user_item_matrix = None
         self.user_similarity = None
@@ -31,19 +23,20 @@ class RecommendationModel:
         self.user_encoder = LabelEncoder()
         self.item_encoder = LabelEncoder()
         self.scaler = StandardScaler()
-
-        # Store rental coordinates
-        self.rental_coordinates = {}  # {rental_id: (longitude, latitude)}
-        self.user_locations = {}      # {user_id: (longitude, latitude)}
-
-        self.rental_owners = {}  # {rental_id: user_id}
-
-        # Popularity scores
+        
+        # Geographic data
+        self.rental_coordinates = {}
+        self.user_locations = {}
+        self.rental_owners = {}
+        
+        # Popularity & interaction data
         self.popularity_scores = {}
-
-        # Store interactions for preference calculation
         self.interactions_df = None
-
+        
+        # 🔥 FIX: Initialize matrix_sparsity & matrix_density
+        self.matrix_sparsity = 0.0  # Default value
+        self.matrix_density = 0.0   # Default value
+        
         print("✅ RecommendationModel initialized")
     
     def prepare_data(self, interactions_df, rentals_df):
@@ -65,20 +58,20 @@ class RecommendationModel:
         
         # Store rental coordinates
         print("\n   📍 Loading rental coordinates...")
-        for idx, row in rentals_df.iterrows():
+        for _, row in rentals_df.iterrows():
             rental_id = str(row['_id'])
             lon = float(row.get('longitude', 0))
             lat = float(row.get('latitude', 0))
             self.rental_coordinates[rental_id] = (lon, lat)
             
-            # 🔥 NEW: Store rental ownership
+            # Store rental ownership
             if 'userId' in row and pd.notna(row['userId']):
                 self.rental_owners[rental_id] = str(row['userId'])
         
         print(f"      Stored {len(self.rental_coordinates)} rental coordinates")
-        print(f"      🔥 Stored {len(self.rental_owners)} rental ownerships")
+        print(f"      Stored {len(self.rental_owners)} rental ownerships")
         
-        # Calculate user location centroids from interactions
+        # Calculate user location centroids
         print("   👥 Calculating user location centroids...")
         self._calculate_user_locations(valid_interactions)
         
@@ -86,15 +79,17 @@ class RecommendationModel:
         valid_interactions['user_idx'] = self.user_encoder.fit_transform(valid_interactions['userId'])
         valid_interactions['item_idx'] = self.item_encoder.fit_transform(valid_interactions['rentalId'])
         
+        print(f"   Encoded {len(self.user_encoder.classes_)} users")
+        print(f"   Encoded {len(self.item_encoder.classes_)} items")
+        
         return valid_interactions, rentals_df
     
     def _calculate_user_locations(self, interactions_df):
-        """Tính toán vị trí trung bình của user từ interactions"""
+        """Tính vị trí centroid của mỗi user"""
         try:
             for user_id in interactions_df['userId'].unique():
                 user_interactions = interactions_df[interactions_df['userId'] == user_id]
                 
-                # Lấy tất cả tọa độ mà user đã tương tác
                 valid_coords = []
                 for _, row in user_interactions.iterrows():
                     rental_id = str(row['rentalId'])
@@ -103,7 +98,6 @@ class RecommendationModel:
                         if coords[0] != 0 and coords[1] != 0:
                             valid_coords.append(coords)
                 
-                # Tính trung bình
                 if valid_coords:
                     avg_lon = np.mean([c[0] for c in valid_coords])
                     avg_lat = np.mean([c[1] for c in valid_coords])
@@ -116,35 +110,43 @@ class RecommendationModel:
     
 
     def build_user_item_matrix(self, interactions_df):
-        """Xây dựng User-Item Interaction Matrix"""
+        """
+        🔨 BUILD USER-ITEM MATRIX
+        Phải initialize matrix_sparsity ở đây
+        """
         print("\n🔨 Building User-Item Matrix...")
         
-        # Aggregate interactions by user-item pairs
-        interaction_scores = interactions_df.groupby(['user_idx', 'item_idx'])['interactionScore'].sum().reset_index()
-        
+        # Get dimensions from encoder
         n_users = len(self.user_encoder.classes_)
         n_items = len(self.item_encoder.classes_)
         
         print(f"   Matrix size: {n_users} users × {n_items} items")
         
+        # Aggregate interactions
+        interaction_scores = interactions_df.groupby(['user_idx', 'item_idx'])['interactionScore'].sum().reset_index()
+        
         # Create sparse matrix
         self.user_item_matrix = csr_matrix(
             (interaction_scores['interactionScore'], 
-             (interaction_scores['user_idx'], interaction_scores['item_idx'])),
+            (interaction_scores['user_idx'], interaction_scores['item_idx'])),
             shape=(n_users, n_items)
         )
         
-        # 🔥 FIX: Calculate sparsity correctly
-        total_cells = n_users * n_items
+        # 🔥 FIX: Calculate and store sparsity
         non_zero_cells = self.user_item_matrix.nnz
+        total_cells = n_users * n_items
         
-        # Sparsity = % of zero cells
-        sparsity = 100 * (1 - non_zero_cells / max(total_cells, 1))
+        # Correct sparsity calculation
+        self.matrix_sparsity = 100 * (1 - non_zero_cells / max(total_cells, 1))
+        self.matrix_density = 100 - self.matrix_sparsity
         
-        print(f"   Non-zero cells: {non_zero_cells:,}")
-        print(f"   Total cells: {total_cells:,}")
-        print(f"   Sparsity: {sparsity:.2f}%")
-        print(f"   Density: {100 - sparsity:.2f}%")
+        print(f"\n   📊 SPARSITY ANALYSIS:")
+        print(f"      Total cells: {total_cells:,}")
+        print(f"      Non-zero cells: {non_zero_cells:,}")
+        print(f"      ✅ Sparsity: {self.matrix_sparsity:.2f}%")
+        print(f"      ✅ Density: {self.matrix_density:.2f}%")
+        print(f"\n      Status: {'🔴 VERY SPARSE' if self.matrix_sparsity > 95 else '🟡 SPARSE' if self.matrix_sparsity > 85 else '🟢 ACCEPTABLE'}")
+        print()
     
     def compute_user_similarity(self):
         """Tính User-User Similarity (Collaborative Filtering)"""
@@ -259,60 +261,44 @@ class RecommendationModel:
         print("🚀 STARTING MODEL TRAINING WITH GEOGRAPHIC FEATURES")
         print("="*70)
         
-        # 1. Data validation - 🔥 CRITICAL
+        # 1. Data validation
         print("\n📊 DATA VALIDATION:")
         print(f"   Total interactions: {len(interactions_df)}")
         print(f"   Unique users: {interactions_df['userId'].nunique()}")
         print(f"   Unique rentals: {interactions_df['rentalId'].nunique()}")
         
-        min_users = 5
-        min_interactions = 20
-        min_rentals = 10
-        
-        if interactions_df['userId'].nunique() < min_users:
-            print(f"\n⚠️ WARNING: Too few users ({interactions_df['userId'].nunique()} < {min_users})")
-            print("   Model may not provide good personalization")
-            response = input("Continue anyway? (y/n): ")
-            if response.lower() != 'y':
-                print("Training cancelled.")
-                return
-        
-        if len(interactions_df) < min_interactions:
-            print(f"\n⚠️ WARNING: Few interactions ({len(interactions_df)} < {min_interactions})")
-            print("   Consider collecting more data, but continuing for development...")
-        
-        if interactions_df['rentalId'].nunique() < min_rentals:
-            print(f"\n⚠️ WARNING: Few rentals ({interactions_df['rentalId'].nunique()} < {min_rentals})")
-            print("   Content-based filtering may have limited effectiveness")
-        
-        # 2. Prepare data
+        # 2. Prepare data (encode users/items)
+        print("\n📊 Preparing data...")
         interactions_df, rentals_df = self.prepare_data(interactions_df, rentals_df)
         
-        # 3. Build matrices
+        # 🔥 CRITICAL: Phải call build_user_item_matrix()
+        print("\n🔨 Building matrices...")
         self.build_user_item_matrix(interactions_df)
         
-        # 4. 🔥 IMPROVED: Compute similarities with better normalization
-        print("\n🧮 Computing Similarities...")
+        # 3. Compute similarities
+        print("\n🧮 Computing similarities...")
         self.compute_user_similarity()
         self.compute_item_similarity()
         
-        # 5. Compute popularity
+        # 4. Compute popularity
+        print("\n⭐ Computing popularity scores...")
         self.compute_popularity_scores(interactions_df)
         
-        # 6. 🔥 NEW: Extract item features for personalization
+        # 5. Extract item features
         print("\n📋 Extracting item features...")
         self.item_features = {}
         
         for idx, row in rentals_df.iterrows():
             try:
                 rental_id = str(row['_id'])
-                
                 self.item_features[rental_id] = {
                     'price': float(row['price']) if pd.notna(row['price']) else 0,
                     'propertyType': str(row['propertyType']) if pd.notna(row['propertyType']) else 'unknown',
                     'location_text': str(row.get('location_short', 'unknown')) if 'location_short' in row and pd.notna(row.get('location_short')) else 'unknown',
-                    'area': float(row.get('area_total', 0)) if 'area_total' in row and pd.notna(row.get('area_total')) else 0,
-                    'amenities': row.get('amenities', []) if 'amenities' in row and isinstance(row.get('amenities'), list) else [],
+                    'area_total': float(row.get('area_total', 0)) if 'area_total' in row and pd.notna(row.get('area_total')) else 0,
+                    'amenities_count': int(row.get('amenities_count', 0)) if 'amenities_count' in row else 0,
+                    'longitude': float(row.get('longitude', 0)) if 'longitude' in row else 0,
+                    'latitude': float(row.get('latitude', 0)) if 'latitude' in row else 0,
                 }
             except Exception as e:
                 print(f"      ⚠️ Error extracting features for rental {idx}: {e}")
@@ -326,204 +312,619 @@ class RecommendationModel:
         
         # Summary
         print("📊 MODEL SUMMARY:")
-        print(f"   Users: {len(self.user_encoder.classes_)}")
-        print(f"   Items: {len(self.item_encoder.classes_)}")
-        print(f"   User-Item interactions: {self.user_item_matrix.nnz}")
-        
-        # 🔥 FIX: Correct sparsity calculation
-        total_cells = len(self.user_encoder.classes_) * len(self.item_encoder.classes_)
-        sparsity = 100 * (1 - self.user_item_matrix.nnz / max(total_cells, 1))
-        print(f"   Sparsity: {sparsity:.2f}%")
-        print(f"   Density: {100 - sparsity:.2f}%")
-        
-        print(f"   Rental coordinates: {len(self.rental_coordinates)}")
-        print(f"   User locations: {len(self.user_locations)}")
-        print(f"   Item features: {len(self.item_features)}")
-        
-        # 🔥 NEW: Recommendations for improvement
-        print("\n💡 RECOMMENDATIONS:")
-        if len(interactions_df) < 50:
-            print("   • Collect more user interactions (views, favorites, contacts)")
-        if interactions_df['userId'].nunique() < 10:
-            print("   • Encourage more users to interact with rentals")
-        if interactions_df['rentalId'].nunique() < 20:
-            print("   • Add more rental listings")
-        if sparsity > 99:
-            print("   • Very sparse matrix - diversity is good but more interactions needed")
-        
+        print(f"   👥 Users: {len(self.user_encoder.classes_)}")
+        print(f"   🏠 Items: {len(self.item_encoder.classes_)}")
+        print(f"   📊 Interactions: {self.user_item_matrix.nnz}")
+        print(f"   📉 Sparsity: {self.matrix_sparsity:.2f}%")
+        print(f"   📍 Rental coordinates: {len(self.rental_coordinates)}")
+        print(f"   👤 User locations: {len(self.user_locations)}")
+        print(f"   🏢 Item features: {len(self.item_features)}")
         print()
 
 
-
-    
     def recommend_for_user(self, user_id, n_recommendations=10, exclude_items=None, 
-                          use_location=True, radius_km=20, context=None):
+                        use_location=True, radius_km=20, context=None):
         """
-        🎯 Improved personalized recommendation - 🔥 BETTER ALGORITHM
+        🎯 IMPROVED HYBRID RECOMMENDATION ENGINE
+        
+        **Major Improvements:**
+        1. ✅ Adaptive weights based on data sparsity
+        2. ✅ Proper confidence calculation (0.3-0.95 range)
+        3. ✅ Enhanced content-based scoring
+        4. ✅ Better price matching logic
+        5. ✅ Exclude user's own rentals automatically
+        6. ✅ Detailed scoring breakdown for explainability
         """
+        
         context = context or {}
+        exclude_items = set(exclude_items or [])
+        
+        # Get user data
         user_location = self.user_locations.get(user_id)
-        
-        # Check if user exists
-        if user_id not in self.user_encoder.classes_:
-            print(f"⚠️ New user {user_id}, using popularity-based recommendations")
-            return self.get_popular_items(n_recommendations, exclude_items)
-        
-        user_idx = self.user_encoder.transform([user_id])[0]
         user_prefs = self.get_user_preferences(user_id)
         
-        # 🔥 NEW: Get user's own rentals from interactions to exclude
-        user_own_rentals = set()
-        if self.rental_owners:
-            user_own_rentals = {
-                rental_id for rental_id, owner_id in self.rental_owners.items()
-                if owner_id == user_id
+        # Exclude user's own rentals
+        user_own_rentals = {
+            rental_id for rental_id, owner_id in self.rental_owners.items()
+            if owner_id == user_id
+        }
+        exclude_items.update(user_own_rentals)
+        
+        # Determine adaptive weights
+        matrix_sparsity = getattr(self, 'matrix_sparsity', 0.0)
+        total_interactions = user_prefs.get('total_interactions', 0) if user_prefs else 0
+        
+        if matrix_sparsity > 60:
+            weights = {
+                'popularity': 0.30,
+                'content': 0.50,
+                'cf': 0.20
             }
-                
-            if user_own_rentals:
-                print(f"   🚫 Found {len(user_own_rentals)} own rentals for user {user_id}")
-            
-        # 🔥 FIX: Combine với exclude_items
-        if exclude_items:
-            exclude_items = set(exclude_items) | user_own_rentals
+            strategy = 'content-focused'
+            print(f"   ⚠️ High sparsity ({matrix_sparsity:.1f}%) → Using content-focused weights")
+        elif total_interactions >= 30:
+            weights = {
+                'popularity': 0.20,
+                'content': 0.35,
+                'cf': 0.45
+            }
+            strategy = 'cf-focused'
+            print(f"   👤 Experienced user ({total_interactions} interactions) → Using CF-focused weights")
         else:
-            exclude_items = user_own_rentals
+            weights = {
+                'popularity': 0.25,
+                'content': 0.40,
+                'cf': 0.35
+            }
+            strategy = 'balanced'
         
-        print(f"   🚫 Total excluded items: {len(exclude_items) if exclude_items else 0}")
+        print(f"\n🎯 RECOMMEND (Hybrid {strategy.upper()})")
+        print(f"   User: {user_id}")
+        print(f"   Weights: Pop={weights['popularity']:.0%}, Content={weights['content']:.0%}, CF={weights['cf']:.0%}")
+        print(f"   Data: {len(self.user_encoder.classes_)} users, {len(self.item_encoder.classes_)} rentals")
+        print(f"   Matrix sparsity: {matrix_sparsity:.1f}%")
+        print(f"   Excluding: {len(exclude_items)} items (own rentals + seen)")
         
-        # Get similar users - 🔥 IMPROVED
-        user_similarities = self.user_similarity[user_idx].toarray().flatten()
-        similar_users_idx = np.argsort(user_similarities)[::-1][1:min(101, len(user_similarities))]
+        # Score all candidates
+        candidate_scores = {}
         
-        # Filter by minimum similarity
-        min_similarity_threshold = 0.1
-        valid_similar_users = [idx for idx in similar_users_idx if user_similarities[idx] > min_similarity_threshold]
+        user_exists = user_id in self.user_encoder.classes_
+        if user_exists:
+            user_idx = self.user_encoder.transform([user_id])[0]
         
-        print(f"   Found {len(valid_similar_users)} similar users (threshold: {min_similarity_threshold})")
-        
-        # Get items from similar users
-        candidate_scores = defaultdict(float)
-        candidate_metadata = defaultdict(lambda: {'reasons': [], 'scores': {}})
-        
-        for similar_user_idx in valid_similar_users[:50]:
-            similarity_score = user_similarities[similar_user_idx]
-            user_items = self.user_item_matrix[similar_user_idx].toarray().flatten()
+        for item_idx, rental_id in enumerate(self.item_encoder.classes_):
+            rental_id = str(rental_id)
             
-            for item_idx, interaction_score in enumerate(user_items):
-                if interaction_score > 0:
-                    rental_id = self.item_encoder.inverse_transform([item_idx])[0]
-                    
-                    # 🔥 CRITICAL: Skip if user already interacted OR if it's their own rental
-                    if self.user_item_matrix[user_idx, item_idx] > 0:
-                        continue
-                    
-                    if exclude_items and rental_id in exclude_items:
-                        continue
-                    
-                    # Calculate weighted score
-                    weighted_score = similarity_score * interaction_score
-                    candidate_scores[item_idx] += weighted_score
-                    candidate_metadata[item_idx]['reasons'].append(f"Similar user interaction ({interaction_score:.1f})")
-                    candidate_metadata[item_idx]['scores']['collaborative'] = weighted_score
-        
-        # 🔥 ADD: Content-based filtering
-        user_item_vector = self.user_item_matrix[user_idx].toarray().flatten()
-        
-        if user_item_vector.sum() > 0:
-            item_similarities = cosine_similarity([user_item_vector], self.item_similarity)[0]
-            
-            for item_idx, sim_score in enumerate(item_similarities):
-                if sim_score > 0.2 and self.user_item_matrix[user_idx, item_idx] == 0:
-                    rental_id = self.item_encoder.inverse_transform([item_idx])[0]
-                    
-                    # 🔥 CRITICAL: Skip own rentals
-                    if exclude_items and rental_id in exclude_items:
-                        continue
-                    
-                    weighted_sim = sim_score * 0.5
-                    candidate_scores[item_idx] += weighted_sim
-                    candidate_metadata[item_idx]['reasons'].append(f"Similar to liked items ({sim_score:.2f})")
-        
-        # Sort by score
-        sorted_items = sorted(candidate_scores.items(), key=lambda x: x[1], reverse=True)
-        
-        recommendations = []
-        for item_idx, score in sorted_items:
-            rental_id = self.item_encoder.inverse_transform([item_idx])[0]
-            
-            # 🔥 DOUBLE CHECK: Skip excluded items
-            if exclude_items and rental_id in exclude_items:
+            if rental_id in exclude_items or rental_id in context.get('impressions', []):
                 continue
             
-            if context.get('impressions') and rental_id in context.get('impressions'):
+            if user_exists and self.user_item_matrix[user_idx, item_idx] > 0:
                 continue
             
-            # LOCATION BONUS
+            # Calculate scores
+            popularity_score = self.popularity_scores.get(rental_id, 0) / 100
+            content_score = self._calculate_content_score(rental_id, user_prefs)
+            
+            cf_score = 0
+            if user_exists and len(self.user_encoder.classes_) >= 5:
+                try:
+                    cf_score = self._calculate_cf_score(user_idx, item_idx)
+                except Exception:
+                    cf_score = 0
+            
+            # Hybrid base score
+            hybrid_score = (
+                popularity_score * weights['popularity'] +
+                content_score * weights['content'] +
+                cf_score * weights['cf']
+            )
+            
+            # Location bonus
             location_bonus = 1.0
-            distance = None
-            
+            distance_km = None
             if use_location and user_location and rental_id in self.rental_coordinates:
-                rental_coords = self.rental_coordinates[rental_id]
-                
-                if rental_coords[0] != 0 and rental_coords[1] != 0:
-                    distance = self._haversine_distance(
-                        user_location[0], user_location[1],
-                        rental_coords[0], rental_coords[1]
-                    )
-                    
-                    if distance <= radius_km:
-                        location_bonus = 1.0 + (1.0 - (distance / radius_km)) ** 2
-                    else:
-                        location_bonus = 0.3
+                location_bonus, distance_km = self._calculate_location_bonus(
+                    self.rental_coordinates[rental_id],
+                    user_location,
+                    radius_km
+                )
             
-            # PREFERENCE MATCHING
-            preference_bonus = 1.0
+            # Other bonuses
+            preference_bonus = self._calculate_preference_bonus(rental_id, user_prefs)
+            time_bonus = self._calculate_time_bonus(user_id, context)
             
-            if user_prefs:
-                if 'price_range' in user_prefs:
-                    price_min = user_prefs['price_range'].get('min', 0)
-                    price_max = user_prefs['price_range'].get('max', float('inf'))
-                    avg_price = user_prefs['price_range'].get('avg', 0)
-                    
-                    if str(rental_id) in self.item_features:
-                        rental_price = self.item_features[str(rental_id)].get('price', 0)
-                        
-                        if price_min <= rental_price <= price_max:
-                            price_diff = abs(rental_price - avg_price)
-                            max_diff = max(avg_price - price_min, price_max - avg_price)
-                            price_match = 1.0 - (price_diff / max_diff) if max_diff > 0 else 1.0
-                            preference_bonus *= (0.9 + 0.2 * price_match)
+            # Final score
+            final_score = hybrid_score * location_bonus * preference_bonus * time_bonus
             
-            # TIME BONUS
-            time_bonus = 1.0
-            time_of_day = context.get('time_of_day', 'morning')
+            # Calculate confidence
+            confidence = self._calculate_confidence(
+                content_score=content_score,
+                cf_score=cf_score,
+                popularity_score=popularity_score,
+                user_prefs=user_prefs,
+                location_bonus=location_bonus,
+                total_interactions=total_interactions
+            )
             
-            if user_prefs and user_prefs.get('total_interactions', 0) > 10:
-                time_bonus = 1.05
+            candidate_scores[rental_id] = {
+                'final_score': final_score,
+                'hybrid_score': hybrid_score,
+                'popularity': popularity_score,
+                'content_score': content_score,
+                'cf_score': cf_score,
+                'location_bonus': location_bonus,
+                'preference_bonus': preference_bonus,
+                'time_bonus': time_bonus,
+                'distance_km': distance_km,
+                'confidence': confidence,
+                'weights': weights,
+                'strategy': strategy
+            }
+        
+        # Sort and select top N
+        sorted_items = sorted(
+            candidate_scores.items(),
+            key=lambda x: x[1]['final_score'],
+            reverse=True
+        )
+        
+        # Build recommendations
+        recommendations = []
+        
+        for rental_id, scores in sorted_items[:n_recommendations]:
+            coords = self.rental_coordinates.get(rental_id, (0, 0))
             
-            # Calculate final score
-            final_score = score * location_bonus * preference_bonus * time_bonus
-            
-            recommendations.append({
+            recommendation = {
                 'rentalId': rental_id,
-                'score': float(score),
-                'locationBonus': float(location_bonus),
-                'preferenceBonus': float(preference_bonus),
-                'timeBonus': float(time_bonus),
-                'finalScore': float(final_score),
-                'method': 'collaborative_personalized',
-                'coordinates': self.rental_coordinates.get(rental_id, (0, 0)),
-                'distance_km': distance,
-                'confidence': min(1.0, float(score / 10.0)) if score > 0 else 0.5,
-            })
+                'score': float(scores['hybrid_score']),
+                'popularityScore': float(scores['popularity']),
+                'contentScore': float(scores['content_score']),
+                'cfScore': float(scores['cf_score']),
+                'locationBonus': float(scores['location_bonus']),
+                'preferenceBonus': float(scores['preference_bonus']),
+                'timeBonus': float(scores['time_bonus']),
+                'finalScore': float(scores['final_score']),
+                'confidence': float(scores['confidence']),
+                'method': f'hybrid_{strategy}',
+                'weights': scores['weights'],
+                'coordinates': coords,
+                'distance_km': float(scores['distance_km']) if scores['distance_km'] else None,
+                'scoreBreakdown': {
+                    'popularity': {
+                        'score': float(scores['popularity']),
+                        'weight': float(weights['popularity']),
+                        'contribution': float(scores['popularity'] * weights['popularity'])
+                    },
+                    'content': {
+                        'score': float(scores['content_score']),
+                        'weight': float(weights['content']),
+                        'contribution': float(scores['content_score'] * weights['content'])
+                    },
+                    'collaborative': {
+                        'score': float(scores['cf_score']),
+                        'weight': float(weights['cf']),
+                        'contribution': float(scores['cf_score'] * weights['cf'])
+                    }
+                }
+            }
             
-            if len(recommendations) >= n_recommendations * 2:
-                break
+            recommendations.append(recommendation)
         
-        # Sort by final score
-        recommendations.sort(key=lambda x: x['finalScore'], reverse=True)
+        # Log summary
+        print(f"   ✅ Generated {len(recommendations)} recommendations")
         
-        return recommendations[:n_recommendations]
+        if recommendations:
+            top = recommendations[0]
+            print(f"   🥇 Top recommendation:")
+            print(f"      rentalId: {top['rentalId'][:16]}...")
+            print(f"      finalScore: {top['finalScore']:.2f}")
+            print(f"      confidence: {top['confidence']:.2f} ({int(top['confidence']*100)}%)")
+            print(f"      breakdown: Pop={top['scoreBreakdown']['popularity']['contribution']:.2f}, "
+                  f"Content={top['scoreBreakdown']['content']['contribution']:.2f}, "
+                  f"CF={top['scoreBreakdown']['collaborative']['contribution']:.2f}")
+            
+            if top['distance_km']:
+                print(f"      distance: {top['distance_km']:.2f}km")
+        
+        return recommendations
+
+# ================================ CẬP NHẬT HELPER MỚI 
+
+    def _calculate_confidence(self, content_score, cf_score, popularity_score, 
+                                user_prefs, location_bonus, total_interactions):
+            """
+            🎯 Calculate REALISTIC confidence score (0.3-0.95)
+            
+            Factors:
+            1. Content match quality (40%)
+            2. CF data availability (30%)
+            3. User experience level (20%)
+            4. Location accuracy (10%)
+            """
+            
+            # Base confidence from content score (40%)
+            base_confidence = content_score * 0.40
+            
+            # CF contribution (30%)
+            if cf_score > 0:
+                cf_confidence = cf_score * 0.30
+            else:
+                cf_confidence = 0.05
+            
+            # User experience bonus (20%)
+            experience_factor = min(1.0, total_interactions / 50.0)
+            experience_confidence = experience_factor * 0.20
+            
+            # Location accuracy bonus (10%)
+            location_confidence = 0
+            if location_bonus > 1.0:
+                location_factor = min(1.0, (location_bonus - 1.0) / 0.5)
+                location_confidence = location_factor * 0.10
+            elif location_bonus < 1.0:
+                location_confidence = (location_bonus - 0.5) * 0.10
+            
+            # Combine
+            raw_confidence = (
+                base_confidence +
+                cf_confidence +
+                experience_confidence +
+                location_confidence
+            )
+            
+            # Apply realistic bounds (0.3 - 0.95)
+            confidence = max(0.30, min(0.95, raw_confidence))
+            
+            # Adjust for sparse matrix
+            matrix_sparsity = getattr(self, 'matrix_sparsity', 0.0)
+            if matrix_sparsity > 70:
+                confidence *= 0.90
+                confidence = max(0.30, confidence)
+            
+            return float(confidence)
+
+    def _calculate_content_score(self, rental_id, user_prefs):
+        """
+        📊 IMPROVED CONTENT-BASED SCORING
+        
+        Adjusted weights: Price 40%, Type 35%, Location 25%
+        """
+        
+        if not user_prefs:
+            return 0.60
+        
+        rental = self.item_features.get(rental_id, {})
+        if not rental:
+            return 0.40
+        
+        # Calculate component scores
+        price_score = self._price_match_score(
+            rental.get('price', 0),
+            user_prefs.get('price_range', {})
+        )
+        
+        type_score = self._property_type_match_score(
+            rental.get('propertyType', ''),
+            user_prefs.get('property_type_distribution', {})
+        )
+        
+        location_score = self._location_diversity_score(
+            rental.get('longitude', 0),
+            rental.get('latitude', 0),
+            user_prefs.get('user_centroid_longitude', 0),
+            user_prefs.get('user_centroid_latitude', 0)
+        )
+        
+        # Combine with adjusted weights
+        content_score = (
+            price_score * 0.40 +
+            type_score * 0.35 +
+            location_score * 0.25
+        )
+        
+        # Engagement bonus for experienced users
+        total_interactions = user_prefs.get('total_interactions', 0)
+        if total_interactions >= 30:
+            content_score = min(1.0, content_score * 1.05)
+        
+        return min(1.0, max(0.0, content_score))
+
+    def _price_match_score(self, rental_price, price_range):
+        """
+        💰 IMPROVED Price matching with clear penalty/bonus structure
+        
+        Logic:
+        - Within range + near median → 0.90-0.95 (excellent)
+        - Within range → 0.70-0.90 (good)
+        - Cheaper than min → 0.70-0.95 (good to excellent)
+        - More expensive → 0.15-0.60 (bad to acceptable)
+        """
+        
+        if not price_range or rental_price == 0:
+            return 0.50
+        
+        min_p = price_range.get('min', 0)
+        max_p = price_range.get('max', float('inf'))
+        avg_p = price_range.get('avg', 0)
+        median_p = price_range.get('median', avg_p)
+        
+        if avg_p == 0:
+            return 0.50
+        
+        # CASE 1: Within range
+        if min_p <= rental_price <= max_p:
+            # Very close to median (within 10%)
+            if abs(rental_price - median_p) < median_p * 0.10:
+                return 0.95
+            
+            # Close to average
+            diff_from_avg = abs(rental_price - avg_p)
+            max_diff = max(avg_p - min_p, max_p - avg_p, 1)
+            score = 0.90 - (diff_from_avg / max_diff) * 0.20
+            return max(0.70, score)
+        
+        # CASE 2: Cheaper (good!)
+        elif rental_price < min_p:
+            discount_percent = (min_p - rental_price) / min_p
+            
+            if discount_percent <= 0.10:
+                return 0.85
+            elif discount_percent <= 0.20:
+                return 0.90
+            elif discount_percent <= 0.30:
+                return 0.95
+            else:
+                return 0.70
+        
+        # CASE 3: More expensive (penalty)
+        else:
+            overprice_percent = (rental_price - max_p) / max_p
+            
+            if overprice_percent <= 0.10:
+                return 0.60
+            elif overprice_percent <= 0.20:
+                return 0.45
+            elif overprice_percent <= 0.30:
+                return 0.30
+            else:
+                return 0.15
+
+    def _property_type_match_score(self, rental_type, type_distribution):
+        """
+        🏠 Property type preference matching
+        
+        Logic:
+        - Top preference (≥60%) → 0.95
+        - Strong preference (≥30%) → 0.75
+        - Medium preference (≥10%) → 0.55
+        - Low/no preference → 0.35
+        """
+        
+        if not type_distribution or not rental_type:
+            return 0.50
+        
+        total = sum(type_distribution.values())
+        if total == 0:
+            return 0.50
+        
+        percentage = type_distribution.get(rental_type, 0) / total
+        
+        if percentage >= 0.60:
+            return 0.95
+        elif percentage >= 0.30:
+            return 0.75
+        elif percentage >= 0.10:
+            return 0.55
+        else:
+            return 0.35
+
+
+    def _location_diversity_score(self, rental_lon, rental_lat, user_lon, user_lat):
+        """
+        🌍 Location diversity scoring
+        
+        Strategy: Encourage exploration while respecting familiarity
+        - Very close (0-0.5km) → 0.60
+        - Nearby (0.5-2km) → 0.90 (sweet spot)
+        - Medium (2-5km) → 0.85
+        - Far (5-10km) → 0.70
+        - Very far (>10km) → 0.50
+        """
+        
+        if rental_lon == 0 or rental_lat == 0:
+            return 0.60
+        
+        if user_lon == 0 or user_lat == 0:
+            return 0.70
+        
+        dist = self._haversine_distance(user_lon, user_lat, rental_lon, rental_lat)
+        
+        if dist <= 0.5:
+            return 0.60
+        elif dist <= 2:
+            return 0.90
+        elif dist <= 5:
+            return 0.85
+        elif dist <= 10:
+            return 0.70
+        else:
+            return 0.50
+
+
+    def _amenity_match_score(self, amenities_count, avg_amenities):
+        """🏢 Amenities richness"""
+        if amenities_count == 0:
+            return 0.4
+        elif amenities_count <= 3:
+            return 0.7
+        elif amenities_count <= 6:
+            return 0.9
+        else:
+            return 1.0
+    
+    def _calculate_location_bonus(self, rental_coords, user_location, radius_km):
+        """
+        📍 Calculate location bonus based on distance
+        Returns: (location_bonus, distance_km)
+        """
+        if not rental_coords or not user_location:
+            return 1.0, None
+        
+        rental_lon, rental_lat = rental_coords[0], rental_coords[1]
+        user_lon, user_lat = user_location[0], user_location[1]
+        
+        # Check for invalid coordinates
+        if rental_lon == 0 and rental_lat == 0:
+            return 1.0, None
+        if user_lon == 0 and user_lat == 0:
+            return 1.0, None
+        
+        # Calculate distance
+        distance_km = self._haversine_distance(user_lon, user_lat, rental_lon, rental_lat)
+        
+        # Calculate bonus based on distance and radius
+        if distance_km <= radius_km:
+            # Within radius: bonus increases as distance decreases
+            if distance_km <= 1.0:  # Very close (< 1km)
+                bonus = 1.3
+            elif distance_km <= 3.0:  # Close (1-3km)
+                bonus = 1.2
+            elif distance_km <= 5.0:  # Medium (3-5km)
+                bonus = 1.1
+            else:  # Within radius but further (5km - radius_km)
+                bonus = 1.0 + (1.0 - (distance_km / radius_km)) * 0.1
+        else:
+            # Outside radius: penalty increases with distance
+            excess_distance = distance_km - radius_km
+            if excess_distance <= 5.0:  # Just outside (0-5km)
+                bonus = 0.9
+            elif excess_distance <= 10.0:  # Moderately outside (5-10km)
+                bonus = 0.7
+            else:  # Far outside (> 10km)
+                bonus = 0.5
+        
+        return max(0.1, min(1.5, bonus)), distance_km
+    
+    def _calculate_cf_score(self, user_idx, item_idx):
+        """
+        👥 Calculate Collaborative Filtering score
+        Uses user-user similarity to predict item rating
+        """
+        try:
+            if self.user_similarity is None or self.user_item_matrix is None:
+                return 0.0
+            
+            # Get similar users (top K similar users)
+            user_similarities = self.user_similarity[user_idx].toarray().flatten()
+            
+            # Get users who interacted with this item
+            item_vector = self.user_item_matrix[:, item_idx].toarray().flatten()
+            interacted_users = np.where(item_vector > 0)[0]
+            
+            if len(interacted_users) == 0:
+                return 0.0
+            
+            # Weighted average of similar users' ratings
+            numerator = 0.0
+            denominator = 0.0
+            
+            for other_user_idx in interacted_users:
+                similarity = user_similarities[other_user_idx]
+                if similarity > 0:  # Only positive similarities
+                    rating = item_vector[other_user_idx]
+                    numerator += similarity * rating
+                    denominator += abs(similarity)
+            
+            if denominator == 0:
+                return 0.0
+            
+            # Normalize to 0-1 range
+            cf_score = (numerator / denominator) / 10.0  # Assuming max interaction score is 10
+            return min(1.0, max(0.0, cf_score))
+            
+        except Exception as e:
+            print(f"      ⚠️ Error calculating CF score: {e}")
+            return 0.0
+    
+    def _calculate_preference_bonus(self, rental_id, user_prefs):
+        """
+        🎯 Calculate preference bonus based on user's historical preferences
+        """
+        if not user_prefs:
+            return 1.0
+        
+        rental = self.item_features.get(rental_id, {})
+        if not rental:
+            return 1.0
+        
+        bonus_factors = []
+        
+        # Property type match
+        property_type = rental.get('propertyType', '')
+        type_dist = user_prefs.get('property_type_distribution', {})
+        if type_dist and property_type in type_dist:
+            total = sum(type_dist.values())
+            if total > 0:
+                type_ratio = type_dist[property_type] / total
+                if type_ratio >= 0.5:
+                    bonus_factors.append(1.1)
+                elif type_ratio >= 0.2:
+                    bonus_factors.append(1.05)
+                else:
+                    bonus_factors.append(1.0)
+            else:
+                bonus_factors.append(1.0)
+        else:
+            bonus_factors.append(1.0)
+        
+        # Price range match
+        rental_price = rental.get('price', 0)
+        price_range = user_prefs.get('price_range', {})
+        if price_range and rental_price > 0:
+            avg_price = price_range.get('avg', 0)
+            if avg_price > 0:
+                price_ratio = rental_price / avg_price
+                if 0.8 <= price_ratio <= 1.2:  # Within 20% of average
+                    bonus_factors.append(1.1)
+                elif 0.6 <= price_ratio <= 1.5:  # Within 50% of average
+                    bonus_factors.append(1.05)
+                else:
+                    bonus_factors.append(1.0)
+            else:
+                bonus_factors.append(1.0)
+        else:
+            bonus_factors.append(1.0)
+        
+        # Calculate average bonus
+        if bonus_factors:
+            avg_bonus = np.mean(bonus_factors)
+            return min(1.2, max(0.8, avg_bonus))
+        
+        return 1.0
+    
+    def _calculate_time_bonus(self, user_id, context):
+        """
+        ⏰ Calculate time-based bonus (recency, time of day, etc.)
+        """
+        if not context:
+            return 1.0
+        
+        bonus = 1.0
+        
+        # Recency bonus: favor recently interacted items
+        if 'recent_interactions' in context:
+            recent_count = len(context.get('recent_interactions', []))
+            if recent_count > 0:
+                # Small bonus for active users
+                bonus *= 1.05
+        
+        # Time of day bonus (if provided)
+        if 'hour' in context:
+            hour = context['hour']
+            # Prefer morning/afternoon hours (8-18) for better engagement
+            if 8 <= hour <= 18:
+                bonus *= 1.02
+        
+        return min(1.1, max(0.9, bonus))
     
     def recommend_similar_items(self, item_id, n_recommendations=10, use_location=True, context=None):
         """
@@ -655,7 +1056,9 @@ class RecommendationModel:
             'popularity_scores': self.popularity_scores,
             'rental_coordinates': self.rental_coordinates,
             'user_locations': self.user_locations,
-            'rental_owners': self.rental_owners,  # 🔥 NEW
+            'rental_owners': self.rental_owners,
+            'matrix_sparsity': self.matrix_sparsity,  # 🔥 ADD
+            'matrix_density': self.matrix_density,    # 🔥 ADD
             'trained_at': datetime.now().isoformat()
         }
         
@@ -665,7 +1068,7 @@ class RecommendationModel:
         print(f"   File size: {os.path.getsize(filepath) / (1024*1024):.2f} MB")
         print(f"   Rental coordinates stored: {len(self.rental_coordinates)}")
         print(f"   User locations calculated: {len(self.user_locations)}")
-        print(f"   🔥 Rental ownerships stored: {len(self.rental_owners)}")
+        print(f"   🔥 Matrix sparsity saved: {self.matrix_sparsity:.2f}%")  # ← FIX
 
     # 🔥 UPDATE: load method to include rental_owners (line ~530)
     @classmethod
@@ -678,7 +1081,10 @@ class RecommendationModel:
         
         model_data = joblib.load(filepath)
         
+        # ✅ FIX: Create instance properly
         model = cls()
+        
+        # ✅ Restore all attributes from saved model
         model.user_item_matrix = model_data['user_item_matrix']
         model.user_similarity = model_data['user_similarity']
         model.item_similarity = model_data['item_similarity']
@@ -687,13 +1093,27 @@ class RecommendationModel:
         model.popularity_scores = model_data['popularity_scores']
         model.rental_coordinates = model_data.get('rental_coordinates', {})
         model.user_locations = model_data.get('user_locations', {})
-        model.rental_owners = model_data.get('rental_owners', {})  # 🔥 NEW
+        model.rental_owners = model_data.get('rental_owners', {})
+        
+        # 🔥 FIX: Restore matrix_sparsity with safe fallback
+        if 'matrix_sparsity' in model_data:
+            model.matrix_sparsity = model_data['matrix_sparsity']
+            model.matrix_density = model_data['matrix_density']
+        else:
+            # Calculate if not in file
+            n_users = len(model.user_encoder.classes_)
+            n_items = len(model.item_encoder.classes_)
+            total_cells = n_users * n_items
+            non_zero_cells = model.user_item_matrix.nnz
+            
+            model.matrix_sparsity = 100 * (1 - non_zero_cells / max(total_cells, 1))
+            model.matrix_density = 100 - model.matrix_sparsity
         
         print(f"✅ Model loaded successfully")
         print(f"   Trained at: {model_data.get('trained_at', 'unknown')}")
         print(f"   Rental coordinates loaded: {len(model.rental_coordinates)}")
         print(f"   User locations loaded: {len(model.user_locations)}")
-        print(f"   🔥 Rental ownerships loaded: {len(model.rental_owners)}")
+        print(f"   🔥 Matrix sparsity: {model.matrix_sparsity:.2f}%")
         
         return model
 
@@ -799,7 +1219,6 @@ def main():
     
     try:
         # Import ModelVisualizer từ cùng thư mục
-        import sys
         current_dir = os.path.dirname(os.path.abspath(__file__))
         sys.path.insert(0, current_dir)
         

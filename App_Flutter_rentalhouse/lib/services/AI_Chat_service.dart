@@ -24,6 +24,9 @@ class ChatAIService {
     String? conversationId,
     bool includeRecommendations = true,
     Map<String, dynamic>? userContext,
+    // 🔥 NEW: Add location parameters
+    double? latitude,
+    double? longitude,
   }) async {
     try {
       print('═════════════════════════════════════════════');
@@ -31,6 +34,12 @@ class ChatAIService {
       print('📝 Message: "$message"');
       print('📚 History: ${conversationHistory?.length ?? 0} messages');
       print('🆔 Conversation ID: ${conversationId ?? "new"}');
+
+      // 🔥 NEW: Log location if provided
+      if (latitude != null && longitude != null) {
+        print('📍 User Location: ($latitude, $longitude)');
+      }
+
       print('═════════════════════════════════════════════');
 
       final token = await _getAuthToken();
@@ -41,12 +50,21 @@ class ChatAIService {
         'Authorization': 'Bearer $token',
       };
 
+      // 🔥 NEW: Add location to userContext
+      Map<String, dynamic> enhancedContext = userContext ?? {};
+      if (latitude != null && longitude != null) {
+        enhancedContext['currentLocation'] = {
+          'latitude': latitude,
+          'longitude': longitude,
+        };
+      }
+
       final body = jsonEncode({
         'message': message,
         'conversationHistory': conversationHistory?.map((msg) => msg.toJson()).toList() ?? [],
         'conversationId': conversationId,
         'includeRecommendations': includeRecommendations,
-        'userContext': userContext,
+        'userContext': enhancedContext,  // 🔥 Use enhanced context
       });
 
       print('🔗 URL: ${ApiRoutes.aiChat}');
@@ -64,14 +82,10 @@ class ChatAIService {
         print('✅ Chat response received');
         print('🏠 Recommendations: ${data['recommendations']?.length ?? 0}');
 
-        // 🔥 FIX: Debug raw recommendations safely
-        if (data['recommendations'] != null && data['recommendations'] is List) {
-          print('📦 Raw recommendations type: ${data['recommendations'].runtimeType}');
-          if ((data['recommendations'] as List).isNotEmpty) {
-            print('📦 First recommendation: ${data['recommendations'][0]}');
-          } else {
-            print('⚠️ Recommendations array is empty');
-          }
+        // 🔥 NEW: Log filter metadata
+        if (data['metadata'] != null) {
+          print('📍 Location filter: ${data['metadata']['hasLocationFilter']}');
+          print('🏢 POI filter: ${data['metadata']['hasPOIFilter']}');
         }
 
         return ChatResponse.fromJson(data);

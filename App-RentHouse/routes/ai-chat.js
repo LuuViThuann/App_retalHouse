@@ -296,18 +296,40 @@ function enrichRecommendations(mlRecommendations, rentals) {
                 title: rental.title,
                 price: parseFloat(rental.price) || 0,
                 propertyType: rental.propertyType || 'Unknown',
-                area: rental.area,
-                images: Array.isArray(rental.images) ? rental.images.slice(0, 3) : [],
-                amenities: Array.isArray(rental.amenities) ? rental.amenities.slice(0, 6) : [],
+
+                // 🔥 ENHANCED: Complete area data
+                area: {
+                    total: rental.area?.total || 0,
+                    bedrooms: rental.area?.bedrooms || 0,
+                    bathrooms: rental.area?.bathrooms || 0
+                },
+
+                // 🔥 ENHANCED: More images
+                images: Array.isArray(rental.images) ? rental.images : [],
+
+                // 🔥 ENHANCED: Full amenities list
+                amenities: Array.isArray(rental.amenities) ? rental.amenities : [],
+
                 furniture: rental.furniture || [],
+
+                // 🔥 ENHANCED: Complete location data
                 location: {
                     short: rental.location?.short || 'Unknown',
                     full: rental.location?.fullAddress || rental.location?.short || 'Unknown',
+                    district: rental.location?.district || '',
+                    city: rental.location?.city || '',
+                    ward: rental.location?.ward || '',
+                    street: rental.location?.street || '',
                     coordinates: {
                         longitude: coords[0],
                         latitude: coords[1]
                     }
                 },
+
+                // 🔥 ENHANCED: Complete description
+                description: rental.description || '',
+
+                // AI Scores
                 aiScore: mlRec.score || 0,
                 confidence: mlRec.confidence || 0.5,
                 finalScore: mlRec.finalScore || mlRec.score || 0,
@@ -317,7 +339,13 @@ function enrichRecommendations(mlRecommendations, rentals) {
                 distance_km: mlRec.distance_km || null,
                 method: mlRec.method || 'ml_personalized',
                 isAIRecommended: true,
-                createdAt: rental.createdAt
+
+                // 🔥 ENHANCED: Additional metadata
+                views: rental.views || 0,
+                favorites: rental.favorites || 0,
+                status: rental.status || 'available',
+                createdAt: rental.createdAt,
+                userId: rental.userId // Owner ID
             };
         })
         .filter(rec => rec !== null)
@@ -347,6 +375,8 @@ router.post('/chat', authMiddleware, async (req, res) => {
 
         log.info(`[CHAT] User: ${userId}, Message: "${message.substring(0, 50)}..."`);
 
+        const userLocation = _extractUserLocation(userContext);
+
         // ===== STEP 1: CALL ML SERVICE =====
         const mlResult = await axios.post(
             `${ML_SERVICE_URL}/chat`,
@@ -354,7 +384,10 @@ router.post('/chat', authMiddleware, async (req, res) => {
                 userId,
                 message: message.trim(),
                 conversationHistory: conversationHistory || [],
-                userContext: userContext || {},
+                userContext: {
+                    ...userContext,
+                    currentLocation: userLocation  // 🔥 Pass location to ML
+                },
                 includeRecommendations
             },
             {
@@ -383,8 +416,67 @@ router.post('/chat', authMiddleware, async (req, res) => {
         let explanationMessage = chatData.explanation;
 
         if (includeRecommendations && chatData.shouldRecommend) {
+            const prefs = chatData.extractedPreferences || {};
 
-            // 🔥 Case 1: ML service returned recommendations
+            // 🔥 NEW: Check if user wants nearby recommendations
+            if (prefs.wants_nearby_location && userLocation) {
+                log.info(`[CHAT] 📍 User wants nearby recommendations`);
+
+                // Get nearby recommendations from ML
+                try {
+                    const nearbyResult = await axios.post(
+                        `${ML_SERVICE_URL}/recommend/personalized`,
+                        {
+                            userId,
+                            n_recommendations: 10,
+                            use_location: true,
+                            radius_km: prefs.search_radius || 5,
+                            context: {
+                                map_center: [userLocation.longitude, userLocation.latitude],
+                                zoom_level: 15
+                            }
+                        },
+                        { timeout: 15000 }
+                    );
+
+                    if (nearbyResult.data?.recommendations) {
+                        chatData.recommendations = nearbyResult.data.recommendations;
+                        log.info(`[CHAT] ✅ Got ${nearbyResult.data.recommendations.length} nearby recommendations`);
+                    }
+                } catch (err) {
+                    log.error(`[CHAT] Error getting nearby recs: ${err.message}`);
+                }
+            }
+
+            // 🔥 NEW: Check if user wants POI-based recommendations
+            if (prefs.wants_poi_filter && prefs.poi_categories && userLocation) {
+                log.info(`[CHAT] 🏢 User wants POI-based recommendations`);
+                log.info(`[CHAT] POI Categories: ${prefs.poi_categories.join(', ')}`);
+
+                const poiRentals = await _getRecommendationsWithPOI(userId, prefs, userLocation);
+
+                if (poiRentals && poiRentals.length > 0) {
+                    // Transform POI rentals to match ML format
+                    chatData.recommendations = poiRentals.map(rental => ({
+                        rentalId: rental._id.toString(),
+                        score: rental.aiScore || 0,
+                        confidence: 0.8,
+                        finalScore: rental.aiScore || 0,
+                        locationBonus: 1.2,
+                        method: 'poi_based',
+                        coordinates: {
+                            longitude: rental.location?.coordinates?.coordinates?.[0] || 0,
+                            latitude: rental.location?.coordinates?.coordinates?.[1] || 0
+                        },
+                        nearestPOIs: rental.nearestPOIs || []
+                    }));
+
+                    explanationMessage = `Tôi tìm thấy ${poiRentals.length} bài đăng gần các tiện ích bạn quan tâm!`;
+                    log.info(`[CHAT] ✅ Got ${poiRentals.length} POI-based recommendations`);
+                }
+            }
+
+            // Process recommendations (existing code)
             if (chatData.recommendations && chatData.recommendations.length > 0) {
                 log.info(`[CHAT] ML returned ${chatData.recommendations.length} recommendations`);
 
@@ -403,8 +495,6 @@ router.post('/chat', authMiddleware, async (req, res) => {
 
                 log.info(`[CHAT] ✅ Enriched ${enrichedRecommendations.length} recommendations from ML`);
             }
-
-            // 🔥 Case 2: No ML recommendations BUT has extracted preferences
             else if (chatData.extractedPreferences && Object.keys(chatData.extractedPreferences).length > 0) {
                 log.info(`[CHAT] No ML recs, using MongoDB fallback with prefs...`);
 
@@ -415,16 +505,9 @@ router.post('/chat', authMiddleware, async (req, res) => {
 
                 log.info(`[CHAT] ✅ Fallback returned ${enrichedRecommendations.length} rentals`);
 
-                // Update explanation if fallback found results
                 if (enrichedRecommendations.length > 0) {
                     explanationMessage = `Tôi tìm được ${enrichedRecommendations.length} bài đăng phù hợp! Xem chi tiết bên dưới nhé.`;
                 }
-            }
-
-            // 🔥 Case 3: Still empty → DON'T override AI message (it should explain why no results)
-            if (enrichedRecommendations.length === 0) {
-                log.warn(`[CHAT] No recommendations found`);
-                // AI message already says why (hallucination prevention handled in Python)
             }
         }
 
@@ -471,6 +554,8 @@ router.post('/chat', authMiddleware, async (req, res) => {
                 responseTime: `${duration}ms`,
                 isFromML: enrichedRecommendations.length > 0 && chatData.recommendations?.length > 0,
                 hasFallback: enrichedRecommendations.length > 0 && !chatData.recommendations?.length,
+                hasLocationFilter: chatData.extractedPreferences?.wants_nearby_location || false,
+                hasPOIFilter: chatData.extractedPreferences?.wants_poi_filter || false,
                 timestamp: new Date().toISOString()
             }
         });
@@ -484,6 +569,122 @@ router.post('/chat', authMiddleware, async (req, res) => {
         });
     }
 });
+
+
+// NEW UPDATE ================================================================
+/**
+ * 🔥 NEW: Get user's current location from request or context
+ */
+function _extractUserLocation(userContext) {
+    if (userContext?.currentLocation) {
+        return {
+            latitude: userContext.currentLocation.latitude,
+            longitude: userContext.currentLocation.longitude
+        };
+    }
+
+    if (userContext?.mapCenter) {
+        return {
+            latitude: userContext.mapCenter.latitude,
+            longitude: userContext.mapCenter.longitude
+        };
+    }
+
+    return null;
+}
+
+/**
+ * 🔥 NEW: Call Node.js POI service to filter rentals
+ */
+async function _getRecommendationsWithPOI(userId, preferences, userLocation) {
+    try {
+        const poiCategories = preferences.poi_categories || [];
+        if (poiCategories.length === 0) {
+            log.warn('[POI-FILTER] No POI categories provided');
+            return null;
+        }
+
+        // 🔥 FIX: Import POIService properly
+        const { POIService } = require('../service/poi-service');
+        const poiService = new POIService();
+
+        log.info(`[POI-FILTER] Calling POI service with categories: ${poiCategories.join(', ')}`);
+
+        // Get POIs for categories
+        const allPOIs = [];
+        for (const category of poiCategories) {
+            try {
+                const pois = await poiService.getPOIsByCategory(
+                    userLocation.latitude,
+                    userLocation.longitude,
+                    category,
+                    preferences.search_radius || 3
+                );
+                allPOIs.push(...pois);
+                log.info(`   ✅ ${category}: ${pois.length} POIs found`);
+            } catch (err) {
+                log.warn(`   ⚠️ ${category}: ${err.message}`);
+            }
+        }
+
+        if (allPOIs.length === 0) {
+            log.warn('[POI-FILTER] No POIs found');
+            return null;
+        }
+
+        log.info(`[POI-FILTER] Found ${allPOIs.length} total POIs`);
+
+        // Find rentals near these POIs
+        const rentalIds = new Set();
+        const Rental = require('../models/Rental');
+
+        for (const poi of allPOIs.slice(0, 20)) {  // 🔥 Limit to top 20 POIs
+            try {
+                const nearbyRentals = await Rental.aggregate([
+                    {
+                        $geoNear: {
+                            near: {
+                                type: 'Point',
+                                coordinates: [poi.longitude, poi.latitude]
+                            },
+                            distanceField: 'distance',
+                            maxDistance: (preferences.search_radius || 3) * 1000,
+                            spherical: true,
+                            query: {
+                                status: 'available',
+                                userId: { $ne: userId }  // 🔥 Exclude own rentals
+                            }
+                        }
+                    },
+                    { $limit: 5 }
+                ]);
+
+                nearbyRentals.forEach(r => rentalIds.add(r._id.toString()));
+            } catch (err) {
+                log.warn(`[POI-FILTER] Error querying near POI: ${err.message}`);
+            }
+        }
+
+        if (rentalIds.size === 0) {
+            log.warn('[POI-FILTER] No rentals near POIs');
+            return null;
+        }
+
+        // Fetch full rental details
+        const rentals = await Rental.find({
+            _id: { $in: Array.from(rentalIds) },
+            status: 'available'
+        }).lean();
+
+        log.info(`[POI-FILTER] Returning ${rentals.length} rentals near POIs`);
+        return rentals;
+
+    } catch (error) {
+        log.error(`[POI-FILTER] Error: ${error.message}`);
+        return null;
+    }
+}
+
 async function getSmartFallbackRecommendations(userId, extractedPreferences) {
     try {
         const query = { status: 'available' };

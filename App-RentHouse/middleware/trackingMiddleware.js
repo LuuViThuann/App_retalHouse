@@ -6,7 +6,7 @@ const Rental = require('../models/Rental');
  */
 const detectDeviceType = (userAgent) => {
   if (!userAgent) return 'unknown';
-  
+
   const ua = userAgent.toLowerCase();
   if (/(tablet|ipad|playbook|silk)|(android(?!.*mobi))/i.test(ua)) {
     return 'tablet';
@@ -31,20 +31,20 @@ function _getTimeOfDay() {
  */
 const trackRentalView = async (req, res, next) => {
   const originalJson = res.json;
-  
-  res.json = function(data) {
+
+  res.json = function (data) {
     originalJson.call(this, data);
-    
+
     setImmediate(async () => {
       try {
         const userId = req.userId || req.headers['x-user-id'] || 'anonymous';
         const rentalId = req.params.id;
-        
+
         if (!rentalId) return;
-        
+
         const rental = await Rental.findById(rentalId).lean();
         if (!rental) return;
-        
+
         const coordinates = rental.location?.coordinates?.coordinates || [0, 0];
 
         // 🔥 EXTRACT CONTEXT DATA
@@ -110,7 +110,7 @@ const trackRentalView = async (req, res, next) => {
           userAgent: req.headers['user-agent'],
           ipAddress: req.ip
         });
-        
+
         console.log(`✅ Tracked VIEW with context: ${userId}`);
         if (req.body?.markerClicked) {
           console.log(`   📍 Marker size: ${req.body.markerSize}, Opacity: ${req.body.markerOpacity}`);
@@ -120,7 +120,7 @@ const trackRentalView = async (req, res, next) => {
       }
     });
   };
-  
+
   next();
 };
 
@@ -130,41 +130,44 @@ const trackRentalView = async (req, res, next) => {
 const trackAction = (actionType) => {
   return async (req, res, next) => {
     next();
-    
+
     setImmediate(async () => {
       try {
         const userId = req.userId;
         const rentalId = req.params.id || req.params.rentalId || req.body.rentalId;
-        
-        if (!userId || !rentalId) {
-          console.warn(`⚠️ Missing userId or rentalId for ${actionType} tracking`);
-          return;
-        }
-        
-        // Get rental data - 🔥 INCLUDE COORDINATES
-        const rental = await Rental.findById(rentalId).lean();
-        if (!rental) {
-          console.warn(`⚠️ Rental ${rentalId} not found for tracking`);
-          return;
-        }
 
-        // 🔥 EXTRACT COORDINATES
+        if (!userId || !rentalId) return;
+
+        const rental = await Rental.findById(rentalId).lean();
+        if (!rental) return;
+
         const coordinates = rental.location?.coordinates?.coordinates || [0, 0];
 
+        const interactionScores = {
+          'view': 1,
+          'favorite': 8,        // ↑ Tăng từ 5 → 8
+          'unfavorite': -5,     // ↓ Giảm từ -3 → -5
+          'contact': 12,        // ↑ Tăng từ 8 → 12
+          'call': 15,           // ↑ Tăng từ 10 → 15
+          'share': 6,           // ↑ Tăng từ 4 → 6
+          'scroll': 2,
+          'detail_open': 4,     // ↑ Tăng từ 3 → 4
+        };
         // Create interaction record - 🔥 ADD coordinates FIELD
         await UserInteraction.create({
           userId,
           rentalId,
           interactionType: actionType,
+          interactionScore: interactionScores[actionType] || 1,
           sessionId: req.sessionID || req.headers['x-session-id'],
           deviceType: detectDeviceType(req.headers['user-agent']),
-          
+
           // 🔥 NEW: Lưu coordinates trực tiếp
           coordinates: {
             type: 'Point',
             coordinates: coordinates
           },
-          
+
           rentalSnapshot: {
             price: rental.price,
             propertyType: rental.propertyType,
@@ -176,7 +179,7 @@ const trackAction = (actionType) => {
           userAgent: req.headers['user-agent'],
           ipAddress: req.ip || req.headers['x-forwarded-for']
         });
-        
+
         console.log(`✅ Tracked ${actionType.toUpperCase()} for rental ${rentalId} by user ${userId}`);
         console.log(`   Coordinates: [${coordinates[0]}, ${coordinates[1]}]`);
       } catch (err) {
@@ -193,20 +196,20 @@ const trackDetailedInteraction = async (req, res) => {
   try {
     const { rentalId, duration, scrollDepth, interactionType = 'view' } = req.body;
     const userId = req.userId || 'anonymous';
-    
+
     if (!rentalId) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'rentalId is required' 
+      return res.status(400).json({
+        success: false,
+        message: 'rentalId is required'
       });
     }
-    
+
     // Get rental data - 🔥 INCLUDE COORDINATES
     const rental = await Rental.findById(rentalId).lean();
     if (!rental) {
-      return res.status(404).json({ 
-        success: false, 
-        message: 'Rental not found' 
+      return res.status(404).json({
+        success: false,
+        message: 'Rental not found'
       });
     }
 
@@ -222,13 +225,13 @@ const trackDetailedInteraction = async (req, res) => {
       deviceType: detectDeviceType(req.headers['user-agent']),
       duration: parseInt(duration) || 0,
       scrollDepth: Math.min(100, Math.max(0, parseInt(scrollDepth) || 0)),
-      
+
       // 🔥 NEW: Lưu coordinates trực tiếp
       coordinates: {
         type: 'Point',
         coordinates: coordinates
       },
-      
+
       rentalSnapshot: {
         price: rental.price,
         propertyType: rental.propertyType,
@@ -240,17 +243,17 @@ const trackDetailedInteraction = async (req, res) => {
       userAgent: req.headers['user-agent'],
       ipAddress: req.ip || req.headers['x-forwarded-for']
     });
-    
-    res.json({ 
-      success: true, 
-      message: 'Interaction tracked successfully' 
+
+    res.json({
+      success: true,
+      message: 'Interaction tracked successfully'
     });
   } catch (err) {
     console.error('Error tracking detailed interaction:', err);
-    res.status(500).json({ 
-      success: false, 
-      message: 'Failed to track interaction', 
-      error: err.message 
+    res.status(500).json({
+      success: false,
+      message: 'Failed to track interaction',
+      error: err.message
     });
   }
 };
@@ -261,41 +264,41 @@ const trackDetailedInteraction = async (req, res) => {
 const getUserAnalytics = async (req, res) => {
   try {
     const userId = req.userId;
-    
+
     if (!userId) {
-      return res.status(401).json({ 
-        success: false, 
-        message: 'Unauthorized' 
+      return res.status(401).json({
+        success: false,
+        message: 'Unauthorized'
       });
     }
-    
+
     const summary = await UserInteraction.getUserSummary(userId);
-    
+
     // Get recent interactions - 🔥 INCLUDE COORDINATES
     const recentInteractions = await UserInteraction.find({ userId })
       .sort({ timestamp: -1 })
       .limit(50)
       .populate('rentalId', 'title price location images')
       .lean();
-    
+
     // Calculate stats    
     const totalInteractions = recentInteractions.length;
     const avgDuration = recentInteractions.reduce((sum, i) => sum + (i.duration || 0), 0) / totalInteractions || 0;
     const avgScrollDepth = recentInteractions.reduce((sum, i) => sum + (i.scrollDepth || 0), 0) / totalInteractions || 0;
-    
+
     // 🔥 NEW: Calculate location stats
-    const validCoordinates = recentInteractions.filter(i => 
-      i.coordinates?.coordinates && 
-      i.coordinates.coordinates[0] !== 0 && 
+    const validCoordinates = recentInteractions.filter(i =>
+      i.coordinates?.coordinates &&
+      i.coordinates.coordinates[0] !== 0 &&
       i.coordinates.coordinates[1] !== 0
     );
-    
+
     let centerLongitude = 0, centerLatitude = 0;
     if (validCoordinates.length > 0) {
       centerLongitude = validCoordinates.reduce((sum, i) => sum + i.coordinates.coordinates[0], 0) / validCoordinates.length;
       centerLatitude = validCoordinates.reduce((sum, i) => sum + i.coordinates.coordinates[1], 0) / validCoordinates.length;
     }
-    
+
     res.json({
       success: true,
       data: {
@@ -303,13 +306,13 @@ const getUserAnalytics = async (req, res) => {
         totalInteractions,
         avgDuration: Math.round(avgDuration),
         avgScrollDepth: Math.round(avgScrollDepth),
-        
+
         // 🔥 NEW: Location analytics
         locationStats: {
           interactionsWithCoordinates: validCoordinates.length,
           centerCoordinates: [centerLongitude, centerLatitude],
         },
-        
+
         recentInteractions: recentInteractions.slice(0, 10).map(i => ({
           ...i,
           coordinates: i.coordinates?.coordinates || [0, 0]
@@ -318,10 +321,10 @@ const getUserAnalytics = async (req, res) => {
     });
   } catch (err) {
     console.error('Error getting user analytics:', err);
-    res.status(500).json({ 
-      success: false, 
-      message: 'Failed to get analytics', 
-      error: err.message 
+    res.status(500).json({
+      success: false,
+      message: 'Failed to get analytics',
+      error: err.message
     });
   }
 };

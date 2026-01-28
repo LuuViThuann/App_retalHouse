@@ -4,11 +4,11 @@ const express = require('express'); // đã xóa ESlint
 const router = express.Router();
 const mongoose = require('mongoose');
 
-const { 
-  trackRentalView, 
-  trackAction, 
+const {
+  trackRentalView,
+  trackAction,
   trackDetailedInteraction,
-  getUserAnalytics 
+  getUserAnalytics
 } = require('../middleware/trackingMiddleware');
 
 const Rental = require('../models/Rental');
@@ -50,29 +50,29 @@ const storage = new CloudinaryStorage({
     const isVideo = file.mimetype.startsWith('video/');
     return {
       folder: 'rentals',
-      allowed_formats: isVideo 
+      allowed_formats: isVideo
         ? ['mp4', 'mov', 'avi', 'mkv', 'webm']
         : ['jpg', 'jpeg', 'png', 'webp'],
       resource_type: isVideo ? 'video' : 'image',
-      transformation: isVideo 
+      transformation: isVideo
         ? [{ width: 1280, height: 720, crop: 'limit', quality: 'auto' }]
         : [{ width: 1920, height: 1080, crop: 'limit' }],
     };
   },
-}); 
+});
 
 const upload = multer({
   storage,
-  limits: { 
+  limits: {
     fileSize: 100 * 1024 * 1024, // 100MB for videos
   },
   fileFilter: (req, file, cb) => {
     const allowedImageFormats = /\.(jpeg|jpg|png|webp)$/i;
     const allowedVideoFormats = /\.(mp4|mov|avi|mkv|webm)$/i;
-    
+
     const isImage = allowedImageFormats.test(file.originalname);
     const isVideo = allowedVideoFormats.test(file.originalname);
-    
+
     if (isImage || isVideo) {
       return cb(null, true);
     }
@@ -96,7 +96,7 @@ const normalizePropertyType = (propertyType) => {
     'Đất nền': 'Land',
     'land': 'Land',
   };
-  
+
   const normalized = typeMap[propertyType] || typeMap[propertyType?.toLowerCase()];
   return normalized || propertyType;
 };
@@ -105,18 +105,18 @@ const deleteCloudinaryMedia = async (cloudinaryIds) => {
   if (!cloudinaryIds || cloudinaryIds.length === 0) {
     return [];
   }
-  
+
   const results = [];
   for (const publicId of cloudinaryIds) {
     try {
       // Tự động detect resource_type (image hoặc video)
       let result = await cloudinary.uploader.destroy(publicId, { resource_type: 'image' });
-      
+
       // Nếu không tìm thấy image, thử xóa video
       if (result.result === 'not found') {
         result = await cloudinary.uploader.destroy(publicId, { resource_type: 'video' });
       }
-      
+
       results.push({ publicId, result });
       console.log('✅ Cloudinary delete:', publicId, result);
     } catch (error) {
@@ -162,7 +162,7 @@ const verifyAdmin = async (req, res, next) => {
 const checkPaymentStatus = async (req, res, next) => {
   try {
     const { paymentTransactionCode } = req.body;
-    
+
     //  Nếu không có transaction code → YÊU CẦU CLIENT THANH TOÁN TRƯỚC
     if (!paymentTransactionCode) {
       return res.status(402).json({
@@ -175,7 +175,7 @@ const checkPaymentStatus = async (req, res, next) => {
 
     // ✅ Tìm payment trong database
     const payment = await Payment.findOne({ transactionCode: paymentTransactionCode });
-    
+
     if (!payment) {
       return res.status(404).json({
         success: false,
@@ -216,7 +216,7 @@ const checkPaymentStatus = async (req, res, next) => {
       transactionCode: paymentTransactionCode,
       createdAt: payment.createdAt,
       confirmedVia: payment.confirmedVia,
-      hint: payment.status === 'processing' 
+      hint: payment.status === 'processing'
         ? 'Vui lòng đợi VNPay xác nhận thanh toán (có thể mất vài giây). Sau đó thử lại.'
         : 'Thanh toán đã thất bại. Vui lòng thanh toán lại.',
       canRetry: payment.status === 'processing', // Client có thể retry nếu processing
@@ -231,6 +231,208 @@ const checkPaymentStatus = async (req, res, next) => {
     });
   }
 };
+
+//=============================================================================================================================== NEW 
+// ==================== IMPROVED GEOCODING ====================
+
+const normalizeAddressForGeocoding = (address) => {
+  if (!address || typeof address !== 'string') return null;
+
+  let normalized = address.trim().replace(/\s+/g, ' ');
+
+  const abbreviations = {
+    'P\\.?\\s': 'Phường ',
+    'Q\\.?\\s': 'Quận ',
+    'TP\\.?\\s': 'Thành phố ',
+    'H\\.?\\s': 'Huyện ',
+    'TX\\.?\\s': 'Thị xã ',
+    'SO\\.?\\s': 'Số ',
+    'Đ\\.?\\s': 'Đường ',
+  };
+
+  Object.entries(abbreviations).forEach(([pattern, replacement]) => {
+    normalized = normalized.replace(new RegExp(pattern, 'gi'), replacement);
+  });
+
+  normalized = normalized.replace(/[<>[\]{}|]/g, '');
+
+  if (!normalized.toLowerCase().includes('việt nam') &&
+    !normalized.toLowerCase().includes('vietnam')) {
+    normalized += ', Việt Nam';
+  }
+
+  return normalized;
+};
+
+const isValidVietnamAddress = (address) => {
+  if (!address || typeof address !== 'string') return false;
+
+  const parts = address.toLowerCase().split(',').map(p => p.trim());
+
+  if (parts.length < 3) return false;
+
+  const vietnamKeywords = [
+    'phường', 'huyện', 'quận', 'tỉnh', 'thành phố',
+    'thị xã', 'đường', 'khu phố', 'xã', 'hẻm'
+  ];
+
+  const fullAddr = address.toLowerCase();
+  const hasVietnamKeywords = vietnamKeywords.some(kw => fullAddr.includes(kw));
+
+  return hasVietnamKeywords;
+};
+
+const tryNominatimGeocode = async (address, maxRetries = 2) => {
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      const response = await fetch(
+        `https://nominatim.openstreetmap.org/search?` +
+        `format=json&` +
+        `q=${encodeURIComponent(address)}&` +
+        `limit=5&` +
+        `countrycodes=vn&` +
+        `addressdetails=1&` +
+        `accept-language=vi`,
+        {
+          headers: {
+            'User-Agent': 'RentalHouseApp/1.0 (+https://rentalhouse.app)',
+            'Accept-Language': 'vi-VN,vi;q=0.9',
+          },
+          timeout: 12000,
+        }
+      );
+
+      if (response.status === 429) {
+        console.warn(`Rate limited on attempt ${attempt + 1}`);
+        await new Promise(resolve => setTimeout(resolve, 2000 * (attempt + 1)));
+        continue;
+      }
+
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+      const data = await response.json();
+
+      if (Array.isArray(data) && data.length > 0) {
+        for (const item of data) {
+          const osmClass = item.class || '';
+          const type = item.type || '';
+
+          if ((osmClass === 'place' &&
+            (type === 'quarter' || type === 'village' || type === 'neighborhood')) ||
+            osmClass === 'highway' ||
+            osmClass === 'building') {
+            return item;
+          }
+        }
+
+        return data[0];
+      }
+    } catch (error) {
+      console.error(`Geocoding attempt ${attempt + 1} failed:`, error.message);
+      if (attempt < maxRetries - 1) {
+        await new Promise(resolve => setTimeout(resolve, 1000 * (attempt + 1)));
+      }
+    }
+  }
+
+  return null;
+};
+
+const createSimplifiedAddress = (normalized) => {
+  const parts = normalized
+    .split(',')
+    .map(p => p.trim())
+    .filter(p => p.length > 0);
+
+  if (parts.length >= 3) {
+    return `${parts[0]}, ${parts[parts.length - 2]}, ${parts[parts.length - 1]}`;
+  }
+  return normalized;
+};
+
+const createMinimalAddress = (normalized) => {
+  const parts = normalized
+    .split(',')
+    .map(p => p.trim())
+    .filter(p => p.length > 0);
+
+  if (parts.length >= 2) {
+    return `${parts[parts.length - 2]}, ${parts[parts.length - 1]}`;
+  }
+  return normalized;
+};
+
+const extractAddressComponents = (nominatimResult) => {
+  try {
+    const addr = nominatimResult.address || {};
+    return {
+      street: addr.road || addr.street || '',
+      ward: addr.suburb || addr.hamlet || '',
+      district: addr.city_district || addr.county || '',
+      city: addr.city || addr.town || '',
+      province: addr.state || '',
+      country: addr.country || 'Vietnam',
+    };
+  } catch (e) {
+    return {};
+  }
+};
+
+const isInVietnam = (lat, lon) => {
+  return lat >= 8.0 && lat <= 23.5 && lon >= 102.0 && lon <= 109.5;
+};
+
+const geocodeAddressFreeImproved = async (address) => {
+  try {
+
+
+    const normalized = normalizeAddressForGeocoding(address);
+    if (!normalized) {
+      throw new Error('Could not normalize address');
+    }
+
+    console.log(`🔍 [GEO] Normalized: ${normalized}`);
+
+    let result = await tryNominatimGeocode(normalized);
+
+    if (!result) {
+      const simplified = createSimplifiedAddress(normalized);
+      console.log(`🔍 [GEO] Trying simplified: ${simplified}`);
+      result = await tryNominatimGeocode(simplified);
+    }
+
+    if (!result) {
+      const minimal = createMinimalAddress(normalized);
+      console.log(`🔍 [GEO] Trying minimal: ${minimal}`);
+      result = await tryNominatimGeocode(minimal);
+    }
+
+    if (!result) {
+      throw new Error(`No results found for addresses`);
+    }
+
+    const lat = parseFloat(result.lat);
+    const lon = parseFloat(result.lon);
+
+    if (!isInVietnam(lat, lon)) {
+      throw new Error(`Location not in Vietnam: ${lat}, ${lon}`);
+    }
+
+    return {
+      latitude: lat,
+      longitude: lon,
+      formattedAddress: result.display_name,
+      status: 'success',
+      addressComponents: extractAddressComponents(result),
+    };
+  } catch (error) {
+    console.error('Geocoding error:', error.message);
+    throw error;
+  }
+};
+
+
+
 
 // ========== ADMIN ROUTES ========================================================
 
@@ -334,10 +536,10 @@ router.patch('/admin/rentals/:rentalId', verifyAdmin, upload.array('media'), asy
     }
 
     const updatedData = {};
-    
+
     if (req.body.title) updatedData.title = req.body.title;
     if (req.body.price) updatedData.price = parseFloat(req.body.price) || rental.price;
-    
+
     if (req.body.areaTotal || req.body.areaLivingRoom || req.body.areaBedrooms || req.body.areaBathrooms) {
       updatedData.area = {
         total: parseFloat(req.body.areaTotal) || rental.area.total,
@@ -413,7 +615,7 @@ router.patch('/admin/rentals/:rentalId', verifyAdmin, upload.array('media'), asy
     let updatedImages = [...(rental.images || [])];
     let updatedVideos = [...(rental.videos || [])];
     let removedMedia = [];
-    
+
     if (req.body.removedMedia) {
       try {
         if (typeof req.body.removedMedia === 'string') {
@@ -431,17 +633,17 @@ router.patch('/admin/rentals/:rentalId', verifyAdmin, upload.array('media'), asy
       if (!Array.isArray(removedMedia)) removedMedia = [removedMedia];
 
       const cloudinaryIdsToDelete = [];
-      
+
       for (const mediaUrl of removedMedia) {
         if (typeof mediaUrl !== 'string') continue;
-        
+
         // Remove from images array
         if (updatedImages.includes(mediaUrl)) {
           updatedImages = updatedImages.filter(img => img !== mediaUrl);
           const publicId = extractCloudinaryPublicId(mediaUrl);
           if (publicId) cloudinaryIdsToDelete.push(publicId);
         }
-        
+
         // Remove from videos array
         if (updatedVideos.includes(mediaUrl)) {
           updatedVideos = updatedVideos.filter(vid => vid !== mediaUrl);
@@ -460,7 +662,7 @@ router.patch('/admin/rentals/:rentalId', verifyAdmin, upload.array('media'), asy
     if (req.files && req.files.length > 0) {
       const newImages = [];
       const newVideos = [];
-      
+
       req.files.forEach(file => {
         if (file.mimetype.startsWith('video/')) {
           newVideos.push(file.path);
@@ -468,7 +670,7 @@ router.patch('/admin/rentals/:rentalId', verifyAdmin, upload.array('media'), asy
           newImages.push(file.path);
         }
       });
-      
+
       updatedImages = [...new Set([...updatedImages, ...newImages])];
       updatedVideos = [...new Set([...updatedVideos, ...newVideos])];
     }
@@ -504,7 +706,7 @@ router.patch('/admin/rentals/:rentalId', verifyAdmin, upload.array('media'), asy
 // ========== ADMIN DELETE RENTAL ========== ====================================================================
 router.delete('/admin/rentals/:rentalId', verifyAdmin, async (req, res) => {
   try {
-    
+
     if (!mongoose.Types.ObjectId.isValid(req.params.rentalId)) {
       return res.status(400).json({ message: 'Invalid rental ID' });
     }
@@ -521,12 +723,12 @@ router.delete('/admin/rentals/:rentalId', verifyAdmin, async (req, res) => {
 
     // Delete images and videos from Cloudinary
     const cloudinaryIdsToDelete = [];
-    
+
     (rental.images || []).forEach(imageUrl => {
       const publicId = extractCloudinaryPublicId(imageUrl);
       if (publicId) cloudinaryIdsToDelete.push(publicId);
     });
-    
+
     (rental.videos || []).forEach(videoUrl => {
       const publicId = extractCloudinaryPublicId(videoUrl);
       if (publicId) cloudinaryIdsToDelete.push(publicId);
@@ -556,7 +758,7 @@ router.delete('/admin/rentals/:rentalId', verifyAdmin, async (req, res) => {
 
     console.log('✅ RENTAL DELETED SUCCESSFULLY');
 
-    res.json({ 
+    res.json({
       message: 'Rental deleted successfully',
       deletedRentalId: req.params.rentalId,
     });
@@ -617,7 +819,7 @@ const syncRentalToElasticsearch = async (rental) => {
 };
 const buildMongoQuery = ({ search, minPrice, maxPrice, propertyTypes, status }) => {
   const query = {};
-  
+
   if (search && search.trim()) {
     query.$or = [
       { title: { $regex: search.trim(), $options: 'i' } },
@@ -625,26 +827,26 @@ const buildMongoQuery = ({ search, minPrice, maxPrice, propertyTypes, status }) 
       { 'location.fullAddress': { $regex: search.trim(), $options: 'i' } },
     ];
   }
-  
+
   if (minPrice || maxPrice) {
     query.price = {};
     if (minPrice) query.price.$gte = Number(minPrice);
     if (maxPrice) query.price.$lte = Number(maxPrice);
   }
-  
+
   // 🔥 FIX: Normalize property types for MongoDB query
   if (propertyTypes && propertyTypes.length > 0) {
     const normalizedTypes = propertyTypes.map(type => normalizePropertyType(type));
     query.propertyType = { $in: normalizedTypes };
     console.log('🏠 MongoDB property type filter:', normalizedTypes);
   }
-  
+
   if (status) {
     query.status = status;
   } else {
     query.status = 'available';
   }
-  
+
   return query;
 };
 const sanitizeHeadersMiddleware = (req, res, next) => {
@@ -657,15 +859,15 @@ const sanitizeHeadersMiddleware = (req, res, next) => {
 // Chuẩn hóa địa chỉ theo định dạng Việt Nam và tạo nhiều phiên bản địa chỉ
 const normalizeVietnameseAddress = (address) => {
   if (!address || typeof address !== 'string') return { full: '', simplified: '', minimal: '' };
-  
+
   let normalized = address.trim().replace(/\s+/g, ' ');
   normalized = normalized.replace(/[<>[\]{}|]/g, '');
   normalized = normalized.replace(/\bP\.?\b/gi, 'Phường');
   normalized = normalized.replace(/\bQ\.?\b/gi, 'Quận');
   normalized = normalized.replace(/\bTP\.?\b/gi, 'Thành phố');
-  
+
   const parts = normalized.split(',').map(part => part.trim()).filter(part => part);
-  
+
   // Địa chỉ đầy đủ
   let fullAddress = normalized;
   if (parts.length >= 3) {
@@ -673,7 +875,7 @@ const normalizeVietnameseAddress = (address) => {
   } else {
     fullAddress = `${normalized}, Việt Nam`;
   }
-  
+
   // Địa chỉ rút gọn: đường + thành phố
   let simplifiedAddress = '';
   if (parts.length >= 3) {
@@ -683,7 +885,7 @@ const normalizeVietnameseAddress = (address) => {
   } else {
     simplifiedAddress = `${normalized}, Việt Nam`;
   }
-  
+
   // Địa chỉ tối thiểu: chỉ thành phố ---------------------------------------
   const city = parts[parts.length - 1] || 'Việt Nam';
   const minimalAddress = `${city}, Việt Nam`;
@@ -733,7 +935,7 @@ const geocodeAddressFree = async (address) => {
         };
       }
 
-      // Thử với địa chỉ rút gọn
+      // Thử với địa chỉ rút gọn 
       console.log(`Full address failed, trying simplified address: ${simplifiedAddress}`);
       response = await fetch(
         `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(simplifiedAddress)}&limit=1&addressdetails=1&countrycodes=vn&accept-language=vi`,
@@ -783,34 +985,34 @@ const geocodeAddressFree = async (address) => {
   }
 };
 
-router.get('/rentals/search', [sanitizeHeadersMiddleware], async (req, res) => {  
+router.get('/rentals/search', [sanitizeHeadersMiddleware], async (req, res) => {
   try {
-    const { 
-      search, 
-      minPrice, 
-      maxPrice, 
-      propertyType, 
-      status, 
-      page = 1, 
-      limit = 10 
+    const {
+      search,
+      minPrice,
+      maxPrice,
+      propertyType,
+      status,
+      page = 1,
+      limit = 10
     } = req.query;
-    
+
     // 🔥 FIX: Normalize property types
-    const rawPropertyTypes = propertyType 
-      ? (Array.isArray(propertyType) ? propertyType : [propertyType]) 
+    const rawPropertyTypes = propertyType
+      ? (Array.isArray(propertyType) ? propertyType : [propertyType])
       : [];
-    
+
     const propertyTypes = rawPropertyTypes
       .map(type => normalizePropertyType(type))
       .filter(Boolean);
-    
+
     console.log('🔍 Raw property types:', rawPropertyTypes);
     console.log('🔍 Normalized property types:', propertyTypes);
-    
+
     const skip = (Number(page) - 1) * Number(limit);
 
     const cacheKey = `search:${search || ''}:${minPrice || ''}:${maxPrice || ''}:${propertyTypes.sort().join(',')}:${status || ''}:${page}:${limit}`;
-    
+
     const cachedResult = await redisClient.get(cacheKey);
     if (cachedResult) {
       console.log('✅ Serving from cache:', cacheKey);
@@ -825,13 +1027,13 @@ router.get('/rentals/search', [sanitizeHeadersMiddleware], async (req, res) => {
         const decodedToken = await admin.auth().verifyIdToken(token);
         const userId = decodedToken.uid;
         const searchKey = `search:${userId}`;
-        
+
         const existingHistory = await redisClient.lRange(searchKey, 0, -1);
         const normalizedSearch = search.toLowerCase().trim();
         const isDuplicate = existingHistory.some(
           item => item.toLowerCase().trim() === normalizedSearch
         );
-        
+
         if (!isDuplicate) {
           await redisClient.lPush(searchKey, search.trim());
           await redisClient.lTrim(searchKey, 0, 19);
@@ -878,10 +1080,10 @@ router.get('/rentals/search', [sanitizeHeadersMiddleware], async (req, res) => {
       // 🔥 FIX: Property type filter with lowercase matching
       if (propertyTypes.length > 0) {
         // Use terms query with lowercase values
-        query.bool.filter.push({ 
-          terms: { 
+        query.bool.filter.push({
+          terms: {
             'propertyType': propertyTypes.map(t => t.toLowerCase())
-          } 
+          }
         });
         console.log('🏠 Property type filter:', propertyTypes);
       }
@@ -900,7 +1102,7 @@ router.get('/rentals/search', [sanitizeHeadersMiddleware], async (req, res) => {
         index: 'rentals',
         from: skip,
         size: Number(limit),
-        body: { 
+        body: {
           query,
           sort: [
             { _score: { order: 'desc' } },
@@ -918,11 +1120,11 @@ router.get('/rentals/search', [sanitizeHeadersMiddleware], async (req, res) => {
       if (rentalIds.length > 0) {
         const rentalsMap = {};
         const dbRentals = await Rental.find({ _id: { $in: rentalIds } }).lean();
-        
+
         dbRentals.forEach(rental => {
           rentalsMap[rental._id.toString()] = rental;
         });
-        
+
         rentals = rentalIds
           .map(id => rentalsMap[id])
           .filter(Boolean);
@@ -932,26 +1134,26 @@ router.get('/rentals/search', [sanitizeHeadersMiddleware], async (req, res) => {
 
     } catch (esErr) {
       console.error('⚠️ Elasticsearch search failed:', esErr.message);
-      
+
       // ==================== MONGODB FALLBACK ====================
-      const mongoQuery = buildMongoQuery({ 
-        search, 
-        minPrice, 
-        maxPrice, 
-        propertyTypes: propertyTypes.length > 0 ? propertyTypes : null, 
-        status: status || 'available' 
+      const mongoQuery = buildMongoQuery({
+        search,
+        minPrice,
+        maxPrice,
+        propertyTypes: propertyTypes.length > 0 ? propertyTypes : null,
+        status: status || 'available'
       });
-      
+
       console.log('🔄 MongoDB fallback query:', JSON.stringify(mongoQuery, null, 2));
-      
+
       rentals = await Rental.find(mongoQuery)
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(Number(limit))
         .lean();
-      
+
       total = await Rental.countDocuments(mongoQuery);
-      
+
       console.log(`✅ Found ${total} rentals via MongoDB fallback`);
     }
 
@@ -972,14 +1174,14 @@ router.get('/rentals/search', [sanitizeHeadersMiddleware], async (req, res) => {
     };
 
     await redisClient.setEx(cacheKey, 300, JSON.stringify(result));
-    
+
     res.json(result);
   } catch (err) {
     console.error('❌ Error in search:', err);
-    res.status(500).json({ 
+    res.status(500).json({
       success: false,
-      message: 'Failed to fetch rentals', 
-      error: err.message 
+      message: 'Failed to fetch rentals',
+      error: err.message
     });
   }
 });
@@ -1007,10 +1209,10 @@ router.get('/search-history', [sanitizeHeadersMiddleware, authMiddleware], async
   try {
     const searchKey = `search:${req.userId}`;
     const history = await redisClient.lRange(searchKey, 0, -1);
-    
+
     // Loại bỏ trùng lặp và giữ thứ tự
     const uniqueHistory = [...new Set(history.map(item => item.toLowerCase().trim()))];
-    
+
     res.json(uniqueHistory);
   } catch (err) {
     console.error('Error fetching search history:', err);
@@ -1022,10 +1224,10 @@ router.delete('/search-history/:query', [sanitizeHeadersMiddleware, authMiddlewa
     const { query } = req.params;
     const searchKey = `search:${req.userId}`;
     const normalizedQuery = query.toLowerCase().trim();
-    
+
     // Bước 1: Xóa từng mục cụ thể (KHÔNG load toàn bộ)
     const allItems = await redisClient.lRange(searchKey, 0, -1);
-    
+
     // Tìm index của mục cần xóa
     let deletedCount = 0;
     for (let i = 0; i < allItems.length; i++) {
@@ -1035,7 +1237,7 @@ router.delete('/search-history/:query', [sanitizeHeadersMiddleware, authMiddlewa
         console.log(`✅ Deleted: "${allItems[i]}" at index ${i}`);
       }
     }
-    
+
     if (deletedCount === 0) {
       return res.status(404).json({
         success: false,
@@ -1043,9 +1245,9 @@ router.delete('/search-history/:query', [sanitizeHeadersMiddleware, authMiddlewa
         deletedQuery: query,
       });
     }
-    
+
     console.log(`✅ Deleted ${deletedCount} item(s) for user ${req.userId}`);
-    
+
     res.json({
       success: true,
       message: 'Đã xóa mục lịch sử tìm kiếm',
@@ -1067,19 +1269,19 @@ router.delete('/search-history', [sanitizeHeadersMiddleware, authMiddleware], as
   try {
     const searchKey = `search:${req.userId}`;
     await redisClient.del(searchKey);
-    
+
     console.log(`✅ Cleared all search history for user ${req.userId}`);
-    
-    res.json({ 
+
+    res.json({
       success: true,
-      message: 'Đã xóa toàn bộ lịch sử tìm kiếm' 
+      message: 'Đã xóa toàn bộ lịch sử tìm kiếm'
     });
   } catch (err) {
     console.error('Error clearing search history:', err);
-    res.status(500).json({ 
+    res.status(500).json({
       success: false,
-      message: 'Failed to clear search history', 
-      error: err.message 
+      message: 'Failed to clear search history',
+      error: err.message
     });
   }
 });
@@ -1087,11 +1289,11 @@ router.delete('/search-history', [sanitizeHeadersMiddleware, authMiddleware], as
 //  XEM CÁC BÀI TỪ VỊ TRÍ HIỆN TẠI 
 router.get('/rentals/nearby-from-location', async (req, res) => {
   const requestId = Date.now(); // Để track request
-  
+
   try {
     const { latitude, longitude, radius = 10, page = 1, limit = 10, minPrice, maxPrice } = req.query;
     const skip = (Number(page) - 1) * Number(limit);
-    
+
     console.log(`🔍 [${requestId}] [NEARBY-FROM-LOCATION] Request:`, {
       latitude,
       longitude,
@@ -1101,28 +1303,28 @@ router.get('/rentals/nearby-from-location', async (req, res) => {
       page,
       limit
     });
-    
+
     // ✅ VALIDATE COORDINATES
     const lat = parseFloat(latitude);
     const lon = parseFloat(longitude);
-    
+
     if (isNaN(lat) || isNaN(lon)) {
-      return res.status(400).json({ 
+      return res.status(400).json({
         success: false,
         message: 'Invalid coordinates: latitude and longitude must be numbers',
         received: { latitude, longitude }
       });
     }
-    
+
     if (Math.abs(lon) > 180 || Math.abs(lat) > 90) {
-      return res.status(400).json({ 
+      return res.status(400).json({
         success: false,
         message: 'Coordinates out of valid range',
         received: { latitude: lat, longitude: lon },
         validRange: { latitude: '[-90, 90]', longitude: '[-180, 180]' }
       });
     }
-    
+
     // ✅ VALIDATE RADIUS
     const radiusNum = parseFloat(radius);
     if (isNaN(radiusNum) || radiusNum <= 0 || radiusNum > 100) {
@@ -1132,10 +1334,10 @@ router.get('/rentals/nearby-from-location', async (req, res) => {
         received: radius
       });
     }
-    
+
     // ✅ BUILD PRICE FILTER SAFELY
     let priceFilter = {};
-    
+
     if (minPrice !== undefined && minPrice !== null && minPrice !== '') {
       const minVal = Number(minPrice);
       if (!isNaN(minVal) && minVal >= 0) {
@@ -1143,7 +1345,7 @@ router.get('/rentals/nearby-from-location', async (req, res) => {
         console.log(`✅ [${requestId}] Min price filter: >= ${minVal}`);
       }
     }
-    
+
     if (maxPrice !== undefined && maxPrice !== null && maxPrice !== '') {
       const maxVal = Number(maxPrice);
       if (!isNaN(maxVal) && maxVal > 0) {
@@ -1151,10 +1353,10 @@ router.get('/rentals/nearby-from-location', async (req, res) => {
         console.log(`✅ [${requestId}] Max price filter: <= ${maxVal}`);
       }
     }
-    
+
     const radiusInMeters = radiusNum * 1000;
     const radiusInRadians = radiusInMeters / 6378100; // Earth's radius in meters
-    
+
     console.log(`📍 [${requestId}] Search center: [${lon}, ${lat}]`);
     console.log(`📏 [${requestId}] Radius: ${radiusNum}km (${radiusInMeters}m)`);
 
@@ -1162,7 +1364,7 @@ router.get('/rentals/nearby-from-location', async (req, res) => {
     const geoQueryFilter = {
       status: 'available',
     };
-    
+
     if (Object.keys(priceFilter).length > 0) {
       geoQueryFilter.price = priceFilter;
     }
@@ -1170,23 +1372,23 @@ router.get('/rentals/nearby-from-location', async (req, res) => {
     let nearbyRentals = [];
     let total = 0;
     let searchMethod = 'geospatial_from_location';
-    
+
     try {
       // 🔥 CHECK: Ensure geospatial index exists
       const indexes = await Rental.collection.getIndexes();
-      const hasGeoIndex = Object.keys(indexes).some(key => 
+      const hasGeoIndex = Object.keys(indexes).some(key =>
         indexes[key]['location.coordinates'] === '2dsphere'
       );
-      
+
       if (!hasGeoIndex) {
         console.warn(`⚠️ [${requestId}] No 2dsphere index, creating...`);
         await Rental.collection.createIndex({ 'location.coordinates': '2dsphere' });
         console.log(`✅ [${requestId}] Geospatial index created`);
       }
-      
+
       // 🔥 EXECUTE GEOSPATIAL QUERY
       console.log(`🚀 [${requestId}] Executing geospatial aggregation...`);
-      
+
       nearbyRentals = await Rental.aggregate([
         {
           $geoNear: {
@@ -1221,9 +1423,9 @@ router.get('/rentals/nearby-from-location', async (req, res) => {
           },
         },
       ]).maxTimeMS(30000);
-      
+
       console.log(`✅ [${requestId}] Query returned ${nearbyRentals.length} results`);
-      
+
       // COUNT TOTAL
       total = await Rental.countDocuments({
         'location.coordinates': {
@@ -1233,16 +1435,16 @@ router.get('/rentals/nearby-from-location', async (req, res) => {
         },
         ...geoQueryFilter,
       }).maxTimeMS(10000);
-      
+
       console.log(`✅ [${requestId}] Total count: ${total}`);
-      
+
     } catch (geoError) {
       console.error(`❌ [${requestId}] Geospatial error:`, geoError.message);
-      
+
       // ✅ FALLBACK: Simple query
       console.log(`⚠️ [${requestId}] Falling back to simple query...`);
       searchMethod = 'fallback_location_based';
-      
+
       nearbyRentals = await Rental.find(geoQueryFilter)
         .sort({ createdAt: -1 })
         .skip(skip)
@@ -1250,30 +1452,30 @@ router.get('/rentals/nearby-from-location', async (req, res) => {
         .select('title price location images videos propertyType createdAt area furniture amenities surroundings rentalTerms contactInfo status userId')
         .lean()
         .maxTimeMS(10000);
-      
+
       total = await Rental.countDocuments(geoQueryFilter).maxTimeMS(5000);
-      
+
       console.log(`✅ [${requestId}] Fallback returned ${nearbyRentals.length} results`);
-      
+
       // Calculate approximate distance
       nearbyRentals = nearbyRentals.map(rental => {
         const [rentLon, rentLat] = rental.location?.coordinates?.coordinates || [0, 0];
-        
+
         // Haversine formula
         const R = 6371;
         const dLat = (rentLat - lat) * Math.PI / 180;
         const dLon = (rentLon - lon) * Math.PI / 180;
-        const a = 
-          Math.sin(dLat/2) * Math.sin(dLat/2) +
+        const a =
+          Math.sin(dLat / 2) * Math.sin(dLat / 2) +
           Math.cos(lat * Math.PI / 180) * Math.cos(rentLat * Math.PI / 180) *
-          Math.sin(dLon/2) * Math.sin(dLon/2);
-        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+          Math.sin(dLon / 2) * Math.sin(dLon / 2);
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
         const distance = R * c * 1000;
-        
+
         return { ...rental, distance };
       });
     }
-    
+
     // ✅ TRANSFORM RESULTS
     const transformedRentals = nearbyRentals.map(rental => ({
       ...rental,
@@ -1281,9 +1483,9 @@ router.get('/rentals/nearby-from-location', async (req, res) => {
       distance: rental.distance ? (rental.distance / 1000).toFixed(2) : null,
       distanceKm: rental.distance ? (rental.distance / 1000).toFixed(2) + 'km' : 'N/A'
     }));
-    
+
     console.log(`✅ [${requestId}] Response: ${transformedRentals.length} rentals`);
-    
+
     res.json({
       success: true,
       rentals: transformedRentals,
@@ -1299,11 +1501,11 @@ router.get('/rentals/nearby-from-location', async (req, res) => {
         maxPrice: priceFilter.$lte || null,
       }
     });
-    
+
   } catch (err) {
     console.error(`❌ [${requestId}] CRITICAL Error:`, err);
-    
-    res.status(500).json({ 
+
+    res.status(500).json({
       success: false,
       message: 'Failed to fetch rental details',
       error: err.message,
@@ -1316,56 +1518,56 @@ router.get('/rentals/nearby/:id', async (req, res) => {
   try {
     const { radius = 10, page = 1, limit = 10, minPrice, maxPrice } = req.query;
     const skip = (Number(page) - 1) * Number(limit);
-    
+
     // ✅ Set timeout headers
     req.setTimeout(60000); // 60 seconds
     res.setTimeout(60000);
-    
+
     console.log(`🔍 Fetching nearby rentals for ID: ${req.params.id} (radius: ${radius}km)`);
     console.log(`💰 Price filter: min=${minPrice}, max=${maxPrice}`);
-    
+
     if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
-      return res.status(400).json({ 
+      return res.status(400).json({
         success: false,
-        message: 'Invalid rental ID format' 
+        message: 'Invalid rental ID format'
       });
     }
-    
+
     const rental = await Rental.findById(req.params.id)
-      .select('location coordinates') 
+      .select('location coordinates')
       .lean();
-      
+
     if (!rental) {
       console.log(`❌ Rental with ID ${req.params.id} not found`);
-      return res.status(404).json({ 
+      return res.status(404).json({
         success: false,
-        message: 'Rental not found' 
+        message: 'Rental not found'
       });
     }
-    
+
     // Extract coordinates
     let coordinates;
-    if (rental.location?.coordinates?.coordinates && 
-        Array.isArray(rental.location.coordinates.coordinates) && 
-        rental.location.coordinates.coordinates.length === 2) {
+    if (rental.location?.coordinates?.coordinates &&
+      Array.isArray(rental.location.coordinates.coordinates) &&
+      rental.location.coordinates.coordinates.length === 2) {
       coordinates = rental.location.coordinates.coordinates;
     } else if (rental.coordinates && Array.isArray(rental.coordinates) && rental.coordinates.length === 2) {
       coordinates = rental.coordinates;
     } else {
-      return res.status(400).json({ 
+      return res.status(400).json({
         success: false,
-        message: 'Rental has invalid coordinate structure' 
+        message: 'Rental has invalid coordinate structure'
       });
     }
-    
+
     const [longitude, latitude] = coordinates;
-    
+
     if (typeof longitude !== 'number' || typeof latitude !== 'number' ||
-        isNaN(longitude) || isNaN(latitude) ||
-        Math.abs(longitude) > 180 || Math.abs(latitude) > 90) {
-      return res.status(400).json({ 
+      isNaN(longitude) || isNaN(latitude) ||
+      Math.abs(longitude) > 180 || Math.abs(latitude) > 90) {
+      return res.status(400).json({
         success: false,
-        message: 'Rental has invalid coordinate values' 
+        message: 'Rental has invalid coordinate values'
       });
     }
 
@@ -1387,21 +1589,21 @@ router.get('/rentals/nearby/:id', async (req, res) => {
         console.log(`✅ Max price filter: <= ${maxVal}`);
       }
     }
-    
+
     // Handle [0, 0] coordinates - fallback to location-based search
     if (longitude === 0 && latitude === 0) {
       console.log('⚠️ Coordinates are [0, 0], using location-based fallback');
-      
+
       const fullRental = await Rental.findById(req.params.id).select('location').lean();
       const locationParts = fullRental.location?.fullAddress?.split(',') || [];
       const wardInfo = locationParts.length > 1 ? locationParts[1].trim() : '';
-      
+
       const query = {
         _id: { $ne: new mongoose.Types.ObjectId(req.params.id) },
         status: 'available',
         ...(wardInfo && { 'location.fullAddress': { $regex: wardInfo, $options: 'i' } }),
       };
-      
+
       // 🔥 Thêm price filter vào query
       if (Object.keys(priceFilter).length > 0) {
         query.price = priceFilter;
@@ -1410,15 +1612,15 @@ router.get('/rentals/nearby/:id', async (req, res) => {
 
       const [nearbyRentals, total] = await Promise.all([
         Rental.find(query)
-          .select('title price location images videos propertyType createdAt area') 
+          .select('title price location images videos propertyType createdAt area')
           .skip(skip)
           .limit(Number(limit))
           .lean(),
         Rental.countDocuments(query)
       ]);
-      
+
       console.log(`✅ Fallback search: Found ${nearbyRentals.length} rentals (total: ${total})`);
-      
+
       return res.json({
         success: true,
         rentals: nearbyRentals.map(rental => ({
@@ -1433,23 +1635,23 @@ router.get('/rentals/nearby/:id', async (req, res) => {
         searchMethod: 'location_fallback'
       });
     }
-    
+
     const radiusInMeters = parseFloat(radius) * 1000;
     const radiusInRadians = radiusInMeters / 6378100;
-    
+
     console.log(`📍 Search center: [${longitude}, ${latitude}]`);
     console.log(`📏 Radius: ${radius}km (${radiusInMeters}m)`);
 
     // ============================================
     // 🔥 GEOSPATIAL QUERY - CẬP NHẬT với price filter
     // ============================================
-    
+
     // Build query filter object
     const geoQueryFilter = {
       _id: { $ne: new mongoose.Types.ObjectId(req.params.id) },
       status: 'available',
     };
-    
+
     // 🔥 Thêm price filter vào geo query
     if (Object.keys(priceFilter).length > 0) {
       geoQueryFilter.price = priceFilter;
@@ -1500,16 +1702,16 @@ router.get('/rentals/nearby/:id', async (req, res) => {
         ...geoQueryFilter,
       })
     ]);
-    
+
     console.log(`✅ Geospatial query: Found ${nearbyRentals.length} rentals (total: ${total})`);
-    
+
     const transformedRentals = nearbyRentals.map(rental => ({
       ...rental,
       coordinates: rental.coordinates || rental.location?.coordinates?.coordinates || [0, 0],
       distance: rental.distance ? (rental.distance / 1000).toFixed(2) : null,
       distanceKm: rental.distance ? (rental.distance / 1000).toFixed(2) + 'km' : 'N/A'
     }));
-    
+
     res.json({
       success: true,
       rentals: transformedRentals,
@@ -1525,18 +1727,18 @@ router.get('/rentals/nearby/:id', async (req, res) => {
         maxPrice: Object.keys(priceFilter).includes('$lte') ? priceFilter.$lte : null,
       }
     });
-    
+
   } catch (err) {
     console.error('❌ Error fetching nearby rentals:', err);
-    
+
     if (err.name === 'CastError') {
-      return res.status(400).json({ 
+      return res.status(400).json({
         success: false,
-        message: 'Invalid rental ID format', 
-        error: err.message 
+        message: 'Invalid rental ID format',
+        error: err.message
       });
     }
-    
+
     if (err.message?.includes('timeout')) {
       return res.status(504).json({
         success: false,
@@ -1544,11 +1746,11 @@ router.get('/rentals/nearby/:id', async (req, res) => {
         error: 'Gateway Timeout'
       });
     }
-    
-    res.status(500).json({ 
+
+    res.status(500).json({
       success: false,
-      message: 'Failed to fetch nearby rentals', 
-      error: err.message 
+      message: 'Failed to fetch nearby rentals',
+      error: err.message
     });
   }
 });
@@ -1556,7 +1758,7 @@ router.get('/rentals/nearby/:id', async (req, res) => {
 router.post('/admin/ensure-geospatial-index', verifyAdmin, async (req, res) => {
   try {
     console.log('🔧 [ENSURE-INDEX] Starting...');
-    
+
     // Drop old index if exists
     try {
       await Rental.collection.dropIndex('location.coordinates_2dsphere');
@@ -1564,20 +1766,20 @@ router.post('/admin/ensure-geospatial-index', verifyAdmin, async (req, res) => {
     } catch (e) {
       // Index doesn't exist
     }
-    
+
     // Create new index
     await Rental.collection.createIndex({ 'location.coordinates': '2dsphere' });
     console.log('✅ Geospatial index created');
-    
+
     // Verify
     const indexes = await Rental.collection.getIndexes();
-    
+
     res.json({
       success: true,
       message: 'Geospatial index ensured',
       indexes: Object.keys(indexes),
     });
-    
+
   } catch (err) {
     console.error('❌ Error ensuring index:', err);
     res.status(500).json({
@@ -1671,43 +1873,59 @@ router.post('/rentals', authMiddleware, upload.array('media'), checkPaymentStatu
     let geocodingStatus = 'pending';
 
     const { full: fullAddress } = normalizeVietnameseAddress(req.body.locationFullAddress);
-    if (!fullAddress) {
-      return res.status(400).json({ message: 'Invalid or missing full address' });
-    }
 
-    if (coordinates[0] === 0 && coordinates[1] === 0 || isNaN(coordinates[0]) || isNaN(coordinates[1])) {
+    let addressComponents = null;
+    const images = req.files?.filter(f => !f.mimetype.startsWith('video/')).map(f => f.path) || [];
+    const videos = req.files?.filter(f => f.mimetype.startsWith('video/')).map(f => f.path) || [];
+
+    // 🔥 GEOCODE CẢI TIẾN
+    if (coordinates[0] === 0 && coordinates[1] === 0 ||
+      isNaN(coordinates[0]) || isNaN(coordinates[1])) {
       try {
-        console.log(`Geocoding address: ${fullAddress}`);
-        const geocodeResult = await geocodeAddressFree(fullAddress);
+        console.log(`🔍 Geocoding address: ${fullAddress}`);
+        const geocodeResult = await geocodeAddressFreeImproved(fullAddress);
+
         coordinates = [geocodeResult.longitude, geocodeResult.latitude];
         formattedAddress = geocodeResult.formattedAddress;
-        geocodingStatus = 'success';
+        geocodingStatus = geocodeResult.status;
+        addressComponents = geocodeResult.addressComponents;
+
+        console.log(`✅ Geocoded successfully`);
+        console.log(`   Coordinates: [${coordinates[0]}, ${coordinates[1]}]`);
+        console.log(`   Components: ${JSON.stringify(addressComponents)}`);
       } catch (geocodeError) {
         console.error('Geocoding failed:', geocodeError.message);
-        coordinates = [0, 0];
-        formattedAddress = fullAddress;
-        geocodingStatus = 'failed';
+
+        return res.status(400).json({
+          success: false,
+          message: `Geocoding failed: ${geocodeError.message}`,
+          hint: 'Please verify your address or use the map picker to set coordinates manually'
+        });
       }
     } else {
       geocodingStatus = 'manual';
-    }
 
-    // Phân loại ảnh và video
-    const images = [];
-    const videos = [];
-    
-    if (req.files && req.files.length > 0) {
-      req.files.forEach(file => {
-        if (file.mimetype.startsWith('video/')) {
-          videos.push(file.path);
-        } else {
-          images.push(file.path);
+      // 🔥 Khi user nhập tọa độ thủ công, thử lấy địa chỉ chi tiết
+      try {
+        const response = await fetch(
+          `https://nominatim.openstreetmap.org/reverse?` +
+          `format=json&lat=${coordinates[1]}&lon=${coordinates[0]}&` +
+          `zoom=18&addressdetails=1&accept-language=vi`,
+          {
+            headers: { 'User-Agent': 'RentalHouseApp/1.0' },
+            timeout: 10000,
+          }
+        );
+        if (response.ok) {
+          const data = await response.json();
+          addressComponents = extractAddressComponents(data);
         }
-      });
-      console.log(`📸 Uploaded ${images.length} images, 🎥 ${videos.length} videos`);
+      } catch (e) {
+        console.warn('Could not get reverse geocoding:', e.message);
+      }
     }
 
-    // ✅ Tạo rental với payment info
+    // ✅ Tạo rental object
     const rental = new Rental({
       title: req.body.title,
       price: req.body.price,
@@ -1747,7 +1965,9 @@ router.post('/rentals', authMiddleware, upload.array('media'), checkPaymentStatu
       status: req.body.status || 'available',
       geocodingStatus: geocodingStatus,
 
-      // ✅ PAYMENT INFO
+      // 🔥 LƯU THÔNG TIN ĐỊA CHỈ CHI TIẾT
+      addressComponents: addressComponents || {},
+
       paymentInfo: {
         transactionCode: req.paymentTransactionCode,
         paymentId: req.payment._id,
@@ -1759,40 +1979,39 @@ router.post('/rentals', authMiddleware, upload.array('media'), checkPaymentStatu
     });
 
     const newRental = await rental.save();
-    
-    // ✅ Cập nhật payment với rentalId
+
     await Payment.updateOne(
       { _id: req.payment._id },
       { rentalId: newRental._id }
     );
-    
+
     console.log(`✅ Rental created successfully: ${newRental._id}`);
-    console.log(`✅ Title: ${newRental.title}`);
-    console.log(`✅ Payment linked: ${req.paymentTransactionCode}`);
-    console.log(`✅ Published at: ${newRental.publishedAt}`);
-    
+    console.log(`   Geocoding Status: ${geocodingStatus}`);
+    console.log(`   Coordinates: [${coordinates[0]}, ${coordinates[1]}]`);
+
     await syncRentalToElasticsearch(newRental);
-    
+
     res.status(201).json({
       success: true,
       message: 'Bài đăng tạo thành công',
       rental: newRental,
-      paymentInfo: {
-        transactionCode: req.paymentTransactionCode,
-        amount: req.payment.amount,
-        status: 'completed',
-        paidAt: req.payment.completedAt,
+      geocodingInfo: {
+        status: geocodingStatus,
+        coordinates: coordinates,
+        addressComponents: addressComponents,
       },
     });
+
+
   } catch (err) {
     console.error('❌ Error creating rental:', err);
     if (err instanceof multer.MulterError) {
       return res.status(400).json({ message: `File upload error: ${err.message}` });
     }
-    res.status(400).json({ 
+    res.status(400).json({
       success: false,
-      message: 'Failed to create rental', 
-      error: err.message 
+      message: 'Failed to create rental',
+      error: err.message
     });
   }
 });
@@ -1809,12 +2028,12 @@ router.patch('/rentals/:id', authMiddleware, upload.array('media'), async (req, 
     }
 
     if (rental.userId !== req.userId) {
-      return res.status(403).json({ 
+      return res.status(403).json({
         success: false,
-        message: 'Unauthorized: You do not own this rental' 
+        message: 'Unauthorized: You do not own this rental'
       });
     }
-    
+
     // ✨ THÊM: Không cho edit nếu chưa thanh toán
     if (rental.paymentInfo?.status !== 'completed') {
       return res.status(402).json({
@@ -1909,7 +2128,7 @@ router.patch('/rentals/:id', authMiddleware, upload.array('media'), async (req, 
     let updatedImages = [...(rental.images || [])];
     let updatedVideos = [...(rental.videos || [])];
     let removedMedia = [];
-    
+
     if (req.body.removedMedia) {
       try {
         if (typeof req.body.removedMedia === 'string') {
@@ -1927,16 +2146,16 @@ router.patch('/rentals/:id', authMiddleware, upload.array('media'), async (req, 
       if (!Array.isArray(removedMedia)) removedMedia = [removedMedia];
 
       const cloudinaryIdsToDelete = [];
-      
+
       for (const mediaUrl of removedMedia) {
         if (typeof mediaUrl !== 'string') continue;
-        
+
         if (updatedImages.includes(mediaUrl)) {
           updatedImages = updatedImages.filter(img => img !== mediaUrl);
           const publicId = extractCloudinaryPublicId(mediaUrl);
           if (publicId) cloudinaryIdsToDelete.push(publicId);
         }
-        
+
         if (updatedVideos.includes(mediaUrl)) {
           updatedVideos = updatedVideos.filter(vid => vid !== mediaUrl);
           const publicId = extractCloudinaryPublicId(mediaUrl);
@@ -1953,7 +2172,7 @@ router.patch('/rentals/:id', authMiddleware, upload.array('media'), async (req, 
     if (req.files && req.files.length > 0) {
       const newImages = [];
       const newVideos = [];
-      
+
       req.files.forEach(file => {
         if (file.mimetype.startsWith('video/')) {
           newVideos.push(file.path);
@@ -1961,7 +2180,7 @@ router.patch('/rentals/:id', authMiddleware, upload.array('media'), async (req, 
           newImages.push(file.path);
         }
       });
-      
+
       updatedImages = [...new Set([...updatedImages, ...newImages])];
       updatedVideos = [...new Set([...updatedVideos, ...newVideos])];
     }
@@ -1980,9 +2199,9 @@ router.patch('/rentals/:id', authMiddleware, upload.array('media'), async (req, 
     }
 
     await syncRentalToElasticsearch(updatedRental);
-    
+
     res.json({
-      message: updatedData.location?.coordinates?.coordinates[0] === 0 && updatedData.location?.coordinates?.coordinates[1] === 0 
+      message: updatedData.location?.coordinates?.coordinates[0] === 0 && updatedData.location?.coordinates?.coordinates[1] === 0
         ? 'Rental updated successfully, but geocoding failed. Coordinates set to [0, 0]. Please update coordinates using /rentals/fix-coordinates/:id.'
         : 'Rental updated successfully',
       rental: {
@@ -2004,7 +2223,7 @@ router.patch('/rentals/:id', authMiddleware, upload.array('media'), async (req, 
 router.get('/rentals/:id/payment-status', authMiddleware, async (req, res) => {
   try {
     const rental = await Rental.findById(req.params.id);
-    
+
     if (!rental) {
       return res.status(404).json({
         success: false,
@@ -2019,7 +2238,7 @@ router.get('/rentals/:id/payment-status', authMiddleware, async (req, res) => {
       });
     }
 
-    const payment = rental.paymentInfo?.paymentId 
+    const payment = rental.paymentInfo?.paymentId
       ? await Payment.findById(rental.paymentInfo.paymentId)
       : null;
 
@@ -2067,12 +2286,12 @@ router.delete('/rentals/:id', authMiddleware, async (req, res) => {
 
     // Delete images and videos from Cloudinary
     const cloudinaryIdsToDelete = [];
-    
+
     (rental.images || []).forEach(imageUrl => {
       const publicId = extractCloudinaryPublicId(imageUrl);
       if (publicId) cloudinaryIdsToDelete.push(publicId);
     });
-    
+
     (rental.videos || []).forEach(videoUrl => {
       const publicId = extractCloudinaryPublicId(videoUrl);
       if (publicId) cloudinaryIdsToDelete.push(publicId);
@@ -2126,8 +2345,8 @@ router.post('/rentals/geocode/:id', authMiddleware, async (req, res) => {
 
     const { full: fullAddress } = normalizeVietnameseAddress(req.body.address || rental.location?.fullAddress);
     if (!fullAddress) {
-      return res.status(400).json({ 
-        message: 'No address provided. Include address in request body or ensure rental has fullAddress' 
+      return res.status(400).json({
+        message: 'No address provided. Include address in request body or ensure rental has fullAddress'
       });
     }
 
@@ -2139,8 +2358,8 @@ router.post('/rentals/geocode/:id', authMiddleware, async (req, res) => {
       console.log('Used Nominatim geocoding service');
     } catch (geocodeError) {
       console.error('Geocoding failed:', geocodeError.message);
-      return res.status(400).json({ 
-        message: 'Failed to geocode address', 
+      return res.status(400).json({
+        message: 'Failed to geocode address',
         error: geocodeError.message,
         addressTried: fullAddress,
       });
@@ -2185,29 +2404,29 @@ router.post('/rentals/geocode/:id', authMiddleware, async (req, res) => {
 router.post('/rentals/:id/contact', authMiddleware, trackAction('contact'), async (req, res) => {
   try {
     // Xử lý logic contact (gửi email, sms, etc.)
-    res.json({ 
-      success: true, 
-      message: 'Contact request sent successfully' 
+    res.json({
+      success: true,
+      message: 'Contact request sent successfully'
     });
   } catch (err) {
-    res.status(500).json({ 
-      success: false, 
-      message: 'Failed to send contact request', 
-      error: err.message 
+    res.status(500).json({
+      success: false,
+      message: 'Failed to send contact request',
+      error: err.message
     });
   }
 });
 router.post('/rentals/:id/share', authMiddleware, trackAction('share'), async (req, res) => {
   try {
-    res.json({ 
-      success: true, 
-      message: 'Share tracked successfully' 
+    res.json({
+      success: true,
+      message: 'Share tracked successfully'
     });
   } catch (err) {
-    res.status(500).json({ 
-      success: false, 
-      message: 'Failed to track share', 
-      error: err.message 
+    res.status(500).json({
+      success: false,
+      message: 'Failed to track share',
+      error: err.message
     });
   }
 });
@@ -2215,10 +2434,10 @@ router.get('/rentals/trending/now', async (req, res) => {
   try {
     const UserInteraction = require('../models/UserInteraction');
     const limit = parseInt(req.query.limit) || 10;
-    
+
     // Get trending rental IDs
     const trending = await UserInteraction.getTrendingRentals(limit);
-    
+
     if (trending.length === 0) {
       return res.json({
         success: true,
@@ -2226,12 +2445,12 @@ router.get('/rentals/trending/now', async (req, res) => {
         message: 'No trending data yet'
       });
     }
-    
+
     // Get full rental data
     const rentalIds = trending.map(t => t._id);
     const rentals = await Rental.find({ _id: { $in: rentalIds }, status: 'available' })
       .lean();
-    
+
     // Merge with scores
     const rentalsWithScore = rentals.map(rental => {
       const trendData = trending.find(t => t._id.toString() === rental._id.toString());
@@ -2243,10 +2462,10 @@ router.get('/rentals/trending/now', async (req, res) => {
         contactCount: trendData?.contactCount || 0
       };
     });
-    
+
     // Sort by score
     rentalsWithScore.sort((a, b) => b.trendingScore - a.trendingScore);
-    
+
     res.json({
       success: true,
       rentals: rentalsWithScore,
@@ -2254,10 +2473,10 @@ router.get('/rentals/trending/now', async (req, res) => {
     });
   } catch (err) {
     console.error('Error getting trending rentals:', err);
-    res.status(500).json({ 
-      success: false, 
-      message: 'Failed to get trending rentals', 
-      error: err.message 
+    res.status(500).json({
+      success: false,
+      message: 'Failed to get trending rentals',
+      error: err.message
     });
   }
 });
@@ -2265,16 +2484,16 @@ router.get('/rentals/:id/stats', async (req, res) => {
   try {
     const UserInteraction = require('../models/UserInteraction');
     const rentalId = req.params.id;
-    
+
     if (!mongoose.Types.ObjectId.isValid(rentalId)) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'Invalid rental ID' 
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid rental ID'
       });
     }
-    
+
     const stats = await UserInteraction.getRentalPopularity(rentalId);
-    
+
     res.json({
       success: true,
       rentalId,
@@ -2282,10 +2501,10 @@ router.get('/rentals/:id/stats', async (req, res) => {
     });
   } catch (err) {
     console.error('Error getting rental stats:', err);
-    res.status(500).json({ 
-      success: false, 
-      message: 'Failed to get rental stats', 
-      error: err.message 
+    res.status(500).json({
+      success: false,
+      message: 'Failed to get rental stats',
+      error: err.message
     });
   }
 });
@@ -2294,13 +2513,13 @@ router.get('/admin/export-interactions', verifyAdmin, async (req, res) => {
     const UserInteraction = require('../models/UserInteraction');
     const limit = parseInt(req.query.limit) || 10000;
     const skip = parseInt(req.query.skip) || 0;
-    
+
     const interactions = await UserInteraction.find()
       .sort({ timestamp: -1 })
       .skip(skip)
       .limit(limit)
       .lean();
-    
+
     res.json({
       success: true,
       count: interactions.length,
@@ -2308,10 +2527,10 @@ router.get('/admin/export-interactions', verifyAdmin, async (req, res) => {
     });
   } catch (err) {
     console.error('Error exporting interactions:', err);
-    res.status(500).json({ 
-      success: false, 
-      message: 'Failed to export interactions', 
-      error: err.message 
+    res.status(500).json({
+      success: false,
+      message: 'Failed to export interactions',
+      error: err.message
     });
   }
 });
@@ -2341,7 +2560,7 @@ router.post('/rentals/geocode-all', authMiddleware, async (req, res) => {
       try {
         console.log(`Geocoding rental ${rental._id}: ${rental.location.fullAddress}`);
         const geocodeResult = await geocodeAddressFree(rental.location.fullAddress);
-        
+
         await Rental.findByIdAndUpdate(
           rental._id,
           {
@@ -2406,7 +2625,7 @@ router.patch('/rentals/fix-coordinates/:id', authMiddleware, async (req, res) =>
     let newLongitude = parseFloat(req.body.longitude);
 
     if (isNaN(newLatitude) || isNaN(newLongitude)) {
-      return res.status(400).json({ 
+      return res.status(400).json({
         message: 'Please provide valid latitude and longitude in request body',
         example: { latitude: 10.762622, longitude: 106.660172 },
       });
@@ -2453,7 +2672,7 @@ router.patch('/rentals/fix-coordinates/:id', authMiddleware, async (req, res) =>
 router.get('/rentals/nearby-fallback/:id', async (req, res) => {
   try {
     const { radius = 5 } = req.query;
-    
+
     if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
       return res.status(400).json({ message: 'Invalid rental ID format' });
     }
@@ -2469,7 +2688,7 @@ router.get('/rentals/nearby-fallback/:id', async (req, res) => {
     }
 
     const [targetLon, targetLat] = coordinates;
-    
+
     const nearbyRentals = await Rental.aggregate([
       {
         $match: {
@@ -2957,7 +3176,7 @@ router.get('/admin/dashboard/user-growth', verifyAdmin, async (req, res) => {
 router.get('/admin/dashboard/top-posts', verifyAdmin, async (req, res) => {
   try {
     const limit = parseInt(req.query.limit) || 5;
-    
+
     const topPosts = await Rental.find()
       .select('title price location views images createdAt')
       .sort({ views: -1 })

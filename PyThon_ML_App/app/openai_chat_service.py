@@ -32,7 +32,7 @@ class RentalChatAssistant:
         self.model = model
         self.chat_model = os.getenv('GROQ_MODEL', 'llama-3.3-70b-versatile')
         self.temperature = 0.3  # 🔥 LOWER để giảm hallucination
-        self.max_tokens = 800   # 🔥 GIỚI HẠN để tránh dài dòng
+        self.max_tokens = 800   # 🔥 GIỚI HẠN để tránh dài dòng 
         
         print(f"✅ Enhanced Chat Assistant initialized")
         print(f"   Model: {self.chat_model}")
@@ -421,6 +421,20 @@ LÀM ĐÚNG THẾ NÀY!"""
             else:
                 preferences['search_radius'] = 20
         
+    # ===== 9. LOCATION INTENT - NEW =====
+        location_intent = self._extract_location_from_message(user_msg)
+        if location_intent['wants_nearby']:
+            preferences['wants_nearby_location'] = True
+            preferences['needs_user_location'] = location_intent['needs_user_location']
+            print(f"   📍 Location intent detected: nearby search")
+        
+        # ===== 10. POI INTENT - NEW =====
+        poi_intent = self._extract_poi_from_message(user_msg)
+        if poi_intent['has_poi_intent']:
+            preferences['poi_categories'] = poi_intent['categories']
+            preferences['wants_poi_filter'] = True
+            print(f"   🏢 POI categories detected: {', '.join(poi_intent['categories'])}")
+        
         return preferences
     
     def _classify_intent(self, user_msg: str) -> str:
@@ -556,6 +570,55 @@ LÀM ĐÚNG THẾ NÀY!"""
             print(f"   📐 Area filter: {len(filtered)} rentals remain")
         
         return filtered
+
+    def _extract_location_from_message(self, message: str) -> dict:
+        """
+        🔥 NEW: Extract location intent from user message
+        """
+        msg_lower = message.lower()
+        
+        location_keywords = {
+            'nearby': ['gần đây', 'xung quanh', 'lân cận', 'nearby', 'around here'],
+            'current': ['vị trí hiện tại', 'current location', 'nơi tôi đang ở'],
+            'map': ['trên bản đồ', 'on map', 'map'],
+        }
+        
+        # Check if asking for nearby recommendations
+        wants_nearby = any(kw in msg_lower for kw in location_keywords['nearby'])
+        wants_current = any(kw in msg_lower for kw in location_keywords['current'])
+        wants_map = any(kw in msg_lower for kw in location_keywords['map'])
+        
+        return {
+            'wants_nearby': wants_nearby or wants_current or wants_map,
+            'needs_user_location': True
+        }
+
+    def _extract_poi_from_message(self, message: str) -> dict:
+        """
+        🔥 NEW: Extract POI categories from user message
+        """
+        msg_lower = message.lower()
+        
+        poi_keywords = {
+            'EDUCATION': ['trường', 'school', 'university', 'đại học', 'học'],
+            'HOSPITAL': ['bệnh viện', 'hospital', 'phòng khám', 'clinic', 'y tế'],
+            'TRANSPORT': ['xe buýt', 'bus', 'tàu điện', 'subway', 'giao thông'],
+            'SHOPPING': ['siêu thị', 'supermarket', 'chợ', 'market', 'mua sắm'],
+            'RESTAURANT': ['quán ăn', 'restaurant', 'cafe', 'ăn uống'],
+            'PARK': ['công viên', 'park', 'garden'],
+            'BANK': ['ngân hàng', 'bank', 'atm'],
+            'GYM': ['gym', 'thể thao', 'fitness'],
+        }
+        
+        detected_categories = []
+        for category, keywords in poi_keywords.items():
+            if any(kw in msg_lower for kw in keywords):
+                detected_categories.append(category)
+        
+        return {
+            'has_poi_intent': len(detected_categories) > 0,
+            'categories': detected_categories
+        }
     
     def explain_rental_detail(
         self,

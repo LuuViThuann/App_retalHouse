@@ -19,6 +19,7 @@ class Rental {
   final DateTime createdAt;
   final String landlord;
 
+
   // PAYMENT FIELDS
   final String? paymentTransactionCode;
   final Map<String, dynamic>? paymentInfo;

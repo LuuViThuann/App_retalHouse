@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:http/http.dart' as http;
@@ -67,6 +68,8 @@ class AddressSearchWidget extends StatefulWidget {
   final VoidCallback? onClose;
   final VoidCallback? onSearchStart;
   final VoidCallback? onSearchEnd;
+  final LatLng? currentLocation;
+
 
   const AddressSearchWidget({
     Key? key,
@@ -75,6 +78,7 @@ class AddressSearchWidget extends StatefulWidget {
     this.onClose,
     this.onSearchStart,
     this.onSearchEnd,
+    this.currentLocation,
   }) : super(key: key);
 
   @override
@@ -119,7 +123,6 @@ class _AddressSearchWidgetState extends State<AddressSearchWidget> {
   void _searchAddress(String query) {
     _debounceTimer?.cancel();
 
-    // 🔥 Trigger callback khi user bắt đầu input
     if (query.isNotEmpty && !_isInputFocused) {
       setState(() => _isInputFocused = true);
       widget.onSearchStart?.call();
@@ -143,50 +146,60 @@ class _AddressSearchWidgetState extends State<AddressSearchWidget> {
       try {
         debugPrint('🔍 [ADDRESS-SEARCH] Searching: $query');
 
-        final String url =
-            'https://nominatim.openstreetmap.org/search'
-            '?q=${Uri.encodeComponent(query)}'
-            '&format=json'
-            '&addressdetails=1'
-            '&countrycodes=vn'
-            '&limit=8'
-            '&accept-language=vi';
+        List<AddressSearchResult> allResults = [];
 
-        final response = await http.get(
-          Uri.parse(url),
-          headers: {
-            'User-Agent': 'RentalHouseApp/1.0',
-          },
-        ).timeout(
-          const Duration(seconds: 10),
-          onTimeout: () => throw TimeoutException('Quá thời gian chờ'),
-        );
-
-        if (response.statusCode == 200) {
-          final data = jsonDecode(response.body) as List<dynamic>;
-          final results = data
-              .map((json) => AddressSearchResult.fromNominatim(json as Map<String, dynamic>))
-              .toList();
-
-          debugPrint('✅ [ADDRESS-SEARCH] Found ${results.length} results');
-
-          if (mounted) {
-            setState(() {
-              _searchResults = results;
-              _showResults = results.isNotEmpty;
-              _isSearching = false;
-            });
-          }
-        } else {
-          debugPrint('❌ [ADDRESS-SEARCH] Error: ${response.statusCode}');
-          if (mounted) {
-            setState(() {
-              _searchResults = [];
-              _showResults = false;
-              _isSearching = false;
-            });
-          }
+        //  STRATEGY 1: Search POI/Amenities (ưu tiên cho tên cơ sở)
+        final poiResults = await _searchPOI(query);
+        if (poiResults.isNotEmpty) {
+          allResults.addAll(poiResults);
+          debugPrint('✅ Found ${poiResults.length} POI results');
         }
+
+        //  STRATEGY 2: Search địa chỉ thông thường
+        final addressResults = await _searchAddressNormal(query);
+        if (addressResults.isNotEmpty) {
+          allResults.addAll(addressResults);
+          debugPrint('✅ Found ${addressResults.length} address results');
+        }
+
+        //  Loại bỏ trùng lặp dựa trên tọa độ gần nhau
+        final uniqueResults = _removeDuplicates(allResults);
+
+        //  Sắp xếp theo khoảng cách nếu có vị trí hiện tại
+        if (widget.currentLocation != null && uniqueResults.isNotEmpty) {
+          uniqueResults.sort((a, b) {
+            final aDist = _calculateDistance(
+              widget.currentLocation!.latitude,
+              widget.currentLocation!.longitude,
+              a.latitude,
+              a.longitude,
+            );
+            final bDist = _calculateDistance(
+              widget.currentLocation!.latitude,
+              widget.currentLocation!.longitude,
+              b.latitude,
+              b.longitude,
+            );
+            return aDist.compareTo(bDist);
+          });
+        }
+
+        debugPrint('✅ [ADDRESS-SEARCH] Total unique results: ${uniqueResults.length}');
+
+        if (mounted) {
+          setState(() {
+            _searchResults = uniqueResults;
+            _showResults = uniqueResults.isNotEmpty;
+            _isSearching = false;
+          });
+        }
+
+        //  Nếu không có kết quả, thử search mở rộng
+        if (uniqueResults.isEmpty && query.length >= 2) {
+          debugPrint('🔄 [ADDRESS-SEARCH] No results, trying broader search...');
+          await _searchBroader(query);
+        }
+
       } catch (e) {
         debugPrint('❌ [ADDRESS-SEARCH] Exception: $e');
         if (mounted) {
@@ -199,7 +212,247 @@ class _AddressSearchWidgetState extends State<AddressSearchWidget> {
       }
     });
   }
+// 🔥 HÀM MỚI: Tìm POI/Amenities (trường học, bệnh viện, quán ăn, etc)
+  Future<List<AddressSearchResult>> _searchPOI(String query) async {
+    try {
+      // Build URL với search cho POI
+      String url = 'https://nominatim.openstreetmap.org/search'
+          '?q=${Uri.encodeComponent(query)}'
+          '&format=json'
+          '&addressdetails=1'
+          '&countrycodes=vn'
+          '&limit=15' // Tăng limit cho POI
+          '&accept-language=vi'
+          '&extratags=1'; // Lấy thêm tags để biết loại POI
 
+      //  Thêm viewbox nếu có vị trí hiện tại
+      if (widget.currentLocation != null) {
+        final lat = widget.currentLocation!.latitude;
+        final lon = widget.currentLocation!.longitude;
+
+        // Viewbox 30km xung quanh vị trí hiện tại
+        final latOffset = 0.27; // ~30km
+        final lonOffset = 0.27;
+
+        url += '&viewbox=${lon - lonOffset},${lat + latOffset},${lon + lonOffset},${lat - latOffset}';
+        url += '&bounded=1'; //  Bắt buộc trong viewbox cho POI search
+      }
+
+      debugPrint('🔍 [POI-SEARCH] URL: $url');
+
+      final response = await http.get(
+        Uri.parse(url),
+        headers: {'User-Agent': 'RentalHouseApp/1.0'},
+      ).timeout(const Duration(seconds: 10));
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body) as List<dynamic>;
+
+        // Lọc chỉ lấy POI thực sự (có amenity, building, shop, tourism, etc)
+        final poiData = data.where((json) {
+          final type = json['type']?.toString().toLowerCase() ?? '';
+          final osmClass = json['class']?.toString().toLowerCase() ?? '';
+
+          // Các class/type quan trọng cho POI
+          final isPOI = [
+            'amenity', 'building', 'shop', 'tourism', 'leisure',
+            'office', 'healthcare', 'education', 'sport'
+          ].contains(osmClass) || [
+            'hospital', 'clinic', 'school', 'university', 'college',
+            'restaurant', 'cafe', 'bank', 'atm', 'pharmacy',
+            'supermarket', 'mall', 'hotel', 'museum', 'park'
+          ].contains(type);
+
+          final lat = double.tryParse(json['lat']?.toString() ?? '');
+          final lon = double.tryParse(json['lon']?.toString() ?? '');
+
+          return isPOI &&
+              lat != null && lon != null &&
+              lat >= 8.0 && lat <= 23.5 &&
+              lon >= 102.0 && lon <= 109.5;
+        }).toList();
+
+        return poiData
+            .map((json) => AddressSearchResult.fromNominatim(json as Map<String, dynamic>))
+            .toList();
+      }
+    } catch (e) {
+      debugPrint('❌ [POI-SEARCH] Error: $e');
+    }
+    return [];
+  }
+
+// Tìm địa chỉ thông thường
+  Future<List<AddressSearchResult>> _searchAddressNormal(String query) async {
+    try {
+      String url = 'https://nominatim.openstreetmap.org/search'
+          '?q=${Uri.encodeComponent(query)}'
+          '&format=json'
+          '&addressdetails=1'
+          '&countrycodes=vn'
+          '&limit=10'
+          '&accept-language=vi';
+
+      //  Viewbox cho địa chỉ (rộng hơn POI)
+      if (widget.currentLocation != null) {
+        final lat = widget.currentLocation!.latitude;
+        final lon = widget.currentLocation!.longitude;
+
+        final latOffset = 0.5; // ~55km
+        final lonOffset = 0.5;
+
+        url += '&viewbox=${lon - lonOffset},${lat + latOffset},${lon + lonOffset},${lat - latOffset}';
+        url += '&bounded=0'; // Không bắt buộc, chỉ ưu tiên
+      }
+
+      final response = await http.get(
+        Uri.parse(url),
+        headers: {'User-Agent': 'RentalHouseApp/1.0'},
+      ).timeout(const Duration(seconds: 10));
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body) as List<dynamic>;
+
+        final validResults = data.where((json) {
+          final lat = double.tryParse(json['lat']?.toString() ?? '');
+          final lon = double.tryParse(json['lon']?.toString() ?? '');
+          return lat != null && lon != null &&
+              lat >= 8.0 && lat <= 23.5 &&
+              lon >= 102.0 && lon <= 109.5;
+        }).toList();
+
+        return validResults
+            .map((json) => AddressSearchResult.fromNominatim(json as Map<String, dynamic>))
+            .toList();
+      }
+    } catch (e) {
+      debugPrint('❌ [ADDRESS-NORMAL] Error: $e');
+    }
+    return [];
+  }
+
+// 🔥 HÀM MỚI: Loại bỏ kết quả trùng lặp (cùng tọa độ hoặc rất gần nhau)
+  List<AddressSearchResult> _removeDuplicates(List<AddressSearchResult> results) {
+    if (results.isEmpty) return [];
+
+    final unique = <AddressSearchResult>[];
+
+    for (final result in results) {
+      bool isDuplicate = false;
+
+      for (final existing in unique) {
+        final distance = _calculateDistance(
+          result.latitude,
+          result.longitude,
+          existing.latitude,
+          existing.longitude,
+        );
+
+        // Nếu cách nhau < 50m, coi như trùng
+        if (distance < 0.05) {
+          isDuplicate = true;
+          break;
+        }
+      }
+
+      if (!isDuplicate) {
+        unique.add(result);
+      }
+    }
+
+    debugPrint('🔍 Removed ${results.length - unique.length} duplicates');
+    return unique;
+  }
+  //  Hàm tính khoảng cách
+  double _calculateDistance(double lat1, double lon1, double lat2, double lon2) {
+    const R = 6371; // Bán kính Trái Đất (km)
+    final dLat = _toRadians(lat2 - lat1);
+    final dLon = _toRadians(lon2 - lon1);
+    final a = math.sin(dLat / 2) * math.sin(dLat / 2) +
+        math.cos(_toRadians(lat1)) * math.cos(_toRadians(lat2)) *
+            math.sin(dLon / 2) * math.sin(dLon / 2);
+    final c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a));
+    return R * c;
+  }
+  double _toRadians(double degree) {
+    return degree * math.pi / 180;
+  }
+
+  //  Hàm search mở rộng khi không tìm thấy kết quả
+  Future<void> _searchBroader(String query) async {
+    try {
+      // Thử search với các từ khóa bổ sung
+      final broadQueries = [
+        '$query, Việt Nam',
+        '$query, Vietnam',
+      ];
+
+      // Nếu có vị trí hiện tại, thêm tên tỉnh/thành
+      if (widget.currentLocation != null) {
+        // Lấy tên tỉnh/thành từ vị trí hiện tại (có thể gọi reverse geocoding)
+        // Hoặc đơn giản thêm "Cần Thơ" nếu lat/lon trong khu vực Cần Thơ
+        final lat = widget.currentLocation!.latitude;
+        final lon = widget.currentLocation!.longitude;
+
+        if (lat >= 9.8 && lat <= 10.5 && lon >= 105.3 && lon <= 105.9) {
+          broadQueries.insert(0, '$query, Cần Thơ');
+        }
+      }
+
+      for (final broadQuery in broadQueries) {
+        final url = 'https://nominatim.openstreetmap.org/search'
+            '?q=${Uri.encodeComponent(broadQuery)}'
+            '&format=json'
+            '&addressdetails=1'
+            '&countrycodes=vn'
+            '&limit=5'
+            '&accept-language=vi';
+
+        final response = await http.get(
+          Uri.parse(url),
+          headers: {'User-Agent': 'RentalHouseApp/1.0'},
+        ).timeout(const Duration(seconds: 10));
+
+        if (response.statusCode == 200) {
+          final data = jsonDecode(response.body) as List<dynamic>;
+          if (data.isNotEmpty) {
+            final results = data
+                .map((json) => AddressSearchResult.fromNominatim(json as Map<String, dynamic>))
+                .toList();
+
+            debugPrint('✅ [BROADER-SEARCH] Found ${results.length} results with: $broadQuery');
+
+            if (mounted) {
+              setState(() {
+                _searchResults = results;
+                _showResults = true;
+                _isSearching = false;
+              });
+            }
+            return; // Dừng nếu đã tìm thấy
+          }
+        }
+      }
+
+      // Nếu vẫn không tìm thấy
+      if (mounted) {
+        setState(() {
+          _searchResults = [];
+          _showResults = false;
+          _isSearching = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('❌ [BROADER-SEARCH] Error: $e');
+      if (mounted) {
+        setState(() {
+          _searchResults = [];
+          _showResults = false;
+          _isSearching = false;
+        });
+      }
+    }
+  }
   void _selectResult(AddressSearchResult result) {
     debugPrint('📍 [ADDRESS-SELECT] Selected: ${result.displayName}');
 

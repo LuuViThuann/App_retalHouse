@@ -5,6 +5,7 @@ import 'package:flutter_rentalhouse/services/AI_Chat_service.dart';
 import 'package:flutter_rentalhouse/services/chat_ai_service.dart';
 import 'package:flutter_rentalhouse/views/rental_detail_view.dart';
 import 'package:intl/intl.dart';
+import 'package:location/location.dart' as loc;
 
 class ChatAIBottomSheet extends StatefulWidget {
   const ChatAIBottomSheet({super.key});
@@ -21,12 +22,65 @@ class _ChatAIBottomSheetState extends State<ChatAIBottomSheet> {
   String? conversationId;
   List<String> suggestions = [];
 
+  //  Add location fields
+  double? currentLatitude;
+  double? currentLongitude;
+  bool isLocationAvailable = false;
+
   @override
   void initState() {
     super.initState();
     _initializeConversation();
+    _getCurrentLocation();
   }
+  Future<void> _getCurrentLocation() async {
+    try {
+      loc.Location location = loc.Location();
 
+      // Check if service is enabled
+      bool serviceEnabled = await location.serviceEnabled();
+      if (!serviceEnabled) {
+        serviceEnabled = await location.requestService();
+        if (!serviceEnabled) {
+          print('⚠️ Location service is disabled');
+          setState(() {
+            isLocationAvailable = false;
+          });
+          return;
+        }
+      }
+
+      // Check permission
+      loc.PermissionStatus permissionGranted = await location.hasPermission();
+      if (permissionGranted == loc.PermissionStatus.denied) {
+        permissionGranted = await location.requestPermission();
+        if (permissionGranted != loc.PermissionStatus.granted) {
+          print('⚠️ Location permission denied');
+          setState(() {
+            isLocationAvailable = false;
+          });
+          return;
+        }
+      }
+
+      // Get location
+      final locationData = await location.getLocation();
+
+      setState(() {
+        currentLatitude = locationData.latitude;
+        currentLongitude = locationData.longitude;
+        isLocationAvailable = true;
+      });
+
+      print('✅ Location available: ($currentLatitude, $currentLongitude)');
+
+    } catch (e) {
+      print('⚠️ Could not get location: $e');
+      setState(() {
+        isLocationAvailable = false;
+      });
+    }
+  }
   @override
   void dispose() {
     _controller.dispose();
@@ -114,6 +168,7 @@ class _ChatAIBottomSheetState extends State<ChatAIBottomSheet> {
     print('💬 CHAT AI MESSAGE SENT');
     print('📝 Input: "$userInput"');
     print('🆔 Conversation ID: $conversationId');
+    print('📍 Location: ${isLocationAvailable ? "Available" : "Not available"}');
     print('═════════════════════════════════════════════');
 
     if (userInput.isEmpty) return;
@@ -135,11 +190,14 @@ class _ChatAIBottomSheetState extends State<ChatAIBottomSheet> {
       ))
           .toList();
 
+      // 🔥 UPDATED: Pass location to chat service
       final response = await ChatAIService.chat(
         message: userInput,
         conversationHistory: conversationHistory,
         conversationId: conversationId,
         includeRecommendations: true,
+        latitude: currentLatitude,  // 🔥 NEW
+        longitude: currentLongitude,  // 🔥 NEW
       );
 
       print('✅ Chat response received');
@@ -156,13 +214,13 @@ class _ChatAIBottomSheetState extends State<ChatAIBottomSheet> {
           'text': response.message,
         });
 
-        // 🔥 FIX: ALWAYS show cards if recommendations exist
+        // Add recommendations if available
         if (response.recommendations != null &&
             response.recommendations!.isNotEmpty) {
           print(
               '🏠 Processing ${response.recommendations!.length} rental cards...');
 
-          // Add header with proper type
+          // Add header
           messages.add({
             'role': 'system',
             'type': 'rental_header',
@@ -179,7 +237,7 @@ class _ChatAIBottomSheetState extends State<ChatAIBottomSheet> {
             print('  ✅ Added card: ${rental.title}');
           }
 
-          // Add explanation if available
+          // Add explanation
           if (response.explanation != null &&
               response.explanation!.isNotEmpty) {
             messages.add({
@@ -187,8 +245,6 @@ class _ChatAIBottomSheetState extends State<ChatAIBottomSheet> {
               'text': '💡 ${response.explanation}',
             });
           }
-        } else {
-          print('⚠️ No recommendations to display');
         }
 
         // Update conversationId
@@ -211,6 +267,7 @@ class _ChatAIBottomSheetState extends State<ChatAIBottomSheet> {
       _scrollToBottom();
     }
   }
+
 
   /// 💡 Handle suggestion tap
   void _onSuggestionTap(String suggestion) {
@@ -404,6 +461,44 @@ class _ChatAIBottomSheetState extends State<ChatAIBottomSheet> {
                       ),
                     ),
                     const SizedBox(height: 8),
+
+                    // 🔥 NEW: Location-based suggestions
+                    if (isLocationAvailable)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: [
+                            _SuggestionChip(
+                              icon: Icons.location_on,
+                              label: 'Gần vị trí của tôi',
+                              color: Colors.blue,
+                              onTap: () => _onSuggestionTap('Tìm nhà trọ gần vị trí hiện tại của tôi'),
+                            ),
+                            _SuggestionChip(
+                              icon: Icons.school,
+                              label: 'Gần trường học',
+                              color: Colors.orange,
+                              onTap: () => _onSuggestionTap('Tìm nhà gần trường học'),
+                            ),
+                            _SuggestionChip(
+                              icon: Icons.local_hospital,
+                              label: 'Gần bệnh viện',
+                              color: Colors.red,
+                              onTap: () => _onSuggestionTap('Tìm nhà gần bệnh viện'),
+                            ),
+                            _SuggestionChip(
+                              icon: Icons.shopping_cart,
+                              label: 'Gần siêu thị',
+                              color: Colors.green,
+                              onTap: () => _onSuggestionTap('Tìm nhà gần siêu thị'),
+                            ),
+                          ],
+                        ),
+                      ),
+
+                    // Original suggestions
                     Wrap(
                       spacing: 8,
                       runSpacing: 8,
@@ -934,6 +1029,49 @@ class _InfoChip extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+class _SuggestionChip extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final Color color;
+  final VoidCallback onTap;
+
+  const _SuggestionChip({
+    required this.icon,
+    required this.label,
+    required this.color,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: color.withOpacity(0.1),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: color.withOpacity(0.3), width: 1),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 16, color: color),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 12,
+                color: color,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

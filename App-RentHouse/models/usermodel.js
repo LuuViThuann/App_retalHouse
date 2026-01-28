@@ -2,20 +2,20 @@ const mongoose = require('mongoose');
 
 const userSchema = new mongoose.Schema({
   _id: {
-    type: String, 
+    type: String,
     required: true,
   },
   username: {
     type: String,
     required: true,
-  }, 
+  },
   password: {
     type: String,
-    required: false, 
-  },  
+    required: false,
+  },
   email: {
     type: String,
-    required: false, 
+    required: false,
     unique: true,
     sparse: true,
   },
@@ -32,7 +32,7 @@ const userSchema = new mongoose.Schema({
     type: String,
     default: null,
   },
-  // ✅ Thêm: Lưu publicId để có thể xóa ảnh sau này
+  // ✅ Thêm: Lưu publicId để có thể xóa ảnh sau này 
   avatarPublicId: {
     type: String,
     default: null,
@@ -54,7 +54,7 @@ const userSchema = new mongoose.Schema({
 });
 
 // Middleware để cập nhật updatedAt
-userSchema.pre('save', function(next) {
+userSchema.pre('save', function (next) {
   this.updatedAt = Date.now();
   next();
 });
