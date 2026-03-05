@@ -1,4 +1,4 @@
-🏠 ỨNG DỤNG BẤT ĐỘNG SẢN - AI GỢI Ý – Mobile Application
+🏠 ỨNG DỤNG BẤT ĐỘNG SẢN - AI GỢI Ý CHUYÊN NGHIỆP – Mobile Application
 
 Ứng dụng bất động sản trên nền tảng mobile được xây dựng nhằm kết nối người tìm bất động sản với môi giới hoặc người đăng tin.
 Hệ thống hỗ trợ tìm kiếm, gợi ý bất động sản cá nhân hóa, tương tác theo thời gian thực và phân tích dữ liệu thị trường.
