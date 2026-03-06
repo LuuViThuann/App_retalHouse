@@ -99,6 +99,18 @@ class _RentalMapViewState extends State<RentalMapView>
 
   bool _showControls = true;
 
+  List<Rental> _allNearbyRentals = [];     // ✅ Luôn giữ data thường (không AI)
+  List<Rental> _allAINearbyRentals = [];   // ✅ Giữ data AI recommendations
+
+  LatLngBounds? _lastFetchedBounds;  // Bounds lần fetch trước
+  static const double _viewportPadding = 0.3; // Mở rộng 30% để pre-load
+
+// Thêm vào đầu class _RentalMapViewState
+  final Map<String, BitmapDescriptor> _markerIconCache = {};
+  bool _isUpdatingMarkers = false;
+  Set<String> _currentVisibleIds = {}; // Track IDs đang hiển thị
+
+
  // THÊM HÀM INITIALIZE BADGE ANIMATION
   void _initializeBadgeAnimationIfNeeded() {
     if (_badgeAnimationController != null) return; // Đã init rồi
@@ -558,14 +570,11 @@ class _RentalMapViewState extends State<RentalMapView>
   // Lấy danh sách bất động sản gần đây
   Future<void> _fetchNearbyRentals() async {
     try {
-      final rentalViewModel =
-      Provider.of<RentalViewModel>(context, listen: false);
-
-      bool isCurrentLocationView =
-      widget.rental.id.startsWith('current_location_');
+      final rentalViewModel = Provider.of<RentalViewModel>(context, listen: false);
+      bool isCurrentLocationView = widget.rental.id.startsWith('current_location_');
 
       if (_isAIMode) {
-
+        // Fetch AI data
         if (isCurrentLocationView && _currentLatLng != null) {
           await rentalViewModel.fetchAIRecommendations(
             latitude: _currentLatLng!.latitude,
@@ -580,9 +589,18 @@ class _RentalMapViewState extends State<RentalMapView>
             radius: rentalViewModel.currentRadius,
           );
         }
-      } else {
-        debugPrint('📍 Fetching regular nearby rentals');
 
+        await Future.delayed(const Duration(milliseconds: 100));
+
+        setState(() {
+          _allAINearbyRentals = List.from(rentalViewModel.nearbyRentals); // ✅ Lưu AI data
+          _originalNearbyRentals = List.from(_allAINearbyRentals);
+          _filteredNearbyRentals = List.from(_allAINearbyRentals);
+          _isFilterApplied = false;
+          debugPrint('🤖 AI data loaded: ${_allAINearbyRentals.length}');
+        });
+      } else {
+        // Fetch thường
         if (isCurrentLocationView && _currentLatLng != null) {
           await rentalViewModel.fetchNearbyRentals(
             widget.rental.id,
@@ -592,81 +610,74 @@ class _RentalMapViewState extends State<RentalMapView>
         } else {
           await rentalViewModel.fetchNearbyRentals(widget.rental.id);
         }
+
+        await Future.delayed(const Duration(milliseconds: 100));
+
+        setState(() {
+          _allNearbyRentals = List.from(rentalViewModel.nearbyRentals); // ✅ Lưu data thường
+          _originalNearbyRentals = List.from(_allNearbyRentals);
+          _filteredNearbyRentals = List.from(_allNearbyRentals);
+          _isFilterApplied = false;
+          debugPrint('📍 Normal data loaded: ${_allNearbyRentals.length}');
+        });
       }
-
-      //  Đảm bảo dữ liệu được update NGAY SAU KHI fetch
-      // Thêm delay nhỏ để chắc chắn ViewModel đã update
-      await Future.delayed(const Duration(milliseconds: 100));
-
-      setState(() {
-        _originalNearbyRentals = List.from(rentalViewModel.nearbyRentals);
-        _filteredNearbyRentals = List.from(rentalViewModel.nearbyRentals);
-        _isFilterApplied = false;
-
-        debugPrint(' Updated local rentals: ${_originalNearbyRentals.length}');
-      });
 
       _updateMarkersWithClustering();
     } catch (e) {
-      setState(() {
-        _errorMessage = 'Lỗi khi tải bất động sản gần đây: $e';
-      });
+      setState(() => _errorMessage = 'Lỗi khi tải bất động sản gần đây: $e');
     }
   }
 // ============================================
 // THÊM HÀM: Toggle AI Mode
 // ============================================
   Future<void> _toggleAIMode() async {
-    final wasAIMode = _isAIMode;
-    final hadPOIFilter = _isPOIFilterActive;
-
     setState(() {
       _isAIMode = !_isAIMode;
     });
 
-    debugPrint('🔄 Toggling AI mode: $_isAIMode, POI filter: $hadPOIFilter');
-
-    // ✅ NẾU ĐANG CÓ POI FILTER, TÁI ÁP DỤNG VỚI MODE MỚI
-    if (hadPOIFilter && _currentFilterResult != null) {
-      debugPrint('🔄 Re-applying POI filter with new AI mode');
-
-      final selectedCategories = _currentFilterResult!.selectedCategories;
-      await _applyPOIFilter(selectedCategories);
+    if (_isAIMode) {
+      // ✅ Bật AI: dùng AI data đã có, nếu chưa có mới fetch
+      if (_allAINearbyRentals.isNotEmpty) {
+        debugPrint('🤖 Using cached AI data: ${_allAINearbyRentals.length}');
+        setState(() {
+          _originalNearbyRentals = List.from(_allAINearbyRentals);
+          _filteredNearbyRentals = List.from(_allAINearbyRentals);
+        });
+        await _updateMarkersWithClustering();
+      } else {
+        debugPrint('🤖 Fetching AI data for first time...');
+        await _fetchNearbyRentals();
+      }
     } else {
-      // Fetch lại data theo mode mới (không có POI filter)
-      await _fetchNearbyRentals();
+      // ✅ Tắt AI: khôi phục data thường, KHÔNG FETCH LẠI
+      debugPrint('📍 Restoring normal data: ${_allNearbyRentals.length}');
+      setState(() {
+        _originalNearbyRentals = List.from(_allNearbyRentals);
+        _filteredNearbyRentals = List.from(_allNearbyRentals);
+        _isFilterApplied = false;
+      });
+      await _updateMarkersWithClustering();
     }
 
-    // Show snackbar
+    // Snackbar
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Row(
             children: [
-              Icon(
-                _isAIMode ? Icons.psychology : Icons.location_on,
-                color: Colors.white,
-              ),
+              Icon(_isAIMode ? Icons.psychology : Icons.location_on, color: Colors.white),
               const SizedBox(width: 12),
-              Expanded(
-                child: Text(
-                  _isAIMode
-                      ? (hadPOIFilter
-                      ? ' Đã bật gợi ý AI + lọc tiện ích'
-                      : ' Đã bật gợi ý AI')
-                      : (hadPOIFilter
-                      ? ' Đã tắt AI + giữ lọc tiện ích'
-                      : ' Đã tắt gợi ý AI'),
-                  style: const TextStyle(fontWeight: FontWeight.w600),
-                ),
+              Text(
+                _isAIMode
+                    ? '🤖 Đã bật gợi ý AI (${_originalNearbyRentals.length} bài)'
+                    : '📍 Đã tắt AI - hiển thị ${_originalNearbyRentals.length} bài thường',
+                style: const TextStyle(fontWeight: FontWeight.w600),
               ),
             ],
           ),
           backgroundColor: _isAIMode ? Colors.blue[700] : Colors.green[700],
           behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           margin: const EdgeInsets.all(16),
           duration: const Duration(seconds: 2),
         ),
@@ -699,113 +710,194 @@ class _RentalMapViewState extends State<RentalMapView>
 
   // ============================================
   // CẬP NHẬT MARKERS TRÊN BẢN ĐỒ
+  Future<void> _updateMarkersWithClustering({List<Rental>? visibleRentals}) async {
+    // ✅ Guard: tránh concurrent calls gây ImageReader buffer overflow
+    if (_isUpdatingMarkers) return;
+    _isUpdatingMarkers = true;
 
-  Future<void> _updateMarkersWithClustering() async {
-    final Set<Marker> markers = {};
-    final rentalViewModel = Provider.of<RentalViewModel>(context, listen: false);
+    try {
+      final Set<Marker> markers = {};
+      final rentalViewModel = Provider.of<RentalViewModel>(context, listen: false);
+      bool isCurrentLocationView = widget.rental.id.startsWith('current_location_');
 
-    bool isCurrentLocationView = widget.rental.id.startsWith('current_location_');
+      // ============================================================
+      // 1. MAIN RENTAL MARKER (không cluster, luôn hiển thị)
+      // ============================================================
+      if (!isCurrentLocationView && _rentalLatLng != null && _validateRental(widget.rental)) {
+        final customIcon = await _getCachedMarkerIcon(
+          price: widget.rental.price,
+          isMainRental: true,
+          isAIRecommended: false,
+        );
 
-    // 1. MAIN RENTAL MARKER (không cluster)
-    if (!isCurrentLocationView && _rentalLatLng != null && _validateRental(widget.rental)) {
-      final customIcon = await CustomMarkerHelper.createCustomMarker(
-        price: widget.rental.price,
-        propertyType: 'Rental',
-        isMainRental: true,
-        hasValidCoords: widget.rental.location['latitude'] != 0.0 &&
-            widget.rental.location['longitude'] != 0.0,
-        isAIRecommended: false,
-      );
-
-      markers.add(
-        Marker(
-          markerId: MarkerId('main-${widget.rental.id}'),
-          position: _rentalLatLng!,
-          infoWindow: InfoWindow(
-            title: 'Nhà này: ${widget.rental.title}',
-            snippet: _formatPriceCompact(widget.rental.price),
+        markers.add(
+          Marker(
+            markerId: MarkerId('main-${widget.rental.id}'),
+            position: _rentalLatLng!,
+            infoWindow: InfoWindow(
+              title: 'Nhà này: ${widget.rental.title}',
+              snippet: _formatPriceCompact(widget.rental.price),
+            ),
+            icon: customIcon,
+            onTap: () => _showRentalInfo(widget.rental),
           ),
-          icon: customIcon,
-          onTap: () => _showRentalInfo(widget.rental),
-        ),
-      );
-    }
+        );
+      }
 
-    // 2. CURRENT LOCATION MARKER (không cluster)
-    if (_currentLatLng != null) {
-      markers.add(
-        Marker(
-          markerId: const MarkerId('current-location'),
-          position: _currentLatLng!,
-          infoWindow: const InfoWindow(
-            title: 'Vị trí của bạn',
-            snippet: 'Vị trí hiện tại',
+      // ============================================================
+      // 2. CURRENT LOCATION MARKER (không cluster, luôn hiển thị)
+      // ============================================================
+      if (_currentLatLng != null) {
+        markers.add(
+          Marker(
+            markerId: const MarkerId('current-location'),
+            position: _currentLatLng!,
+            infoWindow: const InfoWindow(
+              title: 'Vị trí của bạn',
+              snippet: 'Vị trí hiện tại',
+            ),
+            icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueBlue),
           ),
-          icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueBlue),
-        ),
+        );
+      }
+
+      // ============================================================
+      // 3. XÁC ĐỊNH DANH SÁCH BÀI CẦN HIỂN THỊ
+      // ============================================================
+      // Nếu visibleRentals được truyền vào (từ viewport) thì dùng nó
+      // Nếu không thì lấy từ state hiện tại
+      final List<Rental> displayRentals = visibleRentals ?? (
+          _isFilterApplied
+              ? _filteredNearbyRentals
+              : _originalNearbyRentals
       );
-    }
 
-    // 3. NEARBY RENTALS - CÓ CLUSTERING
-    final displayRentals = _isFilterApplied
-        ? _filteredNearbyRentals
-        : _originalNearbyRentals;
+      // Fallback: nếu displayRentals trống nhưng viewModel có data
+      if (displayRentals.isEmpty && rentalViewModel.nearbyRentals.isNotEmpty) {
+        _originalNearbyRentals = List.from(rentalViewModel.nearbyRentals);
+        _filteredNearbyRentals = List.from(rentalViewModel.nearbyRentals);
+      }
 
-    if (displayRentals.isEmpty && rentalViewModel.nearbyRentals.isNotEmpty) {
-      _originalNearbyRentals = List.from(rentalViewModel.nearbyRentals);
-      _filteredNearbyRentals = List.from(rentalViewModel.nearbyRentals);
-    }
+      // ============================================================
+      // 4. TẠO CLUSTER ITEMS TỪ DANH SÁCH BÀI
+      // ============================================================
+      final List<ClusterItem> clusterItems = [];
 
-    // Tạo cluster items
-    final List<ClusterItem> clusterItems = [];
+      for (final rental in displayRentals) {
+        // Bỏ qua bài chính (không phải current location view)
+        if (!isCurrentLocationView && rental.id == widget.rental.id) continue;
 
-    for (final rental in displayRentals) {
-      if (!isCurrentLocationView && rental.id == widget.rental.id) continue;
-      if (!_validateRental(rental)) continue;
+        // Bỏ qua bài không hợp lệ
+        if (!_validateRental(rental)) continue;
 
-      final lat = _safeParseDouble(
+        final lat = _safeParseDouble(
           rental.location['latitude'],
-          'rental.location.latitude'
-      ) ?? 0.0;
-      final lng = _safeParseDouble(
+          'rental.location.latitude',
+        ) ?? 0.0;
+        final lng = _safeParseDouble(
           rental.location['longitude'],
-          'rental.location.longitude'
-      ) ?? 0.0;
+          'rental.location.longitude',
+        ) ?? 0.0;
 
-      if (lat == 0.0 && lng == 0.0) continue;
+        // Bỏ qua bài không có tọa độ
+        if (lat == 0.0 && lng == 0.0) continue;
 
-      clusterItems.add(ClusterItem(
-        id: rental.id,
-        position: LatLng(lat, lng),
-        rental: rental,
-      ));
-    }
+        clusterItems.add(ClusterItem(
+          id: rental.id,
+          position: LatLng(lat, lng),
+          rental: rental,
+        ));
+      }
 
-    // Tạo clusters dựa trên zoom level
-    if (_useCluster && _currentZoom < 15) {
-      _currentClusters = MarkerClusterHelper.createClusters(
-        items: clusterItems,
-        zoomLevel: _currentZoom,
-      );
+      // ✅ Giới hạn 50 markers cùng lúc để tránh ImageReader buffer overflow
+      final limitedItems = clusterItems.length > 50
+          ? clusterItems.sublist(0, 50)
+          : clusterItems;
 
-      debugPrint('🎯 [CLUSTERING] Created ${_currentClusters.length} clusters from ${clusterItems.length} items at zoom $_currentZoom');
+      debugPrint('📍 [MARKERS] Total: ${clusterItems.length}, Rendering: ${limitedItems.length}');
 
-      // Tạo markers cho clusters
-      for (final cluster in _currentClusters) {
-        if (cluster.size == 1) {
-          // Single item - hiển thị như marker bình thường
-          final item = cluster.items.first;
+      // ============================================================
+      // 5A. CHẾ ĐỘ CLUSTER (zoom < 15)
+      // ============================================================
+      if (_useCluster && _currentZoom < 15) {
+        _currentClusters = MarkerClusterHelper.createClusters(
+          items: limitedItems,
+          zoomLevel: _currentZoom,
+        );
+
+        debugPrint('🎯 [CLUSTER] Created ${_currentClusters.length} clusters at zoom $_currentZoom');
+
+        for (final cluster in _currentClusters) {
+          if (cluster.size == 1) {
+            // ── Single marker ──────────────────────────────────────
+            final item = cluster.items.first;
+            final rental = item.rental;
+
+            final bool isAIRecommended = _isAIMode ||
+                (rental.isAIRecommended == true) ||
+                (rental.aiScore != null && rental.aiScore! > 0);
+
+            final customIcon = await _getCachedMarkerIcon(
+              price: rental.price,
+              isMainRental: false,
+              isAIRecommended: isAIRecommended,
+            );
+
+            markers.add(
+              Marker(
+                markerId: MarkerId('nearby-${rental.id}'),
+                position: item.position,
+                infoWindow: InfoWindow(
+                  title: isAIRecommended
+                      ? '🤖 AI: ${rental.title}'
+                      : 'Gợi ý: ${rental.title}',
+                  snippet: '${_formatPriceCompact(rental.price)} - ${rental.location['short'] ?? ''}',
+                ),
+                icon: customIcon,
+                onTap: () => _showRentalInfo(rental),
+              ),
+            );
+          } else {
+            // ── Cluster marker ─────────────────────────────────────
+            final bool hasAI = cluster.items.any((item) {
+              final rental = item.rental;
+              return _isAIMode ||
+                  (rental.isAIRecommended == true) ||
+                  (rental.aiScore != null && rental.aiScore! > 0);
+            });
+
+            final clusterIcon = await MarkerClusterHelper.createClusterMarker(
+              clusterSize: cluster.size,
+              hasAI: hasAI,
+            );
+
+            markers.add(
+              Marker(
+                markerId: MarkerId(cluster.id),
+                position: cluster.center,
+                icon: clusterIcon,
+                onTap: () => _onClusterTap(cluster),
+              ),
+            );
+          }
+        }
+      }
+      // ============================================================
+      // 5B. CHẾ ĐỘ KHÔNG CLUSTER (zoom >= 15)
+      // ============================================================
+      else {
+        debugPrint('📍 [NO-CLUSTER] Displaying ${limitedItems.length} markers at zoom $_currentZoom');
+
+        for (final item in limitedItems) {
           final rental = item.rental;
 
-          bool isAIRecommended = _isAIMode ||
+          final bool isAIRecommended = _isAIMode ||
               (rental.isAIRecommended == true) ||
               (rental.aiScore != null && rental.aiScore! > 0);
 
-          final customIcon = await CustomMarkerHelper.createCustomMarker(
+          final customIcon = await _getCachedMarkerIcon(
             price: rental.price,
-            propertyType: 'Rental',
             isMainRental: false,
-            hasValidCoords: true,
             isAIRecommended: isAIRecommended,
           );
 
@@ -823,75 +915,54 @@ class _RentalMapViewState extends State<RentalMapView>
               onTap: () => _showRentalInfo(rental),
             ),
           );
-        } else {
-          // Multiple items - hiển thị cluster marker
-          bool hasAI = cluster.items.any((item) {
-            final rental = item.rental;
-            return _isAIMode ||
-                (rental.isAIRecommended == true) ||
-                (rental.aiScore != null && rental.aiScore! > 0);
-          });
-
-          final clusterIcon = await MarkerClusterHelper.createClusterMarker(
-            clusterSize: cluster.size,
-            hasAI: hasAI,
-          );
-
-          markers.add(
-            Marker(
-              markerId: MarkerId(cluster.id),
-              position: cluster.center,
-              icon: clusterIcon,
-              onTap: () => _onClusterTap(cluster),
-            ),
-          );
         }
       }
-    } else {
-      // Không clustering - hiển thị tất cả markers
-      debugPrint('📍 [NO-CLUSTER] Displaying ${clusterItems.length} individual markers');
 
-      for (final item in clusterItems) {
-        final rental = item.rental;
-
-        bool isAIRecommended = _isAIMode ||
-            (rental.isAIRecommended == true) ||
-            (rental.aiScore != null && rental.aiScore! > 0);
-
-        final customIcon = await CustomMarkerHelper.createCustomMarker(
-          price: rental.price,
-          propertyType: 'Rental',
-          isMainRental: false,
-          hasValidCoords: true,
-          isAIRecommended: isAIRecommended,
-        );
-
-        markers.add(
-          Marker(
-            markerId: MarkerId('nearby-${rental.id}'),
-            position: item.position,
-            infoWindow: InfoWindow(
-              title: isAIRecommended
-                  ? '🤖 AI: ${rental.title}'
-                  : 'Gợi ý: ${rental.title}',
-              snippet: '${_formatPriceCompact(rental.price)} - ${rental.location['short'] ?? ''}',
-            ),
-            icon: customIcon,
-            onTap: () => _showRentalInfo(rental),
-          ),
-        );
+      // ============================================================
+      // 6. CẬP NHẬT STATE
+      // ============================================================
+      if (mounted) {
+        setState(() {
+          _markers = markers;
+        });
+        debugPrint('✅ [MARKERS] Updated: ${markers.length} markers displayed');
       }
-    }
 
-    if (mounted) {
-      setState(() {
-        _markers = markers;
-      });
-
-      debugPrint('✅ [MARKERS] Updated: ${markers.length} markers displayed');
+    } finally {
+      // ✅ Luôn reset guard dù có lỗi hay không
+      _isUpdatingMarkers = false;
     }
   }
+  Future<BitmapDescriptor> _getCachedMarkerIcon({
+    required dynamic price,
+    required bool isMainRental,
+    required bool isAIRecommended,
+  }) async {
+    // Làm tròn giá theo 500K để tái sử dụng cache
+    // VD: 3.200.000 và 3.400.000 → cùng key 3000000
+    final roundedPrice = isMainRental
+        ? 0
+        : (((_safeParseDouble(price, '') ?? 0) / 500000).round() * 500000);
 
+    final String key = '${roundedPrice}_${isMainRental}_$isAIRecommended';
+
+    // ✅ Trả về từ cache nếu đã tạo trước đó
+    if (_markerIconCache.containsKey(key)) {
+      return _markerIconCache[key]!;
+    }
+
+    // Tạo mới và lưu vào cache
+    final BitmapDescriptor icon = await CustomMarkerHelper.createCustomMarker(
+      price: price,
+      propertyType: 'Rental',
+      isMainRental: isMainRental,
+      hasValidCoords: true,
+      isAIRecommended: isAIRecommended,
+    );
+
+    _markerIconCache[key] = icon;
+    return icon;
+  }
   void _onClusterTap(Cluster cluster) {
     if (cluster.size == 1) {
       // Chỉ có 1 item - hiển thị info
@@ -951,9 +1022,50 @@ class _RentalMapViewState extends State<RentalMapView>
   void _onCameraMove(CameraPosition position) {
     _currentZoom = position.zoom;
     _cameraDebounce?.cancel();
-    _cameraDebounce = Timer(const Duration(milliseconds: 800), () {
-      _updateMarkersWithClustering();  // Gọi sau 500ms
+    _cameraDebounce = Timer(const Duration(milliseconds: 600), () {
+      if (mounted) _updateMarkersForViewport();
     });
+  }
+
+// THÊM HÀM MỚI: Lọc và hiển thị markers theo viewport
+  Future<void> _updateMarkersForViewport() async {
+    if (_controller == null || !mounted) return;
+
+    try {
+      final bounds = await _controller!.getVisibleRegion();
+
+      final List<Rental> sourceRentals = _isFilterApplied
+          ? _filteredNearbyRentals
+          : (_isAIMode ? _allAINearbyRentals : _allNearbyRentals);
+
+      // Mở rộng bounds 20% để pre-load xung quanh
+      final double latPad =
+          (bounds.northeast.latitude - bounds.southwest.latitude) * 0.2;
+      final double lngPad =
+          (bounds.northeast.longitude - bounds.southwest.longitude) * 0.2;
+
+      final List<Rental> visibleRentals = sourceRentals.where((rental) {
+        final lat = _safeParseDouble(rental.location['latitude'], '') ?? 0.0;
+        final lng = _safeParseDouble(rental.location['longitude'], '') ?? 0.0;
+        if (lat == 0.0 && lng == 0.0) return false;
+
+        return lat >= (bounds.southwest.latitude - latPad) &&
+            lat <= (bounds.northeast.latitude + latPad) &&
+            lng >= (bounds.southwest.longitude - lngPad) &&
+            lng <= (bounds.northeast.longitude + lngPad);
+      }).toList();
+
+      // ✅ Chỉ update nếu danh sách thay đổi
+      final newIds = visibleRentals.map((r) => r.id).toSet();
+      if (newIds == _currentVisibleIds) return; // Không thay đổi → skip
+      _currentVisibleIds = newIds;
+
+      debugPrint('🗺️ Viewport: ${visibleRentals.length}/${sourceRentals.length} bài');
+
+      await _updateMarkersWithClustering(visibleRentals: visibleRentals);
+    } catch (e) {
+      debugPrint('❌ Viewport update error: $e');
+    }
   }
 
 
@@ -1000,7 +1112,7 @@ class _RentalMapViewState extends State<RentalMapView>
     _cameraDebounce?.cancel();
     _aiRefreshDebounce?.cancel();  // 🔥 Hủy debounce timer khi dispose
     _controlsAnimationController?.dispose();
-
+    _markerIconCache.clear();
     _badgeAnimationController?.dispose(); // ✅ THÊM DÒNG NÀY
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
@@ -2445,15 +2557,30 @@ class _RentalMapViewState extends State<RentalMapView>
                   onMapCreated: (GoogleMapController controller) {
                     _controller = controller;
                     if (_rentalLatLng != null) {
-                      controller.animateCamera(
-                          CameraUpdate.newLatLngZoom(_rentalLatLng!, 16));
+                      controller.animateCamera(CameraUpdate.newLatLngZoom(_rentalLatLng!, 16));
                     } else if (_currentLatLng != null) {
-                      controller.animateCamera(
-                          CameraUpdate.newLatLngZoom(_currentLatLng!, 16));
+                      controller.animateCamera(CameraUpdate.newLatLngZoom(_currentLatLng!, 16));
                     }
+                    // ✅ Load markers theo viewport ngay sau khi map sẵn sàng
+                    Future.delayed(const Duration(milliseconds: 500), () {
+                      if (mounted) _updateMarkersForViewport();
+                    });
+                  },
+                  onCameraMove: (CameraPosition position) {
+                    _currentZoom = position.zoom;
+                    // Debounce nhẹ khi đang kéo - update nhanh hơn
+                    _cameraDebounce?.cancel();
+                    _cameraDebounce = Timer(const Duration(milliseconds: 200), () {
+                      if (mounted) _updateMarkersForViewport();
+                    });
+                  },
+                  onCameraIdle: () {
+                    // Khi dừng hẳn - update chính xác lần cuối
+                    _cameraDebounce?.cancel();
+                    if (mounted) _updateMarkersForViewport();
                   },
                   onTap: (_) => _hideRentalInfo(),
-                  onCameraMove: _onCameraMove,
+
                   markers: _markers,
                   myLocationEnabled: true,
                   myLocationButtonEnabled: true,

@@ -353,6 +353,112 @@ function enrichRecommendations(mlRecommendations, rentals) {
 }
 // ==================== ROUTES ====================
 
+// Lọc theo yêu cầu user đưa ra ================= < 
+function filterByExtractedPreferences(recommendations, extractedPreferences) {
+    if (!extractedPreferences || Object.keys(extractedPreferences).length === 0) {
+        return recommendations;
+    }
+
+    let filtered = [...recommendations];
+    const prefs = extractedPreferences;
+
+    log.info(`[FILTER] Before: ${filtered.length} rentals`);
+    log.info(`[FILTER] Prefs: ${JSON.stringify(prefs)}`);
+
+    // ===== LỌC GIÁ - STRICT =====
+    if (prefs.price_range) {
+        const { min = 0, max = 0 } = prefs.price_range;
+
+        if (max > 0) {
+            const strictMax = max * 1.15; // Chỉ cho phép vượt 15%
+            filtered = filtered.filter(r => {
+                const price = parseFloat(r.price) || 0;
+                return price <= strictMax;
+            });
+            log.info(`[FILTER] After price max (${max/1e6}M → strict ${strictMax/1e6}M): ${filtered.length}`);
+        }
+
+        if (min > 0) {
+            const strictMin = min * 0.85;
+            filtered = filtered.filter(r => {
+                const price = parseFloat(r.price) || 0;
+                return price >= strictMin;
+            });
+            log.info(`[FILTER] After price min: ${filtered.length}`);
+        }
+    }
+
+    // ===== LỌC LOẠI BĐS =====
+    if (prefs.property_type) {
+        const wantedType = prefs.property_type.toLowerCase();
+
+        // Map từ AI intent → propertyType trong DB
+        const typeAliasMap = {
+            'phòng trọ':   ['nhà trọ/phòng trọ', 'phòng trọ', 'nhà trọ', 'phong tro', 'nha tro'],
+            'nhà trọ':     ['nhà trọ/phòng trọ', 'phòng trọ', 'nhà trọ'],
+            'trọ':         ['nhà trọ/phòng trọ', 'phòng trọ', 'nhà trọ'],
+            'căn hộ':      ['căn hộ chung cư', 'căn hộ', 'chung cư', 'apartment'],
+            'chung cư':    ['căn hộ chung cư', 'căn hộ', 'chung cư'],
+            'nhà riêng':   ['nhà riêng', 'nhà nguyên căn', 'nhà phố'],
+            'nhà':         ['nhà riêng', 'nhà nguyên căn', 'nhà phố'],
+            'đất nền':     ['đất nền', 'đất'],
+            'đất':         ['đất nền', 'đất'],
+            'biệt thự':    ['biệt thự', 'villa'],
+            'văn phòng':   ['văn phòng', 'mặt bằng'],
+            'mặt bằng':    ['văn phòng', 'mặt bằng'],
+        };
+
+        const aliases = typeAliasMap[wantedType] || [wantedType];
+
+        const typeFiltered = filtered.filter(r => {
+            const rType = (r.propertyType || '').toLowerCase();
+            return aliases.some(alias => rType.includes(alias) || alias.includes(rType));
+        });
+
+        // Chỉ áp dụng type filter nếu còn kết quả
+        if (typeFiltered.length > 0) {
+            filtered = typeFiltered;
+            log.info(`[FILTER] After type (${wantedType}): ${filtered.length}`);
+        } else {
+            log.warn(`[FILTER] Type filter returned 0 results, keeping all with price filter`);
+        }
+    }
+
+    // ===== LỌC VỊ TRÍ =====
+    if (prefs.location) {
+        const locationLower = prefs.location.toLowerCase();
+        const keywords = locationLower
+            .split(/[\s,;.]+/)
+            .filter(k => k.length > 2);
+
+        if (keywords.length > 0) {
+            const locationFiltered = filtered.filter(r => {
+                const locStr = [
+                    r.location?.short || '',
+                    r.location?.full || '',
+                    r.location?.fullAddress || '',
+                    r.location?.district || '',
+                    r.location?.city || '',
+                ].join(' ').toLowerCase();
+
+                return keywords.some(kw => locStr.includes(kw));
+            });
+
+            // Chỉ áp dụng nếu còn kết quả
+            if (locationFiltered.length > 0) {
+                filtered = locationFiltered;
+                log.info(`[FILTER] After location (${prefs.location}): ${filtered.length}`);
+            } else {
+                log.warn(`[FILTER] Location filter returned 0, skipping location filter`);
+            }
+        }
+    }
+
+    log.info(`[FILTER] Final: ${filtered.length} rentals`);
+    return filtered;
+}
+
+
 router.post('/chat', authMiddleware, async (req, res) => {
     const startTime = Date.now();
     const userId = req.userId;
@@ -418,144 +524,206 @@ router.post('/chat', authMiddleware, async (req, res) => {
         if (includeRecommendations && chatData.shouldRecommend) {
             const prefs = chatData.extractedPreferences || {};
 
-            // 🔥 NEW: Check if user wants nearby recommendations
+            log.info(`[CHAT] Preferences: ${JSON.stringify(prefs)}`);
+
+            // --- Nearby / POI flow (giữ nguyên như cũ) ---
             if (prefs.wants_nearby_location && userLocation) {
-                log.info(`[CHAT] 📍 User wants nearby recommendations`);
-
-                // Get nearby recommendations from ML
-                try {
-                    const nearbyResult = await axios.post(
-                        `${ML_SERVICE_URL}/recommend/personalized`,
-                        {
-                            userId,
-                            n_recommendations: 10,
-                            use_location: true,
-                            radius_km: prefs.search_radius || 5,
-                            context: {
-                                map_center: [userLocation.longitude, userLocation.latitude],
-                                zoom_level: 15
-                            }
-                        },
-                        { timeout: 15000 }
-                    );
-
-                    if (nearbyResult.data?.recommendations) {
-                        chatData.recommendations = nearbyResult.data.recommendations;
-                        log.info(`[CHAT] ✅ Got ${nearbyResult.data.recommendations.length} nearby recommendations`);
-                    }
-                } catch (err) {
-                    log.error(`[CHAT] Error getting nearby recs: ${err.message}`);
-                }
+                // ... (giữ nguyên code cũ)
             }
-
-            // 🔥 NEW: Check if user wants POI-based recommendations
             if (prefs.wants_poi_filter && prefs.poi_categories && userLocation) {
-                log.info(`[CHAT] 🏢 User wants POI-based recommendations`);
-                log.info(`[CHAT] POI Categories: ${prefs.poi_categories.join(', ')}`);
-
-                const poiRentals = await _getRecommendationsWithPOI(userId, prefs, userLocation);
-
-                if (poiRentals && poiRentals.length > 0) {
-                    // Transform POI rentals to match ML format
-                    chatData.recommendations = poiRentals.map(rental => ({
-                        rentalId: rental._id.toString(),
-                        score: rental.aiScore || 0,
-                        confidence: 0.8,
-                        finalScore: rental.aiScore || 0,
-                        locationBonus: 1.2,
-                        method: 'poi_based',
-                        coordinates: {
-                            longitude: rental.location?.coordinates?.coordinates?.[0] || 0,
-                            latitude: rental.location?.coordinates?.coordinates?.[1] || 0
-                        },
-                        nearestPOIs: rental.nearestPOIs || []
-                    }));
-
-                    explanationMessage = `Tôi tìm thấy ${poiRentals.length} bài đăng gần các tiện ích bạn quan tâm!`;
-                    log.info(`[CHAT] ✅ Got ${poiRentals.length} POI-based recommendations`);
-                }
+                // ... (giữ nguyên code cũ)
             }
 
-            // Process recommendations (existing code)
+            // --- Process ML recommendations ---
             if (chatData.recommendations && chatData.recommendations.length > 0) {
                 log.info(`[CHAT] ML returned ${chatData.recommendations.length} recommendations`);
 
                 const rentalIds = chatData.recommendations.map(r => r.rentalId);
-                const rentals = await Rental.find({
+
+                // 🔥 THÊM price filter vào query MongoDB ngay từ đầu
+                let mongoQuery = {
                     _id: { $in: rentalIds },
                     status: 'available'
-                })
+                };
+
+                // Áp dụng price filter tại DB level nếu có
+                if (prefs.price_range) {
+                    const { min = 0, max = 0 } = prefs.price_range;
+                    mongoQuery.price = {};
+                    if (max > 0) mongoQuery.price.$lte = max * 1.15;
+                    if (min > 0) mongoQuery.price.$gte = min * 0.85;
+                    log.info(`[CHAT] DB price filter: ${min/1e6}M - ${max/1e6}M`);
+                }
+
+                // Áp dụng property type filter tại DB level nếu có
+                if (prefs.property_type) {
+                    const typeAliasMap = {
+                        'phòng trọ':   /nhà.*trọ|phòng.*trọ/i,
+                        'nhà trọ':     /nhà.*trọ|phòng.*trọ/i,
+                        'trọ':         /nhà.*trọ|phòng.*trọ/i,
+                        'căn hộ':      /căn.*hộ|chung.*cư/i,
+                        'chung cư':    /căn.*hộ|chung.*cư/i,
+                        'nhà riêng':   /nhà.*riêng|nguyên.*căn/i,
+                        'đất nền':     /đất.*nền/i,
+                        'đất':         /đất/i,
+                    };
+                    const regex = typeAliasMap[prefs.property_type.toLowerCase()];
+                    if (regex) {
+                        mongoQuery.propertyType = regex;
+                        log.info(`[CHAT] DB type filter: ${prefs.property_type}`);
+                    }
+                }
+
+                const rentals = await Rental.find(mongoQuery)
                     .select('title price propertyType area amenities furniture images location createdAt')
                     .lean();
 
-                enrichedRecommendations = enrichRecommendations(
-                    chatData.recommendations,
-                    rentals
-                );
+                log.info(`[CHAT] After DB filter: ${rentals.length} rentals`);
 
-                log.info(`[CHAT] ✅ Enriched ${enrichedRecommendations.length} recommendations from ML`);
+                // Enrich
+                let enriched = enrichRecommendations(chatData.recommendations, rentals);
+
+                // 🔥 THÊM: Lọc lần 2 ở application level (safety net)
+                enriched = filterByExtractedPreferences(enriched, prefs);
+
+                enrichedRecommendations = enriched;
+                log.info(`[CHAT] Final enriched: ${enrichedRecommendations.length}`);
             }
+            // --- Fallback nếu ML không có ---
             else if (chatData.extractedPreferences && Object.keys(chatData.extractedPreferences).length > 0) {
-                log.info(`[CHAT] No ML recs, using MongoDB fallback with prefs...`);
+                log.info(`[CHAT] No ML recs, using MongoDB fallback...`);
 
                 enrichedRecommendations = await getSmartFallbackRecommendations(
                     userId,
                     chatData.extractedPreferences
                 );
 
-                log.info(`[CHAT] ✅ Fallback returned ${enrichedRecommendations.length} rentals`);
+                log.info(`[CHAT] Fallback returned ${enrichedRecommendations.length} rentals`);
 
                 if (enrichedRecommendations.length > 0) {
-                    explanationMessage = `Tôi tìm được ${enrichedRecommendations.length} bài đăng phù hợp! Xem chi tiết bên dưới nhé.`;
+                    explanationMessage = `Tôi tìm được ${enrichedRecommendations.length} bài đăng phù hợp!`;
+                } else if (chatData.extractedPreferences.price_range) {
+                    // Thông báo rõ nếu không có bài nào đúng giá
+                    const maxPrice = chatData.extractedPreferences.price_range.max;
+                    explanationMessage = maxPrice
+                        ? `Hiện chưa có bài đăng nào dưới ${(maxPrice/1e6).toFixed(0)} triệu phù hợp với yêu cầu của bạn.`
+                        : 'Chưa tìm thấy bài đăng phù hợp.';
                 }
             }
         }
 
-        // ===== STEP 3: SAVE CONVERSATION =====
-        if (conversationId) {
-            try {
-                await ChatConversation.findByIdAndUpdate(
-                    conversationId,
-                    {
-                        $push: {
-                            messages: [
-                                { role: 'user', content: message, timestamp: new Date() },
-                                { role: 'assistant', content: chatData.message, timestamp: new Date() }
-                            ]
-                        },
-                        $set: {
-                            lastMessageAt: new Date(),
-                            'conversationFlow.lastIntent': chatData.intent,
-                            extractedPreferences: chatData.extractedPreferences || {}
-                        }
-                    },
-                    { upsert: true }
+       
+                // ===== STEP 3: SAVE CONVERSATION =====
+              
+                let savedConversationId = conversationId;
+
+                const prefs = chatData.extractedPreferences || {};
+                const mappedPreferences = {
+                    priceRange: prefs.price_range ? {
+                        min: prefs.price_range.min || null,
+                        max: prefs.price_range.max || null
+                    } : undefined,
+                    location: prefs.location || undefined,
+                    propertyType: prefs.property_type || undefined,
+                };
+                Object.keys(mappedPreferences).forEach(k =>
+                    mappedPreferences[k] === undefined && delete mappedPreferences[k]
                 );
-            } catch (dbError) {
-                log.warn(`DB save error: ${dbError.message}`);
-            }
-        }
+                
+                // 🔥 Build messages array để lưu (bao gồm cả rentals nếu có)
+                const messagesToSave = [
+                    { role: 'user', content: message, timestamp: new Date() },
+                    { role: 'assistant', content: chatData.message, timestamp: new Date() }
+                ];
+                
+                // 🔥 Lưu rentals vào message đặc biệt nếu có
+                if (enrichedRecommendations.length > 0) {
+                    messagesToSave.push({
+                        role: 'system',
+                        content: '__RENTALS__',  // marker để nhận biết
+                        timestamp: new Date(),
+                        metadata: {
+                            type: 'rental_list',
+                            count: enrichedRecommendations.length,
+                            rentals: enrichedRecommendations.map(r => ({
+                                _id: r._id,
+                                title: r.title,
+                                price: r.price,
+                                propertyType: r.propertyType,
+                                area: r.area,
+                                images: r.images?.slice(0, 3) || [],
+                                amenities: r.amenities?.slice(0, 6) || [],
+                                location: r.location,
+                                confidence: r.confidence,
+                                explanation: r.explanation,
+                                method: r.method,
+                                distance_km: r.distance_km,
+                            }))
+                        }
+                    });
+                }
+                
+                const hasRealContent = message && message.trim().length > 0;
+                
+                if (!savedConversationId && hasRealContent) {
+                    try {
+                        const newConv = await ChatConversation.create({
+                            userId,
+                            messages: messagesToSave,
+                            extractedPreferences: mappedPreferences,
+                            status: 'active',
+                            startedAt: new Date(),
+                            lastMessageAt: new Date(),
+                            totalMessages: 2,
+                            totalRecommendations: enrichedRecommendations.length
+                        });
+                        savedConversationId = newConv._id.toString();
+                        log.info(`[CHAT] New conversation created: ${savedConversationId}`);
+                    } catch (dbError) {
+                        log.warn(`[CHAT] DB create error: ${dbError.message}`);
+                    }
+                } else if (savedConversationId) {
+                    try {
+                        await ChatConversation.findByIdAndUpdate(
+                            savedConversationId,
+                            {
+                                $push: { messages: { $each: messagesToSave } },
+                                $inc: {
+                                    totalMessages: 2,
+                                    totalRecommendations: enrichedRecommendations.length
+                                },
+                                $set: {
+                                    lastMessageAt: new Date(),
+                                    ...(Object.keys(mappedPreferences).length > 0 && {
+                                        extractedPreferences: mappedPreferences
+                                    })
+                                }
+                            }
+                        );
+                    } catch (dbError) {
+                        log.warn(`[CHAT] DB update error: ${dbError.message}`);
+                    }
+                }
 
         // ===== STEP 4: RESPONSE =====
         const duration = Date.now() - startTime;
-
         return res.json({
             success: true,
             message: chatData.message,
             intent: chatData.intent,
-            extractedPreferences: chatData.extractedPreferences || {},
+            extractedPreferences: prefs,
             shouldRecommend: chatData.shouldRecommend || false,
             recommendations: enrichedRecommendations,
             recommendationCount: enrichedRecommendations.length,
             explanation: explanationMessage,
             usage: chatData.usage,
-            conversationId,
+            conversationId: savedConversationId, // 🔥 Trả về ID mới hoặc cũ
             metadata: {
                 responseTime: `${duration}ms`,
                 isFromML: enrichedRecommendations.length > 0 && chatData.recommendations?.length > 0,
                 hasFallback: enrichedRecommendations.length > 0 && !chatData.recommendations?.length,
-                hasLocationFilter: chatData.extractedPreferences?.wants_nearby_location || false,
-                hasPOIFilter: chatData.extractedPreferences?.wants_poi_filter || false,
+                hasLocationFilter: prefs.wants_nearby_location || false,
+                hasPOIFilter: prefs.wants_poi_filter || false,
                 timestamp: new Date().toISOString()
             }
         });
@@ -652,7 +820,7 @@ async function _getRecommendationsWithPOI(userId, preferences, userLocation) {
                             spherical: true,
                             query: {
                                 status: 'available',
-                                userId: { $ne: userId }  // 🔥 Exclude own rentals
+                                userId: { $ne: userId }  // 🔥 Exclude own rentals 
                             }
                         }
                     },
@@ -685,6 +853,8 @@ async function _getRecommendationsWithPOI(userId, preferences, userLocation) {
     }
 }
 
+
+// THÔNG TIN PHẢN HỒI KHI CHAT VỚI AI  ============================================================ < 
 async function getSmartFallbackRecommendations(userId, extractedPreferences) {
     try {
         const query = { status: 'available' };
@@ -692,93 +862,97 @@ async function getSmartFallbackRecommendations(userId, extractedPreferences) {
 
         log.info(`[FALLBACK] Prefs: ${JSON.stringify(extractedPreferences)}`);
 
-        // ===== PRICE FILTER - FLEXIBLE =====
+        // ===== GIÁ - STRICT (không mở rộng nhiều) =====
         if (extractedPreferences.price_range) {
-            const { min, max } = extractedPreferences.price_range;
-            if (min || max) {
+            const { min = 0, max = 0 } = extractedPreferences.price_range;
+            if (max > 0 || min > 0) {
                 query.price = {};
-                if (min) {
-                    query.price.$gte = min * 0.5; // -50%
+                if (max > 0) {
+                    query.price.$lte = max * 1.15; // Chỉ cho phép +15%
                     hasFilters = true;
                 }
-                if (max) {
-                    query.price.$lte = max * 1.5; // +50%
+                if (min > 0) {
+                    query.price.$gte = min * 0.85;
                     hasFilters = true;
                 }
-                log.info(`[FALLBACK] Price: ${query.price.$gte || 0} - ${query.price.$lte || 'unlimited'}`);
+                log.info(`[FALLBACK] STRICT Price ≤ ${(max * 1.15 / 1e6).toFixed(1)}M`);
             }
         }
 
-        // ===== PROPERTY TYPE FILTER - EXACT MAPPING =====
+        // ===== LOẠI BĐS =====
         if (extractedPreferences.property_type) {
             const type = extractedPreferences.property_type.toLowerCase();
-
             const typeMap = {
-                'đất nền': /đất.*nền|land|dat.*nen/i,
-                'phòng trọ': /phòng.*trọ|nhà.*trọ|boarding|room/i,
-                'nhà trọ': /phòng.*trọ|nhà.*trọ|boarding|room/i,
-                'căn hộ': /căn.*hộ|chung.*cư|apartment|condo/i,
-                'chung cư': /căn.*hộ|chung.*cư|apartment|condo/i,
-                'nhà riêng': /nhà.*riêng|nhà.*nguyên.*căn|house|villa/i,
+                'đất nền':  /đất.*nền/i,
+                'phòng trọ': /nhà.*trọ|phòng.*trọ/i,
+                'nhà trọ':  /nhà.*trọ|phòng.*trọ/i,
+                'trọ':      /nhà.*trọ|phòng.*trọ/i,
+                'căn hộ':   /căn.*hộ|chung.*cư/i,
+                'chung cư': /căn.*hộ|chung.*cư/i,
+                'nhà riêng': /nhà.*riêng|nguyên.*căn/i,
                 'biệt thự': /biệt.*thự|villa/i,
-                'mặt bằng': /mặt.*bằng|văn.*phòng|office/i,
+                'văn phòng': /văn.*phòng|mặt.*bằng/i,
             };
-
             const regex = typeMap[type];
             if (regex) {
                 query.propertyType = regex;
                 hasFilters = true;
-                log.info(`[FALLBACK] Type filter: ${type} → ${regex}`);
             }
         }
 
-        // ===== LOCATION FILTER - FLEXIBLE =====
+        // ===== VỊ TRÍ =====
         if (extractedPreferences.location) {
-            const location = extractedPreferences.location;
-            const keywords = location.toLowerCase().split(/[\s,;.]+/).filter(k => k.length > 2);
+            const keywords = extractedPreferences.location
+                .toLowerCase()
+                .split(/[\s,;.]+/)
+                .filter(k => k.length > 2);
 
             if (keywords.length > 0) {
-                const locationQueries = [];
-                keywords.forEach(keyword => {
-                    const regex = new RegExp(keyword, 'i');
-                    locationQueries.push(
-                        { 'location.short': regex },
-                        { 'location.fullAddress': regex },
-                        { 'location.district': regex },
-                        { 'location.city': regex },
-                        { 'location.ward': regex }
-                    );
-                });
+                const locationQueries = keywords.flatMap(keyword => [
+                    { 'location.short': { $regex: keyword, $options: 'i' } },
+                    { 'location.fullAddress': { $regex: keyword, $options: 'i' } },
+                    { 'location.district': { $regex: keyword, $options: 'i' } },
+                    { 'location.city': { $regex: keyword, $options: 'i' } },
+                ]);
 
-                if (locationQueries.length > 0) {
+                // Dùng $and để giữ price filter + location filter cùng lúc
+                if (query.$or) {
+                    query.$and = [{ $or: query.$or }, { $or: locationQueries }];
+                    delete query.$or;
+                } else {
                     query.$or = locationQueries;
-                    hasFilters = true;
                 }
+                hasFilters = true;
             }
         }
 
-        // ===== EXECUTE QUERY =====
         log.info(`[FALLBACK] Query: ${JSON.stringify(query)}`);
 
+        // Không giới hạn số lượng (lấy tối đa 50)
         let rentals = await Rental.find(query)
             .sort({ createdAt: -1, views: -1 })
-            .limit(10)
+            .limit(50)
             .select('title price propertyType area amenities furniture images location createdAt')
             .lean();
 
         log.info(`[FALLBACK] Found ${rentals.length} rentals`);
 
-        // ===== FALLBACK TO POPULAR IF EMPTY =====
-        if (rentals.length === 0 && hasFilters) {
-            log.warn(`[FALLBACK] No results, trying popular...`);
+        // ⚠️ NẾU có price filter mà không có kết quả → KHÔNG fallback
+        // (tránh trả về bài sai giá)
+        if (rentals.length === 0 && hasFilters && extractedPreferences.price_range) {
+            log.warn(`[FALLBACK] No results with price filter - returning EMPTY to avoid wrong results`);
+            return [];
+        }
+
+        // Nếu không có price filter → có thể fallback popular
+        if (rentals.length === 0 && !extractedPreferences.price_range) {
             rentals = await Rental.find({ status: 'available' })
                 .sort({ views: -1 })
-                .limit(5)
+                .limit(10)
                 .select('title price propertyType area amenities furniture images location createdAt')
                 .lean();
         }
 
-        // ===== TRANSFORM =====
         return rentals.map(rental => transformRentalToRecommendation(rental, hasFilters));
 
     } catch (error) {
@@ -786,6 +960,8 @@ async function getSmartFallbackRecommendations(userId, extractedPreferences) {
         return [];
     }
 }
+
+
 function transformRentalToRecommendation(rental, isFiltered) {
     return {
         _id: rental._id,
@@ -1409,44 +1585,42 @@ router.get('/chat/conversation/:conversationId', authMiddleware, async (req, res
         const { conversationId } = req.params;
         const userId = req.userId;
 
-        log.info(`[GET CONV] ID: ${conversationId}, User: ${userId}`);
-
         const conversation = await ChatConversation.findOne({
             _id: conversationId,
             userId
         }).lean();
 
         if (!conversation) {
-            return res.status(404).json({
-                success: false,
-                message: 'Conversation not found'
-            });
+            return res.status(404).json({ success: false, message: 'Conversation not found' });
         }
+
+        // 🔥 Trả về tất cả messages kể cả system (có metadata rentals)
+        const messages = (conversation.messages || []).map(m => ({
+            role: m.role,
+            content: m.content,
+            timestamp: m.timestamp,
+            metadata: m.metadata || {}  // 🔥 bao gồm metadata chứa rentals
+        }));
+
+        log.info(`[GET CONV] Found ${messages.length} messages (including system)`);
 
         return res.json({
             success: true,
             conversation: {
                 _id: conversation._id,
                 userId: conversation.userId,
-                messages: conversation.messages || [],
+                messages,
                 extractedPreferences: conversation.extractedPreferences,
                 status: conversation.status,
                 startedAt: conversation.startedAt,
                 lastMessageAt: conversation.lastMessageAt,
                 totalMessages: conversation.totalMessages || 0,
                 totalRecommendations: conversation.totalRecommendations || 0,
-                mlRecommendations: conversation.mlRecommendations?.slice(-5) || []
             }
         });
-
     } catch (error) {
         log.error(`Exception in get conversation: ${error.message}`);
-
-        return res.status(500).json({
-            success: false,
-            message: 'Failed to get conversation',
-            error: error.message
-        });
+        return res.status(500).json({ success: false, message: 'Failed to get conversation' });
     }
 });
 
@@ -1904,17 +2078,29 @@ router.get('/conversation-list/:userId', authMiddleware, async (req, res) => {
         const total = await ChatConversation.countDocuments(query);
 
         // Format response
-        const formattedConversations = conversations.map(c => ({
-            _id: c._id,
-            lastMessage: c.messages?.[c.messages.length - 1],
-            status: c.status,
-            messageCount: c.totalMessages || 0,
-            recommendationCount: c.totalRecommendations || 0,
-            extractedPreferences: c.extractedPreferences,
-            startedAt: c.startedAt,
-            lastMessageAt: c.lastMessageAt,
-            preview: c.messages?.[c.messages.length - 1]?.content?.substring(0, 100) + '...' || 'Trống'
-        }));
+        const formattedConversations = conversations.map(c => {
+            // 🔥 Tính trực tiếp từ messages array thay vì dùng totalMessages
+            const msgCount = c.messages?.length || 0;
+            const lastMsg = c.messages?.[c.messages.length - 1];
+            
+            // Ưu tiên lấy message của user để preview (tự nhiên hơn)
+            const userMsgs = c.messages?.filter(m => m.role === 'user') || [];
+            const lastUserMsg = userMsgs[userMsgs.length - 1];
+            const previewText = lastUserMsg?.content || lastMsg?.content || '';
+        
+            return {
+                _id: c._id,
+                status: c.status,
+                messageCount: msgCount,                          // 🔥 tính từ array
+                recommendationCount: c.totalRecommendations || 0,
+                extractedPreferences: c.extractedPreferences,
+                startedAt: c.startedAt,
+                lastMessageAt: c.lastMessageAt,
+                preview: previewText.length > 100               // 🔥 preview từ user message
+                    ? previewText.substring(0, 100) + '...'
+                    : previewText || 'Trống'
+            };
+        });
 
         return res.json({
             success: true,
@@ -1994,6 +2180,63 @@ router.post('/chat/rating', authMiddleware, rateLimitMiddleware, async (req, res
             message: 'Failed to save rating',
             error: error.message
         });
+    }
+});
+
+/**
+ * DELETE /api/ai/conversation-list/:conversationId
+ * Xóa một conversation
+ */
+router.delete('/conversation-list/:conversationId', authMiddleware, async (req, res) => {
+    try {
+        const { conversationId } = req.params;
+        const userId = req.userId;
+
+        const result = await ChatConversation.findOneAndDelete({
+            _id: conversationId,
+            userId
+        });
+
+        if (!result) {
+            return res.status(404).json({ success: false, message: 'Không tìm thấy cuộc trò chuyện' });
+        }
+
+        log.info(`[DELETE CONV] Deleted: ${conversationId}`);
+        return res.json({ success: true, message: 'Đã xóa cuộc trò chuyện' });
+
+    } catch (error) {
+        log.error(`Exception in delete conversation: ${error.message}`);
+        return res.status(500).json({ success: false, message: 'Xóa thất bại', error: error.message });
+    }
+});
+
+/**
+ * DELETE /api/ai/conversation-list/empty/clean
+ * Xóa tất cả conversation "Trống" (0 tin nhắn) của user
+ */
+router.delete('/conversation-list/empty/clean', authMiddleware, async (req, res) => {
+    try {
+        const userId = req.userId;
+
+        const result = await ChatConversation.deleteMany({
+            userId,
+            $or: [
+                { messages: { $size: 0 } },
+                { messages: { $exists: false } },
+                { totalMessages: 0 }
+            ]
+        });
+
+        log.info(`[CLEAN] Deleted ${result.deletedCount} empty conversations for ${userId}`);
+        return res.json({
+            success: true,
+            deletedCount: result.deletedCount,
+            message: `Đã xóa ${result.deletedCount} cuộc trò chuyện trống`
+        });
+
+    } catch (error) {
+        log.error(`Exception in clean empty: ${error.message}`);
+        return res.status(500).json({ success: false, message: 'Dọn dẹp thất bại' });
     }
 });
 

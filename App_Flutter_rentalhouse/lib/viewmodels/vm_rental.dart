@@ -188,7 +188,7 @@ class RentalViewModel extends ChangeNotifier {
 
   // Property để lưu poisTotal từ AI+POI response
   int _lastPoisTotal = 0;
-
+  List<Map<String, dynamic>> _similarRentals = [];
 
   //  ========================================================= =========================================================
   bool get isAIRecommendation => _isAIRecommendation;
@@ -225,7 +225,7 @@ class RentalViewModel extends ChangeNotifier {
 
   //  Getter
   int get lastPoisTotal => _lastPoisTotal;
-
+  List<Map<String, dynamic>> get similarRentals => _similarRentals;
   //  LIFECYCLE METHODS
   @override
   void dispose() {
@@ -649,7 +649,7 @@ class RentalViewModel extends ChangeNotifier {
         zoomLevel: zoomLevel,
         timeOfDay: timeOfDay,
         deviceType: deviceType,
-        limit: 20,
+
         impressions: impressions,
         scrollDepth: scrollDepth,
         minPrice: _currentMinPrice,
@@ -726,6 +726,40 @@ class RentalViewModel extends ChangeNotifier {
 
     return 'Tự tin ${confidence.toStringAsFixed(0)}% • $reason';
   }
+
+
+
+  //=================================
+  // ================================================================
+// 🤖 SIMILAR RENTALS BY PROPERTY TYPE
+// ================================================================
+  Future<List<Map<String, dynamic>>> fetchSimilarRentals({
+    required String rentalId,
+    required String propertyType,
+    int limit = 6,
+  }) async {
+    try {
+      final token = await AuthService().getIdToken();
+
+      final results = await _rentalService.fetchSimilarRentals(
+        rentalId: rentalId,
+        propertyType: propertyType,
+        limit: limit,
+        token: token,
+      );
+
+      _similarRentals = results;
+      notifyListeners();
+
+      debugPrint('✅ [VM-SIMILAR] ${results.length} bài loại "$propertyType"');
+      return results;
+
+    } catch (e) {
+      debugPrint('❌ [VM-SIMILAR] Error: $e');
+      _similarRentals = [];
+      return [];
+    }
+  }
   // ============================================
   // FETCH NEARBY RENTALS METHODS
   Future<void> fetchNearbyRentals(
@@ -787,7 +821,7 @@ class RentalViewModel extends ChangeNotifier {
           radius: _currentRadius,
           minPrice: _currentMinPrice,
           maxPrice: _currentMaxPrice,
-          limit: 20,
+
         );
       } else {
         debugPrint(' Using fetchNearbyRentals (rental post view)');
@@ -804,7 +838,7 @@ class RentalViewModel extends ChangeNotifier {
           radius: _currentRadius,
           minPrice: _currentMinPrice,
           maxPrice: _currentMaxPrice,
-          limit: 20,
+
         );
       }
 
@@ -1062,7 +1096,7 @@ class RentalViewModel extends ChangeNotifier {
         radius: _currentRadius,
         minPrice: _currentMinPrice,
         maxPrice: _currentMaxPrice,
-        limit: 20,
+
         token: token,
       );
 
@@ -1160,7 +1194,7 @@ class RentalViewModel extends ChangeNotifier {
       final result = await _rentalService.fetchAINearbyRecommendations(
         rentalId: rentalId,
         radius: _currentRadius,
-        limit: 20,
+
         token: token,
       );
 
@@ -1318,7 +1352,7 @@ class RentalViewModel extends ChangeNotifier {
         poiRadius: poiRadius,
         minPrice: minPrice,
         maxPrice: maxPrice,
-        limit: 20,
+
         token: token,
       );
 
@@ -1377,6 +1411,8 @@ class RentalViewModel extends ChangeNotifier {
       notifyListeners();
     }
   }
+
+
   /// Fetch AI + POI combined recommendations
   Future<void> fetchAIPOIRecommendations({
     required double latitude,
@@ -1403,7 +1439,7 @@ class RentalViewModel extends ChangeNotifier {
         radius: radius ?? _currentRadius,
         minPrice: minPrice ?? _currentMinPrice,
         maxPrice: maxPrice ?? _currentMaxPrice,
-        limit: 20,
+
       );
 
       if (_isFetchingNearby) {
@@ -1428,5 +1464,6 @@ class RentalViewModel extends ChangeNotifier {
       notifyListeners();
     }
   }
+ //-----------
 
 }

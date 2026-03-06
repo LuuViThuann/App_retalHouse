@@ -41,7 +41,7 @@ class PersonalizedRecommendRequest(BaseModel):
     userId: Optional[str] = Field(None)
     
     # 🔥 CHANGE: Increase max from 50 to 100 if needed
-    n_recommendations: int = Field(default=10, ge=1, le=100)  # Was 50, now 100
+    n_recommendations: int = Field(default=50, ge=1, le=10000)  # Was 50, now 100
     exclude_items: Optional[List[str]] = Field(None)
     use_location: bool = Field(default=True)
     radius_km: int = Field(default=20)
@@ -116,14 +116,14 @@ class RecommendRequest(BaseModel):
 class SimilarItemsRequest(BaseModel):
     rentalId: str = Field(..., description="Rental ID")
     # 🔥 CHANGE: Also increase here if needed
-    n_recommendations: int = Field(default=10, ge=1, le=100)  # Was 50, now 100
+    n_recommendations: int = Field(default=50, ge=1, le=10000)  # Was 50, now 100
     use_location: bool = Field(default=True, description="Apply geographic proximity bonus")
-
+    property_type: Optional[str] = Field(None, description="Filter by propertyType")
     model_config = ConfigDict(populate_by_name=True)
 
 class PopularItemsRequest(BaseModel):
     # 🔥 CHANGE: Also increase here if needed
-    n_recommendations: int = Field(default=10, ge=1, le=100)  # Was 50, now 100
+    n_recommendations: int = Field(default=50, ge=1, le=10000)  # Was 50, now 100
     exclude_items: Optional[List[str]] = None
 
     model_config = ConfigDict(populate_by_name=True)
@@ -900,6 +900,12 @@ async def explain_recommendation(
         # 4. Get rental features
         rental_features = model.item_features.get(rentalId, {})
         
+      
+        score_breakdown = matched_rec.get('scoreBreakdown', {})
+        content_score = float(score_breakdown.get('content', {}).get('score', matched_rec.get('contentScore', 0.5)))
+        cf_score = float(score_breakdown.get('collaborative', {}).get('score', matched_rec.get('cfScore', 0.0)))
+        popularity_score = float(score_breakdown.get('popularity', {}).get('score', matched_rec.get('popularityScore', 0.3)))
+
         # 5. Generate DETAILED explanation
         explanation = {
             'userId': userId,
@@ -914,16 +920,17 @@ async def explain_recommendation(
                 'time_score': matched_rec.get('timeBonus', 1.0),
                 'final_score': matched_rec['finalScore'],
                 
-                # 🔥 NEW: Price compatibility (0-1)
+                # 🔥 FIX: Thêm đúng key mà Flutter đang đọc
+                'content_score': content_score,
+                'cf_score': min(1.0, cf_score),
+                'popularity_score': min(1.0, popularity_score),
+                
+                # 🔥 Price, location, property type match
                 'price_match': _calculate_price_match(
                     rental_features.get('price', 0),
                     user_prefs
                 ),
-                
-                # 🔥 NEW: Location compatibility (0-1)
                 'location_match': min(1.0, matched_rec.get('locationBonus', 1.0)),
-                
-                # 🔥 NEW: Property type match (0-1)
                 'property_type_match': _calculate_property_type_match(
                     rental_features.get('propertyType', ''),
                     user_prefs
@@ -1473,15 +1480,24 @@ async def get_similar_items(request: SimilarItemsRequest):
     print(f"   Use location proximity: {request.use_location}")
     
     try:
+        fetch_count = request.n_recommendations * 3 if request.property_type else request.n_recommendations
         # Get recommendations from model
         recommendations = model.recommend_similar_items(
             item_id=request.rentalId,
-            n_recommendations=request.n_recommendations,
+            n_recommendations=fetch_count, 
             use_location=request.use_location
         )
         
         print(f"✅ Model returned {len(recommendations)} recommendations")
-        
+
+        if request.property_type:
+            recommendations = [
+                r for r in recommendations
+                if model.item_features.get(r['rentalId'], {}).get('propertyType', '') == request.property_type
+            ]
+            print(f"   After filter '{request.property_type}': {len(recommendations)} items")
+
+        recommendations = recommendations[:request.n_recommendations]
         # 🔥 DEBUG: Log sample before conversion
         if recommendations:
             sample = recommendations[0]

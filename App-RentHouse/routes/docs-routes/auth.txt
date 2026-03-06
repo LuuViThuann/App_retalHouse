@@ -11,7 +11,7 @@ DELETE,/admin/users/:id,Admin,Xóa người dùng hoàn toàn (xóa MongoDB + Fi
 ==============
 
 AUTH & USER PROFILE (Public / User)
-
+ 
 Method,Route,Quyền truy cập,Mô tả
 POST,/register,Public,"Đăng ký tài khoản mới (bắt buộc avatar, phone, address...)"
 POST,/login,Public,Đăng nhập bằng Firebase ID Token → trả thông tin user + role

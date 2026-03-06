@@ -391,6 +391,46 @@ class ChatAIService {
     }
   }
 
+  /// Xóa một conversation
+  static Future<bool> deleteConversation(String conversationId) async {
+    try {
+      final token = await _getAuthToken();
+      if (token == null) return false;
+
+      final response = await http.delete(
+        Uri.parse(ApiRoutes.aiDeleteConversation(conversationId)),
+        headers: {'Authorization': 'Bearer $token'},
+      ).timeout(const Duration(seconds: 10));
+
+      return response.statusCode == 200;
+    } catch (e) {
+      print('❌ Delete conversation error: $e');
+      return false;
+    }
+  }
+
+  /// Dọn dẹp conversation trống
+  static Future<int> cleanEmptyConversations() async {
+    try {
+      final token = await _getAuthToken();
+      if (token == null) return 0;
+
+      final response = await http.delete(
+        Uri.parse(ApiRoutes.aiCleanEmptyConversations),
+        headers: {'Authorization': 'Bearer $token'},
+      ).timeout(const Duration(seconds: 10));
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return data['deletedCount'] as int? ?? 0;
+      }
+      return 0;
+    } catch (e) {
+      print('❌ Clean empty error: $e');
+      return 0;
+    }
+  }
+
   /// 💚 Health check
   static Future<bool> healthCheck() async {
     try {
@@ -411,26 +451,32 @@ class ChatMessage {
   final String role;
   final String content;
   final DateTime? timestamp;
-
+  final Map<String, dynamic>? metadata;
   ChatMessage({
     required this.role,
     required this.content,
     this.timestamp,
+    this.metadata,
   });
 
   Map<String, dynamic> toJson() => {
     'role': role,
     'content': content,
     if (timestamp != null) 'timestamp': timestamp!.toIso8601String(),
+    if (metadata != null) 'metadata': metadata,
   };
 
   factory ChatMessage.fromJson(Map<String, dynamic> json) {
     return ChatMessage(
-      role: json['role'] as String,
-      content: json['content'] as String,
-      timestamp: json['timestamp'] != null ? DateTime.parse(json['timestamp']) : null,
+      role: json['role'] as String? ?? 'assistant',
+      content: (json['content'] ?? json['text'] ?? '') as String,
+      timestamp: json['timestamp'] != null
+          ? DateTime.tryParse(json['timestamp'].toString())
+          : null,
+      metadata: json['metadata'] as Map<String, dynamic>?, //
     );
   }
+
 }
 
 class ChatResponse {

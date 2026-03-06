@@ -3,7 +3,7 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 class ApiRoutes {
   static const String rootUrl =
-      'http://192.168.1.189:3000'; // http://192.168.43.168:3000 - mạng dữ liệu
+      'http://192.168.1.226:3000'; // http://192.168.43.168:3000 - mạng dữ liệu
   static const String baseUrl = '$rootUrl/api';
   static const String serverBaseUrl = rootUrl;
   static const String socketUrl = serverBaseUrl;
@@ -14,9 +14,20 @@ class ApiRoutes {
   /// POST /api/ai/chat - Chat với AI assistant
   static const String aiChat = '$baseUrl/ai/chat';
 
+  /// DELETE /api/ai/conversation-list/:id - Xóa một conversation
+  static String aiDeleteConversation(String conversationId) {
+    return '$baseUrl/ai/conversation-list/$conversationId';
+  }
+
+  /// DELETE /api/ai/conversation-list/empty/clean - Xóa tất cả conversation trống
+  static const String aiCleanEmptyConversations = '$baseUrl/ai/conversation-list/empty/clean';
+
   /// POST /api/ai/chat/recommendations-with-details - Lấy gợi ý chi tiết
   static const String aiChatRecommendationsWithDetails =
       '$baseUrl/ai/chat/recommendations-with-details';
+
+  static const String aiRecommendationsSimilar =
+      '$baseUrl/ai/recommendations/similar';
 
   /// POST /api/ai/chat/explain-rental - Giải thích chi tiết 1 bài đăng
   static const String aiChatExplainRental = '$baseUrl/ai/chat/explain-rental';
@@ -59,7 +70,7 @@ class ApiRoutes {
 
   /// GET /api/ai/chat/conversation-list/:userId - Danh sách conversations
   static String aiChatConversationList(String userId, {int limit = 10, int skip = 0}) {
-    return '$baseUrl/ai/chat/conversation-list/$userId?limit=$limit&skip=$skip';
+    return '$baseUrl/ai/conversation-list/$userId?limit=$limit&skip=$skip';
   }
 
   /// POST /api/ai/chat/rating - Rating gợi ý/conversation
@@ -105,7 +116,7 @@ class ApiRoutes {
     required List<String> selectedCategories,
     double radius = 10.0,
     double poiRadius = 3.0,
-    int limit = 10,
+    int? limit,
     double? minPrice,
     double? maxPrice,
   }) {
@@ -114,9 +125,9 @@ class ApiRoutes {
       'longitude': longitude.toStringAsFixed(6),
       'radius': radius.toStringAsFixed(2),
       'poiRadius': poiRadius.toStringAsFixed(2),
-      'limit': limit.toString(),
-    };
 
+    };
+    if (limit != null) params['limit'] = limit.toString();
     // 🔥 THÊM selectedCategories theo cách safe
     for (int i = 0; i < selectedCategories.length; i++) {
       params['selectedCategories[$i]'] = selectedCategories[i];
@@ -146,7 +157,7 @@ class ApiRoutes {
     int zoomLevel = 15,
     String timeOfDay = 'morning',
     String deviceType = 'mobile',
-    int limit = 10,
+    int? limit,
     String impressions = '', // Comma-separated rental IDs already shown
     double scrollDepth = 0.5,
   }) {
@@ -157,10 +168,10 @@ class ApiRoutes {
       'zoom_level': zoomLevel.toString(),
       'time_of_day': timeOfDay,
       'device_type': deviceType,
-      'limit': limit.toString(),
+
       'scroll_depth': scrollDepth.toStringAsFixed(2),
     };
-
+    if (limit != null) params['limit'] = limit.toString();
     if (impressions.isNotEmpty) {
       params['impressions'] = impressions;
     }
@@ -215,7 +226,7 @@ class ApiRoutes {
   /// AI gợi ý nearby kết hợp với geospatial query
   static String aiRecommendationsNearby({
     required String rentalId,
-    int limit = 10,
+    int? limit,
     double radius = 10.0,
   }) {
     if (rentalId.isEmpty || rentalId.startsWith('current_location_')) {
@@ -225,10 +236,10 @@ class ApiRoutes {
     }
 
     final params = <String, String>{
-      'limit': limit.toString(),
+
       'radius': radius.toStringAsFixed(2),
     };
-
+    if (limit != null) params['limit'] = limit.toString();
     final uri = Uri.parse('$baseUrl/ai/recommendations/nearby/$rentalId')
         .replace(queryParameters: params);
 
@@ -270,7 +281,7 @@ class ApiRoutes {
     required String rentalId,
     double radius = 10.0,
     int page = 1,
-    int limit = 10,
+    int? limit,
     double? minPrice,
     double? maxPrice,
   }) {
@@ -282,9 +293,10 @@ class ApiRoutes {
     final params = <String, String>{
       'radius': radius.toStringAsFixed(2),
       'page': page.toString(),
-      'limit': limit.toString(),
+
     };
 
+    if (limit != null) params['limit'] = limit.toString();
     if (minPrice != null && minPrice > 0) {
       params['minPrice'] = minPrice.toStringAsFixed(0);
     }
@@ -305,7 +317,7 @@ class ApiRoutes {
     required double longitude,
     double radius = 10.0,
     int page = 1,
-    int limit = 10,
+    int? limit,
     double? minPrice,
     double? maxPrice,
   }) {
@@ -326,9 +338,9 @@ class ApiRoutes {
       'longitude': longitude.toStringAsFixed(6),
       'radius': radius.toStringAsFixed(2),
       'page': page.toString(),
-      'limit': limit.toString(),
-    };
 
+    };
+    if (limit != null) params['limit'] = limit.toString();
     if (minPrice != null && minPrice > 0) {
       params['minPrice'] = minPrice.toStringAsFixed(0);
     }
@@ -375,6 +387,11 @@ class ApiRoutes {
   ///GET /api/analytics/property-types - Thống kê loại nhà
   static const String analyticsPropertyTypes = '$baseUrl/analytics/property-types';
 
+
+  static const String analyticsAreaDistribution   = '$baseUrl/analytics/area-distribution';
+  static const String analyticsAmenitiesStats     = '$baseUrl/analytics/amenities-stats';
+  static const String analyticsUserBehavior       = '$baseUrl/analytics/user-behavior';
+  static const String analyticsGrowthStats        = '$baseUrl/analytics/growth-stats';
   // ==================== SEARCH HISTORY ====================
   /// GET /api/search-history - Lấy lịch sử tìm kiếm
   static const String searchHistory = '$baseUrl/search-history';

@@ -49,7 +49,7 @@ class POIService {
     double poiRadius = 3.0,
     double? minPrice,
     double? maxPrice,
-    int limit = 10,
+    int? limit,
   }) async {
     try {
       final token = await AuthService().getIdToken();
@@ -64,7 +64,7 @@ class POIService {
         'selectedCategories': selectedCategories,
         'radius': radius,
         'poiRadius': poiRadius,
-        'limit': limit,
+        if (limit != null) 'limit': limit,
         if (minPrice != null) 'minPrice': minPrice,
         if (maxPrice != null) 'maxPrice': maxPrice,
       };
@@ -174,7 +174,7 @@ class POIService {
     double radius = 3.0,
     double? minPrice,
     double? maxPrice,
-    int limit = 20,
+    int? limit,
   }) async {
     try {
       final token = await AuthService().getIdToken();
@@ -188,7 +188,7 @@ class POIService {
         'longitude': longitude,
         'selectedCategories': selectedCategories,
         'radius': radius,
-        'limit': limit,
+        if (limit != null) 'limit': limit,
         if (minPrice != null) 'minPrice': minPrice,
         if (maxPrice != null) 'maxPrice': maxPrice,
       };
@@ -262,7 +262,7 @@ class POIService {
     double radius = 5.0,
     double? minPrice,
     double? maxPrice,
-    int limit = 20,
+    int? limit,
   }) async {
     try {
       final token = await AuthService().getIdToken();
@@ -270,7 +270,7 @@ class POIService {
       final body = {
         'poi': poi.toJson(),
         'radius': radius,
-        'limit': limit,
+        if (limit != null) 'limit': limit,
         if (minPrice != null) 'minPrice': minPrice,
         if (maxPrice != null) 'maxPrice': maxPrice,
       };
@@ -358,7 +358,7 @@ class POIService {
     double radius = 10.0,
     double? minPrice,
     double? maxPrice,
-    int limit = 20,
+    int? limit,
   }) async {
     try {
       final token = await AuthService().getIdToken();
@@ -372,7 +372,7 @@ class POIService {
         'longitude': longitude,
         'selectedCategories': selectedCategories,
         'radius': radius,
-        'limit': limit,
+        if (limit != null) 'limit': limit,
         if (minPrice != null) 'minPrice': minPrice,
         if (maxPrice != null) 'maxPrice': maxPrice,
       };

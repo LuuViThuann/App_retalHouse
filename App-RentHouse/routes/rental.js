@@ -1291,8 +1291,9 @@ router.get('/rentals/nearby-from-location', async (req, res) => {
   const requestId = Date.now(); // Để track request
 
   try {
-    const { latitude, longitude, radius = 10, page = 1, limit = 10, minPrice, maxPrice } = req.query;
-    const skip = (Number(page) - 1) * Number(limit);
+    const { latitude, longitude, radius = 10, page = 1, minPrice, maxPrice } = req.query;
+    const limit = req.query.limit ? parseInt(req.query.limit) : null; // ✅ null = lấy tất cả
+    const skip = limit ? (Number(page) - 1) * limit : 0;
 
     console.log(`🔍 [${requestId}] [NEARBY-FROM-LOCATION] Request:`, {
       latitude,
@@ -1399,8 +1400,8 @@ router.get('/rentals/nearby-from-location', async (req, res) => {
             query: geoQueryFilter,
           },
         },
-        { $skip: skip },
-        { $limit: Number(limit) },
+        ...(skip > 0 ? [{ $skip: skip }] : []),
+        ...(limit ? [{ $limit: limit }] : []), 
         {
           $project: {
             title: 1,
@@ -1445,13 +1446,16 @@ router.get('/rentals/nearby-from-location', async (req, res) => {
       console.log(`⚠️ [${requestId}] Falling back to simple query...`);
       searchMethod = 'fallback_location_based';
 
-      nearbyRentals = await Rental.find(geoQueryFilter)
-        .sort({ createdAt: -1 })
-        .skip(skip)
-        .limit(Number(limit))
-        .select('title price location images videos propertyType createdAt area furniture amenities surroundings rentalTerms contactInfo status userId')
-        .lean()
-        .maxTimeMS(10000);
+      let fallbackQuery = Rental.find(geoQueryFilter)
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .select('title price location images videos propertyType createdAt area furniture amenities surroundings rentalTerms contactInfo status userId')
+      .lean()
+      .maxTimeMS(10000);
+    
+      if (limit) fallbackQuery = fallbackQuery.limit(limit); // ✅ Chỉ limit khi có
+      
+      nearbyRentals = await fallbackQuery;
 
       total = await Rental.countDocuments(geoQueryFilter).maxTimeMS(5000);
 
@@ -1492,7 +1496,7 @@ router.get('/rentals/nearby-from-location', async (req, res) => {
       total,
       page: Number(page),
       pages: Math.ceil(total / Number(limit)),
-      hasMore: (Number(page) * Number(limit)) < total,
+      hasMore: limit ? (Number(page) * limit) < total : false,
       searchMethod,
       centerCoordinates: { longitude: lon, latitude: lat },
       radiusKm: radiusNum,
@@ -1516,8 +1520,9 @@ router.get('/rentals/nearby-from-location', async (req, res) => {
 
 router.get('/rentals/nearby/:id', async (req, res) => {
   try {
-    const { radius = 10, page = 1, limit = 10, minPrice, maxPrice } = req.query;
-    const skip = (Number(page) - 1) * Number(limit);
+    const { radius = 10, page = 1, minPrice, maxPrice } = req.query;
+    const limit = req.query.limit ? parseInt(req.query.limit) : null; // ✅ null = lấy tất cả
+    const skip = limit ? (Number(page) - 1) * limit : 0;
 
     // ✅ Set timeout headers
     req.setTimeout(60000); // 60 seconds
@@ -1610,12 +1615,15 @@ router.get('/rentals/nearby/:id', async (req, res) => {
         console.log(`✅ Applied price filter to fallback query:`, priceFilter);
       }
 
+      let fallbackQuery = Rental.find(query)
+      .select('title price location images videos propertyType createdAt area')
+      .skip(skip)
+      .lean();
+    
+      if (limit) fallbackQuery = fallbackQuery.limit(limit); // ✅
+      
       const [nearbyRentals, total] = await Promise.all([
-        Rental.find(query)
-          .select('title price location images videos propertyType createdAt area')
-          .skip(skip)
-          .limit(Number(limit))
-          .lean(),
+        fallbackQuery,
         Rental.countDocuments(query)
       ]);
 
@@ -1630,7 +1638,8 @@ router.get('/rentals/nearby/:id', async (req, res) => {
         })),
         total,
         page: Number(page),
-        pages: Math.ceil(total / Number(limit)),
+        pages: limit ? Math.ceil(total / limit) : 1,
+        hasMore: limit ? (Number(page) * limit) < total : false,
         warning: 'Rental coordinates are invalid ([0, 0]). Showing rentals in the same area instead.',
         searchMethod: 'location_fallback'
       });
@@ -1668,8 +1677,8 @@ router.get('/rentals/nearby/:id', async (req, res) => {
             query: geoQueryFilter, // 🔥 Áp dụng filter vào geoNear
           },
         },
-        { $skip: skip },
-        { $limit: Number(limit) },
+        ...(skip > 0 ? [{ $skip: skip }] : []),
+        ...(limit ? [{ $limit: limit }] : []),
         {
           $project: {
             title: 1,
@@ -1718,7 +1727,7 @@ router.get('/rentals/nearby/:id', async (req, res) => {
       total,
       page: Number(page),
       pages: Math.ceil(total / Number(limit)),
-      hasMore: (Number(page) * Number(limit)) < total,
+      hasMore: limit ? (Number(page) * limit) < total : false,
       searchMethod: 'geospatial',
       centerCoordinates: { longitude, latitude },
       radiusKm: parseFloat(radius),
@@ -2034,7 +2043,7 @@ router.patch('/rentals/:id', authMiddleware, upload.array('media'), async (req, 
       });
     }
 
-    // ✨ THÊM: Không cho edit nếu chưa thanh toán
+    // ✨ THÊM: Không cho edit nếu chưa thanh toán 
     if (rental.paymentInfo?.status !== 'completed') {
       return res.status(402).json({
         success: false,

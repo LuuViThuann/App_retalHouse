@@ -81,7 +81,7 @@ const POI_CATEGORIES = {
 
 /**
  * 🔍 Overpass API Service - Lấy POI từ OpenStreetMap
- * ✅ TỐI ƯU HÓA: Xử lý lỗi 504, giới hạn POI, retry logic
+ * ✅ TỐI ƯU HÓA: Xử lý lỗi 504, giới hạn POI, retry logic 
  */
 class POIService {
   constructor() {

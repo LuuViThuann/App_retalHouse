@@ -19,6 +19,7 @@ import 'package:flutter_rentalhouse/viewmodels/vm_rental.dart';
 import 'package:flutter_rentalhouse/views/Admin/Service/banner.dart';
 import 'package:flutter_rentalhouse/views/Admin/Widget/HomeMain/News_home.dart';
 import 'package:flutter_rentalhouse/views/Admin/model/banner.dart';
+import 'package:flutter_rentalhouse/views/chat_ai_view_user.dart';
 import 'package:flutter_rentalhouse/views/favorite_view.dart';
 import 'package:flutter_rentalhouse/views/login_view.dart';
 import 'package:flutter_rentalhouse/views/rental_detail_view.dart';
@@ -38,6 +39,7 @@ import '../config/api_routes.dart';
 import 'package:http/http.dart' as http;
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 
+import '../utils/ChatAIPageRoute.dart';
 import '../utils/Snackbar_process.dart';
 
 
@@ -70,6 +72,27 @@ class _HomeContentState extends State<HomeContent> {
 
   RentalFilter filter = const RentalFilter();
 
+  void _showWelcomeToast(String username) {
+    final hour = DateTime.now().hour;
+    final String greeting = hour < 12
+        ? 'Chào buổi sáng, $username!'
+        : hour < 18
+        ? 'Chào buổi chiều, $username!'
+        : 'Chào buổi tối, $username!';
+
+    final overlay = Overlay.of(context);
+    late OverlayEntry entry;
+
+    entry = OverlayEntry(
+      builder: (_) => _WelcomeToast(
+        message: greeting,
+        onDismiss: () => entry.remove(),
+      ),
+    );
+
+    overlay.insert(entry);
+  }
+
   @override
   void initState() {
     super.initState();
@@ -94,6 +117,11 @@ class _HomeContentState extends State<HomeContent> {
           _loadUnreadCount();
           _startNotificationTimer();
           _loadAIRecommendations();
+
+          Future.delayed(
+            const Duration(milliseconds: 600),
+                () => _showWelcomeToast(authViewModel.currentUser!.username ?? 'bạn'),
+          );
         }
       }
     });
@@ -1899,14 +1927,9 @@ class _HomeContentState extends State<HomeContent> {
         children: [
           RawMaterialButton(
             onPressed: () {
-              // ✅ SIMPLE: Just open the chat - no API key needed
-              showModalBottomSheet(
-                context: context,
-                isScrollControlled: true,
-                shape: const RoundedRectangleBorder(
-                  borderRadius: BorderRadius.vertical(top: Radius.circular(25)),
-                ),
-                builder: (_) => const ChatAIBottomSheet(),
+              Navigator.push(
+                context,
+                ChatAIPageRoute(page: const ChatAIPage()),
               );
             },
             constraints: const BoxConstraints.tightFor(width: 145, height: 145),
@@ -2023,5 +2046,171 @@ class RentalCardPlaceholder extends StatelessWidget {
         ],
       ),
     );
+  }
+}
+
+class _WelcomeToast extends StatefulWidget {
+  final String message;
+  final VoidCallback onDismiss;
+
+  const _WelcomeToast({required this.message, required this.onDismiss});
+
+  @override
+  State<_WelcomeToast> createState() => _WelcomeToastState();
+}
+
+class _WelcomeToastState extends State<_WelcomeToast>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 400),
+  );
+  late final Animation<Offset> _slide = Tween<Offset>(
+    begin: const Offset(0, -1),
+    end: Offset.zero,
+  ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic));
+
+  @override
+  void initState() {
+    super.initState();
+    _controller.forward();
+    // Tự biến mất sau 3 giây
+    Future.delayed(const Duration(seconds: 30), _dismiss);
+  }
+
+  void _dismiss() async {
+    if (!mounted) return;
+    await _controller.reverse();
+    widget.onDismiss();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Positioned(
+      top: MediaQuery.of(context).padding.top + 12,
+      left: 16,
+      right: 16,
+      child: SlideTransition(
+        position: _slide,
+        child: Material(
+          color: Colors.transparent,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: const Color(0xFFE8EDF5), width: 1),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.10),
+                  blurRadius: 20,
+                  offset: const Offset(0, 6),
+                ),
+              ],
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                // GIF to hơn, nền xanh nổi bật
+                Image.asset(
+                  'assets/img/heloai.gif',
+                  width: 112,
+                  height: 112,
+                  fit: BoxFit.contain,
+                  errorBuilder: (_, __, ___) => const Icon(
+                    Icons.waving_hand,
+                    color: Color(0xFF1E40AF),
+                    size: 28,
+                  ),
+                ),
+                const SizedBox(width: 14),
+
+                // Nội dung text
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // Dòng tag nhỏ phía trên
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 8, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFEFF6FF),
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: const Text(
+                              'Trợ lý AI bất động sản',
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w600,
+                                color: Color(0xFF1E40AF),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 5),
+                      // Dòng chào chính
+                      Text(
+                        widget.message,
+                        style: const TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFF1A1A2E),
+                          letterSpacing: -0.2,
+                        ),
+                      ),
+                      const SizedBox(height: 3),
+                      // Dòng phụ
+                      Text(
+                        'Chào mừng bạn quay lại ! Hôm nay có ${_getTodayListings()} bất động sản mới cho bạn.',
+                        style: const TextStyle(
+                          fontSize: 13,
+                          color: Color(0xFF6B7280),
+                          fontWeight: FontWeight.w400,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+
+                // Nút đóng
+                GestureDetector(
+                  onTap: _dismiss,
+                  child: Container(
+                    padding: const EdgeInsets.all(4),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF3F4F6),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Icon(
+                      Icons.close_rounded,
+                      color: Color(0xFF9CA3AF),
+                      size: 16,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+// Helper — số ngẫu nhiên trông thực tế
+  String _getTodayListings() {
+    final values = ['12', '8', '15', '23', '6'];
+    return values[DateTime.now().minute % values.length];
   }
 }

@@ -1,5 +1,15 @@
 import 'package:flutter/material.dart';
 
+class _C {
+  static const bg       = Color(0xFFF9FAFB);
+  static const surface  = Colors.white;
+  static const border   = Color(0xFFE5E7EB);
+  static const text     = Color(0xFF111827);
+  static const textSub  = Color(0xFF6B7280);
+  static const muted    = Color(0xFF9CA3AF);
+  static const accent   = Color(0xFF2563EB);
+}
+
 class ChartDetailDropdown extends StatefulWidget {
   final String title;
   final List<Map<String, dynamic>> data;
@@ -7,7 +17,7 @@ class ChartDetailDropdown extends StatefulWidget {
   final String labelKey;
   final IconData icon;
   final Color accentColor;
-  final String? formatType; // 'price', 'area', 'count', 'percentage'
+  final String? formatType;
 
   const ChartDetailDropdown({
     Key? key,
@@ -16,7 +26,7 @@ class ChartDetailDropdown extends StatefulWidget {
     required this.valueKey,
     required this.labelKey,
     required this.icon,
-    this.accentColor = Colors.blue,
+    this.accentColor = _C.accent,
     this.formatType,
   }) : super(key: key);
 
@@ -34,13 +44,10 @@ class _ChartDetailDropdownState extends State<ChartDetailDropdown>
   void initState() {
     super.initState();
     _animationController = AnimationController(
-      duration: const Duration(milliseconds: 300),
+      duration: const Duration(milliseconds: 250),
       vsync: this,
     );
-    _expandAnimation = CurvedAnimation(
-      parent: _animationController,
-      curve: Curves.easeInOut,
-    );
+    _expandAnimation = CurvedAnimation(parent: _animationController, curve: Curves.easeInOut);
   }
 
   @override
@@ -52,46 +59,32 @@ class _ChartDetailDropdownState extends State<ChartDetailDropdown>
   void _toggleExpanded() {
     setState(() {
       _isExpanded = !_isExpanded;
-      if (_isExpanded) {
-        _animationController.forward();
-      } else {
-        _animationController.reverse();
-      }
+      _isExpanded ? _animationController.forward() : _animationController.reverse();
     });
   }
 
   String _formatValue(dynamic value) {
     if (widget.formatType == null) return value.toString();
-
-    final numValue = _toDouble(value);
-
+    final v = _toDouble(value);
     switch (widget.formatType) {
-      case 'price':
-        return _formatPrice(numValue);
-      case 'area':
-        return '${numValue.toStringAsFixed(0)} m²';
-      case 'percentage':
-        return '${numValue.toStringAsFixed(1)}%';
-      case 'count':
-        return numValue.toStringAsFixed(0);
-      default:
-        return numValue.toString();
+      case 'price':      return _fmtPrice(v);
+      case 'area':       return '${v.toStringAsFixed(0)} m²';
+      case 'percentage': return '${v.toStringAsFixed(1)}%';
+      case 'count':      return v.toStringAsFixed(0);
+      default:           return v.toString();
     }
   }
 
-  String _formatPrice(double price) {
-    if (price >= 1000000000) {
-      return '${(price / 1000000000).toStringAsFixed(2)} tỷ';
-    } else if (price >= 1000000) {
-      return '${(price / 1000000).toStringAsFixed(0)} triệu';
-    }
-    return '${price.toStringAsFixed(0)} đ';
+  String _fmtPrice(double p) {
+    if (p >= 1e9) return '${(p / 1e9).toStringAsFixed(2)} tỷ';
+    if (p >= 1e6) return '${(p / 1e6).toStringAsFixed(0)} triệu';
+    return '${p.toStringAsFixed(0)} đ';
   }
 
-  double _toDouble(dynamic value) {
-    if (value is int) return value.toDouble();
-    if (value is double) return value;
-    if (value is String) return double.tryParse(value) ?? 0.0;
+  double _toDouble(dynamic v) {
+    if (v is int) return v.toDouble();
+    if (v is double) return v;
+    if (v is String) return double.tryParse(v) ?? 0.0;
     return 0.0;
   }
 
@@ -102,104 +95,55 @@ class _ChartDetailDropdownState extends State<ChartDetailDropdown>
     return Container(
       margin: const EdgeInsets.only(top: 12),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey[200]!),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.03),
-            blurRadius: 4,
-            offset: const Offset(0, 2),
-          ),
-        ],
+        color: _C.surface,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: _C.border),
       ),
       child: Column(
         children: [
-          // Header
           InkWell(
             onTap: _toggleExpanded,
-            borderRadius: BorderRadius.circular(12),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            borderRadius: BorderRadius.circular(10),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
               child: Row(
                 children: [
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: widget.accentColor.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Icon(
-                      widget.icon,
-                      color: widget.accentColor,
-                      size: 20,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
+                  Icon(widget.icon, color: _C.textSub, size: 16),
+                  const SizedBox(width: 10),
                   Expanded(
-                    child: Text(
-                      widget.title,
-                      style: const TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
+                    child: Text(widget.title,
+                        style: const TextStyle(
+                            fontSize: 13, fontWeight: FontWeight.w600, color: _C.text)),
                   ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 4,
-                    ),
-                    decoration: BoxDecoration(
-                      color: widget.accentColor.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Text(
-                      '${widget.data.length} mục',
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.bold,
-                        color: widget.accentColor,
-                      ),
-                    ),
-                  ),
+                  Text('${widget.data.length} mục',
+                      style: const TextStyle(fontSize: 11, color: _C.muted)),
                   const SizedBox(width: 8),
                   RotationTransition(
                     turns: Tween(begin: 0.0, end: 0.5).animate(_expandAnimation),
-                    child: Icon(
-                      Icons.keyboard_arrow_down,
-                      color: Colors.grey[600],
-                    ),
+                    child: const Icon(Icons.keyboard_arrow_down, color: _C.muted, size: 18),
                   ),
                 ],
               ),
             ),
           ),
-
-          // Expandable Content
           SizeTransition(
             sizeFactor: _expandAnimation,
             child: Column(
               children: [
-                const Divider(height: 1),
+                const Divider(height: 1, color: _C.border),
                 Container(
                   constraints: const BoxConstraints(maxHeight: 300),
                   child: ListView.separated(
                     shrinkWrap: true,
-                    padding: const EdgeInsets.all(12),
+                    padding: const EdgeInsets.all(10),
                     itemCount: widget.data.length,
-                    separatorBuilder: (_, __) => const SizedBox(height: 8),
-                    itemBuilder: (context, index) {
-                      final item = widget.data[index];
+                    separatorBuilder: (_, __) => const SizedBox(height: 6),
+                    itemBuilder: (context, i) {
+                      final item  = widget.data[i];
                       final label = item[widget.labelKey]?.toString() ?? 'N/A';
                       final value = item[widget.valueKey];
-
-                      return _buildDetailItem(
-                        index: index + 1,
-                        label: label,
-                        value: _formatValue(value),
-                        item: item,
-                      );
+                      return _buildRow(index: i + 1, label: label,
+                          value: _formatValue(value), item: item);
                     },
                   ),
                 ),
@@ -211,144 +155,69 @@ class _ChartDetailDropdownState extends State<ChartDetailDropdown>
     );
   }
 
-  Widget _buildDetailItem({
+  Widget _buildRow({
     required int index,
     required String label,
     required String value,
     required Map<String, dynamic> item,
   }) {
-    // Gradient colors for top 3
-    Color? gradientColor;
-    if (index == 1) {
-      gradientColor = Colors.amber[100];
-    } else if (index == 2) {
-      gradientColor = Colors.grey[200];
-    } else if (index == 3) {
-      gradientColor = Colors.orange[100];
-    }
-
+    final isTop = index <= 3;
     return Container(
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
       decoration: BoxDecoration(
-        gradient: gradientColor != null
-            ? LinearGradient(
-          colors: [gradientColor, Colors.white],
-          begin: Alignment.centerLeft,
-          end: Alignment.centerRight,
-        )
-            : null,
-        color: gradientColor == null ? Colors.grey[50] : null,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(
-          color: index <= 3 ? widget.accentColor.withOpacity(0.3) : Colors.grey[200]!,
-        ),
+        color: isTop ? _C.bg : Colors.white,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: _C.border),
       ),
       child: Row(
         children: [
-          // Rank
-          Container(
-            width: 32,
-            height: 32,
-            decoration: BoxDecoration(
-              color: index <= 3
-                  ? widget.accentColor.withOpacity(0.2)
-                  : Colors.grey[300],
-              shape: BoxShape.circle,
-              border: Border.all(
-                color: index <= 3 ? widget.accentColor : Colors.grey[400]!,
-                width: 2,
-              ),
-            ),
-            child: Center(
-              child: index <= 3
-                  ? Icon(
-                Icons.emoji_events,
-                size: 18,
-                color: widget.accentColor,
-              )
-                  : Text(
-                '$index',
+          SizedBox(
+            width: 22,
+            child: Text('$index',
                 style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.grey[700],
-                ),
-              ),
-            ),
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    color: isTop ? _C.accent : _C.muted),
+                textAlign: TextAlign.center),
           ),
-          const SizedBox(width: 12),
-
-          // Label
+          const SizedBox(width: 10),
           Expanded(
-            flex: 3,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  label,
-                  style: const TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                  ),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
+                Text(label,
+                    style: const TextStyle(
+                        fontSize: 13, fontWeight: FontWeight.w500, color: _C.text),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis),
                 if (item['percentage'] != null) ...[
-                  const SizedBox(height: 4),
+                  const SizedBox(height: 5),
                   Row(
                     children: [
-                      Container(
-                        height: 4,
-                        width: 40,
-                        decoration: BoxDecoration(
-                          color: widget.accentColor.withOpacity(0.2),
+                      Expanded(
+                        child: ClipRRect(
                           borderRadius: BorderRadius.circular(2),
-                        ),
-                        child: FractionallySizedBox(
-                          alignment: Alignment.centerLeft,
-                          widthFactor: (_toDouble(item['percentage']) / 100).clamp(0.0, 1.0),
-                          child: Container(
-                            decoration: BoxDecoration(
-                              color: widget.accentColor,
-                              borderRadius: BorderRadius.circular(2),
-                            ),
+                          child: LinearProgressIndicator(
+                            value: (_toDouble(item['percentage']) / 100).clamp(0.0, 1.0),
+                            minHeight: 3,
+                            backgroundColor: _C.border,
+                            valueColor: const AlwaysStoppedAnimation(_C.accent),
                           ),
                         ),
                       ),
-                      const SizedBox(width: 6),
-                      Text(
-                        '${_toDouble(item['percentage']).toStringAsFixed(1)}%',
-                        style: TextStyle(
-                          fontSize: 10,
-                          color: Colors.grey[600],
-                        ),
-                      ),
+                      const SizedBox(width: 8),
+                      Text('${_toDouble(item['percentage']).toStringAsFixed(1)}%',
+                          style: const TextStyle(fontSize: 10, color: _C.muted)),
                     ],
                   ),
                 ],
               ],
             ),
           ),
-
-          // Value
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-            decoration: BoxDecoration(
-              color: widget.accentColor.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(
-                color: widget.accentColor.withOpacity(0.3),
-              ),
-            ),
-            child: Text(
-              value,
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.bold,
-                color: widget.accentColor,
-              ),
-            ),
-          ),
+          const SizedBox(width: 12),
+          Text(value,
+              style: const TextStyle(
+                  fontSize: 12, fontWeight: FontWeight.w700, color: _C.text)),
         ],
       ),
     );

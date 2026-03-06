@@ -199,6 +199,52 @@ class AnalyticsService {
     }
   }
 
+  Future<List<dynamic>> fetchAreaDistribution({Map<String, String?>? filters}) async {
+    try {
+      final queryParams = _buildQueryParams(filters);
+      final response = await http.get(
+        Uri.parse('${ApiRoutes.analyticsAreaDistribution}$queryParams'),
+        headers: {'Content-Type': 'application/json'},
+      ).timeout(const Duration(seconds: 10));
+      if (response.statusCode == 200) return jsonDecode(response.body);
+      throw Exception('Lỗi: ${response.statusCode}');
+    } catch (e) { throw Exception('Lỗi tải phân bố diện tích: $e'); }
+  }
+
+  Future<Map<String, dynamic>> fetchAmenitiesStats({Map<String, String?>? filters}) async {
+    try {
+      final queryParams = _buildQueryParams(filters);
+      final response = await http.get(
+        Uri.parse('${ApiRoutes.analyticsAmenitiesStats}$queryParams'),
+        headers: {'Content-Type': 'application/json'},
+      ).timeout(const Duration(seconds: 10));
+      if (response.statusCode == 200) return jsonDecode(response.body);
+      throw Exception('Lỗi: ${response.statusCode}');
+    } catch (e) { throw Exception('Lỗi tải tiện nghi: $e'); }
+  }
+
+  Future<Map<String, dynamic>> fetchUserBehavior({int days = 30}) async {
+    try {
+      final response = await http.get(
+        Uri.parse('${ApiRoutes.analyticsUserBehavior}?days=$days'),
+        headers: {'Content-Type': 'application/json'},
+      ).timeout(const Duration(seconds: 10));
+      if (response.statusCode == 200) return jsonDecode(response.body);
+      throw Exception('Lỗi: ${response.statusCode}');
+    } catch (e) { throw Exception('Lỗi tải hành vi: $e'); }
+  }
+
+  Future<Map<String, dynamic>> fetchGrowthStats({int months = 6}) async {
+    try {
+      final response = await http.get(
+        Uri.parse('${ApiRoutes.analyticsGrowthStats}?months=$months'),
+        headers: {'Content-Type': 'application/json'},
+      ).timeout(const Duration(seconds: 10));
+      if (response.statusCode == 200) return jsonDecode(response.body);
+      throw Exception('Lỗi: ${response.statusCode}');
+    } catch (e) { throw Exception('Lỗi tải tăng trưởng: $e'); }
+  }
+
   // ==================== HELPER METHODS ====================
 
   /// Format giá tiền

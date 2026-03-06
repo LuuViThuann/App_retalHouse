@@ -27,6 +27,10 @@ class _ChatAIBottomSheetState extends State<ChatAIBottomSheet> {
   double? currentLongitude;
   bool isLocationAvailable = false;
 
+  static const int _initialShowCount = 5;
+  Map<String, int> _rentalGroupShowCount = {};
+  // =======================
+
   @override
   void initState() {
     super.initState();
@@ -215,31 +219,33 @@ class _ChatAIBottomSheetState extends State<ChatAIBottomSheet> {
         });
 
         // Add recommendations if available
-        if (response.recommendations != null &&
-            response.recommendations!.isNotEmpty) {
-          print(
-              '🏠 Processing ${response.recommendations!.length} rental cards...');
+        if (response.recommendations != null && response.recommendations!.isNotEmpty) {
+          print('🏠 Processing ${response.recommendations!.length} rental cards...');
 
-          // Add header
+          final allRentals = response.recommendations!;
+          final groupId = DateTime.now().millisecondsSinceEpoch.toString();
+
+          // Khởi tạo showCount cho group này
+          _rentalGroupShowCount[groupId] = 5;  // ban đầu hiện 5
+
+          // Header
           messages.add({
             'role': 'system',
             'type': 'rental_header',
-            'count': response.recommendations!.length,
+            'count': allRentals.length,
+            'groupId': groupId,
           });
 
-          // Add cards (max 5)
-          for (var rental in response.recommendations!.take(5)) {
-            messages.add({
-              'role': 'system',
-              'type': 'rental_card',
-              'rental': rental,
-            });
-            print('  ✅ Added card: ${rental.title}');
-          }
+          // Toàn bộ list (không take(5) nữa)
+          messages.add({
+            'role': 'system',
+            'type': 'rental_list',
+            'rentals': allRentals,
+            'groupId': groupId,
+          });
 
-          // Add explanation
-          if (response.explanation != null &&
-              response.explanation!.isNotEmpty) {
+          // Explanation
+          if (response.explanation != null && response.explanation!.isNotEmpty) {
             messages.add({
               'role': 'assistant',
               'text': '💡 ${response.explanation}',
@@ -277,6 +283,99 @@ class _ChatAIBottomSheetState extends State<ChatAIBottomSheet> {
 
   /// Build message item - FIXED
   Widget _buildMessageItem(BuildContext context, Map<String, dynamic> msg) {
+
+    // NÚT XEM THÊM ============================= <
+    if (msg['type'] == 'rental_list' && msg['rentals'] != null) {
+      final rentals = msg['rentals'] as List<Rental>;
+      final groupId = msg['groupId'] as String;
+
+      return StatefulBuilder(
+        builder: (context, setLocalState) {
+          // 🔥 ĐỌC showCount BÊN TRONG builder (không được đọc bên ngoài)
+          final showCount = _rentalGroupShowCount[groupId] ?? _initialShowCount;
+          final displayRentals = rentals.take(showCount).toList();
+
+          return Column(
+            children: [
+              ...displayRentals.map((rental) => _ModernRentalCard(
+
+                rental: rental,
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => RentalDetailScreen(rental: rental),
+                  ),
+                ),
+              )),
+
+              // NÚT XEM THÊM
+              if (showCount < rentals.length)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+                  child: InkWell(
+                    onTap: () {
+                      // 🔥 GỌI CẢ HAI setState để rebuild đúng
+                      setState(() {
+                        _rentalGroupShowCount[groupId] =
+                            (showCount + 5).clamp(0, rentals.length);
+                      });
+                    },
+                    child: Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [Colors.blue[700]!, Colors.blue[500]!],
+                        ),
+                        borderRadius: BorderRadius.circular(14),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.blue.withOpacity(0.3),
+                            blurRadius: 8,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Icon(Icons.expand_more, color: Colors.white, size: 20),
+                          const SizedBox(width: 8),
+                          Text(
+                            'Xem thêm ${rentals.length - showCount} bài đăng',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w600,
+                              fontSize: 14,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+
+              // ĐÃ HIỆN HẾT
+              if (showCount >= rentals.length && rentals.length > _initialShowCount)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.check_circle, color: Colors.green[600], size: 16),
+                      const SizedBox(width: 6),
+                      Text(
+                        'Đã hiển thị tất cả ${rentals.length} bài đăng',
+                        style: TextStyle(color: Colors.grey[600], fontSize: 12),
+                      ),
+                    ],
+                  ),
+                ),
+            ],
+          );
+        },
+      );
+    }
     // 🏠 RENTAL HEADER
     if (msg['type'] == 'rental_header') {
       return Padding(
@@ -989,6 +1088,239 @@ class _RentalSuggestionCard extends StatelessWidget {
   }
 }
 
+class _ModernRentalCard extends StatelessWidget {
+  final Rental rental;
+  final VoidCallback? onTap;
+
+  const _ModernRentalCard({super.key, required this.rental, this.onTap});
+
+  String _formatPrice(double price) {
+    if (price >= 1000000000) return '${(price / 1000000000).toStringAsFixed(1)} tỷ';
+    if (price >= 1000000) return '${(price / 1000000).toStringAsFixed(1)}tr';
+    return NumberFormat.currency(locale: 'vi_VN', symbol: '₫', decimalDigits: 0).format(price);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final imageUrl = rental.images.isNotEmpty
+        ? rental.images[0]
+        : 'https://via.placeholder.com/400x200?text=No+Image';
+    final area = rental.area['total']?.toString() ?? '0';
+    final bedrooms = rental.area['bedrooms']?.toString() ?? '0';
+    final bathrooms = rental.area['bathrooms']?.toString() ?? '0';
+
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        margin: const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.06),
+              blurRadius: 16,
+              offset: const Offset(0, 6),
+            ),
+          ],
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(20),
+          child: IntrinsicHeight(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // ===== LEFT: IMAGE =====
+                SizedBox(
+                  width: 130,
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      Image.network(
+                        imageUrl,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => Container(
+                          color: Colors.grey[200],
+                          child: Icon(Icons.home_outlined, color: Colors.grey[400], size: 40),
+                        ),
+                      ),
+                      // Gradient overlay
+                      Container(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.centerRight,
+                            end: Alignment.centerLeft,
+                            colors: [Colors.transparent, Colors.black.withOpacity(0.15)],
+                          ),
+                        ),
+                      ),
+                      // Property type badge
+                      Positioned(
+                        top: 10,
+                        left: 8,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: Colors.blue[700],
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(
+                            rental.propertyType,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 9,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ),
+                      // AI badge
+                      if (rental.isAIRecommended == true)
+                        Positioned(
+                          bottom: 10,
+                          left: 8,
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(100),
+                            child: Image.asset(
+                              "assets/img/ai.jpg",
+                              width: 35,
+                              height: 35,
+                              fit: BoxFit.cover,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+
+                // ===== RIGHT: CONTENT =====
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Title
+                        Text(
+                          rental.title,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xFF1a1a2e),
+                            height: 1.3,
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+
+                        // Location
+                        Row(
+                          children: [
+                            Icon(Icons.place_outlined, size: 12, color: Colors.grey[500]),
+                            const SizedBox(width: 3),
+                            Expanded(
+                              child: Text(
+                                rental.location['short'] ?? '—',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(fontSize: 11, color: Colors.grey[600]),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+
+                        // Stats row
+                        Row(
+                          children: [
+                            if (area != '0') _MiniChip(icon: Icons.square_foot, label: '${area}m²'),
+                            if (area != '0') const SizedBox(width: 4),
+                            if (bedrooms != '0') _MiniChip(icon: Icons.bed_outlined, label: bedrooms),
+                            if (bedrooms != '0') const SizedBox(width: 4),
+                            if (bathrooms != '0') _MiniChip(icon: Icons.bathroom_outlined, label: bathrooms),
+                          ],
+                        ),
+                        const Spacer(),
+
+                        // Price + CTA row
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: [
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  _formatPrice(rental.price),
+                                  style: TextStyle(
+                                    color: Colors.red[700],
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                if (rental.confidence != null && rental.confidence! > 0)
+                                  Text(
+                                    'Phù hợp ${(rental.confidence! * 100).toStringAsFixed(0)}%',
+                                    style: TextStyle(fontSize: 10, color: Colors.blue[600]),
+                                  ),
+                              ],
+                            ),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                              decoration: BoxDecoration(
+                                color: Colors.blue[700],
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: const Text(
+                                'Xem',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _MiniChip extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  const _MiniChip({required this.icon, required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+      decoration: BoxDecoration(
+        color: Colors.grey[100],
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: Colors.grey[200]!),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 10, color: Colors.grey[600]),
+          const SizedBox(width: 3),
+          Text(label, style: TextStyle(fontSize: 10, color: Colors.grey[700], fontWeight: FontWeight.w600)),
+        ],
+      ),
+    );
+  }
+}
 // ============== INFO CHIP WIDGET ==============
 class _InfoChip extends StatelessWidget {
   final IconData icon;

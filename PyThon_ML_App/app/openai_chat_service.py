@@ -90,6 +90,13 @@ Bạn có muốn:
 • Xem nhà riêng/nhà trọ giá phải chăng?
 • Tăng ngân sách lên 1.5 tỷ để có nhiều lựa chọn hơn?"
 
+6. 💰 TRÍCH XUẤT GIÁ CHÍNH XÁC:
+   - "dưới 10 triệu" → max = 10_000_000 (KHÔNG phải 15M hay 20M)
+   - "khoảng 5 triệu" → min=3.75M, max=6.25M
+   - "từ 3-5 triệu" → min=3M, max=5M
+   - "dưới 1 tỷ" → max = 1_000_000_000
+   - KHI tìm kiếm: CHỈ trả về bài có giá ≤ max
+   
 LÀM ĐÚNG THẾ NÀY!"""
     
     def chat(
@@ -261,67 +268,70 @@ LÀM ĐÚNG THẾ NÀY!"""
         msg_lower = user_msg.lower()
         
         # ===== 1. PRICE EXTRACTION =====
-        price_patterns = [
-            r'(\d+(?:\.\d+)?)\s*(?:-|đến|tới)\s*(\d+(?:\.\d+)?)\s*(?:tỷ|ty|billion)',
-            r'dưới\s*(\d+(?:\.\d+)?)\s*(?:tỷ|ty|billion)',
-            r'trên\s*(\d+(?:\.\d+)?)\s*(?:tỷ|ty|billion)',
-            r'khoảng\s*(\d+(?:\.\d+)?)\s*(?:tỷ|ty|billion)',
-            r'(\d+(?:\.\d+)?)\s*(?:tỷ|ty|billion)',
-            r'(\d+)\s*(?:-|đến|tới)\s*(\d+)\s*(?:triệu|tr|trieu|m)',
-            r'dưới\s*(\d+)\s*(?:triệu|tr|trieu|m)',
-            r'trên\s*(\d+)\s*(?:triệu|tr|trieu|m)',
-            r'khoảng\s*(\d+)\s*(?:triệu|tr|trieu|m)',
-            r'(\d+)\s*(?:triệu|tr|trieu|m)',
+        price_found = False
+
+        # --- Dạng khoảng: X-Y triệu / tỷ ---
+        range_patterns = [
+            (r'(\d+(?:\.\d+)?)\s*(?:-|đến|tới|~)\s*(\d+(?:\.\d+)?)\s*(?:tỷ|ty)\b', 1e9),
+            (r'(\d+(?:\.\d+)?)\s*(?:-|đến|tới|~)\s*(\d+(?:\.\d+)?)\s*(?:triệu|tr|trieu)\b', 1e6),
         ]
-        
-        for pattern in price_patterns:
-            match = re.search(pattern, msg_lower)
-            if match:
-                # Xử lý tỷ (billion)
-                if 'tỷ' in pattern or 'ty' in pattern or 'billion' in pattern:
-                    if len(match.groups()) >= 2 and match.group(2):
-                        min_price = float(match.group(1)) * 1e9
-                        max_price = float(match.group(2)) * 1e9
-                    elif 'dưới' in pattern:
-                        min_price = 0
-                        max_price = float(match.group(1)) * 1e9
-                    elif 'trên' in pattern:
-                        min_price = float(match.group(1)) * 1e9
-                        max_price = float(match.group(1)) * 2 * 1e9
-                    elif 'khoảng' in pattern:
-                        base = float(match.group(1)) * 1e9
-                        min_price = base * 0.7
-                        max_price = base * 1.3
-                    else:
-                        base = float(match.group(1)) * 1e9
-                        min_price = base * 0.5
-                        max_price = base * 1.5
-                # Xử lý triệu (million)
-                else:
-                    if len(match.groups()) >= 2 and match.group(2):
-                        min_price = int(match.group(1)) * 1e6
-                        max_price = int(match.group(2)) * 1e6
-                    elif 'dưới' in pattern:
-                        min_price = 0
-                        max_price = int(match.group(1)) * 1e6
-                    elif 'trên' in pattern:
-                        min_price = int(match.group(1)) * 1e6
-                        max_price = int(match.group(1)) * 2 * 1e6
-                    elif 'khoảng' in pattern:
-                        base = int(match.group(1)) * 1e6
-                        min_price = base * 0.7
-                        max_price = base * 1.3
-                    else:
-                        base = int(match.group(1)) * 1e6
-                        min_price = base * 0.5
-                        max_price = base * 1.5
-                
-                preferences['price_range'] = {
-                    'min': int(min_price),
-                    'max': int(max_price)
-                }
-                print(f"   💰 Extracted price: {min_price/1e6:.1f}M - {max_price/1e6:.1f}M")
+        for pattern, unit in range_patterns:
+            m = re.search(pattern, msg_lower)
+            if m:
+                min_price = float(m.group(1)) * unit
+                max_price = float(m.group(2)) * unit
+                preferences['price_range'] = {'min': int(min_price), 'max': int(max_price)}
+                price_found = True
+                print(f"   💰 Range price: {min_price/1e6:.1f}M - {max_price/1e6:.1f}M")
                 break
+
+        # --- Dạng giới hạn: dưới/trên/khoảng ---
+        if not price_found:
+            limit_patterns = [
+                # Dưới X tỷ
+                (r'dưới\s*(\d+(?:\.\d+)?)\s*(?:tỷ|ty)\b', 'max', 1e9),
+                # Trên X tỷ
+                (r'trên\s*(\d+(?:\.\d+)?)\s*(?:tỷ|ty)\b', 'min', 1e9),
+                # Tối đa X tỷ
+                (r'(?:tối đa|max|không quá)\s*(\d+(?:\.\d+)?)\s*(?:tỷ|ty)\b', 'max', 1e9),
+                # Khoảng X tỷ
+                (r'(?:khoảng|tầm|~)\s*(\d+(?:\.\d+)?)\s*(?:tỷ|ty)\b', 'approx', 1e9),
+                # X tỷ đơn giản
+                (r'\b(\d+(?:\.\d+)?)\s*(?:tỷ|ty)\b', 'approx', 1e9),
+                # Dưới X triệu
+                (r'dưới\s*(\d+(?:\.\d+)?)\s*(?:triệu|tr|trieu)\b', 'max', 1e6),
+                # Trên X triệu
+                (r'trên\s*(\d+(?:\.\d+)?)\s*(?:triệu|tr|trieu)\b', 'min', 1e6),
+                # Tối đa X triệu
+                (r'(?:tối đa|max|không quá)\s*(\d+(?:\.\d+)?)\s*(?:triệu|tr|trieu)\b', 'max', 1e6),
+                # Khoảng X triệu
+                (r'(?:khoảng|tầm|~)\s*(\d+(?:\.\d+)?)\s*(?:triệu|tr|trieu)\b', 'approx', 1e6),
+                # X triệu đơn giản (phải đứng sau các pattern trên)
+                (r'\b(\d+(?:\.\d+)?)\s*(?:triệu|tr|trieu)\b', 'approx', 1e6),
+            ]
+            
+            for pattern, price_type, unit in limit_patterns:
+                m = re.search(pattern, msg_lower)
+                if m:
+                    value = float(m.group(1)) * unit
+                    
+                    if price_type == 'max':
+                        min_p = 0
+                        max_p = value  # STRICT: không mở rộng
+                    elif price_type == 'min':
+                        min_p = value
+                        max_p = value * 5  # tối đa 5x
+                    elif price_type == 'approx':
+                        min_p = value * 0.75  # ±25%
+                        max_p = value * 1.25
+                    else:
+                        min_p = 0
+                        max_p = value
+                    
+                    preferences['price_range'] = {'min': int(min_p), 'max': int(max_p)}
+                    price_found = True
+                    print(f"   💰 {price_type} price ({value/1e6:.1f}M): {min_p/1e6:.1f}M - {max_p/1e6:.1f}M")
+                    break
         
         # ===== 2. LOCATION EXTRACTION =====
         cities = [
@@ -435,6 +445,14 @@ LÀM ĐÚNG THẾ NÀY!"""
             preferences['wants_poi_filter'] = True
             print(f"   🏢 POI categories detected: {', '.join(poi_intent['categories'])}")
         
+        # Validate price range
+        if 'price_range' in preferences:
+            pr = preferences['price_range']
+            if pr['max'] > 0 and pr['min'] >= pr['max']:
+                pr['min'] = 0
+            # Log để debug
+            print(f"   ✅ Final price_range: {pr['min']/1e6:.1f}M - {pr['max']/1e6:.1f}M")
+
         return preferences
     
     def _classify_intent(self, user_msg: str) -> str:
@@ -457,19 +475,22 @@ LÀM ĐÚNG THẾ NÀY!"""
         return 'chitchat'
     
     def _should_recommend(self, user_msg: str, ai_msg: str, preferences: Dict) -> bool:
-        """Decide whether to recommend rentals"""
         msg_lower = user_msg.lower()
         
-        # Explicit keywords
-        explicit_keywords = ['gợi ý', 'goi y', 'tìm cho', 'tim cho', 'show', 'xem']
-        if any(kw in msg_lower for kw in explicit_keywords):
+        # Từ khoá tìm kiếm rõ ràng
+        search_keywords = [
+            'tìm', 'tim', 'thuê', 'thue', 'cần', 'can', 'muốn', 'muon',
+            'gợi ý', 'goi y', 'show', 'xem', 'cho tôi', 'giúp tôi',
+            'có nhà', 'có phòng', 'có bài', 'có bất động sản'
+        ]
+        if any(kw in msg_lower for kw in search_keywords):
             return True
         
-        # Has enough preferences (at least 2)
-        key_prefs = ['price_range', 'location', 'property_type']
+        # Có ít nhất 1 preference cụ thể là đủ (thay vì cần 2)
+        key_prefs = ['price_range', 'location', 'property_type', 'bedrooms', 'area']
         pref_count = sum(1 for key in key_prefs if key in preferences)
         
-        return pref_count >= 2
+        return pref_count >= 1
     
     def _format_user_context(self, context: Dict) -> str:
         """Format user context"""

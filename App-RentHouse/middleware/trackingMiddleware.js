@@ -125,7 +125,7 @@ const trackRentalView = async (req, res, next) => {
 };
 
 /**
- * Track explicit actions (favorite, contact, etc.) - 🔥 CẬP NHẬT lưu coordinates
+ * Track explicit actions (favorite, contact, etc.) - 🔥 CẬP NHẬT lưu coordinates 
  */
 const trackAction = (actionType) => {
   return async (req, res, next) => {

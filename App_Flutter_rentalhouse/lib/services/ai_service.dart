@@ -40,7 +40,7 @@ class AIService {
     int zoomLevel = 15,
     String timeOfDay = 'morning',
     String deviceType = 'mobile',
-    int limit = 10,
+    int limit = 100,
     List<String> impressions = const [],
     double scrollDepth = 0.5,
     double? minPrice,

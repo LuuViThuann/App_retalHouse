@@ -1,230 +1,269 @@
 import 'package:flutter/material.dart';
 import '../../viewmodels/vm_analytics.dart';
 
+class _C {
+  static const bg      = Color(0xFFF9FAFB);
+  static const surface = Colors.white;
+  static const border  = Color(0xFFE5E7EB);
+  static const text    = Color(0xFF111827);
+  static const textSub = Color(0xFF6B7280);
+  static const muted   = Color(0xFF9CA3AF);
+  static const accent  = Color(0xFF2563EB);
+}
+
 class HotAreasList extends StatelessWidget {
   final AnalyticsViewModel viewModel;
 
   const HotAreasList({Key? key, required this.viewModel}) : super(key: key);
 
+  String _getAreaName(Map<String, dynamic> area) =>
+      (area['_id'] ?? area['name'] ?? 'N/A').toString();
+
+  int _getCount(Map<String, dynamic> area) {
+    final v = area['count'];
+    if (v == null) return 0;
+    if (v is int) return v;
+    if (v is double) return v.toInt();
+    if (v is String) return int.tryParse(v) ?? 0;
+    return 0;
+  }
+
+  double _getAvgPrice(dynamic v) {
+    if (v == null) return 0;
+    if (v is double) return v;
+    if (v is int) return v.toDouble();
+    if (v is String) return double.tryParse(v) ?? 0;
+    return 0;
+  }
+
   @override
   Widget build(BuildContext context) {
-    if (viewModel.hotAreas.isEmpty) return const SizedBox.shrink();
+    final hotAreas = viewModel.hotAreas;
+    if (hotAreas.isEmpty) return const SizedBox.shrink();
+
+    final totalCount = hotAreas.fold<int>(
+        0, (sum, area) => sum + _getCount(area as Map<String, dynamic>));
+    final maxCount = hotAreas.isNotEmpty
+        ? _getCount(hotAreas.first as Map<String, dynamic>)
+        : 1;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        // ── Header ──────────────────────────────────────────
         Row(
           children: [
-            Icon(Icons.whatshot, color: Colors.orange[700], size: 24),
-            const SizedBox(width: 8),
-            const Text(
-              'Khu vực có nhiều BĐS nhất',
-              style: TextStyle(
-                fontSize: 22,
-                fontWeight: FontWeight.bold,
+            const Text('Khu vực nổi bật',
+                style: TextStyle(
+                    fontSize: 17,
+                    fontWeight: FontWeight.w700,
+                    color: _C.text)),
+            const Spacer(),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: _C.bg,
+                borderRadius: BorderRadius.circular(6),
+                border: Border.all(color: _C.border),
               ),
+              child: Text('$totalCount BĐS',
+                  style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: _C.textSub)),
             ),
           ],
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 4),
+        const Text(
+          'Tỷ lệ % trên tổng số bất động sản',
+          style: TextStyle(fontSize: 11, color: _C.muted),
+        ),
+        const SizedBox(height: 14),
 
+        // ── Card ────────────────────────────────────────────
         Container(
-          padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(16),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.05),
-                blurRadius: 8,
-                offset: const Offset(0, 2),
-              ),
-            ],
+            color: _C.surface,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: _C.border),
           ),
           child: Column(
-            children: viewModel.hotAreas.asMap().entries.map((entry) {
-              final index = entry.key;
-              final area = entry.value;
-              final count = area['count'] ?? 0;
-              final isHot = count >= 20;
-              final avgPrice = viewModel.formatPrice(area['avgPrice']);
-
-              return Padding(
-                padding: const EdgeInsets.only(bottom: 12),
-                child: _buildAreaCard(
-                  rank: index + 1,
-                  name: area['_id'] ?? 'N/A',
-                  count: count,
-                  avgPrice: avgPrice,
-                  isHot: isHot,
+            children: [
+              // Table header
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                decoration: const BoxDecoration(
+                  color: _C.bg,
+                  borderRadius: BorderRadius.vertical(top: Radius.circular(12)),
+                  border: Border(bottom: BorderSide(color: _C.border)),
                 ),
-              );
-            }).toList(),
+                child: Row(
+                  children: const [
+                    SizedBox(width: 32, child: Text('#', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: _C.muted))),
+                    SizedBox(width: 10),
+                    Expanded(child: Text('Khu vực', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: _C.muted))),
+                    Text('Tỷ lệ', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: _C.muted)),
+                  ],
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
+                child: _buildHotList(hotAreas, totalCount, maxCount),
+              ),
+            ],
           ),
         ),
       ],
     );
   }
 
-  Widget _buildAreaCard({
+  Widget _buildHotList(List hotAreas, int totalCount, int maxCount) {
+    if (hotAreas.isEmpty) {
+      return SizedBox(
+        height: 80,
+        child: Center(
+            child: Text('Chưa có dữ liệu khu vực',
+                style: TextStyle(color: _C.muted, fontSize: 13))),
+      );
+    }
+
+    return Column(
+      children: hotAreas.asMap().entries.map((entry) {
+        final idx      = entry.key;
+        final area     = entry.value as Map<String, dynamic>;
+        final count    = _getCount(area);
+        final name     = _getAreaName(area);
+        final avgPrice = viewModel.formatPrice(_getAvgPrice(area['avgPrice']));
+        final pctOfTotal = totalCount > 0 ? count / totalCount : 0.0;
+        final pctBar   = maxCount > 0 ? count / maxCount : 0.0;
+        final isHot    = count >= 20;
+
+        return _buildCard(
+          rank: idx + 1,
+          name: name,
+          count: count,
+          avgPrice: avgPrice,
+          pctOfTotal: pctOfTotal,
+          pctBar: pctBar,
+          isHot: isHot,
+        );
+      }).toList(),
+    );
+  }
+
+  Widget _buildCard({
     required int rank,
     required String name,
     required int count,
     required String avgPrice,
+    required double pctOfTotal,
+    required double pctBar,
     required bool isHot,
   }) {
-    IconData rankIcon;
-    Color rankColor;
-
-    if (rank == 1) {
-      rankIcon = Icons.emoji_events;
-      rankColor = Colors.amber[700]!;
-    } else if (rank == 2) {
-      rankIcon = Icons.emoji_events;
-      rankColor = Colors.grey[400]!;
-    } else if (rank == 3) {
-      rankIcon = Icons.emoji_events;
-      rankColor = Colors.orange[700]!;
-    } else {
-      rankIcon = Icons.circle;
-      rankColor = Colors.grey[400]!;
-    }
+    final pctText = '${(pctOfTotal * 100).toStringAsFixed(1)}%';
+    final isFirst = rank == 1;
 
     return Container(
-      padding: const EdgeInsets.all(14),
+      margin: const EdgeInsets.only(top: 8),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: isHot
-              ? [Colors.red[50]!, Colors.orange[50]!]
-              : [Colors.grey[50]!, Colors.white],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(12),
+        color: isFirst ? const Color(0xFFF0F5FF) : Colors.white,
+        borderRadius: BorderRadius.circular(8),
         border: Border.all(
-          color: isHot ? Colors.red[300]! : Colors.grey[200]!,
-          width: isHot ? 2 : 1,
-        ),
-        boxShadow: isHot
-            ? [
-          BoxShadow(
-            color: Colors.red.withOpacity(0.1),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ]
-            : null,
+            color: isFirst ? const Color(0xFFBFD3FF) : _C.border),
       ),
-      child: Row(
+      child: Column(
         children: [
-          // Rank Badge
-          Container(
-            width: 48,
-            height: 48,
-            decoration: BoxDecoration(
-              color: rankColor.withOpacity(0.2),
-              shape: BoxShape.circle,
-              border: Border.all(color: rankColor, width: 2),
-            ),
-            child: Stack(
-              alignment: Alignment.center,
-              children: [
-                Icon(rankIcon, color: rankColor, size: rank <= 3 ? 28 : 16),
-                if (rank > 3)
-                  Text(
-                    '$rank',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: rankColor,
-                    ),
+          Row(
+            children: [
+              // Rank
+              SizedBox(
+                width: 32,
+                child: Text(
+                  '$rank',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: rank <= 3 ? _C.accent : _C.muted,
                   ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 14),
+                  textAlign: TextAlign.center,
+                ),
+              ),
+              const SizedBox(width: 10),
 
-          // Content
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
+              // Name + meta
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Expanded(
-                      child: Text(
-                        name,
-                        style: const TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.bold,
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(name,
+                              style: const TextStyle(
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 13,
+                                  color: _C.text),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis),
                         ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                    if (isHot)
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: Colors.red[600],
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: const Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(Icons.local_fire_department, color: Colors.white, size: 14),
-                            SizedBox(width: 4),
-                            Text(
-                              'HOT',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 10,
-                                fontWeight: FontWeight.bold,
-                              ),
+                        if (isHot) ...[
+                          const SizedBox(width: 6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFFEF3C7),
+                              borderRadius: BorderRadius.circular(4),
+                              border: Border.all(color: const Color(0xFFFCD34D)),
                             ),
-                          ],
-                        ),
-                      ),
+                            child: const Text('HOT',
+                                style: TextStyle(
+                                    fontSize: 9,
+                                    fontWeight: FontWeight.w700,
+                                    color: Color(0xFF92400E))),
+                          ),
+                        ],
+                      ],
+                    ),
+                    const SizedBox(height: 2),
+                    Text('$count BĐS · TB: $avgPrice',
+                        style: const TextStyle(
+                            fontSize: 11, color: _C.textSub)),
                   ],
                 ),
-                const SizedBox(height: 6),
-                Row(
-                  children: [
-                    Icon(Icons.home, size: 14, color: Colors.grey[600]),
-                    const SizedBox(width: 4),
-                    Text(
-                      '$count BĐS',
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: Colors.grey[700],
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Icon(Icons.attach_money, size: 14, color: Colors.grey[600]),
-                    const SizedBox(width: 4),
-                    Expanded(
-                      child: Text(
-                        'TB: $avgPrice',
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: Colors.grey[700],
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
+              ),
+
+              // Pct
+              Text(pctText,
+                  style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      color: _C.accent)),
+            ],
+          ),
+          const SizedBox(height: 8),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(3),
+            child: LinearProgressIndicator(
+              value: pctBar.clamp(0.0, 1.0),
+              minHeight: 4,
+              backgroundColor: _C.border,
+              valueColor: AlwaysStoppedAnimation<Color>(
+                isFirst ? _C.accent : const Color(0xFF93C5FD),
+              ),
             ),
           ),
-
-          // Arrow
-          Icon(
-            Icons.chevron_right,
-            color: Colors.grey[400],
-            size: 24,
+          const SizedBox(height: 4),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text('So với khu vực dẫn đầu',
+                  style: TextStyle(fontSize: 10, color: _C.muted)),
+              Text('${(pctBar * 100).toStringAsFixed(0)}%',
+                  style: const TextStyle(fontSize: 10, color: _C.muted)),
+            ],
           ),
         ],
       ),

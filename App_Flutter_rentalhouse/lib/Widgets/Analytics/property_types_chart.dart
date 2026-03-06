@@ -3,13 +3,26 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter_rentalhouse/Widgets/Analytics/ChartDetailDropdown.dart';
 import '../../viewmodels/vm_analytics.dart';
 
-// ==================== PRICE DISTRIBUTION CHART ====================
+class _C {
+  static const bg      = Color(0xFFF9FAFB);
+  static const surface = Colors.white;
+  static const border  = Color(0xFFE5E7EB);
+  static const text    = Color(0xFF111827);
+  static const textSub = Color(0xFF6B7280);
+  static const muted   = Color(0xFF9CA3AF);
+}
+
+// ─── Palette tối giản 6 màu ──────────────────────────────────────────────────
+const _palette = [
+  Color(0xFF2563EB), Color(0xFF0EA5E9), Color(0xFF10B981),
+  Color(0xFFF59E0B), Color(0xFF8B5CF6), Color(0xFF64748B),
+];
+
+// ==================== PRICE DISTRIBUTION ====================
 class PriceDistributionChart extends StatelessWidget {
   final AnalyticsViewModel viewModel;
-
   const PriceDistributionChart({Key? key, required this.viewModel}) : super(key: key);
 
-  // ✅ Helper method để convert safely
   double _toDouble(dynamic value) {
     if (value == null) return 0.0;
     if (value is int) return value.toDouble();
@@ -22,178 +35,35 @@ class PriceDistributionChart extends StatelessWidget {
   Widget build(BuildContext context) {
     if (viewModel.priceDistribution.isEmpty) return const SizedBox.shrink();
 
-    final chartData = viewModel.priceDistribution.map((item) {
+    final chartData = viewModel.priceDistribution.asMap().entries.map((e) {
+      final item = e.value;
       return _ChartData(
-        label: (item['label'] ?? '').toString(),
+        label:      (item['label'] ?? '').toString(),
         shortLabel: (item['label'] ?? '').toString().split(' ')[0],
-        count: _toDouble(item['count']),           // ✅ FIXED
-        percentage: _toDouble(item['percentage']), // ✅ FIXED
-        color: _parseColor(item['color'] ?? '#4CAF50'),
+        count:      _toDouble(item['count']),
+        percentage: _toDouble(item['percentage']),
+        color:      _palette[e.key % _palette.length],
       );
     }).toList();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          children: [
-            Icon(Icons.account_balance_wallet, color: Colors.green[700], size: 24),
-            const SizedBox(width: 8),
-            const Text(
-              'Phân bố giá',
-              style: TextStyle(
-                fontSize: 22,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 16),
-
+        const Text('Phân bố giá',
+            style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700, color: _C.text)),
+        const SizedBox(height: 14),
         Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(16),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.05),
-                blurRadius: 8,
-                offset: const Offset(0, 2),
-              ),
-            ],
+            color: _C.surface,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: _C.border),
           ),
           child: Column(
             children: [
-              SizedBox(
-                height: 280,
-                child: BarChart(
-                  BarChartData(
-                    alignment: BarChartAlignment.spaceAround,
-                    maxY: _getMaxY(chartData.map((e) => e.count).toList()) * 1.1,
-                    barTouchData: BarTouchData(
-                      enabled: true,
-                      touchTooltipData: BarTouchTooltipData(
-                        getTooltipItem: (group, groupIndex, rod, rodIndex) {
-                          if (groupIndex >= chartData.length) return null;
-                          return BarTooltipItem(
-                            '${chartData[groupIndex].label}\n${rod.toY.toInt()} BĐS (${chartData[groupIndex].percentage.toStringAsFixed(1)}%)',
-                            const TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 11,
-                            ),
-                          );
-                        },
-                      ),
-                    ),
-                    titlesData: FlTitlesData(
-                      show: true,
-                      bottomTitles: AxisTitles(
-                        sideTitles: SideTitles(
-                          showTitles: true,
-                          getTitlesWidget: (value, meta) {
-                            final index = value.toInt();
-                            if (index < 0 || index >= chartData.length) {
-                              return const SizedBox();
-                            }
-                            return Padding(
-                              padding: const EdgeInsets.only(top: 8.0),
-                              child: Text(
-                                chartData[index].shortLabel,
-                                style: const TextStyle(
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            );
-                          },
-                        ),
-                      ),
-                      leftTitles: AxisTitles(
-                        sideTitles: SideTitles(
-                          showTitles: true,
-                          reservedSize: 40,
-                          getTitlesWidget: (value, meta) {
-                            return Text(
-                              '${value.toInt()}',
-                              style: const TextStyle(fontSize: 10),
-                            );
-                          },
-                        ),
-                      ),
-                      topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                      rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                    ),
-                    borderData: FlBorderData(show: false),
-                    gridData: FlGridData(
-                      show: true,
-                      drawVerticalLine: false,
-                      getDrawingHorizontalLine: (value) {
-                        return FlLine(color: Colors.grey[200]!, strokeWidth: 1);
-                      },
-                    ),
-                    barGroups: chartData.asMap().entries.map((e) {
-                      return BarChartGroupData(
-                        x: e.key,
-                        barRods: [
-                          BarChartRodData(
-                            toY: e.value.count,
-                            color: e.value.color,
-                            width: 18,
-                            borderRadius: const BorderRadius.vertical(
-                              top: Radius.circular(6),
-                            ),
-                            gradient: LinearGradient(
-                              colors: [
-                                e.value.color,
-                                e.value.color.withOpacity(0.7),
-                              ],
-                              begin: Alignment.topCenter,
-                              end: Alignment.bottomCenter,
-                            ),
-                          ),
-                        ],
-                      );
-                    }).toList(),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-
-              // Legend
-              Wrap(
-                spacing: 12,
-                runSpacing: 8,
-                children: chartData.map((item) {
-                  return Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: item.color.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: item.color.withOpacity(0.3)),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Container(
-                          width: 12,
-                          height: 12,
-                          decoration: BoxDecoration(
-                            color: item.color,
-                            borderRadius: BorderRadius.circular(2),
-                          ),
-                        ),
-                        const SizedBox(width: 6),
-                        Text(
-                          '${item.label}: ${item.count.toInt()} (${item.percentage.toStringAsFixed(1)}%)',
-                          style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
-                        ),
-                      ],
-                    ),
-                  );
-                }).toList(),
-              ),
+              SizedBox(height: 240, child: _buildBar(chartData)),
+              const SizedBox(height: 14),
+              _buildLegend(chartData),
             ],
           ),
         ),
@@ -201,24 +71,105 @@ class PriceDistributionChart extends StatelessWidget {
     );
   }
 
-  Color _parseColor(String colorStr) {
-    final hex = colorStr.replaceFirst('#', '');
-    return Color(int.parse('FF$hex', radix: 16));
+  Widget _buildBar(List<_ChartData> chartData) {
+    final maxY = chartData.map((e) => e.count).fold(0.0, (a, b) => a > b ? a : b) * 1.15;
+
+    return BarChart(BarChartData(
+      alignment: BarChartAlignment.spaceAround,
+      maxY: maxY,
+      barTouchData: BarTouchData(
+        enabled: true,
+        touchTooltipData: BarTouchTooltipData(
+          getTooltipColor: (_) => const Color(0xFF1F2937),
+          getTooltipItem: (group, groupIndex, rod, rodIndex) {
+            if (groupIndex >= chartData.length) return null;
+            final d = chartData[groupIndex];
+            return BarTooltipItem(
+              '${d.label}\n${rod.toY.toInt()} BĐS (${d.percentage.toStringAsFixed(1)}%)',
+              const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w600),
+            );
+          },
+        ),
+      ),
+      titlesData: FlTitlesData(
+        bottomTitles: AxisTitles(
+          sideTitles: SideTitles(
+            showTitles: true,
+            getTitlesWidget: (value, meta) {
+              final i = value.toInt();
+              if (i < 0 || i >= chartData.length) return const SizedBox();
+              return Padding(
+                padding: const EdgeInsets.only(top: 6),
+                child: Text(chartData[i].shortLabel,
+                    style: const TextStyle(fontSize: 10, color: _C.textSub)),
+              );
+            },
+          ),
+        ),
+        leftTitles: AxisTitles(
+          sideTitles: SideTitles(
+            showTitles: true,
+            reservedSize: 36,
+            getTitlesWidget: (value, meta) => Text('${value.toInt()}',
+                style: const TextStyle(fontSize: 9, color: _C.muted)),
+          ),
+        ),
+        topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+        rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+      ),
+      borderData: FlBorderData(show: false),
+      gridData: FlGridData(
+        show: true,
+        drawVerticalLine: false,
+        getDrawingHorizontalLine: (_) =>
+        const FlLine(color: Color(0xFFF3F4F6), strokeWidth: 1),
+      ),
+      barGroups: chartData.asMap().entries.map((e) {
+        return BarChartGroupData(
+          x: e.key,
+          barRods: [
+            BarChartRodData(
+              toY: e.value.count,
+              color: e.value.color,
+              width: 20,
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(4)),
+            ),
+          ],
+        );
+      }).toList(),
+    ));
   }
 
-  double _getMaxY(List<double> values) {
-    if (values.isEmpty) return 100;
-    return values.reduce((a, b) => a > b ? a : b);
+  Widget _buildLegend(List<_ChartData> data) {
+    return Wrap(
+      spacing: 10,
+      runSpacing: 6,
+      children: data.map((item) {
+        return Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+                width: 8, height: 8,
+                decoration: BoxDecoration(
+                    color: item.color,
+                    borderRadius: BorderRadius.circular(2))),
+            const SizedBox(width: 5),
+            Text(
+              '${item.shortLabel}: ${item.count.toInt()} (${item.percentage.toStringAsFixed(1)}%)',
+              style: const TextStyle(fontSize: 11, color: _C.textSub),
+            ),
+          ],
+        );
+      }).toList(),
+    );
   }
 }
 
-// ==================== PROPERTY TYPES CHART ====================
+// ==================== PROPERTY TYPES ====================
 class PropertyTypesChart extends StatelessWidget {
   final AnalyticsViewModel viewModel;
-
   const PropertyTypesChart({Key? key, required this.viewModel}) : super(key: key);
 
-  // ✅ Helper method để convert safely
   double _toDouble(dynamic value) {
     if (value == null) return 0.0;
     if (value is int) return value.toDouble();
@@ -231,211 +182,49 @@ class PropertyTypesChart extends StatelessWidget {
   Widget build(BuildContext context) {
     if (viewModel.propertyTypes.isEmpty) return const SizedBox.shrink();
 
-    final chartData = viewModel.propertyTypes.take(6).map((item) {
+    final chartData = viewModel.propertyTypes.take(6).toList().asMap().entries.map((e) {
+      final item = e.value;
       return _ChartData(
-        label: (item['_id'] ?? '?').toString(),
+        label:      (item['_id'] ?? '?').toString(),
         shortLabel: (item['_id'] ?? '?').toString().length > 8
             ? (item['_id'] ?? '?').toString().substring(0, 8)
             : (item['_id'] ?? '?').toString(),
-        count: _toDouble(item['count']),           // ✅ FIXED
-        percentage: _toDouble(item['percentage']), // ✅ FIXED
-        color: Colors.blue,
+        count:      _toDouble(item['count']),
+        percentage: _toDouble(item['percentage']),
+        color:      _palette[e.key % _palette.length],
       );
     }).toList();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          children: [
-            Icon(Icons.home_work, color: Colors.indigo[700], size: 24),
-            const SizedBox(width: 8),
-            const Text(
-              'Loại bất động sản',
-              style: TextStyle(
-                fontSize: 22,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 16),
-
+        const Text('Loại bất động sản',
+            style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700, color: _C.text)),
+        const SizedBox(height: 14),
         Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(16),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.05),
-                blurRadius: 8,
-                offset: const Offset(0, 2),
-              ),
-            ],
+            color: _C.surface,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: _C.border),
           ),
           child: Column(
             children: [
-              SizedBox(
-                height: 280,
-                child: BarChart(
-                  BarChartData(
-                    alignment: BarChartAlignment.spaceAround,
-                    maxY: _getMaxY(chartData.map((e) => e.count).toList()) * 1.1,
-                    barTouchData: BarTouchData(
-                      enabled: true,
-                      touchTooltipData: BarTouchTooltipData(
-                        getTooltipItem: (group, groupIndex, rod, rodIndex) {
-                          if (groupIndex >= chartData.length) return null;
-                          return BarTooltipItem(
-                            '${chartData[groupIndex].label}\n${rod.toY.toInt()} BĐS (${chartData[groupIndex].percentage.toStringAsFixed(1)}%)',
-                            const TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 11,
-                            ),
-                          );
-                        },
-                      ),
-                    ),
-                    titlesData: FlTitlesData(
-                      show: true,
-                      bottomTitles: AxisTitles(
-                        sideTitles: SideTitles(
-                          showTitles: true,
-                          getTitlesWidget: (value, meta) {
-                            final index = value.toInt();
-                            if (index < 0 || index >= chartData.length) {
-                              return const SizedBox();
-                            }
-                            return Padding(
-                              padding: const EdgeInsets.only(top: 8.0),
-                              child: Text(
-                                chartData[index].shortLabel,
-                                style: const TextStyle(
-                                  fontSize: 9,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            );
-                          },
-                        ),
-                      ),
-                      leftTitles: AxisTitles(
-                        sideTitles: SideTitles(
-                          showTitles: true,
-                          reservedSize: 40,
-                          getTitlesWidget: (value, meta) {
-                            return Text(
-                              '${value.toInt()}',
-                              style: const TextStyle(fontSize: 10),
-                            );
-                          },
-                        ),
-                      ),
-                      topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                      rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                    ),
-                    borderData: FlBorderData(show: false),
-                    gridData: FlGridData(
-                      show: true,
-                      drawVerticalLine: false,
-                      getDrawingHorizontalLine: (value) {
-                        return FlLine(color: Colors.grey[200]!, strokeWidth: 1);
-                      },
-                    ),
-                    barGroups: chartData.asMap().entries.map((e) {
-                      final colors = [
-                        Colors.blue[600]!,
-                        Colors.green[600]!,
-                        Colors.orange[600]!,
-                        Colors.red[600]!,
-                        Colors.purple[600]!,
-                        Colors.teal[600]!,
-                      ];
-                      final color = colors[e.key % colors.length];
-                      return BarChartGroupData(
-                        x: e.key,
-                        barRods: [
-                          BarChartRodData(
-                            toY: e.value.count,
-                            color: color,
-                            width: 20,
-                            borderRadius: const BorderRadius.vertical(
-                              top: Radius.circular(6),
-                            ),
-                            gradient: LinearGradient(
-                              colors: [color, color.withOpacity(0.7)],
-                              begin: Alignment.topCenter,
-                              end: Alignment.bottomCenter,
-                            ),
-                          ),
-                        ],
-                      );
-                    }).toList(),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-
-              // Stats Summary - ✅ FIXED
-              SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: Row(
-                  children: viewModel.propertyTypes.map<Widget>((item) {
-                    // ✅ Convert safely
-                    final count = (item['count'] is int)
-                        ? item['count'] as int
-                        : ((item['count'] as double?)?.toInt() ?? 0);
-
-                    final percentage = _toDouble(item['percentage']);
-
-                    return Container(
-                      margin: const EdgeInsets.only(right: 10),
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: [Colors.grey[100]!, Colors.grey[50]!],
-                        ),
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: Colors.grey[300]!),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            item['_id'] ?? '?',
-                            style: const TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            '$count BĐS • ${percentage.toStringAsFixed(1)}%',
-                            style: TextStyle(
-                              fontSize: 10,
-                              color: Colors.grey[600],
-                            ),
-                          ),
-                        ],
-                      ),
-                    );
-                  }).toList(),
-                ),
-              ),
+              SizedBox(height: 240, child: _buildBar(chartData)),
+              const SizedBox(height: 14),
+              _buildSummaryRow(),
               const SizedBox(height: 12),
               ChartDetailDropdown(
                 title: 'Chi tiết loại bất động sản',
                 data: viewModel.propertyTypes.map<Map<String, dynamic>>((item) => {
-                  'label': item['_id'] ?? '?',
-                  'value': item['count'] ?? 0,
+                  'label':      item['_id'] ?? '?',
+                  'value':      item['count'] ?? 0,
                   'percentage': item['percentage'] ?? 0.0,
                 }).toList(),
                 valueKey: 'value',
                 labelKey: 'label',
                 icon: Icons.home_work,
-                accentColor: Colors.indigo,
+                accentColor: _palette[0],
                 formatType: 'count',
               ),
             ],
@@ -445,24 +234,129 @@ class PropertyTypesChart extends StatelessWidget {
     );
   }
 
-  double _getMaxY(List<double> values) {
-    if (values.isEmpty) return 100;
-    return values.reduce((a, b) => a > b ? a : b);
+  Widget _buildBar(List<_ChartData> chartData) {
+    final maxY = chartData.map((e) => e.count).fold(0.0, (a, b) => a > b ? a : b) * 1.15;
+
+    return BarChart(BarChartData(
+      alignment: BarChartAlignment.spaceAround,
+      maxY: maxY,
+      barTouchData: BarTouchData(
+        enabled: true,
+        touchTooltipData: BarTouchTooltipData(
+          getTooltipColor: (_) => const Color(0xFF1F2937),
+          getTooltipItem: (group, groupIndex, rod, rodIndex) {
+            if (groupIndex >= chartData.length) return null;
+            final d = chartData[groupIndex];
+            return BarTooltipItem(
+              '${d.label}\n${rod.toY.toInt()} BĐS (${d.percentage.toStringAsFixed(1)}%)',
+              const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w600),
+            );
+          },
+        ),
+      ),
+      titlesData: FlTitlesData(
+        bottomTitles: AxisTitles(
+          sideTitles: SideTitles(
+            showTitles: true,
+            getTitlesWidget: (value, meta) {
+              final i = value.toInt();
+              if (i < 0 || i >= chartData.length) return const SizedBox();
+              return Padding(
+                padding: const EdgeInsets.only(top: 6),
+                child: Text(chartData[i].shortLabel,
+                    style: const TextStyle(fontSize: 10, color: _C.textSub)),
+              );
+            },
+          ),
+        ),
+        leftTitles: AxisTitles(
+          sideTitles: SideTitles(
+            showTitles: true,
+            reservedSize: 36,
+            getTitlesWidget: (value, meta) => Text('${value.toInt()}',
+                style: const TextStyle(fontSize: 9, color: _C.muted)),
+          ),
+        ),
+        topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+        rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+      ),
+      borderData: FlBorderData(show: false),
+      gridData: FlGridData(
+        show: true,
+        drawVerticalLine: false,
+        getDrawingHorizontalLine: (_) =>
+        const FlLine(color: Color(0xFFF3F4F6), strokeWidth: 1),
+      ),
+      barGroups: chartData.asMap().entries.map((e) {
+        return BarChartGroupData(
+          x: e.key,
+          barRods: [
+            BarChartRodData(
+              toY: e.value.count,
+              color: e.value.color,
+              width: 22,
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(4)),
+            ),
+          ],
+        );
+      }).toList(),
+    ));
+  }
+
+  Widget _buildSummaryRow() {
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        children: viewModel.propertyTypes.asMap().entries.map<Widget>((e) {
+          final item  = e.value;
+          final count = (item['count'] is int)
+              ? item['count'] as int
+              : ((item['count'] as double?)?.toInt() ?? 0);
+          final pct   = _toDouble(item['percentage']);
+          final color = _palette[e.key % _palette.length];
+
+          return Container(
+            margin: const EdgeInsets.only(right: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: _C.bg,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: _C.border),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(width: 8, height: 8,
+                    decoration: BoxDecoration(
+                        color: color, borderRadius: BorderRadius.circular(2))),
+                const SizedBox(width: 7),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(item['_id'] ?? '?',
+                        style: const TextStyle(
+                            fontSize: 12, fontWeight: FontWeight.w600,
+                            color: _C.text)),
+                    Text('$count · ${pct.toStringAsFixed(1)}%',
+                        style: const TextStyle(fontSize: 10, color: _C.muted)),
+                  ],
+                ),
+              ],
+            ),
+          );
+        }).toList(),
+      ),
+    );
   }
 }
 
 class _ChartData {
-  final String label;
-  final String shortLabel;
-  final double count;
-  final double percentage;
+  final String label, shortLabel;
+  final double count, percentage;
   final Color color;
-
   _ChartData({
-    required this.label,
-    required this.shortLabel,
-    required this.count,
-    required this.percentage,
+    required this.label, required this.shortLabel,
+    required this.count, required this.percentage,
     required this.color,
   });
 }

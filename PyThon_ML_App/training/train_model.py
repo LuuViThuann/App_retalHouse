@@ -543,42 +543,53 @@ class RecommendationModel:
             """
             
             # Base confidence from content score (40%)
-            base_confidence = content_score * 0.40
+            base_confidence = content_score * 0.35
+    
+    # Popularity contribution (20%) - popularity_score là 0-1
+            popularity_confidence = popularity_score * 0.20
             
-            # CF contribution (30%)
+            # CF contribution (25%) - cf_score thường rất nhỏ (0-0.1), cần scale up
             if cf_score > 0:
-                cf_confidence = cf_score * 0.30
+                # Scale CF score: nếu cf=0.05 thì đóng góp 0.05*2.5 = 0.125 vào 0.25 max
+                cf_confidence = min(0.25, cf_score * 2.5)
             else:
-                cf_confidence = 0.05
+                # Không có CF data nhưng vẫn cho base 0.08 (model vẫn hoạt động)
+                cf_confidence = 0.08
             
-            # User experience bonus (20%)
-            experience_factor = min(1.0, total_interactions / 50.0)
-            experience_confidence = experience_factor * 0.20
+            # User experience bonus (15%)
+            experience_factor = min(1.0, total_interactions / 30.0)  # Giảm từ 50 xuống 30
+            experience_confidence = experience_factor * 0.15
             
-            # Location accuracy bonus (10%)
-            location_confidence = 0
+            # Location accuracy bonus (5%)
+            location_confidence = 0.0
             if location_bonus > 1.0:
-                location_factor = min(1.0, (location_bonus - 1.0) / 0.5)
-                location_confidence = location_factor * 0.10
-            elif location_bonus < 1.0:
-                location_confidence = (location_bonus - 0.5) * 0.10
+                # location_bonus trong range 1.0-1.3 → scale về 0-0.05
+                location_factor = min(1.0, (location_bonus - 1.0) / 0.3)
+                location_confidence = location_factor * 0.05
+            elif location_bonus >= 0.9:
+                location_confidence = 0.02  # gần khu vực, nhỏ bonus
             
-            # Combine
+            # Combine tất cả thành phần
             raw_confidence = (
                 base_confidence +
+                popularity_confidence +
                 cf_confidence +
                 experience_confidence +
                 location_confidence
             )
             
-            # Apply realistic bounds (0.3 - 0.95)
-            confidence = max(0.30, min(0.95, raw_confidence))
+            # Base floor: ngay cả cold-start user cũng có ít nhất 0.45
+            # Ceiling: không vượt quá 0.92 (luôn có uncertainty)
+            confidence = max(0.45, min(0.92, raw_confidence))
             
-            # Adjust for sparse matrix
+            # Penalty nhẹ nếu matrix quá thưa (nhưng không quá nghiêm khắc)
             matrix_sparsity = getattr(self, 'matrix_sparsity', 0.0)
-            if matrix_sparsity > 70:
-                confidence *= 0.90
-                confidence = max(0.30, confidence)
+            if matrix_sparsity > 85:
+                confidence *= 0.92  # chỉ giảm 8%
+                confidence = max(0.45, confidence)
+            elif matrix_sparsity > 70:
+                confidence *= 0.96
+                confidence = max(0.45, confidence)
             
             return float(confidence)
 

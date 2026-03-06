@@ -463,7 +463,7 @@ class RentalService {
     double? maxPrice,
     String? token,
     int page = 1,
-    int limit = 10,
+    int? limit,
   }) async {
     //  CLIENT-SIDE VALIDATION
     if (latitude.abs() > 90 || longitude.abs() > 180) {
@@ -484,7 +484,7 @@ class RentalService {
           longitude: longitude,
           radius: radius,
           page: page,
-          limit: limit,
+
           minPrice: minPrice,
           maxPrice: maxPrice,
         );
@@ -572,7 +572,7 @@ class RentalService {
     double? maxPrice,
     String? token,
     int page = 1,
-    int limit = 10,
+    int? limit,
   }) async {
     // CHECK: If rentalId starts with 'current_location_', it's invalid
     if (rentalId.startsWith('current_location_')) {
@@ -585,7 +585,7 @@ class RentalService {
         rentalId: rentalId,
         radius: radius,
         page: page,
-        limit: limit,
+
         minPrice: minPrice,
         maxPrice: maxPrice,
       );
@@ -638,7 +638,7 @@ class RentalService {
           'total': data['total'] ?? rentals.length,
           'radiusKm': data['radiusKm'] ?? radius,
           'page': page,
-          'hasMore': rentals.length >= limit,
+          'hasMore': limit != null ? rentals.length >= limit : false,
           'appliedFilters': data['appliedFilters'],
         };
       } else {
@@ -810,7 +810,15 @@ class RentalService {
       json['distanceKm'] = json['distance_km'].toString();
     }
 
+    if (json['nearestPOIs'] != null && json['nearestPOIs'] is List) {
+      final rawPOIs = json['nearestPOIs'] as List;
+      json['nearestPOIs'] = rawPOIs
+          .whereType<Map>()
+          .map((e) => Map<String, dynamic>.from(e))
+          .toList();
+    }
     debugPrint('✅ [PARSE-RENTAL] Complete: $finalLon, $finalLat\n');
+
 
     return Rental.fromJson(json);
   }
@@ -829,7 +837,7 @@ class RentalService {
     required double poiRadius,
     double? minPrice,
     double? maxPrice,
-    int limit = 10,
+    int? limit,
     required String token,
   }) async {
     try {
@@ -843,7 +851,7 @@ class RentalService {
         poiRadius: poiRadius,
         minPrice: minPrice,
         maxPrice: maxPrice,
-        limit: limit,
+
       );
 
       return result;
@@ -867,7 +875,7 @@ class RentalService {
     double? minPrice,
     double? maxPrice,
     String? token,
-    int limit = 10,
+    int? limit,
   }) async {
     // Validate coordinates
     if (latitude.abs() > 90 || longitude.abs() > 180) {
@@ -883,7 +891,7 @@ class RentalService {
               '?latitude=$latitude'
               '&longitude=$longitude'
               '&radius=$radius'
-              '&limit=$limit'
+              '${limit != null ? '&limit=$limit' : ''}'
               '${minPrice != null ? '&minPrice=$minPrice' : ''}'
               '${maxPrice != null ? '&maxPrice=$maxPrice' : ''}'
       );
@@ -1040,7 +1048,7 @@ class RentalService {
     required String rentalId,
     double radius = 10.0,
     String? token,
-    int limit = 10,
+    int? limit,
   }) async {
     // Validate rentalId
     if (rentalId.isEmpty || rentalId.startsWith('current_location_')) {
@@ -1051,7 +1059,7 @@ class RentalService {
       // 🔥 SỬ DỤNG endpoint từ ai-recommendations.js
       final url = Uri.parse(
           '${ApiRoutes.baseUrl}/ai/recommendations/nearby/$rentalId'
-              '?limit=$limit'
+              '${limit != null ? '&limit=$limit' : ''}'
               '&radius=$radius'
       );
 
@@ -1153,5 +1161,49 @@ class RentalService {
       }
     }, maxRetries: 2);
   }
+// ================================================================
+// 🤖 FETCH SIMILAR RENTALS BY PROPERTY TYPE
+// ================================================================
+  Future<List<Map<String, dynamic>>> fetchSimilarRentals({
+    required String rentalId,
+    required String propertyType,
+    int limit = 6,
+    String? token,
+  }) async {
+    try {
+      final uri = Uri.parse(ApiRoutes.aiRecommendationsSimilar);  // 🔥 Node.js, port 3000
 
+      final body = jsonEncode({
+        'rentalId': rentalId,
+        'propertyType': propertyType,
+        'limit': limit,
+      });
+
+      final headers = {
+        'Content-Type': 'application/json',
+        if (token != null) 'Authorization': 'Bearer $token',
+      };
+
+      debugPrint('🤖 [SIMILAR] POST $uri');
+      debugPrint('   rentalId: $rentalId | propertyType: $propertyType');
+
+      final response = await _safeRequest(
+            () => _client.post(uri, headers: headers, body: body),
+        timeout: const Duration(seconds: 30),
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        final recs = (data['recommendations'] as List? ?? []);
+        debugPrint('✅ [SIMILAR] ${recs.length} bài loại "$propertyType"');
+        return recs.cast<Map<String, dynamic>>();
+      } else {
+        debugPrint('❌ [SIMILAR] Status ${response.statusCode}: ${response.body}');
+        return [];
+      }
+    } catch (e) {
+      debugPrint('❌ [SIMILAR] Error: $e');
+      return [];
+    }
+  }
 }

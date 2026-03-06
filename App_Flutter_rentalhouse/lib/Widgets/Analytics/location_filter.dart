@@ -3,13 +3,23 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import '../../config/api_routes.dart';
 
+class _C {
+  static const bg      = Color(0xFFF9FAFB);
+  static const surface = Colors.white;
+  static const border  = Color(0xFFE5E7EB);
+  static const text    = Color(0xFF111827);
+  static const textSub = Color(0xFF6B7280);
+  static const muted   = Color(0xFF9CA3AF);
+  static const accent  = Color(0xFF2563EB);
+}
+
 class LocationFilter extends StatefulWidget {
   final String? selectedProvince;
   final String? selectedDistrict;
   final String? selectedWard;
   final Function({String? province, String? district, String? ward}) onLocationChanged;
   final VoidCallback onClear;
-  final VoidCallback onApply; // ✅ NEW: Callback khi nhấn Áp dụng
+  final VoidCallback onApply;
 
   const LocationFilter({
     Key? key,
@@ -18,7 +28,7 @@ class LocationFilter extends StatefulWidget {
     this.selectedWard,
     required this.onLocationChanged,
     required this.onClear,
-    required this.onApply, // ✅ NEW
+    required this.onApply,
   }) : super(key: key);
 
   @override
@@ -32,37 +42,33 @@ class _LocationFilterState extends State<LocationFilter> {
 
   String? selectedProvinceCode;
   String? selectedDistrictCode;
-
-  // ✅ NEW: Temporary selections (chưa apply)
   String? tempProvince;
   String? tempDistrict;
   String? tempWard;
 
   bool isLoading = false;
-  bool hasChanges = false; // ✅ NEW: Track nếu có thay đổi
+  bool hasChanges = false;
 
   @override
   void initState() {
     super.initState();
     _fetchProvinces();
-    // Initialize temp values
     tempProvince = widget.selectedProvince;
     tempDistrict = widget.selectedDistrict;
-    tempWard = widget.selectedWard;
+    tempWard     = widget.selectedWard;
   }
 
   @override
   void didUpdateWidget(LocationFilter oldWidget) {
     super.didUpdateWidget(oldWidget);
-    // Update temp values when widget updates
     if (widget.selectedProvince != oldWidget.selectedProvince ||
         widget.selectedDistrict != oldWidget.selectedDistrict ||
-        widget.selectedWard != oldWidget.selectedWard) {
+        widget.selectedWard     != oldWidget.selectedWard) {
       setState(() {
         tempProvince = widget.selectedProvince;
         tempDistrict = widget.selectedDistrict;
-        tempWard = widget.selectedWard;
-        hasChanges = false;
+        tempWard     = widget.selectedWard;
+        hasChanges   = false;
       });
     }
   }
@@ -114,38 +120,27 @@ class _LocationFilterState extends State<LocationFilter> {
     }
   }
 
-  // ✅ NEW: Check if there are changes
   void _checkChanges() {
     setState(() {
       hasChanges = tempProvince != widget.selectedProvince ||
           tempDistrict != widget.selectedDistrict ||
-          tempWard != widget.selectedWard;
+          tempWard     != widget.selectedWard;
     });
   }
 
-  // ✅ NEW: Apply filter
   void _applyFilter() {
     widget.onLocationChanged(
-      province: tempProvince,
-      district: tempDistrict,
-      ward: tempWard,
-    );
-    setState(() {
-      hasChanges = false;
-    });
-    widget.onApply(); // Trigger refresh analytics
+        province: tempProvince, district: tempDistrict, ward: tempWard);
+    setState(() => hasChanges = false);
+    widget.onApply();
   }
 
-  // ✅ NEW: Clear all filters
   void _clearAllFilters() {
     setState(() {
-      tempProvince = null;
-      tempDistrict = null;
-      tempWard = null;
-      selectedProvinceCode = null;
-      selectedDistrictCode = null;
+      tempProvince = tempDistrict = tempWard = null;
+      selectedProvinceCode = selectedDistrictCode = null;
       districts = [];
-      wards = [];
+      wards     = [];
       hasChanges = false;
     });
     widget.onClear();
@@ -153,149 +148,110 @@ class _LocationFilterState extends State<LocationFilter> {
 
   @override
   Widget build(BuildContext context) {
-    final hasFilter = tempProvince != null ||
-        tempDistrict != null ||
-        tempWard != null;
+    final hasFilter =
+        tempProvince != null || tempDistrict != null || tempWard != null;
 
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
+        color: _C.surface,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: _C.border),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Icon(Icons.filter_list_rounded, color: Colors.blue[700], size: 24),
-              const SizedBox(width: 8),
-              const Text(
-                'Lọc theo khu vực',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
+              const Text('Lọc khu vực',
+                  style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      color: _C.text)),
               const Spacer(),
               if (hasFilter)
-                TextButton.icon(
-                  onPressed: _clearAllFilters,
-                  icon: const Icon(Icons.clear, size: 18),
-                  label: const Text('Xóa bộ lọc'),
-                  style: TextButton.styleFrom(
-                    foregroundColor: Colors.red[400],
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                  ),
+                GestureDetector(
+                  onTap: _clearAllFilters,
+                  child: const Text('Xóa',
+                      style: TextStyle(
+                          fontSize: 12,
+                          color: Color(0xFFEF4444),
+                          fontWeight: FontWeight.w500)),
                 ),
             ],
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 12),
 
-          // Filter Chips
+          // Filter chips
           Row(
             children: [
               Expanded(
-                child: _buildFilterChip(
+                child: _buildChip(
                   label: tempProvince ?? 'Tỉnh/TP',
-                  icon: Icons.location_city,
                   isSelected: tempProvince != null,
                   onTap: () => _selectProvince(context),
                 ),
               ),
               const SizedBox(width: 8),
               Expanded(
-                child: _buildFilterChip(
+                child: _buildChip(
                   label: tempDistrict ?? 'Quận/Huyện',
-                  icon: Icons.map_outlined,
                   isSelected: tempDistrict != null,
-                  onTap: tempProvince == null
-                      ? null
-                      : () => _selectDistrict(context),
+                  onTap: tempProvince == null ? null : () => _selectDistrict(context),
                 ),
               ),
               const SizedBox(width: 8),
               Expanded(
-                child: _buildFilterChip(
+                child: _buildChip(
                   label: tempWard ?? 'Phường/Xã',
-                  icon: Icons.location_on_outlined,
                   isSelected: tempWard != null,
-                  onTap: tempDistrict == null
-                      ? null
-                      : () => _selectWard(context),
+                  onTap: tempDistrict == null ? null : () => _selectWard(context),
                 ),
               ),
             ],
           ),
 
-          // ✅ NEW: Apply Button (show when hasChanges)
+          // Apply button
           if (hasChanges) ...[
             const SizedBox(height: 12),
-            AnimatedContainer(
-              duration: const Duration(milliseconds: 300),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: ElevatedButton.icon(
-                      onPressed: _applyFilter,
-                      icon: const Icon(Icons.check_circle, size: 20),
-                      label: const Text(
-                        'Áp dụng bộ lọc',
-                        style: TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.blue[700],
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        elevation: 2,
-                      ),
-                    ),
-                  ),
-                ],
+            SizedBox(
+              width: double.infinity,
+              child: TextButton(
+                onPressed: _applyFilter,
+                style: TextButton.styleFrom(
+                  backgroundColor: _C.accent,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8)),
+                ),
+                child: const Text('Áp dụng',
+                    style: TextStyle(
+                        fontSize: 13, fontWeight: FontWeight.w600)),
               ),
             ),
           ],
 
-          // ✅ NEW: Current Filter Info (when applied)
+          // Applied state info
           if (!hasChanges && hasFilter) ...[
-            const SizedBox(height: 12),
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.blue[50],
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: Colors.blue[200]!),
-              ),
-              child: Row(
-                children: [
-                  Icon(Icons.info_outline, color: Colors.blue[700], size: 18),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      'Đang lọc thông tin địa chỉ đã chọn...',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.blue[900],
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ),
-                  Icon(Icons.check_circle, color: Colors.green[600], size: 18),
-                ],
-              ),
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                const Icon(Icons.check_circle_outline,
+                    size: 14, color: Color(0xFF10B981)),
+                const SizedBox(width: 6),
+                Text(
+                  [
+                    if (tempProvince != null) tempProvince!,
+                    if (tempDistrict != null) tempDistrict!,
+                    if (tempWard     != null) tempWard!,
+                  ].join(' › '),
+                  style: const TextStyle(
+                      fontSize: 12,
+                      color: _C.textSub,
+                      fontWeight: FontWeight.w500),
+                ),
+              ],
             ),
           ],
         ],
@@ -303,53 +259,37 @@ class _LocationFilterState extends State<LocationFilter> {
     );
   }
 
-  // ✅ NEW: Get filter text
-  String _getFilterText() {
-    final parts = <String>[];
-    if (tempProvince != null) parts.add(tempProvince!);
-    if (tempDistrict != null) parts.add(tempDistrict!);
-    if (tempWard != null) parts.add(tempWard!);
-    return parts.join(' → ');
-  }
-
-  Widget _buildFilterChip({
+  Widget _buildChip({
     required String label,
-    required IconData icon,
     required bool isSelected,
     required VoidCallback? onTap,
   }) {
-    return InkWell(
+    final disabled = onTap == null;
+    return GestureDetector(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
         decoration: BoxDecoration(
-          color: isSelected ? Colors.blue[700] : Colors.grey[100],
-          borderRadius: BorderRadius.circular(12),
+          color: isSelected ? _C.accent : (disabled ? _C.bg : Colors.white),
+          borderRadius: BorderRadius.circular(8),
           border: Border.all(
-            color: isSelected ? Colors.blue[700]! : Colors.grey[300]!,
+            color: isSelected
+                ? _C.accent
+                : (disabled ? _C.border : _C.border),
           ),
         ),
-        child: Column(
-          children: [
-            Icon(
-              icon,
-              color: isSelected ? Colors.white : Colors.grey[600],
-              size: 20,
-            ),
-            const SizedBox(height: 4),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                color: isSelected ? Colors.white : Colors.grey[700],
-              ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              textAlign: TextAlign.center,
-            ),
-          ],
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 11,
+            fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+            color: isSelected
+                ? Colors.white
+                : (disabled ? _C.muted : _C.textSub),
+          ),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          textAlign: TextAlign.center,
         ),
       ),
     );
@@ -361,19 +301,16 @@ class _LocationFilterState extends State<LocationFilter> {
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (_) => _BottomSheetSelector(
-        title: 'Chọn Tỉnh/Thành phố',
-        items: provinces,
-        currentSelection: tempProvince,
-      ),
+          title: 'Tỉnh / Thành phố',
+          items: provinces,
+          currentSelection: tempProvince),
     );
-
     if (selected != null && mounted) {
       selectedProvinceCode = selected['code'].toString();
       await _fetchDistricts(selectedProvinceCode!);
       setState(() {
         tempProvince = selected['name'];
-        tempDistrict = null;
-        tempWard = null;
+        tempDistrict = tempWard = null;
         selectedDistrictCode = null;
         wards = [];
       });
@@ -387,19 +324,17 @@ class _LocationFilterState extends State<LocationFilter> {
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (_) => _BottomSheetSelector(
-        title: 'Chọn Quận/Huyện',
-        items: districts,
-        displayKey: 'name',
-        currentSelection: tempDistrict,
-      ),
+          title: 'Quận / Huyện',
+          items: districts,
+          displayKey: 'name',
+          currentSelection: tempDistrict),
     );
-
     if (selected != null && mounted) {
       selectedDistrictCode = selected['code'].toString();
       await _fetchWards(selectedDistrictCode!);
       setState(() {
         tempDistrict = selected['name'];
-        tempWard = null;
+        tempWard     = null;
       });
       _checkChanges();
     }
@@ -411,17 +346,13 @@ class _LocationFilterState extends State<LocationFilter> {
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (_) => _BottomSheetSelector(
-        title: 'Chọn Phường/Xã',
-        items: wards,
-        displayKey: 'name',
-        currentSelection: tempWard,
-      ),
+          title: 'Phường / Xã',
+          items: wards,
+          displayKey: 'name',
+          currentSelection: tempWard),
     );
-
     if (selected != null && mounted) {
-      setState(() {
-        tempWard = selected['name'];
-      });
+      setState(() => tempWard = selected['name']);
       _checkChanges();
     }
   }
@@ -431,7 +362,7 @@ class _BottomSheetSelector extends StatelessWidget {
   final String title;
   final List items;
   final String displayKey;
-  final String? currentSelection; // ✅ NEW: Highlight current selection
+  final String? currentSelection;
 
   const _BottomSheetSelector({
     required this.title,
@@ -445,56 +376,65 @@ class _BottomSheetSelector extends StatelessWidget {
     return Container(
       decoration: const BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
       height: MediaQuery.of(context).size.height * 0.7,
       child: Column(
         children: [
-          Padding(
-            padding: const EdgeInsets.all(16),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            decoration: const BoxDecoration(
+              border: Border(bottom: BorderSide(color: Color(0xFFE5E7EB))),
+            ),
             child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                TextButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: const Text('Huỷ'),
+                GestureDetector(
+                  onTap: () => Navigator.pop(context),
+                  child: const Text('Huỷ',
+                      style: TextStyle(
+                          fontSize: 14, color: Color(0xFF6B7280))),
                 ),
-                Text(
-                  title,
-                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                Expanded(
+                  child: Text(title,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFF111827))),
                 ),
                 const SizedBox(width: 48),
               ],
             ),
           ),
-          const Divider(height: 1),
           Expanded(
             child: ListView.builder(
-              padding: const EdgeInsets.symmetric(horizontal: 8),
               itemCount: items.length,
               itemBuilder: (_, i) {
                 final item = items[i];
                 final displayText = item is Map
                     ? item[displayKey] ?? item['name'] ?? ''
                     : item.toString();
-
-                // ✅ NEW: Check if this is current selection
                 final isSelected = displayText == currentSelection;
 
                 return ListTile(
-                  title: Text(
-                    displayText,
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                      color: isSelected ? Colors.blue[700] : Colors.black,
-                    ),
-                  ),
-                  onTap: () => Navigator.pop(context, item),
+                  dense: true,
+                  title: Text(displayText,
+                      style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: isSelected
+                              ? FontWeight.w600
+                              : FontWeight.normal,
+                          color: isSelected
+                              ? const Color(0xFF2563EB)
+                              : const Color(0xFF111827))),
                   trailing: isSelected
-                      ? Icon(Icons.check_circle, color: Colors.blue[700])
-                      : const Icon(Icons.chevron_right),
-                  tileColor: isSelected ? Colors.blue[50] : null,
+                      ? const Icon(Icons.check,
+                      color: Color(0xFF2563EB), size: 18)
+                      : null,
+                  tileColor: isSelected
+                      ? const Color(0xFFF0F5FF)
+                      : null,
+                  onTap: () => Navigator.pop(context, item),
                 );
               },
             ),

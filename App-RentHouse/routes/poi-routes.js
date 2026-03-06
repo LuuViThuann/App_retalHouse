@@ -30,7 +30,7 @@ const authMiddleware = async (req, res, next) => {
   }
 };
 
-/**
+/** 
  * GET /api/poi/categories - Lấy danh sách POI categories
  */
 router.get('/categories', async (req, res) => {
@@ -70,7 +70,7 @@ router.post('/filter-rentals-by-poi', authMiddleware, async (req, res) => {
         longitude,
         selectedCategories = [],
         radius = 3,
-        limit = 20,
+        limit,
         minPrice,
         maxPrice
       } = req.body;
@@ -186,7 +186,8 @@ router.post('/filter-rentals-by-poi', authMiddleware, async (req, res) => {
       console.log(`✅ [POI-FILTER] Filtered result: ${filteredRentals.length} rentals within ${radiusKm}km`);
   
       // Step 4: Transform response
-      const rentalsWithPOI = filteredRentals.slice(0, limit).map(rental => ({
+      const effectiveLimit = limit ? parseInt(limit) : filteredRentals.length;
+      const rentalsWithPOI = filteredRentals.slice(0, effectiveLimit).map(rental => ({
         ...rental,
         nearestPOIs: rental.nearestPOIs || [],
         poisCount: rental.nearestPOIs?.length || 0,
@@ -306,7 +307,7 @@ router.get('/nearby', async (req, res) => {
  */
 router.post('/rentals-near-poi', authMiddleware, async (req, res) => {
   try {
-    const { poi, radius = 20, limit = 20, minPrice, maxPrice } = req.body;
+    const { poi, radius = 20, limit, minPrice, maxPrice } = req.body; // ✅ bỏ limit = 20
 
     if (!poi || !poi.latitude || !poi.longitude) {
       return res.status(400).json({
@@ -324,9 +325,7 @@ router.post('/rentals-near-poi', authMiddleware, async (req, res) => {
       maxPrice
     });
 
-    const query = {
-      status: 'available',
-    };
+    const query = { status: 'available' };
 
     if (minPrice || maxPrice) {
       query.price = {};
@@ -336,12 +335,13 @@ router.post('/rentals-near-poi', authMiddleware, async (req, res) => {
 
     const radiusInMeters = radius * 1000;
 
-    const rentals = await Rental.aggregate([
+    // ✅ Xây dựng pipeline động
+    const pipeline = [
       {
         $geoNear: {
-          near: { 
-            type: 'Point', 
-            coordinates: [poi.longitude, poi.latitude] 
+          near: {
+            type: 'Point',
+            coordinates: [poi.longitude, poi.latitude]
           },
           distanceField: 'distance',
           maxDistance: radiusInMeters,
@@ -349,28 +349,19 @@ router.post('/rentals-near-poi', authMiddleware, async (req, res) => {
           query: query,
         },
       },
-      { $limit: parseInt(limit) },
+      // ✅ Chỉ thêm $limit nếu client truyền lên
+      ...(limit ? [{ $limit: parseInt(limit) }] : []),
       {
         $project: {
-          title: 1,
-          price: 1,
-          location: 1,
-          images: 1,
-          videos: 1,
-          propertyType: 1,
-          createdAt: 1,
-          distance: 1,
-          area: 1,
-          furniture: 1,
-          amenities: 1,
-          surroundings: 1,
-          rentalTerms: 1,
-          contactInfo: 1,
-          status: 1,
-          userId: 1,
+          title: 1, price: 1, location: 1, images: 1, videos: 1,
+          propertyType: 1, createdAt: 1, distance: 1, area: 1,
+          furniture: 1, amenities: 1, surroundings: 1, rentalTerms: 1,
+          contactInfo: 1, status: 1, userId: 1,
         },
       },
-    ]);
+    ];
+
+    const rentals = await Rental.aggregate(pipeline);
 
     const rentalsWithPOI = rentals.map(rental => ({
       ...rental,
@@ -416,7 +407,7 @@ router.post('/ai-recommendations', authMiddleware, async (req, res) => {
       longitude,
       selectedCategories = [],
       radius = 20,
-      limit = 20,
+      limit,       // ✅ bỏ = 20
       minPrice,
       maxPrice,
     } = req.body;
@@ -436,23 +427,16 @@ router.post('/ai-recommendations', authMiddleware, async (req, res) => {
     }
 
     console.log(`🤖🏢 [AI-POI] Request:`, {
-      latitude,
-      longitude,
-      selectedCategories,
-      radius,
-      limit
+      latitude, longitude, selectedCategories, radius, limit
     });
 
-    // Step 1: Fetch POIs for selected categories (Parallel)
+    // Step 1: Fetch POIs parallel
     const allPOIs = [];
-    
+
     const poiPromises = selectedCategories.map(async (category) => {
       try {
         const pois = await poiService.getPOIsByCategory(
-          latitude, 
-          longitude, 
-          category, 
-          radius
+          latitude, longitude, category, radius
         );
         allPOIs.push(...pois);
         return pois;
@@ -478,10 +462,8 @@ router.post('/ai-recommendations', authMiddleware, async (req, res) => {
     }
 
     const radiusInMeters = radius * 1000;
-    
-    const query = {
-      status: 'available',
-    };
+
+    const query = { status: 'available' };
 
     if (minPrice || maxPrice) {
       query.price = {};
@@ -489,12 +471,13 @@ router.post('/ai-recommendations', authMiddleware, async (req, res) => {
       if (maxPrice) query.price.$lte = Number(maxPrice);
     }
 
+    // ✅ Bỏ $limit hoàn toàn - lấy toàn bộ để AI scoring chính xác
     const nearbyRentals = await Rental.aggregate([
       {
         $geoNear: {
-          near: { 
-            type: 'Point', 
-            coordinates: [longitude, latitude] 
+          near: {
+            type: 'Point',
+            coordinates: [longitude, latitude]
           },
           distanceField: 'distance',
           maxDistance: radiusInMeters,
@@ -502,7 +485,6 @@ router.post('/ai-recommendations', authMiddleware, async (req, res) => {
           query: query,
         },
       },
-      { $limit: parseInt(limit) * 3 },
     ]);
 
     console.log(`📍 Found ${nearbyRentals.length} rentals near user`);
@@ -511,16 +493,11 @@ router.post('/ai-recommendations', authMiddleware, async (req, res) => {
       const rentalLat = rental.location?.coordinates?.coordinates?.[1] || 0;
       const rentalLon = rental.location?.coordinates?.coordinates?.[0] || 0;
 
-      if (rentalLat === 0 || rentalLon === 0) {
-        return null;
-      }
+      if (rentalLat === 0 || rentalLon === 0) return null;
 
       const poiDistances = allPOIs.map(poi => {
         const distance = poiService.calculateDistance(
-          rentalLat,
-          rentalLon,
-          poi.latitude,
-          poi.longitude
+          rentalLat, rentalLon, poi.latitude, poi.longitude
         );
         return { poi, distance };
       });
@@ -528,7 +505,6 @@ router.post('/ai-recommendations', authMiddleware, async (req, res) => {
       poiDistances.sort((a, b) => a.distance - b.distance);
 
       const nearestPOIs = poiDistances.slice(0, 5);
-
       const avgDistance = nearestPOIs.reduce((sum, p) => sum + p.distance, 0) / nearestPOIs.length;
       const score = Math.max(0, 100 - (avgDistance * 10));
 
@@ -548,7 +524,10 @@ router.post('/ai-recommendations', authMiddleware, async (req, res) => {
 
     rentalsWithScores.sort((a, b) => b.aiScore - a.aiScore);
 
-    const topRentals = rentalsWithScores.slice(0, parseInt(limit));
+    // ✅ Chỉ slice nếu client truyền limit, không thì trả về tất cả
+    const topRentals = limit
+      ? rentalsWithScores.slice(0, parseInt(limit))
+      : rentalsWithScores;
 
     console.log(`✅ [AI-POI] Returning ${topRentals.length} rentals with AI scores`);
 

@@ -47,7 +47,7 @@ function _getMarkerColorScheme(userPreferences) {
 router.get('/recommendations/personalized', authMiddleware, async (req, res) => {
   try {
     const {
-      limit = 10,
+      limit,
       latitude,
       longitude,
       radius = 10,
@@ -61,8 +61,9 @@ router.get('/recommendations/personalized', authMiddleware, async (req, res) => 
     console.log(`   Location: (${latitude}, ${longitude}), radius: ${radius}km`);
     console.log(`   Price: ${minPrice || 'any'} - ${maxPrice || 'any'}`);
 
-    const n_recommendations = Math.min(parseInt(limit) || 10, 50);
-    const n_recommendations_fetch = Math.min(parseInt(limit) * 2 || 20, 50);
+    const totalRentals = await Rental.countDocuments({ status: 'available' });
+    const n_recommendations = totalRentals;
+    const n_recommendations_fetch = totalRentals;
 
     console.log(`   Requesting ${n_recommendations} recommendations (capped at 50)`);
 
@@ -98,7 +99,7 @@ router.get('/recommendations/personalized', authMiddleware, async (req, res) => 
         {
           userId: userId,
           user_id: userId,
-          n_recommendations: n_recommendations_fetch,
+          n_recommendations: totalRentals,
           use_location: true,
           radius_km: parseInt(radius) || 20,
           exclude_items: userOwnRentalIds,  // 🔥 PASS OWN RENTAL IDS
@@ -157,7 +158,6 @@ router.get('/recommendations/personalized', authMiddleware, async (req, res) => 
         userId: { $ne: userId }  // 🔥 EXCLUDE OWN RENTALS
       })
         .sort({ views: -1, createdAt: -1 })
-        .limit(Math.min(parseInt(limit) * 3, 50))
         .select('_id')
         .lean();
 
@@ -180,8 +180,10 @@ router.get('/recommendations/personalized', authMiddleware, async (req, res) => 
     if (latitude && longitude) {
       const lat = parseFloat(latitude);
       const lon = parseFloat(longitude);
-      const radiusInMeters = parseFloat(radius) * 1000;
-
+      // Tăng radius * 3 để lấy nhiều bài hơn, sort theo score sau
+      const searchRadius = parseFloat(radius) * 3;
+      const radiusInMeters = searchRadius * 1000;
+    
       if (!isNaN(lat) && !isNaN(lon) && lat !== 0 && lon !== 0) {
         geoFilter = {
           'location.coordinates': {
@@ -190,7 +192,7 @@ router.get('/recommendations/personalized', authMiddleware, async (req, res) => 
             }
           }
         };
-        console.log(`📍 Geo filter applied: center (${lon}, ${lat}), radius ${radius}km`);
+        console.log(`📍 Geo filter: ${searchRadius}km (3x expanded from ${radius}km)`);
       }
     }
 
@@ -203,6 +205,7 @@ router.get('/recommendations/personalized', authMiddleware, async (req, res) => 
       console.log(`💰 Price filter:`, priceFilter.price);
     }
 
+    //--------------- < 
     // 🔥 STEP 4: Query MongoDB with DOUBLE-CHECK exclusion
     const query = {
       _id: { $in: rentalIds },
@@ -212,9 +215,7 @@ router.get('/recommendations/personalized', authMiddleware, async (req, res) => 
       ...priceFilter
     };
 
-    const rentals = await Rental.find(query)
-      .limit(n_recommendations)
-      .lean();
+    const rentals = await Rental.find(query).lean();
 
     console.log(`✅ Found ${rentals.length} rentals matching criteria`);
 
@@ -294,7 +295,7 @@ function _getTimeOfDay() {
 router.get('/recommendations/nearby/:rentalId', authMiddleware, async (req, res) => {
   try {
     const { rentalId } = req.params;
-    const { limit = 10, radius = 10 } = req.query;
+    const { limit, radius = 10 } = req.query;
     const userId = req.userId;
 
     console.log(`🤖 [AI-NEARBY] User: ${userId}, Rental: ${rentalId}`);
@@ -323,6 +324,7 @@ router.get('/recommendations/nearby/:rentalId', authMiddleware, async (req, res)
     // Gọi AI recommendations
     let aiRecommendations = [];
     let isAIRecommendation = false;
+    const totalAvailable = await Rental.countDocuments({ status: 'available' });
 
     try {
       console.log(`🔗 Calling ML service: ${ML_SERVICE_URL}/recommend/similar`);
@@ -332,7 +334,7 @@ router.get('/recommendations/nearby/:rentalId', authMiddleware, async (req, res)
         `${ML_SERVICE_URL}/recommend/similar`,
         {
           rentalId: rentalId,  // 🔥 SỬA: rental_id -> rentalId
-          n_recommendations: parseInt(limit) * 2,
+          n_recommendations: totalAvailable,
           use_location: true  // 🔥 THÊM: enable geographic proximity
         },
         {
@@ -376,7 +378,7 @@ router.get('/recommendations/nearby/:rentalId', authMiddleware, async (req, res)
           }
         }
       },
-      { $limit: parseInt(limit) * 2 }
+      { $limit: totalAvailable }
     ]);
 
     console.log(`📍 Found ${nearbyRentals.length} nearby rentals`);
@@ -422,7 +424,8 @@ router.get('/recommendations/nearby/:rentalId', authMiddleware, async (req, res)
       return (a.distance || 0) - (b.distance || 0);
     });
 
-    const finalRentals = rentalsWithAI.slice(0, parseInt(limit));
+    const effectiveLimit = limit ? parseInt(limit) : rentalsWithAI.length;
+    const finalRentals = rentalsWithAI.slice(0, effectiveLimit);
 
     console.log(`✅ Response ready: ${finalRentals.length} rentals`);
     console.log(`   AI recommended: ${finalRentals.filter(r => r.isAIRecommended).length}`);
@@ -469,7 +472,7 @@ router.get('/recommendations/personalized/context', authMiddleware, async (req, 
       zoom_level = 15,
       time_of_day = 'morning',
       device_type = 'mobile',
-      limit = 10,
+      limit,
       impressions = '' // Comma-separated rental IDs already shown
     } = req.query;
 
@@ -496,12 +499,13 @@ router.get('/recommendations/personalized/context', authMiddleware, async (req, 
     };
 
     try {
+      const totalAvailable = await Rental.countDocuments({ status: 'available' });
       // 🔥 CALL ML SERVICE WITH CONTEXT
       const mlResponse = await axios.post(
         `${ML_SERVICE_URL}/recommend/personalized`,
         {
           userId,
-          n_recommendations: parseInt(limit) * 2,
+          n_recommendations: totalAvailable,
           use_location: true,
           radius_km: parseInt(radius),
           context  // 🔥 PASS CONTEXT
@@ -553,7 +557,7 @@ router.get('/recommendations/personalized/context', authMiddleware, async (req, 
         _id: { $in: rentalIds },
         status: 'available',
         ...geoFilter
-      }).limit(parseInt(limit)).lean();
+      }).lean();
 
       console.log(`✅ Found ${rentals.length} rentals in MongoDB`);
 
@@ -627,7 +631,7 @@ router.get('/recommendations/personalized/context', authMiddleware, async (req, 
       // FALLBACK: popularity-based
       const popularRentals = await Rental.find({ status: 'available' })
         .sort({ views: -1, createdAt: -1 })
-        .limit(parseInt(limit))
+        .limit(totalAvailable)
         .lean();
 
       const fallbackRentals = popularRentals.map((rental, idx) => ({
@@ -677,7 +681,7 @@ router.post('/recommendations/personalized/with-poi', authMiddleware, async (req
       selectedCategories = [],
       radius = 10,
       poiRadius = 3,
-      limit = 10,
+      limit,
       minPrice,
       maxPrice
     } = req.body;
@@ -706,15 +710,18 @@ router.post('/recommendations/personalized/with-poi', authMiddleware, async (req
     // =====================================================
     let aiRecommendations = [];
     let isAIRecommendation = false;
+    const totalAvailable = await Rental.countDocuments({ status: 'available' });
 
     try {
       console.log(`🔗 [AI-POI] Calling ML service for personalized recommendations...`);
+
+      
 
       const mlResponse = await axios.post(
         `${ML_SERVICE_URL}/recommend/personalized`,
         {
           userId: userId,
-          n_recommendations: Math.min(parseInt(limit) * 3, 50), // Fetch 3x limit từ ML
+          n_recommendations: totalAvailable,
           use_location: true,
           radius_km: parseInt(radius),
           exclude_items: [],
@@ -872,7 +879,8 @@ router.post('/recommendations/personalized/with-poi', authMiddleware, async (req
     // =====================================================
     // STEP 6: Fetch rental details từ MongoDB
     // =====================================================
-    const topRentalIds = combinedScores.slice(0, limit).map(r => r.rentalId);
+    const effectiveLimit = limit ? parseInt(limit) : combinedScores.length;
+    const topRentalIds = combinedScores.slice(0, effectiveLimit).map(r => r.rentalId);
     const topRentals = await Rental.find({
       _id: { $in: topRentalIds },
       status: 'available'
@@ -1036,7 +1044,7 @@ router.get('/explain/:userId/:rentalId', authMiddleware, async (req, res) => {
 
 /**
  * 👤 GET /api/ai/user-preferences/:userId
- * Lấy thông tin preferences của user
+ * Lấy thông tin preferences của user 
  */
 router.get('/user-preferences/:userId', authMiddleware, async (req, res) => {
   try {
@@ -1128,7 +1136,154 @@ router.get('/recommendations/paginated', async (req, res) => {
 });
 // ==================== HELPER FUNCTIONS ====================
 
+/**
+ * 🤖 POST /api/ai/recommendations/similar
+ * Similar rentals filtered by propertyType
+ * Flutter gọi endpoint này, Node.js proxy sang Python ML
+ */
+router.post('/recommendations/similar', authMiddleware, async (req, res) => {
+  try {
+    const { rentalId, propertyType, limit } = req.body;
+    const userId = req.userId;
 
+    if (!rentalId) {
+      return res.status(400).json({
+        success: false,
+        message: 'rentalId is required'
+      });
+    }
+
+    console.log(`🤖 [SIMILAR] User: ${userId}, Rental: ${rentalId}`);
+    console.log(`   PropertyType filter: ${propertyType || 'none'}`);
+    console.log(`   Limit: ${limit}`);
+
+    // 🔥 STEP 1: Gọi Python ML với property_type filter
+    let recommendations = [];
+    let isAIRecommendation = false;
+
+    const totalAvailable = await Rental.countDocuments({ status: 'available' });
+    try {
+      console.log(`🔗 Calling ML: ${ML_SERVICE_URL}/recommend/similar`);
+
+      const mlResponse = await axios.post(
+        `${ML_SERVICE_URL}/recommend/similar`,
+        {
+          rentalId: rentalId,
+          n_recommendations: totalAvailable,
+          use_location: true,
+          property_type: propertyType || null,  // 🔥 pass propertyType
+        },
+        {
+          timeout: 10000,
+          headers: { 'Content-Type': 'application/json' }
+        }
+      );
+
+      if (mlResponse.data?.recommendations) {
+        recommendations = mlResponse.data.recommendations;
+        isAIRecommendation = true;
+        console.log(`✅ ML returned ${recommendations.length} similar items`);
+      }
+    } catch (mlError) {
+      console.error('⚠️ ML Service error:', mlError.message);
+      // Fallback: MongoDB query cùng loại
+    }
+
+    // 🔥 STEP 2: Nếu ML thất bại → fallback MongoDB
+    if (!isAIRecommendation || recommendations.length === 0) {
+      console.log('⚠️ ML failed or empty, using MongoDB fallback');
+
+      const mongoQuery = {
+        _id: { $ne: rentalId },
+        status: 'available',
+      };
+      if (propertyType) {
+        mongoQuery.propertyType = propertyType;
+      }
+
+      const fallbackRentals = await Rental.find(mongoQuery)
+        .sort({ createdAt: -1 })
+        .limit(totalAvailable) 
+        .select('_id propertyType location price title images')
+        .lean();
+
+      // Format để giống ML response
+      recommendations = fallbackRentals.map(r => ({
+        rentalId: r._id.toString(),
+        score: 0.5,
+        confidence: 0.3,
+        finalScore: 0.5,
+        coordinates: {
+          longitude: r.location?.coordinates?.coordinates?.[0] || 0,
+          latitude: r.location?.coordinates?.coordinates?.[1] || 0,
+        },
+        propertyType: r.propertyType,
+        method: 'fallback',
+      }));
+
+      console.log(`✅ MongoDB fallback: ${recommendations.length} items`);
+    }
+
+    // 🔥 STEP 3: Enrich với data từ MongoDB
+    const rentalIds = recommendations.map(r => r.rentalId);
+    const rentals = await Rental.find({
+      _id: { $in: rentalIds },
+      status: 'available',
+    }).lean();
+
+    // Build map để lookup nhanh
+    const rentalMap = {};
+    rentals.forEach(r => {
+      rentalMap[r._id.toString()] = r;
+    });
+
+    // Merge ML metadata + rental details
+    const enrichedResults = recommendations
+      .map(rec => {
+        const rental = rentalMap[rec.rentalId];
+        if (!rental) return null;
+
+        const coords = rec.coordinates || {
+          longitude: rental.location?.coordinates?.coordinates?.[0] || 0,
+          latitude: rental.location?.coordinates?.coordinates?.[1] || 0,
+        };
+
+        return {
+          ...rec,
+          // Rental details
+          title: rental.title,
+          price: rental.price,
+          propertyType: rental.propertyType,
+          images: rental.images || [],
+          location: {
+            ...rental.location,
+            longitude: coords.longitude,
+            latitude: coords.latitude,
+          },
+          area: rental.area,
+        };
+      })
+      .filter(Boolean);
+
+    console.log(`✅ [SIMILAR] Response: ${enrichedResults.length} similar rentals`);
+
+    res.json({
+      success: true,
+      recommendations: enrichedResults,
+      total: enrichedResults.length,
+      isAIRecommendation,
+      filter: { propertyType: propertyType || null },
+    });
+
+  } catch (err) {
+    console.error('❌ Error in similar recommendations:', err);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to get similar recommendations',
+      error: err.message
+    });
+  }
+});
 
 
 module.exports = router;

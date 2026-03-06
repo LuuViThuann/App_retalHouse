@@ -29,5 +29,9 @@ Các thuật toán hỗ trợ xử lý quá trình thao tác trên bản đồ :
  + Cập nhật hiển thị tất cả marker --> kéo zoom tới đâu hiển thị tới đó
 
 =====================
+----- > Điều chỉnh chatAI đưa chính xác thông tin giá , loại hơn
+
+-------> Đưa nhìu gợi ý AI trên bản đồ hơn
+
 
 

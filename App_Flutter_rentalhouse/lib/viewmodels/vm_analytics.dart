@@ -20,6 +20,18 @@ class AnalyticsViewModel extends ChangeNotifier {
   List<dynamic> _trendingAreas = [];
   List<dynamic> _propertyTypes = [];
 
+  // Thêm state variables:
+  List<dynamic> _areaDistribution = [];
+  Map<String, dynamic> _amenitiesStats = {};
+  Map<String, dynamic> _userBehavior = {};
+  Map<String, dynamic> _growthStats = {};
+
+// Thêm getters:
+  List<dynamic> get areaDistribution => _areaDistribution;
+  Map<String, dynamic> get amenitiesStats => _amenitiesStats;
+  Map<String, dynamic> get userBehavior => _userBehavior;
+  Map<String, dynamic> get growthStats => _growthStats;
+
   // Getters
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
@@ -33,9 +45,35 @@ class AnalyticsViewModel extends ChangeNotifier {
   List<dynamic> get trendingAreas => _trendingAreas;
   List<dynamic> get propertyTypes => _propertyTypes;
 
+  // ============ INTERNAL SAFE HELPERS ============
+
+  /// Convert any numeric type safely to double
+  double _toDouble(dynamic v) {
+    if (v == null) return 0.0;
+    if (v is double) return v;
+    if (v is int) return v.toDouble();
+    if (v is String) return double.tryParse(v) ?? 0.0;
+    return 0.0;
+  }
+
+  /// Convert any numeric type safely to int
+  int _toInt(dynamic v) {
+    if (v == null) return 0;
+    if (v is int) return v;
+    if (v is double) return v.toInt();
+    if (v is String) return int.tryParse(v) ?? 0;
+    return 0;
+  }
+
+  /// Get string from dynamic safely
+  String _toStr(dynamic v, {String fallback = 'N/A'}) {
+    if (v == null) return fallback;
+    final s = v.toString().trim();
+    return s.isEmpty ? fallback : s;
+  }
+
   // ============ FETCH METHODS ============
 
-  /// Tải tổng quan
   Future<void> fetchOverview({Map<String, String?>? filters}) async {
     try {
       _overviewData = await _analyticsService.fetchOverview(filters: filters);
@@ -48,7 +86,6 @@ class AnalyticsViewModel extends ChangeNotifier {
     }
   }
 
-  /// Tải phân bố giá
   Future<void> fetchPriceDistribution({Map<String, String?>? filters}) async {
     try {
       _priceDistribution = await _analyticsService.fetchPriceDistribution(filters: filters);
@@ -61,7 +98,6 @@ class AnalyticsViewModel extends ChangeNotifier {
     }
   }
 
-  /// Tải timeline
   Future<void> fetchPostsTimeline({String period = 'day', Map<String, String?>? filters}) async {
     try {
       _timelineData = await _analyticsService.fetchPostsTimeline(
@@ -78,7 +114,6 @@ class AnalyticsViewModel extends ChangeNotifier {
     }
   }
 
-  /// Tải thống kê khu vực
   Future<void> fetchLocationStats({Map<String, String?>? filters}) async {
     try {
       _locationStats = await _analyticsService.fetchLocationStats(filters: filters);
@@ -91,7 +126,6 @@ class AnalyticsViewModel extends ChangeNotifier {
     }
   }
 
-  /// Tải khu vực nóng
   Future<void> fetchHottestAreas({int days = 7, Map<String, String?>? filters}) async {
     try {
       _hotAreas = await _analyticsService.fetchHottestAreas(
@@ -107,7 +141,6 @@ class AnalyticsViewModel extends ChangeNotifier {
     }
   }
 
-  /// Tải khu vực trending
   Future<void> fetchTrendingAreas({int days = 7, Map<String, String?>? filters}) async {
     try {
       _trendingAreas = await _analyticsService.fetchTrendingAreas(
@@ -123,7 +156,6 @@ class AnalyticsViewModel extends ChangeNotifier {
     }
   }
 
-  /// Tải loại nhà
   Future<void> fetchPropertyTypes({Map<String, String?>? filters}) async {
     try {
       _propertyTypes = await _analyticsService.fetchPropertyTypes(filters: filters);
@@ -136,7 +168,6 @@ class AnalyticsViewModel extends ChangeNotifier {
     }
   }
 
-  /// ✅ NEW: Tải tất cả dữ liệu với filter
   Future<void> fetchFilteredAnalytics(Map<String, String?> filters) async {
     _isLoading = true;
     _errorMessage = null;
@@ -152,7 +183,6 @@ class AnalyticsViewModel extends ChangeNotifier {
         fetchTrendingAreas(filters: filters),
         fetchPropertyTypes(filters: filters),
       ]);
-
       debugPrint('✅ Filtered analytics loaded successfully');
     } catch (e) {
       _errorMessage = 'Lỗi tải dữ liệu lọc: $e';
@@ -163,7 +193,6 @@ class AnalyticsViewModel extends ChangeNotifier {
     }
   }
 
-  /// Tải tất cả dữ liệu
   Future<void> fetchAllAnalytics() async {
     _isLoading = true;
     _errorMessage = null;
@@ -178,8 +207,12 @@ class AnalyticsViewModel extends ChangeNotifier {
         fetchHottestAreas(),
         fetchTrendingAreas(),
         fetchPropertyTypes(),
-      ]);
 
+        fetchAreaDistribution(),
+        fetchAmenitiesStats(),
+        fetchUserBehavior(),
+        fetchGrowthStats(),
+      ]);
       debugPrint('✅ All analytics loaded successfully');
     } catch (e) {
       _errorMessage = 'Lỗi tải dữ liệu: $e';
@@ -189,75 +222,104 @@ class AnalyticsViewModel extends ChangeNotifier {
       notifyListeners();
     }
   }
+// Thêm fetch methods:
+  Future<void> fetchAreaDistribution({Map<String, String?>? filters}) async {
+    try {
+      _areaDistribution = await _analyticsService.fetchAreaDistribution(filters: filters);
+      notifyListeners();
+    } catch (e) { debugPrint('Error: $e'); }
+  }
 
+  Future<void> fetchAmenitiesStats({Map<String, String?>? filters}) async {
+    try {
+      _amenitiesStats = await _analyticsService.fetchAmenitiesStats(filters: filters);
+      notifyListeners();
+    } catch (e) { debugPrint('Error: $e'); }
+  }
+
+  Future<void> fetchUserBehavior({int days = 30}) async {
+    try {
+      _userBehavior = await _analyticsService.fetchUserBehavior(days: days);
+      notifyListeners();
+    } catch (e) { debugPrint('Error: $e'); }
+  }
+
+  Future<void> fetchGrowthStats({int months = 6}) async {
+    try {
+      _growthStats = await _analyticsService.fetchGrowthStats(months: months);
+      notifyListeners();
+    } catch (e) { debugPrint('Error: $e'); }
+  }
   // ============ HELPER METHODS ============
 
-  /// Format giá
   String formatPrice(dynamic price) {
     return _analyticsService.formatPrice(price);
   }
 
-  /// Tính phần trăm
   double calculatePercentage(int value, int total) {
     return _analyticsService.calculatePercentage(value, total);
   }
 
-  /// Lấy giá trung bình
+  // ── Overview stats ────────────────────────────────────────
+
   double getAveragePrice() {
-    return (_overviewData['priceStats']?['avgPrice'] ?? 0.0).toDouble();
+    return _toDouble(_overviewData['priceStats']?['avgPrice']);
   }
 
-  /// Lấy giá cao nhất
   double getMaxPrice() {
-    return (_overviewData['priceStats']?['maxPrice'] ?? 0.0).toDouble();
+    return _toDouble(_overviewData['priceStats']?['maxPrice']);
   }
 
-  /// Lấy giá thấp nhất
   double getMinPrice() {
-    return (_overviewData['priceStats']?['minPrice'] ?? 0.0).toDouble();
+    return _toDouble(_overviewData['priceStats']?['minPrice']);
   }
 
-  /// Lấy diện tích trung bình
   double getAverageArea() {
-    return (_overviewData['areaStats']?['avgArea'] ?? 0.0).toDouble();
+    return _toDouble(_overviewData['areaStats']?['avgArea']);
   }
 
-  /// Lấy tổng số BĐS
   int getTotalRentals() {
-    return _overviewData['totalRentals'] ?? 0;
+    return _toInt(_overviewData['totalRentals']);
   }
 
-  /// Lấy tổng BĐS nóng nhất (top area)
+  // ── Hottest area ──────────────────────────────────────────
+
+  /// FIX: Backend aggregate trả _id = tên khu vực, KHÔNG phải 'name'
   String getHottestArea() {
-    if (_hotAreas.isEmpty) return 'N/A';
-    return _hotAreas.first['_id'] ?? 'N/A';
+    if (_hotAreas.isEmpty) return 'Chưa có dữ liệu';
+    final area = _hotAreas.first as Map<String, dynamic>;
+    // Thử _id trước (aggregate result), fallback name
+    return _toStr(area['_id'] ?? area['name'], fallback: 'Chưa có dữ liệu');
   }
 
-  /// Lấy số BĐS ở khu vực nóng nhất
+  /// FIX: Safe int cast – tránh lỗi khi MongoDB trả double
   int getHottestAreaCount() {
     if (_hotAreas.isEmpty) return 0;
-    return _hotAreas.first['count'] ?? 0;
+    final area = _hotAreas.first as Map<String, dynamic>;
+    return _toInt(area['count']);
   }
 
-  /// Lấy khu vực trending nhất
+  // ── Trending area ─────────────────────────────────────────
+
   String getTrendingArea() {
-    if (_trendingAreas.isEmpty) return 'N/A';
-    return _trendingAreas.first['_id'] ?? 'N/A';
+    if (_trendingAreas.isEmpty) return 'Chưa có dữ liệu';
+    final area = _trendingAreas.first as Map<String, dynamic>;
+    return _toStr(area['_id'] ?? area['name'], fallback: 'Chưa có dữ liệu');
   }
 
-  /// Lấy lượt xem khu vực trending nhất
   int getTrendingAreaViews() {
     if (_trendingAreas.isEmpty) return 0;
-    return _trendingAreas.first['totalViews'] ?? 0;
+    final area = _trendingAreas.first as Map<String, dynamic>;
+    return _toInt(area['totalViews']);
   }
 
-  /// Xóa lỗi
+  // ── Misc ──────────────────────────────────────────────────
+
   void clearError() {
     _errorMessage = null;
     notifyListeners();
   }
 
-  /// Reset tất cả dữ liệu
   void resetData() {
     _overviewData = {};
     _priceDistribution = [];

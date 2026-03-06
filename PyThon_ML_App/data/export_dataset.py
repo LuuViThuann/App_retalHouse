@@ -79,7 +79,7 @@ class DatasetExporter:
         
         interactions = list(self.db.userinteractions.find({
             'timestamp': {'$gte': cutoff_date}
-        }).sort('timestamp', -1).limit(10000))
+        }).sort('timestamp', -1).limit(100000))
         
         print(f"   ✅ Found {len(interactions)} interactions\n")
         

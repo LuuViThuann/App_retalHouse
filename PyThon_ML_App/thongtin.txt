@@ -1,0 +1,32 @@
+*THÔNG TIN GIẢI THÍCH TỪ MODEL - AI : 
+--------------
+
+1. "Phù hợp sở thích" (content_score) — 0-100%
+
++ Giá các bài user đã xem/yêu thích : So sánh giá bài này với avg_price, min_price, max_price của user
+
++ Loại BĐS user hay xem (Nhà riêng, Phòng trọ...) : Tỉ lệ % loại BĐS này trong lịch sử
+
++ Vị trí các bài user đã xem : Khoảng cách từ bài này đến trung tâm vị trí user
+
+--------------
+
+2. "Người dùng tương tự" (cf_score) — 0-100% 
+
+Đây là điểm Collaborative Filtering — tìm người dùng có hành vi giống user hiện tại
+
++ Toàn bộ lịch sử interactions : Ma trận user × rental với điểm tương tác
+
++ Cosine similarity giữa các user : User A và User B "giống nhau" đến mức nào
+
++ view=1, click=2, favorite=5, contact=8 : Mức độ quan tâm
+
+--------------
+
+3.  "Độ phổ biến" (popularity_score) — 0-100% -> Dành cho gợi ý chẳng hạn như các tài khoản mới 
+
+Đây là điểm Popularity-Based — không phụ thuộc vào user cụ thể
+
++ Tổng điểm tất cả interactions của bài : Bài được quan tâm nhiều cỡ nào
+
++ Số user khác nhau tương tác : Độ rộng của sự quan tâm
