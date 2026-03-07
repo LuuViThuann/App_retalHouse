@@ -1,4 +1,1104 @@
 userId,rentalId,interactionType,interactionScore,price,propertyType,location_text,area,timestamp,longitude,latitude,duration,scrollDepth,deviceType,timeOfDay,searchRadius
+anonymous,6962373e8a8ba4ca1d0b712a,view,1,1850000000,Đất nền,"Lê Hồng Phong, Bình Thủy",90,2026-03-06 19:21:25.245,105.76818,10.04183,0,0,desktop,evening,10
+anonymous,68be3ec67d034079204e4ca0,view,1,5000000,Nhà riêng,"Hẻm 3, Đường Lê Hồng Phong, Phường Bình Thủy, Quận Bình Thủy, Thành phố Cần Thơ, Việt Nam",50,2026-03-06 19:21:25.235,105.7875821,10.0364634,0,0,desktop,evening,10
+anonymous,6962373e8a8ba4ca1d0b712a,view,1,1850000000,Đất nền,"Lê Hồng Phong, Bình Thủy",90,2026-03-06 19:21:07.172,105.76818,10.04183,0,0,desktop,evening,10
+anonymous,68be3ec67d034079204e4ca0,view,1,5000000,Nhà riêng,"Hẻm 3, Đường Lê Hồng Phong, Phường Bình Thủy, Quận Bình Thủy, Thành phố Cần Thơ, Việt Nam",50,2026-03-06 19:21:07.169,105.7875821,10.0364634,0,0,desktop,evening,10
+anonymous,68be3ec67d034079204e4ca0,view,1,5000000,Nhà riêng,"Hẻm 3, Đường Lê Hồng Phong, Phường Bình Thủy, Quận Bình Thủy, Thành phố Cần Thơ, Việt Nam",50,2026-03-06 19:21:05.731,105.7875821,10.0364634,0,0,desktop,evening,10
+anonymous,6962373e8a8ba4ca1d0b712a,view,1,1850000000,Đất nền,"Lê Hồng Phong, Bình Thủy",90,2026-03-06 19:21:05.719,105.76818,10.04183,0,0,desktop,evening,10
+anonymous,68be3ec67d034079204e4ca0,view,1,5000000,Nhà riêng,"Hẻm 3, Đường Lê Hồng Phong, Phường Bình Thủy, Quận Bình Thủy, Thành phố Cần Thơ, Việt Nam",50,2026-03-06 19:20:56.382,105.7875821,10.0364634,0,0,desktop,evening,10
+anonymous,6962373e8a8ba4ca1d0b712a,view,1,1850000000,Đất nền,"Lê Hồng Phong, Bình Thủy",90,2026-03-06 19:20:56.200,105.76818,10.04183,0,0,desktop,evening,10
+anonymous,6962373e8a8ba4ca1d0b712a,view,1,1850000000,Đất nền,"Lê Hồng Phong, Bình Thủy",90,2026-03-06 19:20:28.402,105.76818,10.04183,0,0,desktop,evening,10
+anonymous,68be3ec67d034079204e4ca0,view,1,5000000,Nhà riêng,"Hẻm 3, Đường Lê Hồng Phong, Phường Bình Thủy, Quận Bình Thủy, Thành phố Cần Thơ, Việt Nam",50,2026-03-06 19:20:28.394,105.7875821,10.0364634,0,0,desktop,evening,10
+anonymous,68be3ec67d034079204e4ca0,view,1,5000000,Nhà riêng,"Hẻm 3, Đường Lê Hồng Phong, Phường Bình Thủy, Quận Bình Thủy, Thành phố Cần Thơ, Việt Nam",50,2026-03-06 19:20:27.663,105.7875821,10.0364634,0,0,desktop,evening,10
+anonymous,6962373e8a8ba4ca1d0b712a,view,1,1850000000,Đất nền,"Lê Hồng Phong, Bình Thủy",90,2026-03-06 19:20:27.358,105.76818,10.04183,0,0,desktop,evening,10
+anonymous,6962373e8a8ba4ca1d0b712a,view,1,1850000000,Đất nền,"Lê Hồng Phong, Bình Thủy",90,2026-03-06 19:20:26.711,105.76818,10.04183,0,0,desktop,evening,10
+anonymous,68be3ec67d034079204e4ca0,view,1,5000000,Nhà riêng,"Hẻm 3, Đường Lê Hồng Phong, Phường Bình Thủy, Quận Bình Thủy, Thành phố Cần Thơ, Việt Nam",50,2026-03-06 19:20:26.707,105.7875821,10.0364634,0,0,desktop,evening,10
+anonymous,6962373e8a8ba4ca1d0b712a,view,1,1850000000,Đất nền,"Lê Hồng Phong, Bình Thủy",90,2026-03-06 19:20:24.598,105.76818,10.04183,0,0,desktop,evening,10
+anonymous,68be3ec67d034079204e4ca0,view,1,5000000,Nhà riêng,"Hẻm 3, Đường Lê Hồng Phong, Phường Bình Thủy, Quận Bình Thủy, Thành phố Cần Thơ, Việt Nam",50,2026-03-06 19:20:24.590,105.7875821,10.0364634,0,0,desktop,evening,10
+anonymous,6962373e8a8ba4ca1d0b712a,view,1,1850000000,Đất nền,"Lê Hồng Phong, Bình Thủy",90,2026-03-06 19:20:23.729,105.76818,10.04183,0,0,desktop,evening,10
+anonymous,68be3ec67d034079204e4ca0,view,1,5000000,Nhà riêng,"Hẻm 3, Đường Lê Hồng Phong, Phường Bình Thủy, Quận Bình Thủy, Thành phố Cần Thơ, Việt Nam",50,2026-03-06 19:20:23.720,105.7875821,10.0364634,0,0,desktop,evening,10
+anonymous,696243377ec6d01711acca05,view,1,242000000,Căn hộ chung cư,"Lê Hồng Phong, Bình Thủy",150,2026-03-06 19:20:21.625,105.739,10.0069,0,0,desktop,evening,10
+anonymous,6962373e8a8ba4ca1d0b712a,view,1,1850000000,Đất nền,"Lê Hồng Phong, Bình Thủy",90,2026-03-06 19:20:21.617,105.76818,10.04183,0,0,desktop,evening,10
+anonymous,69623d438a8ba4ca1d0b739b,view,1,41000000,Nhà riêng,"Lê Hồng Phong, Bình Thủy",120,2026-03-06 19:20:21.609,105.769,10.04228,0,0,desktop,evening,10
+anonymous,6962373e8a8ba4ca1d0b712a,view,1,1850000000,Đất nền,"Lê Hồng Phong, Bình Thủy",90,2026-03-06 19:20:21.602,105.76818,10.04183,0,0,desktop,evening,10
+anonymous,68be3ec67d034079204e4ca0,view,1,5000000,Nhà riêng,"Hẻm 3, Đường Lê Hồng Phong, Phường Bình Thủy, Quận Bình Thủy, Thành phố Cần Thơ, Việt Nam",50,2026-03-06 19:20:21.590,105.7875821,10.0364634,0,0,desktop,evening,10
+anonymous,68be3ec67d034079204e4ca0,view,1,5000000,Nhà riêng,"Hẻm 3, Đường Lê Hồng Phong, Phường Bình Thủy, Quận Bình Thủy, Thành phố Cần Thơ, Việt Nam",50,2026-03-06 19:20:21.584,105.7875821,10.0364634,0,0,desktop,evening,10
+anonymous,69623bfb8a8ba4ca1d0b7296,view,1,2100000000,Đất nền,"Lê Hồng Phong, Bình Thủy",110,2026-03-06 19:20:21.558,105.7608,10.0412,0,0,desktop,evening,10
+anonymous,69623ac48a8ba4ca1d0b7249,view,1,1620000000,Đất nền,"Lê Hồng Phong, Bình Thủy",80,2026-03-06 19:20:21.553,105.76847,10.04198,0,0,desktop,evening,10
+anonymous,691dd98fc4291505ff617ae8,view,1,1538000000,Biệt thự,"51 Lê Hồng Phong, Bình Thủy",220,2026-03-06 19:20:21.528,105.752,10.071,0,0,desktop,evening,10
+anonymous,696e4ff40b5cb591377c16c2,view,1,18000000,Đất nền,"Võ Văn Kiệt, Long Hòa",450,2026-03-06 19:15:17.753,105.7308,10.0816,0,0,desktop,evening,10
+anonymous,6962373e8a8ba4ca1d0b712a,view,1,1850000000,Đất nền,"Lê Hồng Phong, Bình Thủy",90,2026-03-06 19:15:17.746,105.76818,10.04183,0,0,desktop,evening,10
+anonymous,691dd98fc4291505ff617ae8,view,1,1538000000,Biệt thự,"51 Lê Hồng Phong, Bình Thủy",220,2026-03-06 19:15:17.734,105.752,10.071,0,0,desktop,evening,10
+anonymous,68be41337d034079204e4d87,view,1,5000000,Nhà riêng,"168/15 Võ Văn Kiệt, Phường An Thới, Quận Bình Thủy, Thành phố Cần Thơ, Việt Nam",30,2026-03-06 19:15:17.729,105.771892,10.045217,0,0,desktop,evening,10
+anonymous,696e4ff40b5cb591377c16c2,view,1,18000000,Đất nền,"Võ Văn Kiệt, Long Hòa",450,2026-03-06 19:15:17.719,105.7308,10.0816,0,0,desktop,evening,10
+anonymous,69623bfb8a8ba4ca1d0b7296,view,1,2100000000,Đất nền,"Lê Hồng Phong, Bình Thủy",110,2026-03-06 19:15:17.713,105.7608,10.0412,0,0,desktop,evening,10
+anonymous,68be3ec67d034079204e4ca0,view,1,5000000,Nhà riêng,"Hẻm 3, Đường Lê Hồng Phong, Phường Bình Thủy, Quận Bình Thủy, Thành phố Cần Thơ, Việt Nam",50,2026-03-06 19:15:17.702,105.7875821,10.0364634,0,0,desktop,evening,10
+anonymous,69623ac48a8ba4ca1d0b7249,view,1,1620000000,Đất nền,"Lê Hồng Phong, Bình Thủy",80,2026-03-06 19:15:17.692,105.76847,10.04198,0,0,desktop,evening,10
+anonymous,69623d438a8ba4ca1d0b739b,view,1,41000000,Nhà riêng,"Lê Hồng Phong, Bình Thủy",120,2026-03-06 19:15:17.688,105.769,10.04228,0,0,desktop,evening,10
+anonymous,696e4ff40b5cb591377c16c2,view,1,18000000,Đất nền,"Võ Văn Kiệt, Long Hòa",450,2026-03-06 19:15:03.355,105.7308,10.0816,0,0,desktop,evening,10
+anonymous,691dd98fc4291505ff617ae8,view,1,1538000000,Biệt thự,"51 Lê Hồng Phong, Bình Thủy",220,2026-03-06 19:15:03.352,105.752,10.071,0,0,desktop,evening,10
+anonymous,691dd98fc4291505ff617ae8,view,1,1538000000,Biệt thự,"51 Lê Hồng Phong, Bình Thủy",220,2026-03-06 19:15:02.394,105.752,10.071,0,0,desktop,evening,10
+anonymous,696e4ff40b5cb591377c16c2,view,1,18000000,Đất nền,"Võ Văn Kiệt, Long Hòa",450,2026-03-06 19:15:02.391,105.7308,10.0816,0,0,desktop,evening,10
+anonymous,691dd98fc4291505ff617ae8,view,1,1538000000,Biệt thự,"51 Lê Hồng Phong, Bình Thủy",220,2026-03-06 19:14:59.177,105.752,10.071,0,0,desktop,evening,10
+anonymous,696e4ff40b5cb591377c16c2,view,1,18000000,Đất nền,"Võ Văn Kiệt, Long Hòa",450,2026-03-06 19:14:59.172,105.7308,10.0816,0,0,desktop,evening,10
+anonymous,691dd98fc4291505ff617ae8,view,1,1538000000,Biệt thự,"51 Lê Hồng Phong, Bình Thủy",220,2026-03-06 19:14:59.048,105.752,10.071,0,0,desktop,evening,10
+anonymous,696e4ff40b5cb591377c16c2,view,1,18000000,Đất nền,"Võ Văn Kiệt, Long Hòa",450,2026-03-06 19:14:59.044,105.7308,10.0816,0,0,desktop,evening,10
+anonymous,6962373e8a8ba4ca1d0b712a,view,1,1850000000,Đất nền,"Lê Hồng Phong, Bình Thủy",90,2026-03-06 19:14:58.322,105.76818,10.04183,0,0,desktop,evening,10
+anonymous,69623bfb8a8ba4ca1d0b7296,view,1,2100000000,Đất nền,"Lê Hồng Phong, Bình Thủy",110,2026-03-06 19:14:58.313,105.7608,10.0412,0,0,desktop,evening,10
+anonymous,696e4ff40b5cb591377c16c2,view,1,18000000,Đất nền,"Võ Văn Kiệt, Long Hòa",450,2026-03-06 19:14:58.307,105.7308,10.0816,0,0,desktop,evening,10
+anonymous,68be41337d034079204e4d87,view,1,5000000,Nhà riêng,"168/15 Võ Văn Kiệt, Phường An Thới, Quận Bình Thủy, Thành phố Cần Thơ, Việt Nam",30,2026-03-06 19:14:58.296,105.771892,10.045217,0,0,desktop,evening,10
+anonymous,696e4ff40b5cb591377c16c2,view,1,18000000,Đất nền,"Võ Văn Kiệt, Long Hòa",450,2026-03-06 19:14:58.286,105.7308,10.0816,0,0,desktop,evening,10
+anonymous,69623d438a8ba4ca1d0b739b,view,1,41000000,Nhà riêng,"Lê Hồng Phong, Bình Thủy",120,2026-03-06 19:14:58.282,105.769,10.04228,0,0,desktop,evening,10
+anonymous,68be3ec67d034079204e4ca0,view,1,5000000,Nhà riêng,"Hẻm 3, Đường Lê Hồng Phong, Phường Bình Thủy, Quận Bình Thủy, Thành phố Cần Thơ, Việt Nam",50,2026-03-06 19:14:58.196,105.7875821,10.0364634,0,0,desktop,evening,10
+anonymous,69623ac48a8ba4ca1d0b7249,view,1,1620000000,Đất nền,"Lê Hồng Phong, Bình Thủy",80,2026-03-06 19:14:58.174,105.76847,10.04198,0,0,desktop,evening,10
+anonymous,691dd98fc4291505ff617ae8,view,1,1538000000,Biệt thự,"51 Lê Hồng Phong, Bình Thủy",220,2026-03-06 19:14:57.743,105.752,10.071,0,0,desktop,evening,10
+anonymous,69623d438a8ba4ca1d0b739b,view,1,41000000,Nhà riêng,"Lê Hồng Phong, Bình Thủy",120,2026-03-06 19:14:57.585,105.769,10.04228,0,0,desktop,evening,10
+anonymous,6962373e8a8ba4ca1d0b712a,view,1,1850000000,Đất nền,"Lê Hồng Phong, Bình Thủy",90,2026-03-06 19:14:57.554,105.76818,10.04183,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 19:14:57.542,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,68be3ec67d034079204e4ca0,view,1,5000000,Nhà riêng,"Hẻm 3, Đường Lê Hồng Phong, Phường Bình Thủy, Quận Bình Thủy, Thành phố Cần Thơ, Việt Nam",50,2026-03-06 19:14:57.491,105.7875821,10.0364634,0,0,desktop,evening,10
+anonymous,69623d438a8ba4ca1d0b739b,view,1,41000000,Nhà riêng,"Lê Hồng Phong, Bình Thủy",120,2026-03-06 19:14:57.462,105.769,10.04228,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 19:14:57.437,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,69623d438a8ba4ca1d0b739b,view,1,41000000,Nhà riêng,"Lê Hồng Phong, Bình Thủy",120,2026-03-06 19:14:57.423,105.769,10.04228,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 19:14:57.416,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 19:14:57.409,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,69623d438a8ba4ca1d0b739b,view,1,41000000,Nhà riêng,"Lê Hồng Phong, Bình Thủy",120,2026-03-06 19:14:46.106,105.769,10.04228,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 19:14:46.097,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 19:14:24.811,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,69623d438a8ba4ca1d0b739b,view,1,41000000,Nhà riêng,"Lê Hồng Phong, Bình Thủy",120,2026-03-06 19:14:24.704,105.769,10.04228,0,0,desktop,evening,10
+anonymous,69623d438a8ba4ca1d0b739b,view,1,41000000,Nhà riêng,"Lê Hồng Phong, Bình Thủy",120,2026-03-06 19:13:55.852,105.769,10.04228,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 19:13:55.837,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 19:13:54.777,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,69623d438a8ba4ca1d0b739b,view,1,41000000,Nhà riêng,"Lê Hồng Phong, Bình Thủy",120,2026-03-06 19:13:54.746,105.769,10.04228,0,0,desktop,evening,10
+anonymous,69623d438a8ba4ca1d0b739b,view,1,41000000,Nhà riêng,"Lê Hồng Phong, Bình Thủy",120,2026-03-06 19:13:48.754,105.769,10.04228,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 19:13:48.750,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 19:13:47.714,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,69623d438a8ba4ca1d0b739b,view,1,41000000,Nhà riêng,"Lê Hồng Phong, Bình Thủy",120,2026-03-06 19:13:47.706,105.769,10.04228,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 19:13:44.634,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 19:13:41.791,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,69623d438a8ba4ca1d0b739b,view,1,41000000,Nhà riêng,"Lê Hồng Phong, Bình Thủy",120,2026-03-06 19:13:41.786,105.769,10.04228,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 19:13:40.841,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,69623d438a8ba4ca1d0b739b,view,1,41000000,Nhà riêng,"Lê Hồng Phong, Bình Thủy",120,2026-03-06 19:13:40.806,105.769,10.04228,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 19:13:36.732,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,69623d438a8ba4ca1d0b739b,view,1,41000000,Nhà riêng,"Lê Hồng Phong, Bình Thủy",120,2026-03-06 19:13:36.724,105.769,10.04228,0,0,desktop,evening,10
+anonymous,69623d438a8ba4ca1d0b739b,view,1,41000000,Nhà riêng,"Lê Hồng Phong, Bình Thủy",120,2026-03-06 19:13:24.970,105.769,10.04228,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 19:12:45.473,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,69623d438a8ba4ca1d0b739b,view,1,41000000,Nhà riêng,"Lê Hồng Phong, Bình Thủy",120,2026-03-06 19:12:45.359,105.769,10.04228,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 19:12:31.577,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,69623d438a8ba4ca1d0b739b,view,1,41000000,Nhà riêng,"Lê Hồng Phong, Bình Thủy",120,2026-03-06 19:12:31.573,105.769,10.04228,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 19:12:29.813,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,69623d438a8ba4ca1d0b739b,view,1,41000000,Nhà riêng,"Lê Hồng Phong, Bình Thủy",120,2026-03-06 19:12:29.807,105.769,10.04228,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 19:12:29.204,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,69623d438a8ba4ca1d0b739b,view,1,41000000,Nhà riêng,"Lê Hồng Phong, Bình Thủy",120,2026-03-06 19:12:29.200,105.769,10.04228,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 19:12:28.445,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,69623d438a8ba4ca1d0b739b,view,1,41000000,Nhà riêng,"Lê Hồng Phong, Bình Thủy",120,2026-03-06 19:12:28.365,105.769,10.04228,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 19:12:26.079,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,69623d438a8ba4ca1d0b739b,view,1,41000000,Nhà riêng,"Lê Hồng Phong, Bình Thủy",120,2026-03-06 19:12:26.074,105.769,10.04228,0,0,desktop,evening,10
+anonymous,68be3ec67d034079204e4ca0,view,1,5000000,Nhà riêng,"Hẻm 3, Đường Lê Hồng Phong, Phường Bình Thủy, Quận Bình Thủy, Thành phố Cần Thơ, Việt Nam",50,2026-03-06 19:12:26.057,105.7875821,10.0364634,0,0,desktop,evening,10
+anonymous,6962373e8a8ba4ca1d0b712a,view,1,1850000000,Đất nền,"Lê Hồng Phong, Bình Thủy",90,2026-03-06 19:12:26.043,105.76818,10.04183,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 19:12:26.006,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 19:12:25.994,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,69623d438a8ba4ca1d0b739b,view,1,41000000,Nhà riêng,"Lê Hồng Phong, Bình Thủy",120,2026-03-06 19:12:25.981,105.769,10.04228,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 19:04:58.824,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,69623d438a8ba4ca1d0b739b,view,1,41000000,Nhà riêng,"Lê Hồng Phong, Bình Thủy",120,2026-03-06 19:04:38.948,105.769,10.04228,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 19:02:21.939,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,69623d438a8ba4ca1d0b739b,view,1,41000000,Nhà riêng,"Lê Hồng Phong, Bình Thủy",120,2026-03-06 19:02:21.924,105.769,10.04228,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 19:01:46.303,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,69623d438a8ba4ca1d0b739b,view,1,41000000,Nhà riêng,"Lê Hồng Phong, Bình Thủy",120,2026-03-06 19:01:46.299,105.769,10.04228,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 19:01:45.419,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,69623d438a8ba4ca1d0b739b,view,1,41000000,Nhà riêng,"Lê Hồng Phong, Bình Thủy",120,2026-03-06 19:01:45.409,105.769,10.04228,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 19:01:43.045,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,69623d438a8ba4ca1d0b739b,view,1,41000000,Nhà riêng,"Lê Hồng Phong, Bình Thủy",120,2026-03-06 19:01:43.034,105.769,10.04228,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 19:01:42.536,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,69623d438a8ba4ca1d0b739b,view,1,41000000,Nhà riêng,"Lê Hồng Phong, Bình Thủy",120,2026-03-06 19:01:42.533,105.769,10.04228,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 19:01:42.285,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,69623d438a8ba4ca1d0b739b,view,1,41000000,Nhà riêng,"Lê Hồng Phong, Bình Thủy",120,2026-03-06 19:01:42.282,105.769,10.04228,0,0,desktop,evening,10
+anonymous,6962373e8a8ba4ca1d0b712a,view,1,1850000000,Đất nền,"Lê Hồng Phong, Bình Thủy",90,2026-03-06 19:01:41.269,105.76818,10.04183,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 19:01:41.257,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,68be3ec67d034079204e4ca0,view,1,5000000,Nhà riêng,"Hẻm 3, Đường Lê Hồng Phong, Phường Bình Thủy, Quận Bình Thủy, Thành phố Cần Thơ, Việt Nam",50,2026-03-06 19:01:41.254,105.7875821,10.0364634,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 19:01:41.249,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,69623d438a8ba4ca1d0b739b,view,1,41000000,Nhà riêng,"Lê Hồng Phong, Bình Thủy",120,2026-03-06 19:01:41.241,105.769,10.04228,0,0,desktop,evening,10
+anonymous,69623d438a8ba4ca1d0b739b,view,1,41000000,Nhà riêng,"Lê Hồng Phong, Bình Thủy",120,2026-03-06 19:01:41.238,105.769,10.04228,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 19:01:41.223,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,6962373e8a8ba4ca1d0b712a,view,1,1850000000,Đất nền,"Lê Hồng Phong, Bình Thủy",90,2026-03-06 19:01:41.158,105.76818,10.04183,0,0,desktop,evening,10
+anonymous,69623d438a8ba4ca1d0b739b,view,1,41000000,Nhà riêng,"Lê Hồng Phong, Bình Thủy",120,2026-03-06 19:01:41.155,105.769,10.04228,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 19:01:41.145,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,68be3ec67d034079204e4ca0,view,1,5000000,Nhà riêng,"Hẻm 3, Đường Lê Hồng Phong, Phường Bình Thủy, Quận Bình Thủy, Thành phố Cần Thơ, Việt Nam",50,2026-03-06 19:01:41.141,105.7875821,10.0364634,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 19:01:41.134,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 19:01:40.990,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,69623d438a8ba4ca1d0b739b,view,1,41000000,Nhà riêng,"Lê Hồng Phong, Bình Thủy",120,2026-03-06 19:01:40.980,105.769,10.04228,0,0,desktop,evening,10
+anonymous,69623d438a8ba4ca1d0b739b,view,1,41000000,Nhà riêng,"Lê Hồng Phong, Bình Thủy",120,2026-03-06 19:01:18.286,105.769,10.04228,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 19:01:18.283,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 19:01:17.997,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,69623d438a8ba4ca1d0b739b,view,1,41000000,Nhà riêng,"Lê Hồng Phong, Bình Thủy",120,2026-03-06 19:01:17.994,105.769,10.04228,0,0,desktop,evening,10
+anonymous,6962373e8a8ba4ca1d0b712a,view,1,1850000000,Đất nền,"Lê Hồng Phong, Bình Thủy",90,2026-03-06 19:01:17.989,105.76818,10.04183,0,0,desktop,evening,10
+anonymous,68be3ec67d034079204e4ca0,view,1,5000000,Nhà riêng,"Hẻm 3, Đường Lê Hồng Phong, Phường Bình Thủy, Quận Bình Thủy, Thành phố Cần Thơ, Việt Nam",50,2026-03-06 19:01:17.985,105.7875821,10.0364634,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 19:01:17.977,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 19:01:17.968,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,69623d438a8ba4ca1d0b739b,view,1,41000000,Nhà riêng,"Lê Hồng Phong, Bình Thủy",120,2026-03-06 19:01:17.922,105.769,10.04228,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 19:01:13.288,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,69623d438a8ba4ca1d0b739b,view,1,41000000,Nhà riêng,"Lê Hồng Phong, Bình Thủy",120,2026-03-06 19:01:13.285,105.769,10.04228,0,0,desktop,evening,10
+anonymous,69623d438a8ba4ca1d0b739b,view,1,41000000,Nhà riêng,"Lê Hồng Phong, Bình Thủy",120,2026-03-06 19:01:06.174,105.769,10.04228,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 19:01:06.170,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,69623d438a8ba4ca1d0b739b,view,1,41000000,Nhà riêng,"Lê Hồng Phong, Bình Thủy",120,2026-03-06 19:00:56.020,105.769,10.04228,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 19:00:56.018,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,69623d438a8ba4ca1d0b739b,view,1,41000000,Nhà riêng,"Lê Hồng Phong, Bình Thủy",120,2026-03-06 19:00:54.903,105.769,10.04228,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 19:00:54.899,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 19:00:53.220,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,69623d438a8ba4ca1d0b739b,view,1,41000000,Nhà riêng,"Lê Hồng Phong, Bình Thủy",120,2026-03-06 19:00:53.216,105.769,10.04228,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 19:00:52.952,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,69623d438a8ba4ca1d0b739b,view,1,41000000,Nhà riêng,"Lê Hồng Phong, Bình Thủy",120,2026-03-06 19:00:52.950,105.769,10.04228,0,0,desktop,evening,10
+anonymous,68be3ec67d034079204e4ca0,view,1,5000000,Nhà riêng,"Hẻm 3, Đường Lê Hồng Phong, Phường Bình Thủy, Quận Bình Thủy, Thành phố Cần Thơ, Việt Nam",50,2026-03-06 19:00:50.817,105.7875821,10.0364634,0,0,desktop,evening,10
+anonymous,69623d438a8ba4ca1d0b739b,view,1,41000000,Nhà riêng,"Lê Hồng Phong, Bình Thủy",120,2026-03-06 19:00:50.810,105.769,10.04228,0,0,desktop,evening,10
+anonymous,6962373e8a8ba4ca1d0b712a,view,1,1850000000,Đất nền,"Lê Hồng Phong, Bình Thủy",90,2026-03-06 19:00:50.806,105.76818,10.04183,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 19:00:50.793,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 19:00:50.789,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 19:00:50.779,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,69623d438a8ba4ca1d0b739b,view,1,41000000,Nhà riêng,"Lê Hồng Phong, Bình Thủy",120,2026-03-06 19:00:50.775,105.769,10.04228,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 19:00:50.318,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,69623d438a8ba4ca1d0b739b,view,1,41000000,Nhà riêng,"Lê Hồng Phong, Bình Thủy",120,2026-03-06 19:00:50.315,105.769,10.04228,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 19:00:49.817,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,69623d438a8ba4ca1d0b739b,view,1,41000000,Nhà riêng,"Lê Hồng Phong, Bình Thủy",120,2026-03-06 19:00:49.810,105.769,10.04228,0,0,desktop,evening,10
+anonymous,6962373e8a8ba4ca1d0b712a,view,1,1850000000,Đất nền,"Lê Hồng Phong, Bình Thủy",90,2026-03-06 19:00:49.806,105.76818,10.04183,0,0,desktop,evening,10
+anonymous,68be3ec67d034079204e4ca0,view,1,5000000,Nhà riêng,"Hẻm 3, Đường Lê Hồng Phong, Phường Bình Thủy, Quận Bình Thủy, Thành phố Cần Thơ, Việt Nam",50,2026-03-06 19:00:49.800,105.7875821,10.0364634,0,0,desktop,evening,10
+anonymous,69623d438a8ba4ca1d0b739b,view,1,41000000,Nhà riêng,"Lê Hồng Phong, Bình Thủy",120,2026-03-06 19:00:49.783,105.769,10.04228,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 19:00:49.777,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 19:00:49.761,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 19:00:49.757,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,69623d438a8ba4ca1d0b739b,view,1,41000000,Nhà riêng,"Lê Hồng Phong, Bình Thủy",120,2026-03-06 19:00:49.743,105.769,10.04228,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 19:00:14.676,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,69623d438a8ba4ca1d0b739b,view,1,41000000,Nhà riêng,"Lê Hồng Phong, Bình Thủy",120,2026-03-06 19:00:14.603,105.769,10.04228,0,0,desktop,evening,10
+anonymous,6962373e8a8ba4ca1d0b712a,view,1,1850000000,Đất nền,"Lê Hồng Phong, Bình Thủy",90,2026-03-06 18:59:59.762,105.76818,10.04183,0,0,desktop,evening,10
+anonymous,69623d438a8ba4ca1d0b739b,view,1,41000000,Nhà riêng,"Lê Hồng Phong, Bình Thủy",120,2026-03-06 18:59:59.752,105.769,10.04228,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:59:59.748,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:59:59.741,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,68be3ec67d034079204e4ca0,view,1,5000000,Nhà riêng,"Hẻm 3, Đường Lê Hồng Phong, Phường Bình Thủy, Quận Bình Thủy, Thành phố Cần Thơ, Việt Nam",50,2026-03-06 18:59:59.736,105.7875821,10.0364634,0,0,desktop,evening,10
+anonymous,69623d438a8ba4ca1d0b739b,view,1,41000000,Nhà riêng,"Lê Hồng Phong, Bình Thủy",120,2026-03-06 18:59:59.720,105.769,10.04228,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:59:59.713,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:59:28.476,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,69623d438a8ba4ca1d0b739b,view,1,41000000,Nhà riêng,"Lê Hồng Phong, Bình Thủy",120,2026-03-06 18:59:28.471,105.769,10.04228,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:59:27.280,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,69623d438a8ba4ca1d0b739b,view,1,41000000,Nhà riêng,"Lê Hồng Phong, Bình Thủy",120,2026-03-06 18:59:27.277,105.769,10.04228,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:59:24.885,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,69623d438a8ba4ca1d0b739b,view,1,41000000,Nhà riêng,"Lê Hồng Phong, Bình Thủy",120,2026-03-06 18:59:24.880,105.769,10.04228,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:59:24.169,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,69623d438a8ba4ca1d0b739b,view,1,41000000,Nhà riêng,"Lê Hồng Phong, Bình Thủy",120,2026-03-06 18:59:24.165,105.769,10.04228,0,0,desktop,evening,10
+anonymous,69623d438a8ba4ca1d0b739b,view,1,41000000,Nhà riêng,"Lê Hồng Phong, Bình Thủy",120,2026-03-06 18:59:22.222,105.769,10.04228,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:59:22.215,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,6962373e8a8ba4ca1d0b712a,view,1,1850000000,Đất nền,"Lê Hồng Phong, Bình Thủy",90,2026-03-06 18:59:22.208,105.76818,10.04183,0,0,desktop,evening,10
+anonymous,68be3ec67d034079204e4ca0,view,1,5000000,Nhà riêng,"Hẻm 3, Đường Lê Hồng Phong, Phường Bình Thủy, Quận Bình Thủy, Thành phố Cần Thơ, Việt Nam",50,2026-03-06 18:59:22.201,105.7875821,10.0364634,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:59:22.195,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:59:22.187,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,69623d438a8ba4ca1d0b739b,view,1,41000000,Nhà riêng,"Lê Hồng Phong, Bình Thủy",120,2026-03-06 18:59:22.152,105.769,10.04228,0,0,desktop,evening,10
+anonymous,691dd98fc4291505ff617ae8,view,1,1538000000,Biệt thự,"51 Lê Hồng Phong, Bình Thủy",220,2026-03-06 18:59:21.758,105.752,10.071,0,0,desktop,evening,10
+anonymous,69623bfb8a8ba4ca1d0b7296,view,1,2100000000,Đất nền,"Lê Hồng Phong, Bình Thủy",110,2026-03-06 18:59:21.754,105.7608,10.0412,0,0,desktop,evening,10
+anonymous,69623bfb8a8ba4ca1d0b7296,view,1,2100000000,Đất nền,"Lê Hồng Phong, Bình Thủy",110,2026-03-06 18:59:21.139,105.7608,10.0412,0,0,desktop,evening,10
+anonymous,691dd98fc4291505ff617ae8,view,1,1538000000,Biệt thự,"51 Lê Hồng Phong, Bình Thủy",220,2026-03-06 18:59:21.131,105.752,10.071,0,0,desktop,evening,10
+anonymous,68be3ec67d034079204e4ca0,view,1,5000000,Nhà riêng,"Hẻm 3, Đường Lê Hồng Phong, Phường Bình Thủy, Quận Bình Thủy, Thành phố Cần Thơ, Việt Nam",50,2026-03-06 18:59:21.125,105.7875821,10.0364634,0,0,desktop,evening,10
+anonymous,69623bfb8a8ba4ca1d0b7296,view,1,2100000000,Đất nền,"Lê Hồng Phong, Bình Thủy",110,2026-03-06 18:59:21.112,105.7608,10.0412,0,0,desktop,evening,10
+anonymous,691dd98fc4291505ff617ae8,view,1,1538000000,Biệt thự,"51 Lê Hồng Phong, Bình Thủy",220,2026-03-06 18:59:21.108,105.752,10.071,0,0,desktop,evening,10
+anonymous,69623bfb8a8ba4ca1d0b7296,view,1,2100000000,Đất nền,"Lê Hồng Phong, Bình Thủy",110,2026-03-06 18:59:21.096,105.7608,10.0412,0,0,desktop,evening,10
+anonymous,691dd98fc4291505ff617ae8,view,1,1538000000,Biệt thự,"51 Lê Hồng Phong, Bình Thủy",220,2026-03-06 18:59:21.091,105.752,10.071,0,0,desktop,evening,10
+anonymous,691dd98fc4291505ff617ae8,view,1,1538000000,Biệt thự,"51 Lê Hồng Phong, Bình Thủy",220,2026-03-06 18:51:18.415,105.752,10.071,0,0,desktop,evening,10
+anonymous,69623bfb8a8ba4ca1d0b7296,view,1,2100000000,Đất nền,"Lê Hồng Phong, Bình Thủy",110,2026-03-06 18:51:18.406,105.7608,10.0412,0,0,desktop,evening,10
+anonymous,69623bfb8a8ba4ca1d0b7296,view,1,2100000000,Đất nền,"Lê Hồng Phong, Bình Thủy",110,2026-03-06 18:50:23.496,105.7608,10.0412,0,0,desktop,evening,10
+anonymous,691dd98fc4291505ff617ae8,view,1,1538000000,Biệt thự,"51 Lê Hồng Phong, Bình Thủy",220,2026-03-06 18:50:23.493,105.752,10.071,0,0,desktop,evening,10
+anonymous,69623bfb8a8ba4ca1d0b7296,view,1,2100000000,Đất nền,"Lê Hồng Phong, Bình Thủy",110,2026-03-06 18:50:23.030,105.7608,10.0412,0,0,desktop,evening,10
+anonymous,691dd98fc4291505ff617ae8,view,1,1538000000,Biệt thự,"51 Lê Hồng Phong, Bình Thủy",220,2026-03-06 18:50:23.026,105.752,10.071,0,0,desktop,evening,10
+anonymous,69623bfb8a8ba4ca1d0b7296,view,1,2100000000,Đất nền,"Lê Hồng Phong, Bình Thủy",110,2026-03-06 18:50:22.362,105.7608,10.0412,0,0,desktop,evening,10
+anonymous,691dd98fc4291505ff617ae8,view,1,1538000000,Biệt thự,"51 Lê Hồng Phong, Bình Thủy",220,2026-03-06 18:50:22.358,105.752,10.071,0,0,desktop,evening,10
+anonymous,691dd98fc4291505ff617ae8,view,1,1538000000,Biệt thự,"51 Lê Hồng Phong, Bình Thủy",220,2026-03-06 18:50:20.917,105.752,10.071,0,0,desktop,evening,10
+anonymous,69623bfb8a8ba4ca1d0b7296,view,1,2100000000,Đất nền,"Lê Hồng Phong, Bình Thủy",110,2026-03-06 18:50:20.910,105.7608,10.0412,0,0,desktop,evening,10
+anonymous,69623bfb8a8ba4ca1d0b7296,view,1,2100000000,Đất nền,"Lê Hồng Phong, Bình Thủy",110,2026-03-06 18:50:20.430,105.7608,10.0412,0,0,desktop,evening,10
+anonymous,691dd98fc4291505ff617ae8,view,1,1538000000,Biệt thự,"51 Lê Hồng Phong, Bình Thủy",220,2026-03-06 18:50:20.426,105.752,10.071,0,0,desktop,evening,10
+anonymous,68be3ec67d034079204e4ca0,view,1,5000000,Nhà riêng,"Hẻm 3, Đường Lê Hồng Phong, Phường Bình Thủy, Quận Bình Thủy, Thành phố Cần Thơ, Việt Nam",50,2026-03-06 18:50:19.480,105.7875821,10.0364634,0,0,desktop,evening,10
+anonymous,69623bfb8a8ba4ca1d0b7296,view,1,2100000000,Đất nền,"Lê Hồng Phong, Bình Thủy",110,2026-03-06 18:50:19.472,105.7608,10.0412,0,0,desktop,evening,10
+anonymous,691dd98fc4291505ff617ae8,view,1,1538000000,Biệt thự,"51 Lê Hồng Phong, Bình Thủy",220,2026-03-06 18:50:19.450,105.752,10.071,0,0,desktop,evening,10
+anonymous,691dd98fc4291505ff617ae8,view,1,1538000000,Biệt thự,"51 Lê Hồng Phong, Bình Thủy",220,2026-03-06 18:50:19.447,105.752,10.071,0,0,desktop,evening,10
+anonymous,69623bfb8a8ba4ca1d0b7296,view,1,2100000000,Đất nền,"Lê Hồng Phong, Bình Thủy",110,2026-03-06 18:50:19.414,105.7608,10.0412,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:50:18.997,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,69623d438a8ba4ca1d0b739b,view,1,41000000,Nhà riêng,"Lê Hồng Phong, Bình Thủy",120,2026-03-06 18:50:18.986,105.769,10.04228,0,0,desktop,evening,10
+anonymous,6962373e8a8ba4ca1d0b712a,view,1,1850000000,Đất nền,"Lê Hồng Phong, Bình Thủy",90,2026-03-06 18:50:18.482,105.76818,10.04183,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:50:18.473,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,69623d438a8ba4ca1d0b739b,view,1,41000000,Nhà riêng,"Lê Hồng Phong, Bình Thủy",120,2026-03-06 18:50:18.468,105.769,10.04228,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:50:18.458,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,68be3ec67d034079204e4ca0,view,1,5000000,Nhà riêng,"Hẻm 3, Đường Lê Hồng Phong, Phường Bình Thủy, Quận Bình Thủy, Thành phố Cần Thơ, Việt Nam",50,2026-03-06 18:50:18.443,105.7875821,10.0364634,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:50:18.376,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,69623d438a8ba4ca1d0b739b,view,1,41000000,Nhà riêng,"Lê Hồng Phong, Bình Thủy",120,2026-03-06 18:50:18.368,105.769,10.04228,0,0,desktop,evening,10
+anonymous,69623d438a8ba4ca1d0b739b,view,1,41000000,Nhà riêng,"Lê Hồng Phong, Bình Thủy",120,2026-03-06 18:50:04.968,105.769,10.04228,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:50:04.965,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,69623d438a8ba4ca1d0b739b,view,1,41000000,Nhà riêng,"Lê Hồng Phong, Bình Thủy",120,2026-03-06 18:47:52.852,105.769,10.04228,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:47:52.849,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:47:51.935,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,69623d438a8ba4ca1d0b739b,view,1,41000000,Nhà riêng,"Lê Hồng Phong, Bình Thủy",120,2026-03-06 18:47:51.931,105.769,10.04228,0,0,desktop,evening,10
+anonymous,69623d438a8ba4ca1d0b739b,view,1,41000000,Nhà riêng,"Lê Hồng Phong, Bình Thủy",120,2026-03-06 18:47:49.768,105.769,10.04228,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:47:49.765,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:47:49.337,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,69623d438a8ba4ca1d0b739b,view,1,41000000,Nhà riêng,"Lê Hồng Phong, Bình Thủy",120,2026-03-06 18:47:49.332,105.769,10.04228,0,0,desktop,evening,10
+anonymous,68be3ec67d034079204e4ca0,view,1,5000000,Nhà riêng,"Hẻm 3, Đường Lê Hồng Phong, Phường Bình Thủy, Quận Bình Thủy, Thành phố Cần Thơ, Việt Nam",50,2026-03-06 18:47:47.978,105.7875821,10.0364634,0,0,desktop,evening,10
+anonymous,6962373e8a8ba4ca1d0b712a,view,1,1850000000,Đất nền,"Lê Hồng Phong, Bình Thủy",90,2026-03-06 18:47:47.975,105.76818,10.04183,0,0,desktop,evening,10
+anonymous,69623d438a8ba4ca1d0b739b,view,1,41000000,Nhà riêng,"Lê Hồng Phong, Bình Thủy",120,2026-03-06 18:47:47.970,105.769,10.04228,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:47:47.955,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:47:47.946,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:47:47.943,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,69623d438a8ba4ca1d0b739b,view,1,41000000,Nhà riêng,"Lê Hồng Phong, Bình Thủy",120,2026-03-06 18:47:47.934,105.769,10.04228,0,0,desktop,evening,10
+anonymous,69623d438a8ba4ca1d0b739b,view,1,41000000,Nhà riêng,"Lê Hồng Phong, Bình Thủy",120,2026-03-06 18:47:47.247,105.769,10.04228,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:47:47.241,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:47:46.982,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,69623d438a8ba4ca1d0b739b,view,1,41000000,Nhà riêng,"Lê Hồng Phong, Bình Thủy",120,2026-03-06 18:47:46.976,105.769,10.04228,0,0,desktop,evening,10
+anonymous,6962373e8a8ba4ca1d0b712a,view,1,1850000000,Đất nền,"Lê Hồng Phong, Bình Thủy",90,2026-03-06 18:47:46.961,105.76818,10.04183,0,0,desktop,evening,10
+anonymous,69623d438a8ba4ca1d0b739b,view,1,41000000,Nhà riêng,"Lê Hồng Phong, Bình Thủy",120,2026-03-06 18:47:46.946,105.769,10.04228,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:47:46.938,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,68be3ec67d034079204e4ca0,view,1,5000000,Nhà riêng,"Hẻm 3, Đường Lê Hồng Phong, Phường Bình Thủy, Quận Bình Thủy, Thành phố Cần Thơ, Việt Nam",50,2026-03-06 18:47:46.927,105.7875821,10.0364634,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:47:46.910,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:47:46.889,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,69623d438a8ba4ca1d0b739b,view,1,41000000,Nhà riêng,"Lê Hồng Phong, Bình Thủy",120,2026-03-06 18:47:46.835,105.769,10.04228,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:47:32.809,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,69623d438a8ba4ca1d0b739b,view,1,41000000,Nhà riêng,"Lê Hồng Phong, Bình Thủy",120,2026-03-06 18:47:32.804,105.769,10.04228,0,0,desktop,evening,10
+anonymous,69623d438a8ba4ca1d0b739b,view,1,41000000,Nhà riêng,"Lê Hồng Phong, Bình Thủy",120,2026-03-06 18:47:28.597,105.769,10.04228,0,0,desktop,evening,10
+anonymous,69623d438a8ba4ca1d0b739b,view,1,41000000,Nhà riêng,"Lê Hồng Phong, Bình Thủy",120,2026-03-06 18:47:28.594,105.769,10.04228,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:47:28.584,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:47:28.521,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:47:28.517,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,6962373e8a8ba4ca1d0b712a,view,1,1850000000,Đất nền,"Lê Hồng Phong, Bình Thủy",90,2026-03-06 18:47:28.513,105.76818,10.04183,0,0,desktop,evening,10
+anonymous,68be3ec67d034079204e4ca0,view,1,5000000,Nhà riêng,"Hẻm 3, Đường Lê Hồng Phong, Phường Bình Thủy, Quận Bình Thủy, Thành phố Cần Thơ, Việt Nam",50,2026-03-06 18:47:28.502,105.7875821,10.0364634,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:46:46.930,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,69623d438a8ba4ca1d0b739b,view,1,41000000,Nhà riêng,"Lê Hồng Phong, Bình Thủy",120,2026-03-06 18:46:46.926,105.769,10.04228,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:46:31.215,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,69623d438a8ba4ca1d0b739b,view,1,41000000,Nhà riêng,"Lê Hồng Phong, Bình Thủy",120,2026-03-06 18:46:31.212,105.769,10.04228,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:46:30.120,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,69623d438a8ba4ca1d0b739b,view,1,41000000,Nhà riêng,"Lê Hồng Phong, Bình Thủy",120,2026-03-06 18:46:30.048,105.769,10.04228,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:46:26.791,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,69623d438a8ba4ca1d0b739b,view,1,41000000,Nhà riêng,"Lê Hồng Phong, Bình Thủy",120,2026-03-06 18:46:26.788,105.769,10.04228,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:46:26.554,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,69623d438a8ba4ca1d0b739b,view,1,41000000,Nhà riêng,"Lê Hồng Phong, Bình Thủy",120,2026-03-06 18:46:26.551,105.769,10.04228,0,0,desktop,evening,10
+anonymous,68be3ec67d034079204e4ca0,view,1,5000000,Nhà riêng,"Hẻm 3, Đường Lê Hồng Phong, Phường Bình Thủy, Quận Bình Thủy, Thành phố Cần Thơ, Việt Nam",50,2026-03-06 18:46:24.792,105.7875821,10.0364634,0,0,desktop,evening,10
+anonymous,69623d438a8ba4ca1d0b739b,view,1,41000000,Nhà riêng,"Lê Hồng Phong, Bình Thủy",120,2026-03-06 18:46:24.788,105.769,10.04228,0,0,desktop,evening,10
+anonymous,6962373e8a8ba4ca1d0b712a,view,1,1850000000,Đất nền,"Lê Hồng Phong, Bình Thủy",90,2026-03-06 18:46:24.781,105.76818,10.04183,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:46:24.772,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:46:24.763,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,69623d438a8ba4ca1d0b739b,view,1,41000000,Nhà riêng,"Lê Hồng Phong, Bình Thủy",120,2026-03-06 18:46:24.747,105.769,10.04228,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:46:24.742,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:46:23.865,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,69623d438a8ba4ca1d0b739b,view,1,41000000,Nhà riêng,"Lê Hồng Phong, Bình Thủy",120,2026-03-06 18:46:23.860,105.769,10.04228,0,0,desktop,evening,10
+anonymous,69623d438a8ba4ca1d0b739b,view,1,41000000,Nhà riêng,"Lê Hồng Phong, Bình Thủy",120,2026-03-06 18:46:23.522,105.769,10.04228,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:46:23.518,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,69623d438a8ba4ca1d0b739b,view,1,41000000,Nhà riêng,"Lê Hồng Phong, Bình Thủy",120,2026-03-06 18:46:23.369,105.769,10.04228,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:46:23.365,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:46:23.359,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,68be3ec67d034079204e4ca0,view,1,5000000,Nhà riêng,"Hẻm 3, Đường Lê Hồng Phong, Phường Bình Thủy, Quận Bình Thủy, Thành phố Cần Thơ, Việt Nam",50,2026-03-06 18:46:23.354,105.7875821,10.0364634,0,0,desktop,evening,10
+anonymous,6962373e8a8ba4ca1d0b712a,view,1,1850000000,Đất nền,"Lê Hồng Phong, Bình Thủy",90,2026-03-06 18:46:23.351,105.76818,10.04183,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:46:23.273,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,69623d438a8ba4ca1d0b739b,view,1,41000000,Nhà riêng,"Lê Hồng Phong, Bình Thủy",120,2026-03-06 18:46:23.252,105.769,10.04228,0,0,desktop,evening,10
+anonymous,69623d438a8ba4ca1d0b739b,view,1,41000000,Nhà riêng,"Lê Hồng Phong, Bình Thủy",120,2026-03-06 18:45:41.157,105.769,10.04228,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:45:41.153,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:43:53.491,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,69623d438a8ba4ca1d0b739b,view,1,41000000,Nhà riêng,"Lê Hồng Phong, Bình Thủy",120,2026-03-06 18:43:53.486,105.769,10.04228,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:43:52.293,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,69623d438a8ba4ca1d0b739b,view,1,41000000,Nhà riêng,"Lê Hồng Phong, Bình Thủy",120,2026-03-06 18:43:52.290,105.769,10.04228,0,0,desktop,evening,10
+anonymous,69623d438a8ba4ca1d0b739b,view,1,41000000,Nhà riêng,"Lê Hồng Phong, Bình Thủy",120,2026-03-06 18:43:49.893,105.769,10.04228,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:43:49.889,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:43:49.534,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,69623d438a8ba4ca1d0b739b,view,1,41000000,Nhà riêng,"Lê Hồng Phong, Bình Thủy",120,2026-03-06 18:43:49.531,105.769,10.04228,0,0,desktop,evening,10
+anonymous,69623d438a8ba4ca1d0b739b,view,1,41000000,Nhà riêng,"Lê Hồng Phong, Bình Thủy",120,2026-03-06 18:43:49.176,105.769,10.04228,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:43:49.170,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,69623d438a8ba4ca1d0b739b,view,1,41000000,Nhà riêng,"Lê Hồng Phong, Bình Thủy",120,2026-03-06 18:43:47.365,105.769,10.04228,0,0,desktop,evening,10
+anonymous,6962373e8a8ba4ca1d0b712a,view,1,1850000000,Đất nền,"Lê Hồng Phong, Bình Thủy",90,2026-03-06 18:43:47.361,105.76818,10.04183,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:43:47.354,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,68be3ec67d034079204e4ca0,view,1,5000000,Nhà riêng,"Hẻm 3, Đường Lê Hồng Phong, Phường Bình Thủy, Quận Bình Thủy, Thành phố Cần Thơ, Việt Nam",50,2026-03-06 18:43:47.350,105.7875821,10.0364634,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:43:47.344,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:43:47.334,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,69623d438a8ba4ca1d0b739b,view,1,41000000,Nhà riêng,"Lê Hồng Phong, Bình Thủy",120,2026-03-06 18:43:47.310,105.769,10.04228,0,0,desktop,evening,10
+anonymous,69623d438a8ba4ca1d0b739b,view,1,41000000,Nhà riêng,"Lê Hồng Phong, Bình Thủy",120,2026-03-06 18:43:07.709,105.769,10.04228,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:43:07.703,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,6962373e8a8ba4ca1d0b712a,view,1,1850000000,Đất nền,"Lê Hồng Phong, Bình Thủy",90,2026-03-06 18:43:07.699,105.76818,10.04183,0,0,desktop,evening,10
+anonymous,68be3ec67d034079204e4ca0,view,1,5000000,Nhà riêng,"Hẻm 3, Đường Lê Hồng Phong, Phường Bình Thủy, Quận Bình Thủy, Thành phố Cần Thơ, Việt Nam",50,2026-03-06 18:43:07.691,105.7875821,10.0364634,0,0,desktop,evening,10
+anonymous,69623d438a8ba4ca1d0b739b,view,1,41000000,Nhà riêng,"Lê Hồng Phong, Bình Thủy",120,2026-03-06 18:43:07.676,105.769,10.04228,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:43:07.672,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,69623d438a8ba4ca1d0b739b,view,1,41000000,Nhà riêng,"Lê Hồng Phong, Bình Thủy",120,2026-03-06 18:43:07.669,105.769,10.04228,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:43:07.656,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:43:07.650,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:42:55.674,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,69623d438a8ba4ca1d0b739b,view,1,41000000,Nhà riêng,"Lê Hồng Phong, Bình Thủy",120,2026-03-06 18:42:55.668,105.769,10.04228,0,0,desktop,evening,10
+anonymous,69623d438a8ba4ca1d0b739b,view,1,41000000,Nhà riêng,"Lê Hồng Phong, Bình Thủy",120,2026-03-06 18:42:49.690,105.769,10.04228,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:42:49.684,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:42:49.680,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,6962373e8a8ba4ca1d0b712a,view,1,1850000000,Đất nền,"Lê Hồng Phong, Bình Thủy",90,2026-03-06 18:42:49.639,105.76818,10.04183,0,0,desktop,evening,10
+anonymous,68be3ec67d034079204e4ca0,view,1,5000000,Nhà riêng,"Hẻm 3, Đường Lê Hồng Phong, Phường Bình Thủy, Quận Bình Thủy, Thành phố Cần Thơ, Việt Nam",50,2026-03-06 18:42:49.624,105.7875821,10.0364634,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:42:49.614,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,69623d438a8ba4ca1d0b739b,view,1,41000000,Nhà riêng,"Lê Hồng Phong, Bình Thủy",120,2026-03-06 18:42:49.592,105.769,10.04228,0,0,desktop,evening,10
+anonymous,68be3ec67d034079204e4ca0,view,1,5000000,Nhà riêng,"Hẻm 3, Đường Lê Hồng Phong, Phường Bình Thủy, Quận Bình Thủy, Thành phố Cần Thơ, Việt Nam",50,2026-03-06 18:41:17.438,105.7875821,10.0364634,0,0,desktop,evening,10
+anonymous,6962373e8a8ba4ca1d0b712a,view,1,1850000000,Đất nền,"Lê Hồng Phong, Bình Thủy",90,2026-03-06 18:41:17.435,105.76818,10.04183,0,0,desktop,evening,10
+anonymous,69623d438a8ba4ca1d0b739b,view,1,41000000,Nhà riêng,"Lê Hồng Phong, Bình Thủy",120,2026-03-06 18:41:17.429,105.769,10.04228,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:41:17.417,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:41:17.407,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,69623d438a8ba4ca1d0b739b,view,1,41000000,Nhà riêng,"Lê Hồng Phong, Bình Thủy",120,2026-03-06 18:41:17.400,105.769,10.04228,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:41:17.383,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,6962373e8a8ba4ca1d0b712a,view,1,1850000000,Đất nền,"Lê Hồng Phong, Bình Thủy",90,2026-03-06 18:41:16.304,105.76818,10.04183,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:41:16.299,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:41:16.292,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,68be3ec67d034079204e4ca0,view,1,5000000,Nhà riêng,"Hẻm 3, Đường Lê Hồng Phong, Phường Bình Thủy, Quận Bình Thủy, Thành phố Cần Thơ, Việt Nam",50,2026-03-06 18:41:16.288,105.7875821,10.0364634,0,0,desktop,evening,10
+anonymous,69623d438a8ba4ca1d0b739b,view,1,41000000,Nhà riêng,"Lê Hồng Phong, Bình Thủy",120,2026-03-06 18:41:16.275,105.769,10.04228,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:41:16.271,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,69623d438a8ba4ca1d0b739b,view,1,41000000,Nhà riêng,"Lê Hồng Phong, Bình Thủy",120,2026-03-06 18:41:16.260,105.769,10.04228,0,0,desktop,evening,10
+anonymous,69623d438a8ba4ca1d0b739b,view,1,41000000,Nhà riêng,"Lê Hồng Phong, Bình Thủy",120,2026-03-06 18:41:04.827,105.769,10.04228,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:41:04.824,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,69623d438a8ba4ca1d0b739b,view,1,41000000,Nhà riêng,"Lê Hồng Phong, Bình Thủy",120,2026-03-06 18:41:03.630,105.769,10.04228,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:41:03.623,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:41:01.013,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,69623d438a8ba4ca1d0b739b,view,1,41000000,Nhà riêng,"Lê Hồng Phong, Bình Thủy",120,2026-03-06 18:41:01.010,105.769,10.04228,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:41:00.314,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,69623d438a8ba4ca1d0b739b,view,1,41000000,Nhà riêng,"Lê Hồng Phong, Bình Thủy",120,2026-03-06 18:41:00.306,105.769,10.04228,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:40:59.675,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,69623d438a8ba4ca1d0b739b,view,1,41000000,Nhà riêng,"Lê Hồng Phong, Bình Thủy",120,2026-03-06 18:40:59.672,105.769,10.04228,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:40:57.304,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,69623d438a8ba4ca1d0b739b,view,1,41000000,Nhà riêng,"Lê Hồng Phong, Bình Thủy",120,2026-03-06 18:40:57.301,105.769,10.04228,0,0,desktop,evening,10
+anonymous,69623d438a8ba4ca1d0b739b,view,1,41000000,Nhà riêng,"Lê Hồng Phong, Bình Thủy",120,2026-03-06 18:40:17.338,105.769,10.04228,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:40:17.334,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:39:01.185,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,69623d438a8ba4ca1d0b739b,view,1,41000000,Nhà riêng,"Lê Hồng Phong, Bình Thủy",120,2026-03-06 18:39:01.181,105.769,10.04228,0,0,desktop,evening,10
+anonymous,6962373e8a8ba4ca1d0b712a,view,1,1850000000,Đất nền,"Lê Hồng Phong, Bình Thủy",90,2026-03-06 18:39:01.172,105.76818,10.04183,0,0,desktop,evening,10
+anonymous,68be3ec67d034079204e4ca0,view,1,5000000,Nhà riêng,"Hẻm 3, Đường Lê Hồng Phong, Phường Bình Thủy, Quận Bình Thủy, Thành phố Cần Thơ, Việt Nam",50,2026-03-06 18:39:01.168,105.7875821,10.0364634,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:39:01.165,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:39:01.059,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,69623d438a8ba4ca1d0b739b,view,1,41000000,Nhà riêng,"Lê Hồng Phong, Bình Thủy",120,2026-03-06 18:39:01.050,105.769,10.04228,0,0,desktop,evening,10
+anonymous,69623d438a8ba4ca1d0b739b,view,1,41000000,Nhà riêng,"Lê Hồng Phong, Bình Thủy",120,2026-03-06 18:38:47.802,105.769,10.04228,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:38:47.800,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,69623d438a8ba4ca1d0b739b,view,1,41000000,Nhà riêng,"Lê Hồng Phong, Bình Thủy",120,2026-03-06 18:38:46.701,105.769,10.04228,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:38:46.697,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,69623d438a8ba4ca1d0b739b,view,1,41000000,Nhà riêng,"Lê Hồng Phong, Bình Thủy",120,2026-03-06 18:38:44.584,105.769,10.04228,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:38:44.580,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:38:44.175,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,69623d438a8ba4ca1d0b739b,view,1,41000000,Nhà riêng,"Lê Hồng Phong, Bình Thủy",120,2026-03-06 18:38:44.172,105.769,10.04228,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:38:43.819,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,69623d438a8ba4ca1d0b739b,view,1,41000000,Nhà riêng,"Lê Hồng Phong, Bình Thủy",120,2026-03-06 18:38:43.814,105.769,10.04228,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:35:42.657,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,69623d438a8ba4ca1d0b739b,view,1,41000000,Nhà riêng,"Lê Hồng Phong, Bình Thủy",120,2026-03-06 18:35:42.652,105.769,10.04228,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:35:41.338,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,69623d438a8ba4ca1d0b739b,view,1,41000000,Nhà riêng,"Lê Hồng Phong, Bình Thủy",120,2026-03-06 18:35:41.333,105.769,10.04228,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:35:38.939,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,69623d438a8ba4ca1d0b739b,view,1,41000000,Nhà riêng,"Lê Hồng Phong, Bình Thủy",120,2026-03-06 18:35:38.936,105.769,10.04228,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:35:38.704,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,69623d438a8ba4ca1d0b739b,view,1,41000000,Nhà riêng,"Lê Hồng Phong, Bình Thủy",120,2026-03-06 18:35:38.701,105.769,10.04228,0,0,desktop,evening,10
+anonymous,69623d438a8ba4ca1d0b739b,view,1,41000000,Nhà riêng,"Lê Hồng Phong, Bình Thủy",120,2026-03-06 18:35:38.024,105.769,10.04228,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:35:38.020,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,6962373e8a8ba4ca1d0b712a,view,1,1850000000,Đất nền,"Lê Hồng Phong, Bình Thủy",90,2026-03-06 18:35:36.052,105.76818,10.04183,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:35:36.037,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,68be3ec67d034079204e4ca0,view,1,5000000,Nhà riêng,"Hẻm 3, Đường Lê Hồng Phong, Phường Bình Thủy, Quận Bình Thủy, Thành phố Cần Thơ, Việt Nam",50,2026-03-06 18:35:36.032,105.7875821,10.0364634,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:35:36.023,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,69623d438a8ba4ca1d0b739b,view,1,41000000,Nhà riêng,"Lê Hồng Phong, Bình Thủy",120,2026-03-06 18:35:36.020,105.769,10.04228,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:35:36.009,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,69623d438a8ba4ca1d0b739b,view,1,41000000,Nhà riêng,"Lê Hồng Phong, Bình Thủy",120,2026-03-06 18:35:35.992,105.769,10.04228,0,0,desktop,evening,10
+anonymous,69623d438a8ba4ca1d0b739b,view,1,41000000,Nhà riêng,"Lê Hồng Phong, Bình Thủy",120,2026-03-06 18:33:56.877,105.769,10.04228,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:33:56.873,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:33:55.837,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,69623d438a8ba4ca1d0b739b,view,1,41000000,Nhà riêng,"Lê Hồng Phong, Bình Thủy",120,2026-03-06 18:33:55.834,105.769,10.04228,0,0,desktop,evening,10
+anonymous,69623d438a8ba4ca1d0b739b,view,1,41000000,Nhà riêng,"Lê Hồng Phong, Bình Thủy",120,2026-03-06 18:33:52.914,105.769,10.04228,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:33:52.909,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:33:52.226,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,69623d438a8ba4ca1d0b739b,view,1,41000000,Nhà riêng,"Lê Hồng Phong, Bình Thủy",120,2026-03-06 18:33:52.220,105.769,10.04228,0,0,desktop,evening,10
+anonymous,68be3ec67d034079204e4ca0,view,1,5000000,Nhà riêng,"Hẻm 3, Đường Lê Hồng Phong, Phường Bình Thủy, Quận Bình Thủy, Thành phố Cần Thơ, Việt Nam",50,2026-03-06 18:33:50.062,105.7875821,10.0364634,0,0,desktop,evening,10
+anonymous,6962373e8a8ba4ca1d0b712a,view,1,1850000000,Đất nền,"Lê Hồng Phong, Bình Thủy",90,2026-03-06 18:33:50.043,105.76818,10.04183,0,0,desktop,evening,10
+anonymous,69623d438a8ba4ca1d0b739b,view,1,41000000,Nhà riêng,"Lê Hồng Phong, Bình Thủy",120,2026-03-06 18:33:50.018,105.769,10.04228,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:33:50.010,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:33:49.990,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:33:49.983,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,69623d438a8ba4ca1d0b739b,view,1,41000000,Nhà riêng,"Lê Hồng Phong, Bình Thủy",120,2026-03-06 18:33:49.976,105.769,10.04228,0,0,desktop,evening,10
+anonymous,69623d438a8ba4ca1d0b739b,view,1,41000000,Nhà riêng,"Lê Hồng Phong, Bình Thủy",120,2026-03-06 18:33:04.975,105.769,10.04228,0,0,desktop,evening,10
+anonymous,68be3ec67d034079204e4ca0,view,1,5000000,Nhà riêng,"Hẻm 3, Đường Lê Hồng Phong, Phường Bình Thủy, Quận Bình Thủy, Thành phố Cần Thơ, Việt Nam",50,2026-03-06 18:33:04.967,105.7875821,10.0364634,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:33:04.959,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,6962373e8a8ba4ca1d0b712a,view,1,1850000000,Đất nền,"Lê Hồng Phong, Bình Thủy",90,2026-03-06 18:33:04.954,105.76818,10.04183,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:33:04.941,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:33:04.917,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,69623d438a8ba4ca1d0b739b,view,1,41000000,Nhà riêng,"Lê Hồng Phong, Bình Thủy",120,2026-03-06 18:33:04.858,105.769,10.04228,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:27:45.961,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,69623d438a8ba4ca1d0b739b,view,1,41000000,Nhà riêng,"Lê Hồng Phong, Bình Thủy",120,2026-03-06 18:27:45.954,105.769,10.04228,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:27:44.754,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,69623d438a8ba4ca1d0b739b,view,1,41000000,Nhà riêng,"Lê Hồng Phong, Bình Thủy",120,2026-03-06 18:27:44.732,105.769,10.04228,0,0,desktop,evening,10
+anonymous,69623d438a8ba4ca1d0b739b,view,1,41000000,Nhà riêng,"Lê Hồng Phong, Bình Thủy",120,2026-03-06 18:27:39.847,105.769,10.04228,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:27:39.840,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:27:27.450,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,69623d438a8ba4ca1d0b739b,view,1,41000000,Nhà riêng,"Lê Hồng Phong, Bình Thủy",120,2026-03-06 18:27:27.441,105.769,10.04228,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:27:26.658,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,69623d438a8ba4ca1d0b739b,view,1,41000000,Nhà riêng,"Lê Hồng Phong, Bình Thủy",120,2026-03-06 18:27:26.650,105.769,10.04228,0,0,desktop,evening,10
+anonymous,69623d438a8ba4ca1d0b739b,view,1,41000000,Nhà riêng,"Lê Hồng Phong, Bình Thủy",120,2026-03-06 18:27:20.990,105.769,10.04228,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:27:20.986,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,69623d438a8ba4ca1d0b739b,view,1,41000000,Nhà riêng,"Lê Hồng Phong, Bình Thủy",120,2026-03-06 18:27:16.641,105.769,10.04228,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:27:16.635,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:27:14.973,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,69623d438a8ba4ca1d0b739b,view,1,41000000,Nhà riêng,"Lê Hồng Phong, Bình Thủy",120,2026-03-06 18:27:14.962,105.769,10.04228,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:26:42.947,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,69623d438a8ba4ca1d0b739b,view,1,41000000,Nhà riêng,"Lê Hồng Phong, Bình Thủy",120,2026-03-06 18:26:42.940,105.769,10.04228,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:26:39.953,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,69623d438a8ba4ca1d0b739b,view,1,41000000,Nhà riêng,"Lê Hồng Phong, Bình Thủy",120,2026-03-06 18:26:39.942,105.769,10.04228,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:26:33.077,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,69623d438a8ba4ca1d0b739b,view,1,41000000,Nhà riêng,"Lê Hồng Phong, Bình Thủy",120,2026-03-06 18:26:32.949,105.769,10.04228,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:26:12.664,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,69623d438a8ba4ca1d0b739b,view,1,41000000,Nhà riêng,"Lê Hồng Phong, Bình Thủy",120,2026-03-06 18:26:12.425,105.769,10.04228,0,0,desktop,evening,10
+anonymous,6962373e8a8ba4ca1d0b712a,view,1,1850000000,Đất nền,"Lê Hồng Phong, Bình Thủy",90,2026-03-06 18:21:42.049,105.76818,10.04183,0,0,desktop,evening,10
+anonymous,69623d438a8ba4ca1d0b739b,view,1,41000000,Nhà riêng,"Lê Hồng Phong, Bình Thủy",120,2026-03-06 18:21:42.042,105.769,10.04228,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:21:42.038,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,69623d438a8ba4ca1d0b739b,view,1,41000000,Nhà riêng,"Lê Hồng Phong, Bình Thủy",120,2026-03-06 18:21:42.029,105.769,10.04228,0,0,desktop,evening,10
+anonymous,68be3ec67d034079204e4ca0,view,1,5000000,Nhà riêng,"Hẻm 3, Đường Lê Hồng Phong, Phường Bình Thủy, Quận Bình Thủy, Thành phố Cần Thơ, Việt Nam",50,2026-03-06 18:21:42.025,105.7875821,10.0364634,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:21:42.010,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:21:42.005,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,6962373e8a8ba4ca1d0b712a,view,1,1850000000,Đất nền,"Lê Hồng Phong, Bình Thủy",90,2026-03-06 18:21:41.214,105.76818,10.04183,0,0,desktop,evening,10
+anonymous,68be3ec67d034079204e4ca0,view,1,5000000,Nhà riêng,"Hẻm 3, Đường Lê Hồng Phong, Phường Bình Thủy, Quận Bình Thủy, Thành phố Cần Thơ, Việt Nam",50,2026-03-06 18:21:41.209,105.7875821,10.0364634,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:21:41.199,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:21:41.194,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:21:41.181,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:21:41.176,105.7197269,10.0254761,0,0,desktop,evening,10
+4tdjpYB1TXa4O46vL4F95ZK83pw2,69623d438a8ba4ca1d0b739b,favorite,5,41000000,Nhà riêng,"Lê Hồng Phong, Bình Thủy",120,2026-03-06 18:21:41.141,105.769,10.04228,0,0,mobile,morning,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:21:36.988,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:21:36.982,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:21:36.973,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,6962373e8a8ba4ca1d0b712a,view,1,1850000000,Đất nền,"Lê Hồng Phong, Bình Thủy",90,2026-03-06 18:21:36.965,105.76818,10.04183,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:21:36.955,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,68be3ec67d034079204e4ca0,view,1,5000000,Nhà riêng,"Hẻm 3, Đường Lê Hồng Phong, Phường Bình Thủy, Quận Bình Thủy, Thành phố Cần Thơ, Việt Nam",50,2026-03-06 18:21:36.949,105.7875821,10.0364634,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:21:36.745,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:21:36.741,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:21:36.732,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,68be3ec67d034079204e4ca0,view,1,5000000,Nhà riêng,"Hẻm 3, Đường Lê Hồng Phong, Phường Bình Thủy, Quận Bình Thủy, Thành phố Cần Thơ, Việt Nam",50,2026-03-06 18:21:36.726,105.7875821,10.0364634,0,0,desktop,evening,10
+anonymous,6962373e8a8ba4ca1d0b712a,view,1,1850000000,Đất nền,"Lê Hồng Phong, Bình Thủy",90,2026-03-06 18:21:36.715,105.76818,10.04183,0,0,desktop,evening,10
+anonymous,68be41337d034079204e4d87,view,1,5000000,Nhà riêng,"168/15 Võ Văn Kiệt, Phường An Thới, Quận Bình Thủy, Thành phố Cần Thơ, Việt Nam",30,2026-03-06 18:21:36.701,105.771892,10.045217,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:21:36.687,105.7197269,10.0254761,0,0,desktop,evening,10
+4tdjpYB1TXa4O46vL4F95ZK83pw2,68be41337d034079204e4d87,unfavorite,-3,5000000,Nhà riêng,"168/15 Võ Văn Kiệt, Phường An Thới, Quận Bình Thủy, Thành phố Cần Thơ, Việt Nam",30,2026-03-06 18:21:36.597,105.771892,10.045217,0,0,mobile,morning,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:21:24.139,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:21:24.135,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:21:17.410,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,6962373e8a8ba4ca1d0b712a,view,1,1850000000,Đất nền,"Lê Hồng Phong, Bình Thủy",90,2026-03-06 18:21:17.406,105.76818,10.04183,0,0,desktop,evening,10
+anonymous,68be3ec67d034079204e4ca0,view,1,5000000,Nhà riêng,"Hẻm 3, Đường Lê Hồng Phong, Phường Bình Thủy, Quận Bình Thủy, Thành phố Cần Thơ, Việt Nam",50,2026-03-06 18:21:17.400,105.7875821,10.0364634,0,0,desktop,evening,10
+anonymous,68be41337d034079204e4d87,view,1,5000000,Nhà riêng,"168/15 Võ Văn Kiệt, Phường An Thới, Quận Bình Thủy, Thành phố Cần Thơ, Việt Nam",30,2026-03-06 18:21:17.376,105.771892,10.045217,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:21:17.358,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:21:17.322,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:21:17.295,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:21:03.400,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:21:03.387,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:21:00.841,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:21:00.838,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:21:00.004,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:21:00.001,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,68be3ec67d034079204e4ca0,view,1,5000000,Nhà riêng,"Hẻm 3, Đường Lê Hồng Phong, Phường Bình Thủy, Quận Bình Thủy, Thành phố Cần Thơ, Việt Nam",50,2026-03-06 18:17:13.230,105.7875821,10.0364634,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:17:13.219,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:17:13.212,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,6962373e8a8ba4ca1d0b712a,view,1,1850000000,Đất nền,"Lê Hồng Phong, Bình Thủy",90,2026-03-06 18:17:13.198,105.76818,10.04183,0,0,desktop,evening,10
+anonymous,68be41337d034079204e4d87,view,1,5000000,Nhà riêng,"168/15 Võ Văn Kiệt, Phường An Thới, Quận Bình Thủy, Thành phố Cần Thơ, Việt Nam",30,2026-03-06 18:17:13.183,105.771892,10.045217,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:17:13.173,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:17:13.167,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:14:48.280,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:14:48.270,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,6962373e8a8ba4ca1d0b712a,view,1,1850000000,Đất nền,"Lê Hồng Phong, Bình Thủy",90,2026-03-06 18:14:48.249,105.76818,10.04183,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:14:48.229,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,68be3ec67d034079204e4ca0,view,1,5000000,Nhà riêng,"Hẻm 3, Đường Lê Hồng Phong, Phường Bình Thủy, Quận Bình Thủy, Thành phố Cần Thơ, Việt Nam",50,2026-03-06 18:14:48.225,105.7875821,10.0364634,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:14:48.214,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,68be41337d034079204e4d87,view,1,5000000,Nhà riêng,"168/15 Võ Văn Kiệt, Phường An Thới, Quận Bình Thủy, Thành phố Cần Thơ, Việt Nam",30,2026-03-06 18:14:48.187,105.771892,10.045217,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:14:23.838,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:14:23.835,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:14:03.137,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:14:03.134,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:14:00.562,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:14:00.557,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:14:00.236,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:14:00.233,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,6962373e8a8ba4ca1d0b712a,view,1,1850000000,Đất nền,"Lê Hồng Phong, Bình Thủy",90,2026-03-06 18:13:58.298,105.76818,10.04183,0,0,desktop,evening,10
+anonymous,68be41337d034079204e4d87,view,1,5000000,Nhà riêng,"168/15 Võ Văn Kiệt, Phường An Thới, Quận Bình Thủy, Thành phố Cần Thơ, Việt Nam",30,2026-03-06 18:13:58.293,105.771892,10.045217,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:13:58.287,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,68be3ec67d034079204e4ca0,view,1,5000000,Nhà riêng,"Hẻm 3, Đường Lê Hồng Phong, Phường Bình Thủy, Quận Bình Thủy, Thành phố Cần Thơ, Việt Nam",50,2026-03-06 18:13:58.284,105.7875821,10.0364634,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:13:58.277,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:13:58.267,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:13:58.256,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:13:58.043,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:13:58.039,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:13:56.924,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,6962373e8a8ba4ca1d0b712a,view,1,1850000000,Đất nền,"Lê Hồng Phong, Bình Thủy",90,2026-03-06 18:13:56.919,105.76818,10.04183,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:13:56.908,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,68be3ec67d034079204e4ca0,view,1,5000000,Nhà riêng,"Hẻm 3, Đường Lê Hồng Phong, Phường Bình Thủy, Quận Bình Thủy, Thành phố Cần Thơ, Việt Nam",50,2026-03-06 18:13:56.903,105.7875821,10.0364634,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:13:56.898,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:13:56.887,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,68be41337d034079204e4d87,view,1,5000000,Nhà riêng,"168/15 Võ Văn Kiệt, Phường An Thới, Quận Bình Thủy, Thành phố Cần Thơ, Việt Nam",30,2026-03-06 18:13:56.882,105.771892,10.045217,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:13:56.848,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:13:56.842,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:13:48.369,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:13:48.365,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:13:35.241,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:13:35.236,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:13:34.285,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:13:34.276,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:13:30.318,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:13:30.314,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:13:29.745,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:13:29.741,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:13:29.238,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:13:29.234,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:13:29.134,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:13:29.126,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:13:28.515,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:13:28.509,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,6962373e8a8ba4ca1d0b712a,view,1,1850000000,Đất nền,"Lê Hồng Phong, Bình Thủy",90,2026-03-06 18:13:27.155,105.76818,10.04183,0,0,desktop,evening,10
+anonymous,68be41337d034079204e4d87,view,1,5000000,Nhà riêng,"168/15 Võ Văn Kiệt, Phường An Thới, Quận Bình Thủy, Thành phố Cần Thơ, Việt Nam",30,2026-03-06 18:13:27.142,105.771892,10.045217,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:13:27.123,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,68be3ec67d034079204e4ca0,view,1,5000000,Nhà riêng,"Hẻm 3, Đường Lê Hồng Phong, Phường Bình Thủy, Quận Bình Thủy, Thành phố Cần Thơ, Việt Nam",50,2026-03-06 18:13:27.115,105.7875821,10.0364634,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:13:27.096,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:13:26.833,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:13:26.829,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:13:26.599,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:13:26.548,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,6962373e8a8ba4ca1d0b712a,view,1,1850000000,Đất nền,"Lê Hồng Phong, Bình Thủy",90,2026-03-06 18:13:26.543,105.76818,10.04183,0,0,desktop,evening,10
+anonymous,68be41337d034079204e4d87,view,1,5000000,Nhà riêng,"168/15 Võ Văn Kiệt, Phường An Thới, Quận Bình Thủy, Thành phố Cần Thơ, Việt Nam",30,2026-03-06 18:13:26.531,105.771892,10.045217,0,0,desktop,evening,10
+anonymous,68be3ec67d034079204e4ca0,view,1,5000000,Nhà riêng,"Hẻm 3, Đường Lê Hồng Phong, Phường Bình Thủy, Quận Bình Thủy, Thành phố Cần Thơ, Việt Nam",50,2026-03-06 18:13:26.527,105.7875821,10.0364634,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:13:21.902,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:13:21.899,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:13:20.777,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:13:20.771,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:13:20.184,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:13:20.181,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:13:20.051,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:13:20.047,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:13:18.082,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,68be41337d034079204e4d87,view,1,5000000,Nhà riêng,"168/15 Võ Văn Kiệt, Phường An Thới, Quận Bình Thủy, Thành phố Cần Thơ, Việt Nam",30,2026-03-06 18:13:18.078,105.771892,10.045217,0,0,desktop,evening,10
+anonymous,6962373e8a8ba4ca1d0b712a,view,1,1850000000,Đất nền,"Lê Hồng Phong, Bình Thủy",90,2026-03-06 18:13:18.072,105.76818,10.04183,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:13:18.065,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,68be3ec67d034079204e4ca0,view,1,5000000,Nhà riêng,"Hẻm 3, Đường Lê Hồng Phong, Phường Bình Thủy, Quận Bình Thủy, Thành phố Cần Thơ, Việt Nam",50,2026-03-06 18:13:18.059,105.7875821,10.0364634,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:13:18.050,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:13:18.044,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:13:17.368,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:13:17.365,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,68be41337d034079204e4d87,view,1,5000000,Nhà riêng,"168/15 Võ Văn Kiệt, Phường An Thới, Quận Bình Thủy, Thành phố Cần Thơ, Việt Nam",30,2026-03-06 18:13:16.621,105.771892,10.045217,0,0,desktop,evening,10
+anonymous,6962373e8a8ba4ca1d0b712a,view,1,1850000000,Đất nền,"Lê Hồng Phong, Bình Thủy",90,2026-03-06 18:13:16.615,105.76818,10.04183,0,0,desktop,evening,10
+anonymous,68be3ec67d034079204e4ca0,view,1,5000000,Nhà riêng,"Hẻm 3, Đường Lê Hồng Phong, Phường Bình Thủy, Quận Bình Thủy, Thành phố Cần Thơ, Việt Nam",50,2026-03-06 18:13:16.610,105.7875821,10.0364634,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:13:16.603,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:13:16.599,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:13:16.531,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:13:16.499,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:12:55.255,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:12:55.250,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:12:54.503,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:12:54.499,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:12:52.749,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:12:52.745,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:12:52.271,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:12:52.268,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:12:51.760,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:12:51.756,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:12:51.673,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:12:51.670,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:12:51.516,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:12:51.513,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:12:51.289,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:12:51.286,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,6962373e8a8ba4ca1d0b712a,view,1,1850000000,Đất nền,"Lê Hồng Phong, Bình Thủy",90,2026-03-06 18:12:49.937,105.76818,10.04183,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:12:49.927,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,68be41337d034079204e4d87,view,1,5000000,Nhà riêng,"168/15 Võ Văn Kiệt, Phường An Thới, Quận Bình Thủy, Thành phố Cần Thơ, Việt Nam",30,2026-03-06 18:12:49.922,105.771892,10.045217,0,0,desktop,evening,10
+anonymous,68be3ec67d034079204e4ca0,view,1,5000000,Nhà riêng,"Hẻm 3, Đường Lê Hồng Phong, Phường Bình Thủy, Quận Bình Thủy, Thành phố Cần Thơ, Việt Nam",50,2026-03-06 18:12:49.912,105.7875821,10.0364634,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:12:49.902,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:12:49.838,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:12:49.834,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:12:49.613,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:12:49.610,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,6962373e8a8ba4ca1d0b712a,view,1,1850000000,Đất nền,"Lê Hồng Phong, Bình Thủy",90,2026-03-06 18:12:49.551,105.76818,10.04183,0,0,desktop,evening,10
+anonymous,68be3ec67d034079204e4ca0,view,1,5000000,Nhà riêng,"Hẻm 3, Đường Lê Hồng Phong, Phường Bình Thủy, Quận Bình Thủy, Thành phố Cần Thơ, Việt Nam",50,2026-03-06 18:12:49.539,105.7875821,10.0364634,0,0,desktop,evening,10
+anonymous,68be41337d034079204e4d87,view,1,5000000,Nhà riêng,"168/15 Võ Văn Kiệt, Phường An Thới, Quận Bình Thủy, Thành phố Cần Thơ, Việt Nam",30,2026-03-06 18:12:49.526,105.771892,10.045217,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:12:06.298,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:12:06.292,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:12:05.123,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:12:05.118,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:12:03.048,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:12:03.041,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:12:02.848,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:12:02.843,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,68be41337d034079204e4d87,view,1,5000000,Nhà riêng,"168/15 Võ Văn Kiệt, Phường An Thới, Quận Bình Thủy, Thành phố Cần Thơ, Việt Nam",30,2026-03-06 18:12:02.170,105.771892,10.045217,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:12:02.148,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,68be3ec67d034079204e4ca0,view,1,5000000,Nhà riêng,"Hẻm 3, Đường Lê Hồng Phong, Phường Bình Thủy, Quận Bình Thủy, Thành phố Cần Thơ, Việt Nam",50,2026-03-06 18:12:02.142,105.7875821,10.0364634,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:12:02.124,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:12:01.728,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:12:01.624,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:12:01.577,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:12:01.567,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:12:01.557,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:12:01.538,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,6962373e8a8ba4ca1d0b712a,view,1,1850000000,Đất nền,"Lê Hồng Phong, Bình Thủy",90,2026-03-06 18:12:01.125,105.76818,10.04183,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:11:56.052,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:11:56.040,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,68be3ec67d034079204e4ca0,view,1,5000000,Nhà riêng,"Hẻm 3, Đường Lê Hồng Phong, Phường Bình Thủy, Quận Bình Thủy, Thành phố Cần Thơ, Việt Nam",50,2026-03-06 18:11:55.828,105.7875821,10.0364634,0,0,desktop,evening,10
+anonymous,6962373e8a8ba4ca1d0b712a,view,1,1850000000,Đất nền,"Lê Hồng Phong, Bình Thủy",90,2026-03-06 18:11:55.823,105.76818,10.04183,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:11:55.806,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:11:55.800,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,68be41337d034079204e4d87,view,1,5000000,Nhà riêng,"168/15 Võ Văn Kiệt, Phường An Thới, Quận Bình Thủy, Thành phố Cần Thơ, Việt Nam",30,2026-03-06 18:11:55.782,105.771892,10.045217,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:11:43.481,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:11:43.476,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:11:22.165,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:11:22.162,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:11:21.075,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:11:21.072,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:11:20.476,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:11:20.467,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:11:20.232,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:11:20.228,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:11:20.118,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:11:20.112,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:11:19.765,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:11:19.752,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:11:19.592,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:11:19.587,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:11:17.608,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,68be3ec67d034079204e4ca0,view,1,5000000,Nhà riêng,"Hẻm 3, Đường Lê Hồng Phong, Phường Bình Thủy, Quận Bình Thủy, Thành phố Cần Thơ, Việt Nam",50,2026-03-06 18:11:17.604,105.7875821,10.0364634,0,0,desktop,evening,10
+anonymous,6962373e8a8ba4ca1d0b712a,view,1,1850000000,Đất nền,"Lê Hồng Phong, Bình Thủy",90,2026-03-06 18:11:17.597,105.76818,10.04183,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:11:17.576,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:11:17.563,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,68be41337d034079204e4d87,view,1,5000000,Nhà riêng,"168/15 Võ Văn Kiệt, Phường An Thới, Quận Bình Thủy, Thành phố Cần Thơ, Việt Nam",30,2026-03-06 18:11:17.559,105.771892,10.045217,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:11:17.534,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:11:17.529,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:11:17.508,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:11:17.184,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,6962373e8a8ba4ca1d0b712a,view,1,1850000000,Đất nền,"Lê Hồng Phong, Bình Thủy",90,2026-03-06 18:11:17.180,105.76818,10.04183,0,0,desktop,evening,10
+anonymous,68be3ec67d034079204e4ca0,view,1,5000000,Nhà riêng,"Hẻm 3, Đường Lê Hồng Phong, Phường Bình Thủy, Quận Bình Thủy, Thành phố Cần Thơ, Việt Nam",50,2026-03-06 18:11:17.169,105.7875821,10.0364634,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:11:17.161,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,68be41337d034079204e4d87,view,1,5000000,Nhà riêng,"168/15 Võ Văn Kiệt, Phường An Thới, Quận Bình Thủy, Thành phố Cần Thơ, Việt Nam",30,2026-03-06 18:11:17.149,105.771892,10.045217,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:10:46.848,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:10:46.845,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:10:46.494,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:10:46.488,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:10:45.994,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:10:45.989,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:10:45.673,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:10:45.670,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:10:45.300,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:10:45.297,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:10:45.040,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:10:45.036,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:10:44.799,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:10:44.796,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:10:42.298,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,68be41337d034079204e4d87,view,1,5000000,Nhà riêng,"168/15 Võ Văn Kiệt, Phường An Thới, Quận Bình Thủy, Thành phố Cần Thơ, Việt Nam",30,2026-03-06 18:10:42.224,105.771892,10.045217,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:10:42.217,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,6962373e8a8ba4ca1d0b712a,view,1,1850000000,Đất nền,"Lê Hồng Phong, Bình Thủy",90,2026-03-06 18:10:42.214,105.76818,10.04183,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:10:42.206,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,68be3ec67d034079204e4ca0,view,1,5000000,Nhà riêng,"Hẻm 3, Đường Lê Hồng Phong, Phường Bình Thủy, Quận Bình Thủy, Thành phố Cần Thơ, Việt Nam",50,2026-03-06 18:10:42.197,105.7875821,10.0364634,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:10:42.178,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:10:41.834,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,68be3ec67d034079204e4ca0,view,1,5000000,Nhà riêng,"Hẻm 3, Đường Lê Hồng Phong, Phường Bình Thủy, Quận Bình Thủy, Thành phố Cần Thơ, Việt Nam",50,2026-03-06 18:10:41.629,105.7875821,10.0364634,0,0,desktop,evening,10
+anonymous,6962373e8a8ba4ca1d0b712a,view,1,1850000000,Đất nền,"Lê Hồng Phong, Bình Thủy",90,2026-03-06 18:10:41.626,105.76818,10.04183,0,0,desktop,evening,10
+anonymous,68be41337d034079204e4d87,view,1,5000000,Nhà riêng,"168/15 Võ Văn Kiệt, Phường An Thới, Quận Bình Thủy, Thành phố Cần Thơ, Việt Nam",30,2026-03-06 18:10:41.620,105.771892,10.045217,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:10:41.609,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:10:39.650,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:10:39.647,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:10:39.147,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:10:39.144,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:10:38.787,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:10:38.783,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:10:38.375,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:10:38.366,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:10:38.196,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:10:38.193,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,6962373e8a8ba4ca1d0b712a,view,1,1850000000,Đất nền,"Lê Hồng Phong, Bình Thủy",90,2026-03-06 18:10:36.593,105.76818,10.04183,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:10:36.581,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,68be3ec67d034079204e4ca0,view,1,5000000,Nhà riêng,"Hẻm 3, Đường Lê Hồng Phong, Phường Bình Thủy, Quận Bình Thủy, Thành phố Cần Thơ, Việt Nam",50,2026-03-06 18:10:36.566,105.7875821,10.0364634,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:10:36.559,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,68be41337d034079204e4d87,view,1,5000000,Nhà riêng,"168/15 Võ Văn Kiệt, Phường An Thới, Quận Bình Thủy, Thành phố Cần Thơ, Việt Nam",30,2026-03-06 18:10:36.550,105.771892,10.045217,0,0,desktop,evening,10
+anonymous,6962373e8a8ba4ca1d0b712a,view,1,1850000000,Đất nền,"Lê Hồng Phong, Bình Thủy",90,2026-03-06 18:10:36.251,105.76818,10.04183,0,0,desktop,evening,10
+anonymous,68be3ec67d034079204e4ca0,view,1,5000000,Nhà riêng,"Hẻm 3, Đường Lê Hồng Phong, Phường Bình Thủy, Quận Bình Thủy, Thành phố Cần Thơ, Việt Nam",50,2026-03-06 18:10:36.239,105.7875821,10.0364634,0,0,desktop,evening,10
+anonymous,68be41337d034079204e4d87,view,1,5000000,Nhà riêng,"168/15 Võ Văn Kiệt, Phường An Thới, Quận Bình Thủy, Thành phố Cần Thơ, Việt Nam",30,2026-03-06 18:10:36.227,105.771892,10.045217,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:10:36.213,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:10:36.210,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,68be3ec67d034079204e4ca0,view,1,5000000,Nhà riêng,"Hẻm 3, Đường Lê Hồng Phong, Phường Bình Thủy, Quận Bình Thủy, Thành phố Cần Thơ, Việt Nam",50,2026-03-06 18:10:29.502,105.7875821,10.0364634,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:10:29.493,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,6962373e8a8ba4ca1d0b712a,view,1,1850000000,Đất nền,"Lê Hồng Phong, Bình Thủy",90,2026-03-06 18:10:29.488,105.76818,10.04183,0,0,desktop,evening,10
+anonymous,68be41337d034079204e4d87,view,1,5000000,Nhà riêng,"168/15 Võ Văn Kiệt, Phường An Thới, Quận Bình Thủy, Thành phố Cần Thơ, Việt Nam",30,2026-03-06 18:10:29.482,105.771892,10.045217,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:10:29.466,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,6962373e8a8ba4ca1d0b712a,view,1,1850000000,Đất nền,"Lê Hồng Phong, Bình Thủy",90,2026-03-06 18:10:29.155,105.76818,10.04183,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:10:29.148,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:10:29.142,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,68be3ec67d034079204e4ca0,view,1,5000000,Nhà riêng,"Hẻm 3, Đường Lê Hồng Phong, Phường Bình Thủy, Quận Bình Thủy, Thành phố Cần Thơ, Việt Nam",50,2026-03-06 18:10:29.134,105.7875821,10.0364634,0,0,desktop,evening,10
+anonymous,68be41337d034079204e4d87,view,1,5000000,Nhà riêng,"168/15 Võ Văn Kiệt, Phường An Thới, Quận Bình Thủy, Thành phố Cần Thơ, Việt Nam",30,2026-03-06 18:10:29.122,105.771892,10.045217,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:10:29.100,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:10:29.097,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:10:28.390,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:10:28.385,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:10:27.880,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:10:27.873,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:10:27.118,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:10:27.111,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:10:27.023,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:10:27.016,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:10:26.541,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:10:26.534,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:10:26.428,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:10:26.346,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,68be41337d034079204e4d87,view,1,5000000,Nhà riêng,"168/15 Võ Văn Kiệt, Phường An Thới, Quận Bình Thủy, Thành phố Cần Thơ, Việt Nam",30,2026-03-06 18:10:25.771,105.771892,10.045217,0,0,desktop,evening,10
+anonymous,68be3ec67d034079204e4ca0,view,1,5000000,Nhà riêng,"Hẻm 3, Đường Lê Hồng Phong, Phường Bình Thủy, Quận Bình Thủy, Thành phố Cần Thơ, Việt Nam",50,2026-03-06 18:10:25.767,105.7875821,10.0364634,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:10:25.762,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,6962373e8a8ba4ca1d0b712a,view,1,1850000000,Đất nền,"Lê Hồng Phong, Bình Thủy",90,2026-03-06 18:10:25.750,105.76818,10.04183,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:10:25.736,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:10:25.291,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:10:25.285,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:10:24.710,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:10:24.700,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,6962373e8a8ba4ca1d0b712a,view,1,1850000000,Đất nền,"Lê Hồng Phong, Bình Thủy",90,2026-03-06 18:10:24.587,105.76818,10.04183,0,0,desktop,evening,10
+anonymous,68be3ec67d034079204e4ca0,view,1,5000000,Nhà riêng,"Hẻm 3, Đường Lê Hồng Phong, Phường Bình Thủy, Quận Bình Thủy, Thành phố Cần Thơ, Việt Nam",50,2026-03-06 18:10:24.577,105.7875821,10.0364634,0,0,desktop,evening,10
+anonymous,68be41337d034079204e4d87,view,1,5000000,Nhà riêng,"168/15 Võ Văn Kiệt, Phường An Thới, Quận Bình Thủy, Thành phố Cần Thơ, Việt Nam",30,2026-03-06 18:10:24.557,105.771892,10.045217,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:10:23.698,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:10:23.692,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:10:22.818,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:10:22.812,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:10:21.835,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:10:21.829,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:10:20.732,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:10:20.726,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:10:20.719,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:10:20.708,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:07:27.819,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:07:27.816,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:07:26.595,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:07:26.590,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:07:24.275,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:07:24.272,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:07:23.570,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:07:23.567,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,68be41337d034079204e4d87,view,1,5000000,Nhà riêng,"168/15 Võ Văn Kiệt, Phường An Thới, Quận Bình Thủy, Thành phố Cần Thơ, Việt Nam",30,2026-03-06 18:07:21.560,105.771892,10.045217,0,0,desktop,evening,10
+anonymous,6962373e8a8ba4ca1d0b712a,view,1,1850000000,Đất nền,"Lê Hồng Phong, Bình Thủy",90,2026-03-06 18:07:21.556,105.76818,10.04183,0,0,desktop,evening,10
+anonymous,68be3ec67d034079204e4ca0,view,1,5000000,Nhà riêng,"Hẻm 3, Đường Lê Hồng Phong, Phường Bình Thủy, Quận Bình Thủy, Thành phố Cần Thơ, Việt Nam",50,2026-03-06 18:07:21.545,105.7875821,10.0364634,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:07:21.536,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:07:21.524,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:07:21.520,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:07:21.517,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:07:20.592,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:07:20.589,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:07:20.061,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,6962373e8a8ba4ca1d0b712a,view,1,1850000000,Đất nền,"Lê Hồng Phong, Bình Thủy",90,2026-03-06 18:07:20.057,105.76818,10.04183,0,0,desktop,evening,10
+anonymous,68be41337d034079204e4d87,view,1,5000000,Nhà riêng,"168/15 Võ Văn Kiệt, Phường An Thới, Quận Bình Thủy, Thành phố Cần Thơ, Việt Nam",30,2026-03-06 18:07:20.045,105.771892,10.045217,0,0,desktop,evening,10
+anonymous,68be3ec67d034079204e4ca0,view,1,5000000,Nhà riêng,"Hẻm 3, Đường Lê Hồng Phong, Phường Bình Thủy, Quận Bình Thủy, Thành phố Cần Thơ, Việt Nam",50,2026-03-06 18:07:20.039,105.7875821,10.0364634,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:07:20.035,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:07:19.997,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:07:19.969,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:02:17.164,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:02:17.161,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:02:15.828,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:02:15.824,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:02:13.685,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:02:13.648,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:02:13.065,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:02:13.059,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,68be41337d034079204e4d87,view,1,5000000,Nhà riêng,"168/15 Võ Văn Kiệt, Phường An Thới, Quận Bình Thủy, Thành phố Cần Thơ, Việt Nam",30,2026-03-06 18:02:11.745,105.771892,10.045217,0,0,desktop,evening,10
+anonymous,6962373e8a8ba4ca1d0b712a,view,1,1850000000,Đất nền,"Lê Hồng Phong, Bình Thủy",90,2026-03-06 18:02:11.742,105.76818,10.04183,0,0,desktop,evening,10
+anonymous,68be3ec67d034079204e4ca0,view,1,5000000,Nhà riêng,"Hẻm 3, Đường Lê Hồng Phong, Phường Bình Thủy, Quận Bình Thủy, Thành phố Cần Thơ, Việt Nam",50,2026-03-06 18:02:11.733,105.7875821,10.0364634,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:02:11.721,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:02:11.718,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:02:11.715,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:02:11.702,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:02:11.079,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:02:11.074,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:02:10.163,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,6962373e8a8ba4ca1d0b712a,view,1,1850000000,Đất nền,"Lê Hồng Phong, Bình Thủy",90,2026-03-06 18:02:10.159,105.76818,10.04183,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:02:10.155,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:02:10.145,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,68be3ec67d034079204e4ca0,view,1,5000000,Nhà riêng,"Hẻm 3, Đường Lê Hồng Phong, Phường Bình Thủy, Quận Bình Thủy, Thành phố Cần Thơ, Việt Nam",50,2026-03-06 18:02:10.141,105.7875821,10.0364634,0,0,desktop,evening,10
+anonymous,68be41337d034079204e4d87,view,1,5000000,Nhà riêng,"168/15 Võ Văn Kiệt, Phường An Thới, Quận Bình Thủy, Thành phố Cần Thơ, Việt Nam",30,2026-03-06 18:02:10.131,105.771892,10.045217,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:02:10.121,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:02:10.073,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:02:10.052,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:02:02.187,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:02:02.182,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:02:01.105,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:02:01.102,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:02:01.007,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:02:01.004,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:02:00.602,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:02:00.599,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,6962373e8a8ba4ca1d0b712a,view,1,1850000000,Đất nền,"Lê Hồng Phong, Bình Thủy",90,2026-03-06 18:02:00.509,105.76818,10.04183,0,0,desktop,evening,10
+anonymous,68be41337d034079204e4d87,view,1,5000000,Nhà riêng,"168/15 Võ Văn Kiệt, Phường An Thới, Quận Bình Thủy, Thành phố Cần Thơ, Việt Nam",30,2026-03-06 18:02:00.500,105.771892,10.045217,0,0,desktop,evening,10
+anonymous,68be3ec67d034079204e4ca0,view,1,5000000,Nhà riêng,"Hẻm 3, Đường Lê Hồng Phong, Phường Bình Thủy, Quận Bình Thủy, Thành phố Cần Thơ, Việt Nam",50,2026-03-06 18:02:00.490,105.7875821,10.0364634,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:02:00.481,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:02:00.476,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:02:00.467,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:02:00.463,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,6962373e8a8ba4ca1d0b712a,view,1,1850000000,Đất nền,"Lê Hồng Phong, Bình Thủy",90,2026-03-06 18:01:59.855,105.76818,10.04183,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:01:59.851,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,68be41337d034079204e4d87,view,1,5000000,Nhà riêng,"168/15 Võ Văn Kiệt, Phường An Thới, Quận Bình Thủy, Thành phố Cần Thơ, Việt Nam",30,2026-03-06 18:01:59.848,105.771892,10.045217,0,0,desktop,evening,10
+anonymous,68be3ec67d034079204e4ca0,view,1,5000000,Nhà riêng,"Hẻm 3, Đường Lê Hồng Phong, Phường Bình Thủy, Quận Bình Thủy, Thành phố Cần Thơ, Việt Nam",50,2026-03-06 18:01:59.844,105.7875821,10.0364634,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:01:59.839,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:01:59.836,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:01:59.825,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:01:59.821,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:01:59.808,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:01:59.051,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:01:59.048,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:01:58.572,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:01:58.567,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,68be3ec67d034079204e4ca0,view,1,5000000,Nhà riêng,"Hẻm 3, Đường Lê Hồng Phong, Phường Bình Thủy, Quận Bình Thủy, Thành phố Cần Thơ, Việt Nam",50,2026-03-06 18:01:57.861,105.7875821,10.0364634,0,0,desktop,evening,10
+anonymous,68be41337d034079204e4d87,view,1,5000000,Nhà riêng,"168/15 Võ Văn Kiệt, Phường An Thới, Quận Bình Thủy, Thành phố Cần Thơ, Việt Nam",30,2026-03-06 18:01:57.857,105.771892,10.045217,0,0,desktop,evening,10
+anonymous,6962373e8a8ba4ca1d0b712a,view,1,1850000000,Đất nền,"Lê Hồng Phong, Bình Thủy",90,2026-03-06 18:01:57.851,105.76818,10.04183,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:01:57.836,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:01:57.826,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:01:57.823,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:01:57.805,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,6962373e8a8ba4ca1d0b712a,view,1,1850000000,Đất nền,"Lê Hồng Phong, Bình Thủy",90,2026-03-06 18:01:57.687,105.76818,10.04183,0,0,desktop,evening,10
+anonymous,68be41337d034079204e4d87,view,1,5000000,Nhà riêng,"168/15 Võ Văn Kiệt, Phường An Thới, Quận Bình Thủy, Thành phố Cần Thơ, Việt Nam",30,2026-03-06 18:01:57.675,105.771892,10.045217,0,0,desktop,evening,10
+anonymous,68be3ec67d034079204e4ca0,view,1,5000000,Nhà riêng,"Hẻm 3, Đường Lê Hồng Phong, Phường Bình Thủy, Quận Bình Thủy, Thành phố Cần Thơ, Việt Nam",50,2026-03-06 18:01:57.645,105.7875821,10.0364634,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:01:57.628,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:01:57.623,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:01:57.611,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:01:57.598,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:01:57.185,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:01:57.177,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,68be3ec67d034079204e4ca0,view,1,5000000,Nhà riêng,"Hẻm 3, Đường Lê Hồng Phong, Phường Bình Thủy, Quận Bình Thủy, Thành phố Cần Thơ, Việt Nam",50,2026-03-06 18:01:57.154,105.7875821,10.0364634,0,0,desktop,evening,10
+anonymous,68be41337d034079204e4d87,view,1,5000000,Nhà riêng,"168/15 Võ Văn Kiệt, Phường An Thới, Quận Bình Thủy, Thành phố Cần Thơ, Việt Nam",30,2026-03-06 18:01:57.143,105.771892,10.045217,0,0,desktop,evening,10
+anonymous,6962373e8a8ba4ca1d0b712a,view,1,1850000000,Đất nền,"Lê Hồng Phong, Bình Thủy",90,2026-03-06 18:01:57.138,105.76818,10.04183,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:01:57.128,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:01:57.124,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:01:57.112,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:01:57.107,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:01:56.558,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:01:56.552,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:01:56.077,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:01:56.074,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:01:56.066,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:01:56.059,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,6962373e8a8ba4ca1d0b712a,view,1,1850000000,Đất nền,"Lê Hồng Phong, Bình Thủy",90,2026-03-06 18:01:55.827,105.76818,10.04183,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:01:55.819,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:01:55.813,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,68be3ec67d034079204e4ca0,view,1,5000000,Nhà riêng,"Hẻm 3, Đường Lê Hồng Phong, Phường Bình Thủy, Quận Bình Thủy, Thành phố Cần Thơ, Việt Nam",50,2026-03-06 18:01:55.750,105.7875821,10.0364634,0,0,desktop,evening,10
+anonymous,68be41337d034079204e4d87,view,1,5000000,Nhà riêng,"168/15 Võ Văn Kiệt, Phường An Thới, Quận Bình Thủy, Thành phố Cần Thơ, Việt Nam",30,2026-03-06 18:01:55.744,105.771892,10.045217,0,0,desktop,evening,10
+anonymous,68be3ec67d034079204e4ca0,view,1,5000000,Nhà riêng,"Hẻm 3, Đường Lê Hồng Phong, Phường Bình Thủy, Quận Bình Thủy, Thành phố Cần Thơ, Việt Nam",50,2026-03-06 18:01:55.671,105.7875821,10.0364634,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:01:55.644,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,6962373e8a8ba4ca1d0b712a,view,1,1850000000,Đất nền,"Lê Hồng Phong, Bình Thủy",90,2026-03-06 18:01:55.640,105.76818,10.04183,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:01:55.627,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,68be41337d034079204e4d87,view,1,5000000,Nhà riêng,"168/15 Võ Văn Kiệt, Phường An Thới, Quận Bình Thủy, Thành phố Cần Thơ, Việt Nam",30,2026-03-06 18:01:55.611,105.771892,10.045217,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:01:55.593,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:01:55.589,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:01:55.473,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:01:55.467,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:01:55.211,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:01:55.208,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,6962373e8a8ba4ca1d0b712a,view,1,1850000000,Đất nền,"Lê Hồng Phong, Bình Thủy",90,2026-03-06 18:01:55.095,105.76818,10.04183,0,0,desktop,evening,10
+anonymous,68be3ec67d034079204e4ca0,view,1,5000000,Nhà riêng,"Hẻm 3, Đường Lê Hồng Phong, Phường Bình Thủy, Quận Bình Thủy, Thành phố Cần Thơ, Việt Nam",50,2026-03-06 18:01:55.084,105.7875821,10.0364634,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:01:55.075,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,68be41337d034079204e4d87,view,1,5000000,Nhà riêng,"168/15 Võ Văn Kiệt, Phường An Thới, Quận Bình Thủy, Thành phố Cần Thơ, Việt Nam",30,2026-03-06 18:01:55.071,105.771892,10.045217,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:01:55.063,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:01:55.042,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:01:55.039,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,68be41337d034079204e4d87,view,1,5000000,Nhà riêng,"168/15 Võ Văn Kiệt, Phường An Thới, Quận Bình Thủy, Thành phố Cần Thơ, Việt Nam",30,2026-03-06 18:01:53.519,105.771892,10.045217,0,0,desktop,evening,10
+anonymous,6962373e8a8ba4ca1d0b712a,view,1,1850000000,Đất nền,"Lê Hồng Phong, Bình Thủy",90,2026-03-06 18:01:53.515,105.76818,10.04183,0,0,desktop,evening,10
+anonymous,68be3ec67d034079204e4ca0,view,1,5000000,Nhà riêng,"Hẻm 3, Đường Lê Hồng Phong, Phường Bình Thủy, Quận Bình Thủy, Thành phố Cần Thơ, Việt Nam",50,2026-03-06 18:01:53.507,105.7875821,10.0364634,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:01:53.491,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:01:53.488,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:01:53.475,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:01:53.467,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:01:53.283,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:01:53.280,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,68be41337d034079204e4d87,view,1,5000000,Nhà riêng,"168/15 Võ Văn Kiệt, Phường An Thới, Quận Bình Thủy, Thành phố Cần Thơ, Việt Nam",30,2026-03-06 18:01:52.862,105.771892,10.045217,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:01:52.849,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,68be3ec67d034079204e4ca0,view,1,5000000,Nhà riêng,"Hẻm 3, Đường Lê Hồng Phong, Phường Bình Thủy, Quận Bình Thủy, Thành phố Cần Thơ, Việt Nam",50,2026-03-06 18:01:52.843,105.7875821,10.0364634,0,0,desktop,evening,10
+anonymous,6962373e8a8ba4ca1d0b712a,view,1,1850000000,Đất nền,"Lê Hồng Phong, Bình Thủy",90,2026-03-06 18:01:52.825,105.76818,10.04183,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:01:52.786,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,6962373e8a8ba4ca1d0b712a,view,1,1850000000,Đất nền,"Lê Hồng Phong, Bình Thủy",90,2026-03-06 18:01:47.078,105.76818,10.04183,0,0,desktop,evening,10
+anonymous,68be41337d034079204e4d87,view,1,5000000,Nhà riêng,"168/15 Võ Văn Kiệt, Phường An Thới, Quận Bình Thủy, Thành phố Cần Thơ, Việt Nam",30,2026-03-06 18:01:47.050,105.771892,10.045217,0,0,desktop,evening,10
+anonymous,68be3ec67d034079204e4ca0,view,1,5000000,Nhà riêng,"Hẻm 3, Đường Lê Hồng Phong, Phường Bình Thủy, Quận Bình Thủy, Thành phố Cần Thơ, Việt Nam",50,2026-03-06 18:01:47.022,105.7875821,10.0364634,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:01:47.002,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:01:32.195,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:01:32.190,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:01:31.636,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:01:31.628,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,6962373e8a8ba4ca1d0b712a,view,1,1850000000,Đất nền,"Lê Hồng Phong, Bình Thủy",90,2026-03-06 18:01:30.272,105.76818,10.04183,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:01:30.267,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:01:30.264,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,68be41337d034079204e4d87,view,1,5000000,Nhà riêng,"168/15 Võ Văn Kiệt, Phường An Thới, Quận Bình Thủy, Thành phố Cần Thơ, Việt Nam",30,2026-03-06 18:01:30.257,105.771892,10.045217,0,0,desktop,evening,10
+anonymous,68be3ec67d034079204e4ca0,view,1,5000000,Nhà riêng,"Hẻm 3, Đường Lê Hồng Phong, Phường Bình Thủy, Quận Bình Thủy, Thành phố Cần Thơ, Việt Nam",50,2026-03-06 18:01:30.253,105.7875821,10.0364634,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:01:30.250,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:01:30.227,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,68be3ec67d034079204e4ca0,view,1,5000000,Nhà riêng,"Hẻm 3, Đường Lê Hồng Phong, Phường Bình Thủy, Quận Bình Thủy, Thành phố Cần Thơ, Việt Nam",50,2026-03-06 18:01:30.029,105.7875821,10.0364634,0,0,desktop,evening,10
+anonymous,6962373e8a8ba4ca1d0b712a,view,1,1850000000,Đất nền,"Lê Hồng Phong, Bình Thủy",90,2026-03-06 18:01:30.024,105.76818,10.04183,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:01:30.019,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,68be41337d034079204e4d87,view,1,5000000,Nhà riêng,"168/15 Võ Văn Kiệt, Phường An Thới, Quận Bình Thủy, Thành phố Cần Thơ, Việt Nam",30,2026-03-06 18:01:30.016,105.771892,10.045217,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:01:30.005,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:01:29.996,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:01:29.993,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:01:29.347,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:01:29.110,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,6962373e8a8ba4ca1d0b712a,view,1,1850000000,Đất nền,"Lê Hồng Phong, Bình Thủy",90,2026-03-06 18:01:29.106,105.76818,10.04183,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:01:29.102,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,68be41337d034079204e4d87,view,1,5000000,Nhà riêng,"168/15 Võ Văn Kiệt, Phường An Thới, Quận Bình Thủy, Thành phố Cần Thơ, Việt Nam",30,2026-03-06 18:01:29.090,105.771892,10.045217,0,0,desktop,evening,10
+anonymous,68be3ec67d034079204e4ca0,view,1,5000000,Nhà riêng,"Hẻm 3, Đường Lê Hồng Phong, Phường Bình Thủy, Quận Bình Thủy, Thành phố Cần Thơ, Việt Nam",50,2026-03-06 18:01:29.083,105.7875821,10.0364634,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:01:29.068,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:01:29.039,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:01:29.030,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:01:29.022,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:01:27.889,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:01:27.885,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:01:27.387,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:01:27.381,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:01:27.375,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:01:27.346,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:01:27.340,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:01:27.333,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:01:27.325,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,6962373e8a8ba4ca1d0b712a,view,1,1850000000,Đất nền,"Lê Hồng Phong, Bình Thủy",90,2026-03-06 18:01:26.963,105.76818,10.04183,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:01:26.956,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:01:26.946,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,68be41337d034079204e4d87,view,1,5000000,Nhà riêng,"168/15 Võ Văn Kiệt, Phường An Thới, Quận Bình Thủy, Thành phố Cần Thơ, Việt Nam",30,2026-03-06 18:01:26.942,105.771892,10.045217,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:01:26.929,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,68be3ec67d034079204e4ca0,view,1,5000000,Nhà riêng,"Hẻm 3, Đường Lê Hồng Phong, Phường Bình Thủy, Quận Bình Thủy, Thành phố Cần Thơ, Việt Nam",50,2026-03-06 18:01:26.921,105.7875821,10.0364634,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:01:26.912,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:01:26.715,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:01:26.474,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:01:26.470,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:01:26.410,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,68be3ec67d034079204e4ca0,view,1,5000000,Nhà riêng,"Hẻm 3, Đường Lê Hồng Phong, Phường Bình Thủy, Quận Bình Thủy, Thành phố Cần Thơ, Việt Nam",50,2026-03-06 18:01:26.405,105.7875821,10.0364634,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:01:26.396,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,6962373e8a8ba4ca1d0b712a,view,1,1850000000,Đất nền,"Lê Hồng Phong, Bình Thủy",90,2026-03-06 18:01:26.392,105.76818,10.04183,0,0,desktop,evening,10
+anonymous,68be41337d034079204e4d87,view,1,5000000,Nhà riêng,"168/15 Võ Văn Kiệt, Phường An Thới, Quận Bình Thủy, Thành phố Cần Thơ, Việt Nam",30,2026-03-06 18:01:26.317,105.771892,10.045217,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:01:26.266,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:01:26.261,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:01:25.651,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:01:25.646,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:01:25.637,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:01:25.588,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:01:25.437,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,6962373e8a8ba4ca1d0b712a,view,1,1850000000,Đất nền,"Lê Hồng Phong, Bình Thủy",90,2026-03-06 18:01:25.258,105.76818,10.04183,0,0,desktop,evening,10
+anonymous,68be3ec67d034079204e4ca0,view,1,5000000,Nhà riêng,"Hẻm 3, Đường Lê Hồng Phong, Phường Bình Thủy, Quận Bình Thủy, Thành phố Cần Thơ, Việt Nam",50,2026-03-06 18:01:25.250,105.7875821,10.0364634,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:01:25.230,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:01:24.923,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,68be41337d034079204e4d87,view,1,5000000,Nhà riêng,"168/15 Võ Văn Kiệt, Phường An Thới, Quận Bình Thủy, Thành phố Cần Thơ, Việt Nam",30,2026-03-06 18:01:24.843,105.771892,10.045217,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:01:24.833,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:01:24.819,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,6962373e8a8ba4ca1d0b712a,view,1,1850000000,Đất nền,"Lê Hồng Phong, Bình Thủy",90,2026-03-06 18:01:24.790,105.76818,10.04183,0,0,desktop,evening,10
+anonymous,68be41337d034079204e4d87,view,1,5000000,Nhà riêng,"168/15 Võ Văn Kiệt, Phường An Thới, Quận Bình Thủy, Thành phố Cần Thơ, Việt Nam",30,2026-03-06 18:01:24.785,105.771892,10.045217,0,0,desktop,evening,10
+anonymous,68be3ec67d034079204e4ca0,view,1,5000000,Nhà riêng,"Hẻm 3, Đường Lê Hồng Phong, Phường Bình Thủy, Quận Bình Thủy, Thành phố Cần Thơ, Việt Nam",50,2026-03-06 18:01:24.776,105.7875821,10.0364634,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:01:24.734,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:01:24.368,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:01:24.362,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:01:24.355,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,6962373e8a8ba4ca1d0b712a,view,1,1850000000,Đất nền,"Lê Hồng Phong, Bình Thủy",90,2026-03-06 18:01:23.507,105.76818,10.04183,0,0,desktop,evening,10
+anonymous,68be3ec67d034079204e4ca0,view,1,5000000,Nhà riêng,"Hẻm 3, Đường Lê Hồng Phong, Phường Bình Thủy, Quận Bình Thủy, Thành phố Cần Thơ, Việt Nam",50,2026-03-06 18:01:23.483,105.7875821,10.0364634,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:01:23.476,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,68be41337d034079204e4d87,view,1,5000000,Nhà riêng,"168/15 Võ Văn Kiệt, Phường An Thới, Quận Bình Thủy, Thành phố Cần Thơ, Việt Nam",30,2026-03-06 18:01:23.467,105.771892,10.045217,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:01:23.454,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:01:23.077,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:01:21.747,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:01:21.727,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:01:20.309,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:01:20.225,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:01:16.666,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:01:16.662,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:01:16.641,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:01:16.627,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:01:14.742,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:01:14.722,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,6962373e8a8ba4ca1d0b712a,view,1,1850000000,Đất nền,"Lê Hồng Phong, Bình Thủy",90,2026-03-06 18:01:14.688,105.76818,10.04183,0,0,desktop,evening,10
+anonymous,68be3ec67d034079204e4ca0,view,1,5000000,Nhà riêng,"Hẻm 3, Đường Lê Hồng Phong, Phường Bình Thủy, Quận Bình Thủy, Thành phố Cần Thơ, Việt Nam",50,2026-03-06 18:01:14.628,105.7875821,10.0364634,0,0,desktop,evening,10
+anonymous,68be41337d034079204e4d87,view,1,5000000,Nhà riêng,"168/15 Võ Văn Kiệt, Phường An Thới, Quận Bình Thủy, Thành phố Cần Thơ, Việt Nam",30,2026-03-06 18:01:14.579,105.771892,10.045217,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:01:14.550,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:01:14.541,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:01:14.215,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:01:14.209,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:01:13.364,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:01:13.355,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,6962373e8a8ba4ca1d0b712a,view,1,1850000000,Đất nền,"Lê Hồng Phong, Bình Thủy",90,2026-03-06 18:01:13.349,105.76818,10.04183,0,0,desktop,evening,10
+anonymous,68be3ec67d034079204e4ca0,view,1,5000000,Nhà riêng,"Hẻm 3, Đường Lê Hồng Phong, Phường Bình Thủy, Quận Bình Thủy, Thành phố Cần Thơ, Việt Nam",50,2026-03-06 18:01:13.334,105.7875821,10.0364634,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:01:13.321,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:01:13.315,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,68be41337d034079204e4d87,view,1,5000000,Nhà riêng,"168/15 Võ Văn Kiệt, Phường An Thới, Quận Bình Thủy, Thành phố Cần Thơ, Việt Nam",30,2026-03-06 18:01:13.292,105.771892,10.045217,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 18:01:13.247,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 18:01:13.190,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 17:53:18.350,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 17:53:18.335,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 17:48:05.525,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 17:48:05.512,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 17:47:55.926,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 17:47:55.899,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 17:46:58.367,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,6962373e8a8ba4ca1d0b712a,view,1,1850000000,Đất nền,"Lê Hồng Phong, Bình Thủy",90,2026-03-06 17:46:58.354,105.76818,10.04183,0,0,desktop,evening,10
+anonymous,68be3ec67d034079204e4ca0,view,1,5000000,Nhà riêng,"Hẻm 3, Đường Lê Hồng Phong, Phường Bình Thủy, Quận Bình Thủy, Thành phố Cần Thơ, Việt Nam",50,2026-03-06 17:46:58.348,105.7875821,10.0364634,0,0,desktop,evening,10
+anonymous,68be41337d034079204e4d87,view,1,5000000,Nhà riêng,"168/15 Võ Văn Kiệt, Phường An Thới, Quận Bình Thủy, Thành phố Cần Thơ, Việt Nam",30,2026-03-06 17:46:58.343,105.771892,10.045217,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 17:46:58.336,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 17:46:58.296,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 17:46:58.277,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,6962373e8a8ba4ca1d0b712a,view,1,1850000000,Đất nền,"Lê Hồng Phong, Bình Thủy",90,2026-03-06 17:44:32.737,105.76818,10.04183,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 17:44:32.723,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,68be41337d034079204e4d87,view,1,5000000,Nhà riêng,"168/15 Võ Văn Kiệt, Phường An Thới, Quận Bình Thủy, Thành phố Cần Thơ, Việt Nam",30,2026-03-06 17:44:32.713,105.771892,10.045217,0,0,desktop,evening,10
+anonymous,68be3ec67d034079204e4ca0,view,1,5000000,Nhà riêng,"Hẻm 3, Đường Lê Hồng Phong, Phường Bình Thủy, Quận Bình Thủy, Thành phố Cần Thơ, Việt Nam",50,2026-03-06 17:44:32.704,105.7875821,10.0364634,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 17:44:32.694,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 17:44:32.676,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 17:44:32.541,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 17:40:45.059,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 17:40:45.050,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 17:40:30.443,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 17:40:30.439,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 17:40:29.136,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 17:40:29.129,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 17:40:26.246,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 17:40:26.242,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,68be41337d034079204e4d87,view,1,5000000,Nhà riêng,"168/15 Võ Văn Kiệt, Phường An Thới, Quận Bình Thủy, Thành phố Cần Thơ, Việt Nam",30,2026-03-06 17:40:23.348,105.771892,10.045217,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 17:40:23.338,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,68be3ec67d034079204e4ca0,view,1,5000000,Nhà riêng,"Hẻm 3, Đường Lê Hồng Phong, Phường Bình Thủy, Quận Bình Thủy, Thành phố Cần Thơ, Việt Nam",50,2026-03-06 17:40:23.332,105.7875821,10.0364634,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 17:40:23.325,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 17:40:23.320,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,6962373e8a8ba4ca1d0b712a,view,1,1850000000,Đất nền,"Lê Hồng Phong, Bình Thủy",90,2026-03-06 17:40:23.311,105.76818,10.04183,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 17:40:23.301,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 17:40:22.603,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 17:40:22.587,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 17:32:59.132,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 17:32:39.748,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 17:32:18.453,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 17:32:18.333,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 17:31:29.083,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 17:31:29.078,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 17:31:28.370,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 17:31:28.365,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,68be3ec67d034079204e4ca0,view,1,5000000,Nhà riêng,"Hẻm 3, Đường Lê Hồng Phong, Phường Bình Thủy, Quận Bình Thủy, Thành phố Cần Thơ, Việt Nam",50,2026-03-06 17:31:26.146,105.7875821,10.0364634,0,0,desktop,evening,10
+anonymous,6962373e8a8ba4ca1d0b712a,view,1,1850000000,Đất nền,"Lê Hồng Phong, Bình Thủy",90,2026-03-06 17:31:26.141,105.76818,10.04183,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 17:31:26.123,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,68be41337d034079204e4d87,view,1,5000000,Nhà riêng,"168/15 Võ Văn Kiệt, Phường An Thới, Quận Bình Thủy, Thành phố Cần Thơ, Việt Nam",30,2026-03-06 17:31:26.112,105.771892,10.045217,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 17:31:26.098,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 17:31:26.013,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 17:31:25.987,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,6962373e8a8ba4ca1d0b712a,view,1,1850000000,Đất nền,"Lê Hồng Phong, Bình Thủy",90,2026-03-06 17:26:10.424,105.76818,10.04183,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 17:26:10.414,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 17:26:10.408,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,68be3ec67d034079204e4ca0,view,1,5000000,Nhà riêng,"Hẻm 3, Đường Lê Hồng Phong, Phường Bình Thủy, Quận Bình Thủy, Thành phố Cần Thơ, Việt Nam",50,2026-03-06 17:26:10.391,105.7875821,10.0364634,0,0,desktop,evening,10
+anonymous,68be41337d034079204e4d87,view,1,5000000,Nhà riêng,"168/15 Võ Văn Kiệt, Phường An Thới, Quận Bình Thủy, Thành phố Cần Thơ, Việt Nam",30,2026-03-06 17:26:10.372,105.771892,10.045217,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 17:26:10.311,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 17:26:10.299,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,6962373e8a8ba4ca1d0b712a,view,1,1850000000,Đất nền,"Lê Hồng Phong, Bình Thủy",90,2026-03-06 17:24:56.134,105.76818,10.04183,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 17:24:56.118,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 17:24:56.100,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,68be41337d034079204e4d87,view,1,5000000,Nhà riêng,"168/15 Võ Văn Kiệt, Phường An Thới, Quận Bình Thủy, Thành phố Cần Thơ, Việt Nam",30,2026-03-06 17:24:56.058,105.771892,10.045217,0,0,desktop,evening,10
+anonymous,68be3ec67d034079204e4ca0,view,1,5000000,Nhà riêng,"Hẻm 3, Đường Lê Hồng Phong, Phường Bình Thủy, Quận Bình Thủy, Thành phố Cần Thơ, Việt Nam",50,2026-03-06 17:24:56.047,105.7875821,10.0364634,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 17:24:56.031,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 17:24:56.017,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,68be3ec67d034079204e4ca0,view,1,5000000,Nhà riêng,"Hẻm 3, Đường Lê Hồng Phong, Phường Bình Thủy, Quận Bình Thủy, Thành phố Cần Thơ, Việt Nam",50,2026-03-06 17:21:54.392,105.7875821,10.0364634,0,0,desktop,evening,10
+anonymous,6962373e8a8ba4ca1d0b712a,view,1,1850000000,Đất nền,"Lê Hồng Phong, Bình Thủy",90,2026-03-06 17:21:54.386,105.76818,10.04183,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 17:21:54.381,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,68be41337d034079204e4d87,view,1,5000000,Nhà riêng,"168/15 Võ Văn Kiệt, Phường An Thới, Quận Bình Thủy, Thành phố Cần Thơ, Việt Nam",30,2026-03-06 17:21:54.371,105.771892,10.045217,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 17:21:54.366,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 17:21:54.337,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 17:21:54.322,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 17:20:51.152,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 17:20:51.149,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 17:20:50.167,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 17:20:50.163,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 17:20:47.079,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 17:20:47.069,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,6962373e8a8ba4ca1d0b712a,view,1,1850000000,Đất nền,"Lê Hồng Phong, Bình Thủy",90,2026-03-06 17:20:47.056,105.76818,10.04183,0,0,desktop,evening,10
+anonymous,68be41337d034079204e4d87,view,1,5000000,Nhà riêng,"168/15 Võ Văn Kiệt, Phường An Thới, Quận Bình Thủy, Thành phố Cần Thơ, Việt Nam",30,2026-03-06 17:20:47.032,105.771892,10.045217,0,0,desktop,evening,10
+anonymous,68be3ec67d034079204e4ca0,view,1,5000000,Nhà riêng,"Hẻm 3, Đường Lê Hồng Phong, Phường Bình Thủy, Quận Bình Thủy, Thành phố Cần Thơ, Việt Nam",50,2026-03-06 17:20:47.023,105.7875821,10.0364634,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 17:20:46.991,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 17:20:46.977,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 17:18:16.992,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 17:18:16.732,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 17:16:13.986,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 17:16:13.982,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 17:16:12.574,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 17:16:12.568,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 17:16:09.660,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 17:16:09.655,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 17:16:08.818,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 17:16:08.814,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,6962373e8a8ba4ca1d0b712a,view,1,1850000000,Đất nền,"Lê Hồng Phong, Bình Thủy",90,2026-03-06 17:16:06.104,105.76818,10.04183,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 17:16:06.092,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,68be3ec67d034079204e4ca0,view,1,5000000,Nhà riêng,"Hẻm 3, Đường Lê Hồng Phong, Phường Bình Thủy, Quận Bình Thủy, Thành phố Cần Thơ, Việt Nam",50,2026-03-06 17:16:06.088,105.7875821,10.0364634,0,0,desktop,evening,10
+anonymous,68be41337d034079204e4d87,view,1,5000000,Nhà riêng,"168/15 Võ Văn Kiệt, Phường An Thới, Quận Bình Thủy, Thành phố Cần Thơ, Việt Nam",30,2026-03-06 17:16:06.076,105.771892,10.045217,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 17:16:06.069,105.6654241,10.0614589,0,0,desktop,evening,10
+anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 17:16:06.026,105.7197269,10.0254761,0,0,desktop,evening,10
+anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 17:16:06.006,105.6654241,10.0614589,0,0,desktop,evening,10
 anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 15:04:02.403,105.6654241,10.0614589,0,0,desktop,afternoon,10
 anonymous,697a34c691cb6f492ecbd81d,view,1,950000000,Đất nền,"Long Tuyền, Quận Bình Thủy, Cần Thơ",90,2026-03-06 15:04:01.112,105.7197269,10.0254761,0,0,desktop,afternoon,10
 anonymous,697a363d91cb6f492ecbd971,view,1,700000000,Đất nền,"Phường Nhơn Ái, Huyện Phong Điền, Cần Thơ",100,2026-03-06 15:04:01.089,105.6654241,10.0614589,0,0,desktop,afternoon,10

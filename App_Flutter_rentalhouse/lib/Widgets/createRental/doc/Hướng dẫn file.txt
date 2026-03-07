@@ -7,14 +7,11 @@ Các thuật toán hỗ trợ xử lý quá trình thao tác trên bản đồ :
 + Thuật toán Greedy Screen-Space Clustering : Phân cụm các điểm dữ liệu trên màn hình để giảm thiểu sự chồng chéo và cải thiện khả năng hiển thị.
 
 ======================================================================================================
-
-
+flutter clean
+flutter pub get
 ======================================================================================================
 
-- Các lỗi nhỏ còn :
-+ Lỗi khi chưa nhắn gì vẫn tạo conversation
-+ Lỗi xóa mục yêu thích
-+Chưa chuyển ảnh commet sang cloudr
+
 
 --- THÊM
 
@@ -24,14 +21,9 @@ Các thuật toán hỗ trợ xử lý quá trình thao tác trên bản đồ :
 
  + Cập nhật bài viết thay đổi địa chỉ tọa độ
 
- + Thông tin giải thích bài viết từ AI  chưa đủ
-
- + Cập nhật hiển thị tất cả marker --> kéo zoom tới đâu hiển thị tới đó
 
 =====================
------ > Điều chỉnh chatAI đưa chính xác thông tin giá , loại hơn
 
--------> Đưa nhìu gợi ý AI trên bản đồ hơn
 
 
 

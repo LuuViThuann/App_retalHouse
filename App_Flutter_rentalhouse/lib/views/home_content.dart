@@ -42,6 +42,23 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import '../utils/ChatAIPageRoute.dart';
 import '../utils/Snackbar_process.dart';
 
+// Class gợi ý các bài đăng tránh rebuild lại toàn bộ UI khi có sự thay đổi về trạng thái AI recommendations
+class _AIRecommendationState {
+  List<Rental> rentals = [];
+  bool isLoading = false;
+  bool hasError = false;
+  String? errorMessage;
+  int retryCount = 0;
+  DateTime? lastLoadedAt;
+
+  bool get isEmpty => rentals.isEmpty;
+  bool get canRetry => retryCount < 3;
+
+  bool get isStale {
+    if (lastLoadedAt == null) return true;
+    return DateTime.now().difference(lastLoadedAt!) > const Duration(minutes: 10);
+  }
+}
 
 class HomeContent extends StatefulWidget {
   const HomeContent({super.key});
@@ -67,8 +84,15 @@ class _HomeContentState extends State<HomeContent> {
 
   // BIẾN GƠI Ý AI
   late loc.Location _location;
-  bool _isLoadingAI = false;
-  List<Rental> _aiRecommendations = [];
+
+  // ======================================== <
+ // bool _isLoadingAI = false;
+ // List<Rental> _aiRecommendations = [];
+  final _aiState = _AIRecommendationState();
+  late final ValueNotifier<_AIRecommendationState> _aiNotifier =
+  ValueNotifier(_aiState);
+
+  // ============================== <
 
   RentalFilter filter = const RentalFilter();
 
@@ -116,7 +140,11 @@ class _HomeContentState extends State<HomeContent> {
           rentalViewModel.refreshAllRentals();
           _loadUnreadCount();
           _startNotificationTimer();
-          _loadAIRecommendations();
+
+          // Load AI sau 800ms để UI render xong trước
+          Future.delayed(const Duration(milliseconds: 800), () {
+            if (mounted) _loadAIRecommendations();
+          });
 
           Future.delayed(
             const Duration(milliseconds: 600),
@@ -130,10 +158,15 @@ class _HomeContentState extends State<HomeContent> {
   // ============================================================
 // 🔥 THÊM PHƯƠNG THỨC LOAD AI RECOMMENDATIONS
 
-  Future<void> _loadAIRecommendations() async {
+  Future<void> _loadAIRecommendations({bool forceRefresh = false}) async {
+    // Không load lại nếu đang load hoặc data còn mới (trừ forceRefresh)
+    if (_aiState.isLoading) return;
+    if (!forceRefresh && !_aiState.isStale && !_aiState.isEmpty) return;
+
     try {
       final authViewModel = Provider.of<AuthViewModel>(context, listen: false);
-      final rentalViewModel = Provider.of<RentalViewModel>(context, listen: false);
+      final rentalViewModel =
+      Provider.of<RentalViewModel>(context, listen: false);
 
       if (authViewModel.currentUser == null) return;
 
@@ -150,75 +183,85 @@ class _HomeContentState extends State<HomeContent> {
         if (permissionGranted != loc.PermissionStatus.granted) return;
       }
 
-      // Lấy vị trí hiện tại
-      final currentLocation = await _location.getLocation();
+      // Cập nhật trạng thái loading - CHỈ notify AI notifier, không setState
+      _aiState.isLoading = true;
+      _aiState.hasError = false;
+      _aiState.errorMessage = null;
+      _aiNotifier.notifyListeners();
 
-      if (currentLocation.latitude == null || currentLocation.longitude == null) {
-        return;
+      // Lấy vị trí hiện tại
+      final currentLocation = await _location.getLocation().timeout(
+        const Duration(seconds: 10),
+        onTimeout: () => throw Exception('Timeout lấy vị trí'),
+      );
+
+      if (currentLocation.latitude == null ||
+          currentLocation.longitude == null) {
+        throw Exception('Không lấy được tọa độ');
       }
 
-      setState(() => _isLoadingAI = true);
-
-      // Gọi AI recommendations từ ViewModel
+      // Gọi AI trong background - không block UI
       await rentalViewModel.fetchAIRecommendations(
         latitude: currentLocation.latitude!,
         longitude: currentLocation.longitude!,
         radius: 10.0,
       );
 
-      if (mounted) {
-        setState(() {
-          _aiRecommendations = rentalViewModel.nearbyRentals;
-          _isLoadingAI = false;
-        });
-      }
+      if (!mounted) return;
+
+      // Filter bỏ bài của chính user
+      final authVm = Provider.of<AuthViewModel>(context, listen: false);
+      final currentUserId = authVm.currentUser?.id;
+
+      final filtered = rentalViewModel.nearbyRentals.where((rental) {
+        if (rental.userId == null || rental.userId!.isEmpty) return true;
+        if (currentUserId != null && rental.userId == currentUserId) {
+          return false;
+        }
+        return true;
+      }).toList();
+
+      _aiState.rentals = filtered;
+      _aiState.isLoading = false;
+      _aiState.hasError = false;
+      _aiState.lastLoadedAt = DateTime.now();
+      _aiState.retryCount = 0;
+      _aiNotifier.notifyListeners();
+
+      debugPrint('✅ AI loaded ${filtered.length} rentals');
     } catch (e) {
       debugPrint('❌ Error loading AI recommendations: $e');
-      if (mounted) {
-        setState(() => _isLoadingAI = false);
-      }
+      if (!mounted) return;
+
+      _aiState.isLoading = false;
+      _aiState.hasError = true;
+      _aiState.errorMessage = e.toString();
+      _aiState.retryCount++;
+      _aiNotifier.notifyListeners();
     }
   }
 
+
   Widget _buildAIRecommendationsSection() {
-    if (_aiRecommendations.isEmpty && !_isLoadingAI) {
-      return const SizedBox.shrink();
-    }
+    return ValueListenableBuilder<_AIRecommendationState>(
+      valueListenable: _aiNotifier,
+      builder: (context, state, _) {
+        // Ẩn hoàn toàn nếu không loading và không có data và không có lỗi
+        if (!state.isLoading && state.isEmpty && !state.hasError) {
+          return const SizedBox.shrink();
+        }
 
-    final authViewModel = Provider.of<AuthViewModel>(context, listen: false);
-    final currentUserId = authViewModel.currentUser?.id;
-
-    // 🔥 FIX: Filter out user's own rentals BEFORE displaying
-    final filteredRecommendations = _aiRecommendations.where((rental) {
-      // Skip if rental.userId is null
-      if (rental.userId == null || rental.userId!.isEmpty) {
-        return true; // Keep it if we don't know the owner
-      }
-
-      // Skip if it's user's own rental
-      if (currentUserId != null && rental.userId == currentUserId) {
-        debugPrint('🚫 Filtered out own rental: ${rental.id}');
-        return false;
-      }
-
-      return true;
-    }).toList();
-
-    // If after filtering, no recommendations left
-    if (filteredRecommendations.isEmpty && !_isLoadingAI) {
-      return const SizedBox.shrink();
-    }
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // ── Header row ──
             Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
+                // Badge gradient
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  padding:
+                  const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                   decoration: BoxDecoration(
                     gradient: const LinearGradient(
                       begin: Alignment.topLeft,
@@ -238,14 +281,27 @@ class _HomeContentState extends State<HomeContent> {
                       ),
                     ],
                   ),
-                  child: const Row(
+                  child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(Icons.auto_awesome, color: Colors.white, size: 16),
-                      SizedBox(width: 6),
+                      // Icon xoay khi đang load
+                      state.isLoading
+                          ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(
+                          color: Colors.white,
+                          strokeWidth: 2,
+                        ),
+                      )
+                          : const Icon(Icons.auto_awesome,
+                          color: Colors.white, size: 16),
+                      const SizedBox(width: 6),
                       Text(
-                        'Trợ lý AI gợi ý cho bạn',
-                        style: TextStyle(
+                        state.isLoading
+                            ? 'AI đang phân tích...'
+                            : 'Trợ lý AI gợi ý cho bạn',
+                        style: const TextStyle(
                           color: Colors.white,
                           fontSize: 12,
                           fontWeight: FontWeight.bold,
@@ -253,113 +309,154 @@ class _HomeContentState extends State<HomeContent> {
                       ),
                     ],
                   ),
-                )
+                ),
+
+                // Nút xem tất cả hoặc retry
+                if (state.hasError && state.canRetry)
+                  TextButton.icon(
+                    onPressed: () => _loadAIRecommendations(forceRefresh: true),
+                    icon: const Icon(Icons.refresh, size: 14),
+                    label: const Text('Thử lại', style: TextStyle(fontSize: 13)),
+                    style: TextButton.styleFrom(
+                      foregroundColor: Colors.orange[700],
+                    ),
+                  )
+                else if (!state.isLoading && !state.isEmpty)
+                  TextButton(
+                    onPressed: () async {
+                      final currentLocation = await _location.getLocation();
+                      if (!mounted) return;
+                      if (currentLocation.latitude != null &&
+                          currentLocation.longitude != null) {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => AllAIRecommendationsScreen(
+                              initialLatitude: currentLocation.latitude,
+                              initialLongitude: currentLocation.longitude,
+                              initialRadius: 10.0,
+                            ),
+                          ),
+                        );
+                      } else {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const AllAIRecommendationsScreen(),
+                          ),
+                        );
+                      }
+                    },
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          'Xem tất cả',
+                          style:
+                          TextStyle(fontSize: 14, color: Colors.blue[700]),
+                        ),
+                        const SizedBox(width: 4),
+                        Icon(Icons.arrow_forward,
+                            size: 14, color: Colors.blue[700]),
+                      ],
+                    ),
+                  ),
               ],
             ),
-            TextButton(
-              onPressed: () async {
-                final currentLocation = await _location.getLocation();
 
-                if (currentLocation.latitude != null &&
-                    currentLocation.longitude != null) {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => AllAIRecommendationsScreen(
-                        initialLatitude: currentLocation.latitude,
-                        initialLongitude: currentLocation.longitude,
-                        initialRadius: 10.0,
-                      ),
-                    ),
-                  );
-                } else {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => const AllAIRecommendationsScreen(),
-                    ),
-                  );
-                }
-              },
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    'Xem tất cả',
-                    style: TextStyle(fontSize: 14, color: Colors.blue[700]),
+            const SizedBox(height: 10),
+
+            // ── Content area ──
+            if (state.isLoading)
+            // Shimmer skeleton - chỉ cho phần này
+              SizedBox(
+                height: 280,
+                child: ListView.separated(
+                  scrollDirection: Axis.horizontal,
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  itemCount: 3,
+                  separatorBuilder: (_, __) => const SizedBox(width: 12),
+                  itemBuilder: (context, index) => Shimmer.fromColors(
+                    baseColor: Colors.grey[300]!,
+                    highlightColor: Colors.grey[100]!,
+                    child: const RentalCardPlaceholder(),
                   ),
-                  const SizedBox(width: 4),
-                  Icon(
-                    Icons.arrow_forward,
-                    size: 14,
-                    color: Colors.blue[700],
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 10),
-
-        // 🔥 LOADING STATE
-        if (_isLoadingAI)
-          SizedBox(
-            height: 280,
-            child: ListView.separated(
-              scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              itemCount: 3,
-              separatorBuilder: (_, __) => const SizedBox(width: 12),
-              itemBuilder: (context, index) => Shimmer.fromColors(
-                baseColor: Colors.grey[300]!,
-                highlightColor: Colors.grey[100]!,
-                child: const RentalCardPlaceholder(),
-              ),
-            ),
-          )
-
-        // 🔥 SUCCESS STATE with filtered recommendations
-        else if (filteredRecommendations.isNotEmpty)
-          SizedBox(
-            height: 280,
-            child: ListView.separated(
-              scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              itemCount: filteredRecommendations.length,
-              separatorBuilder: (_, __) => const SizedBox(width: 12),
-              itemBuilder: (context, index) {
-                final rental = filteredRecommendations[index];
-
-                return Stack(
-                  children: [
-                    RentalCardHorizontal(rental: rental),
-
-
-                  ],
-                );
-              },
-            ),
-          )
-
-        // 🔥 EMPTY STATE
-        else
-          Center(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 20),
-              child: Text(
-                'Không có gợi ý AI',
-                style: TextStyle(
-                  fontSize: 14,
-                  color: Colors.grey[600],
                 ),
-              ),
-            ),
-          ),
+              )
+            else if (state.hasError)
+            // Error state với nút retry
+              Container(
+                height: 120,
+                margin: const EdgeInsets.symmetric(horizontal: 16),
+                decoration: BoxDecoration(
+                  color: Colors.orange[50],
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.orange[200]!),
+                ),
+                child: Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.wifi_off_rounded,
+                          color: Colors.orange[400], size: 28),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Không tải được gợi ý AI',
+                        style: TextStyle(
+                            color: Colors.orange[800],
+                            fontWeight: FontWeight.w600),
+                      ),
+                      const SizedBox(height: 4),
+                      if (state.canRetry)
+                        GestureDetector(
+                          onTap: () =>
+                              _loadAIRecommendations(forceRefresh: true),
+                          child: Text(
+                            'Nhấn để thử lại',
+                            style: TextStyle(
+                              color: Colors.blue[600],
+                              fontSize: 13,
+                              decoration: TextDecoration.underline,
+                            ),
+                          ),
+                        )
+                      else
+                        Text(
+                          'Vui lòng kiểm tra kết nối',
+                          style: TextStyle(
+                              color: Colors.grey[600], fontSize: 12),
+                        ),
+                    ],
+                  ),
+                ),
+              )
+            else if (state.isEmpty)
+                const SizedBox.shrink()
+              else
+              // Danh sách AI recommendations
+                SizedBox(
+                  height: 280,
+                  child: ListView.separated(
+                    scrollDirection: Axis.horizontal,
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    itemCount: state.rentals.length,
+                    separatorBuilder: (_, __) => const SizedBox(width: 12),
+                    itemBuilder: (context, index) {
+                      final rental = state.rentals[index];
+                      return RentalCardHorizontal(rental: rental);
+                    },
+                  ),
+                ),
 
-        const SizedBox(height: 20),
-      ],
+            const SizedBox(height: 20),
+          ],
+        );
+      },
     );
   }
+
+
+
   Future<void> _getCurrentLocationAndNavigateToMap() async {
     try {
       final location = loc.Location();
@@ -615,6 +712,8 @@ class _HomeContentState extends State<HomeContent> {
     _bannerController.dispose();
     _currentBannerIndex.dispose();
     _unreadNotificationCount.dispose();
+
+    _aiNotifier.dispose();
     super.dispose();
   }
 
@@ -2059,6 +2158,7 @@ class _WelcomeToast extends StatefulWidget {
   State<_WelcomeToast> createState() => _WelcomeToastState();
 }
 
+// ======================================================================= <
 class _WelcomeToastState extends State<_WelcomeToast>
     with SingleTickerProviderStateMixin {
   late final AnimationController _controller = AnimationController(
@@ -2111,6 +2211,12 @@ class _WelcomeToastState extends State<_WelcomeToast>
                   color: Colors.black.withOpacity(0.10),
                   blurRadius: 20,
                   offset: const Offset(0, 6),
+                ),
+                BoxShadow(
+                  color: const Color(0xFF3B82F6).withOpacity(0.18),
+                  blurRadius: 24,
+                  spreadRadius: 2,
+                  offset: const Offset(0, 4),
                 ),
               ],
             ),
