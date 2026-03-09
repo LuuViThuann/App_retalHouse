@@ -1,295 +1,82 @@
-🏠 ỨNG DỤNG BẤT ĐỘNG SẢN - AI GỢI Ý CHUYÊN NGHIỆP – Mobile Application
 
-Ứng dụng bất động sản trên nền tảng mobile được xây dựng nhằm kết nối người tìm bất động sản với môi giới hoặc người đăng tin.
-Hệ thống hỗ trợ tìm kiếm, gợi ý bất động sản cá nhân hóa, tương tác theo thời gian thực và phân tích dữ liệu thị trường.
-
-Ứng dụng được thiết kế theo mô hình Client–Server, tích hợp nhiều công nghệ hiện đại để đảm bảo hiệu năng, khả năng mở rộng và trải nghiệm người dùng tốt.
-
-🚀 Technology Stack
-1. Frontend
-
-Dart / Flutter
-
-Xây dựng ứng dụng mobile đa nền tảng.
-
-Quản lý trạng thái và giao diện người dùng.
-
-Đồng bộ dữ liệu với hệ thống backend thông qua REST API.
-
-2. Backend
-
-Node.js / Express.js
-
-Xây dựng RESTful API.
-
-Xử lý business logic của hệ thống.
-
-Quản lý authentication, giao dịch và dữ liệu bài đăng.
-
-Python
-
-Xử lý dữ liệu bài đăng.
-
-Xây dựng mô hình AI gợi ý bất động sản cá nhân hóa cho người dùng.
-
-3. Database
-
-MongoDB (NoSQL Database)
-
-Lưu trữ dữ liệu bài đăng bất động sản.
-
-Sử dụng Geospatial Index để hỗ trợ tìm kiếm bất động sản theo vị trí và bán kính.
-
-Firebase
-
-Lưu trữ thông tin người dùng.
-
-Tích hợp Google Authentication.
-
-4. Supporting Technologies & Services
-
-VNPay (Sandbox)
-
-Tích hợp thanh toán cho chức năng đăng tin bất động sản.
-
-Cloudinary
-
-Lưu trữ và tối ưu hình ảnh.
-
-Lưu URL ảnh vào cơ sở dữ liệu.
-
-Redis
-
-Cache dữ liệu tạm thời.
-
-Giảm tải truy vấn trực tiếp vào database.
-
-Docker
-
-Tạo môi trường chạy đồng nhất cho các service:
-
-NodeJS
-
-MongoDB
-
-Redis
-
-Elasticsearch
-
-Socket.IO
-
-Xử lý dữ liệu real-time cho hệ thống chat.
-
-Elasticsearch
-
-Tối ưu hóa tìm kiếm bài đăng bất động sản.
-
-Postman
-
-Kiểm thử và phát triển API.
-
-Nominatim – OpenStreetMap
-
-Chuyển đổi địa chỉ sang tọa độ địa lý (Geocoding).
-
-OpenAI API
-
-Tích hợp chatbot AI tư vấn bất động sản.
-
-Bcrypt
-
-Mã hóa mật khẩu trước khi lưu vào database.
-
-📱 Application Features
-🔐 Authentication
-
-Đăng ký tài khoản
-
-Đăng nhập
-
-Khôi phục mật khẩu qua Email
-
-Đăng nhập bằng Google
-
-🏘️ Real Estate Listing
-
-Hiển thị danh sách bất động sản mới nhất
-
-Phân loại theo loại bất động sản
-
-Xem chi tiết bài đăng
-
-Bình luận và đánh giá bài đăng
-
-🔍 Search & Filter
-
-Tìm kiếm theo:
-
-Từ khóa
-
-Loại bất động sản
-
-Khoảng giá
-
-Lọc kết quả theo nhiều tiêu chí.
-
-🗺️ Map-based Search
-
-Hiển thị bất động sản trên bản đồ.
-
-Tìm kiếm bất động sản trong bán kính vị trí trên bản đồ.
-
-Lọc giá trong khu vực đang xem.
-
-💰 Posting & Payment
-
-Đăng bài bất động sản có phí.
-
-Thanh toán qua VNPay Sandbox.
-
-Lưu lịch sử giao dịch.
-
-💬 Communication
-
-Tạo cuộc trò chuyện giữa người dùng và người đăng tin.
-
-Nhắn tin real-time thông qua Socket.IO.
-
-❤️ User Interaction
-
-Lưu bất động sản yêu thích.
-
-Lưu lịch sử tương tác.
-
-Nhận thông báo hoạt động gần đây.
-
-🤖 AI Chatbot
-
-Chatbot hỗ trợ tư vấn bất động sản.
-
-Sử dụng OpenAI API để tạo hội thoại thông minh.
-
-👤 User Profile
-
-Quản lý hồ sơ cá nhân.
-
-Xem danh sách bài đăng của tài khoản.
-
-Gửi phản hồi và góp ý.
-
-📰 News
-
-Cập nhật tin tức liên quan đến thị trường bất động sản.
-
-📊 Data Analytics & Statistics
-
-Hệ thống cung cấp các chức năng thống kê dữ liệu nhằm hỗ trợ phân tích thị trường:
-
-Thống kê theo khu vực
-
-Biểu đồ cột
-
-Phân bố theo tỉnh / quận / phường.
-
-Thống kê tiện nghi & nội thất
-
-Biểu đồ tròn
-
-Phân bố các tiện nghi phổ biến.
-
-Thống kê tăng trưởng theo thời gian
-
-Phân tích hành vi người dùng
-
-Lượt xem
-
-Yêu thích
-
-Liên hệ
-
-Tỷ lệ chuyển đổi.
-
-Phân bố diện tích bất động sản
-
-Phân bố giá
-
-Phân loại bất động sản
-
-Nhà riêng
-
-Chung cư
-
-Văn phòng
-
-Phòng trọ.
-
-Khu vực nổi bật
-
-Top 5–10 khu vực có nhiều bất động sản nhất.
-
-Tổng quan hệ thống
-
-Tổng số bất động sản
-
-Giá trung bình
-
-Khu vực hot nhất.
-
-🤖 AI Recommendation System
-
-Hệ thống sử dụng Python để xây dựng mô hình gợi ý bất động sản cá nhân hóa cho người dùng.
-
-1️⃣ Content-Based Recommendation (content_score)
-
-Đánh giá mức độ phù hợp với sở thích của người dùng (0–100%).
-
-Các yếu tố:
-
-Giá bất động sản
-
-So sánh với:
-
-avg_price
-
-min_price
-
-max_price
-
-Loại bất động sản
-
-Dựa trên tần suất loại bất động sản trong lịch sử tương tác.
-
-Vị trí
-
-Khoảng cách từ bất động sản đến khu vực người dùng quan tâm.
-
-2️⃣ Collaborative Filtering (cf_score)
-
-Xác định các người dùng có hành vi tương tự.
-
-Phương pháp:
-
-Xây dựng user × rental interaction matrix
-
-Tính Cosine Similarity giữa các người dùng.
-
-Trọng số tương tác:
-
-| Action   | Score |
-| -------- | ----- |
-| View     | 1     |
-| Click    | 2     |
-| Favorite | 5     |
-| Contact  | 8     |
-
-3️⃣ Popularity-Based Recommendation (popularity_score)
-
-Sử dụng cho các trường hợp như người dùng mới (cold start).
-
-Các yếu tố:
-
-Tổng điểm tương tác của bài đăng.
-
-Số lượng người dùng khác nhau đã tương tác.
-
-✔️ Ba điểm số được kết hợp để tạo ra danh sách gợi ý bất động sản tối ưu cho từng người dùng.
+<p float="left">
+  <img src="Screen/startlogin.jpg" width="30%" />
+  <img src="Screen/dangNhap.jpg" width="30%" />
+  <img src="Screen/trangchu.jpg" width="30%" />
+</p>
+
+
+ỨNG DỤNG ĐĂNG TIN BẤT ĐỘNG SẢN TÍCH HỢP MODEL AI GỢI Ý CÁ NHÂN HÓA
+1.CÔNG NGHỆ SỬ DỤNG
+1.1Về phía Front-End
++ Dart / Flutter : Tạo giao diện đa nền tảng mobile 
+1.2Về phía Backend 
++ FLutter : Xử lý hiển thị dữ liệu từ Backend / NodeJS
++ NodeJS / ExpressJS : xử lý dữ liệu từ MongoDB và các logic API 
++ Python : Xử lý thông tin người dùng và gợi ý cá nhân hóa người dùng
+1. "Phù hợp sở thích" (content_score) — 0-100%
++ Giá các bài user đã xem/yêu thích : So sánh giá bài này với avg_price, min_price, max_price của user
++ Loại BĐS user hay xem (Nhà riêng, Phòng trọ...) : Tỉ lệ % loại BĐS này trong lịch sử
++ Vị trí các bài user đã xem : Khoảng cách từ bài này đến trung tâm vị trí user
+2. "Người dùng tương tự" (cf_score) — 0-100%
+Đây là điểm Collaborative Filtering — tìm người dùng có hành vi giống user hiện tại
++ Toàn bộ lịch sử interactions : Ma trận user × rental với điểm tương tác
++ Cosine similarity giữa các user : User A và User B "giống nhau" đến mức nào
++ view=1, click=2, favorite=5, contact=8 : Mức độ quan tâm
+3.  "Độ phổ biến" (popularity_score) — 0-100% -> Dành cho gợi ý chẳng hạn như các tài khoản mới
+Đây là điểm Popularity-Based — không phụ thuộc vào user cụ thể
++ Tổng điểm tất cả interactions của bài : Bài được quan tâm nhiều cỡ nào
++ Số user khác nhau tương tác : Độ rộng của sự quan tâm
++ Flutter Xử lý đồng bộ dữ liệu các bên
+1.3 Database sử dụng : 
++ MongoDB - NoSQL : Tận dụng Geospatial tích hợp xử lý logic hiển thị các bài gợi ý xung quanh
++ Firebase : Lưu trữ thông tin người dùng + tích hợp login Google
++ Redis : Cache dữ liệu tạm thời gọi lại nhanh hơn , không tốn query truy vấn lại trong DB 
+1.4 Các công nghệ và dịch vụ khác liên quan : 
++ Tích hợp VNPay thanh toán khi đăng bài trong môi trường sanbox-test
++ Cloudinary : Lưu trữ các hình ảnh và tối ưu dung lượng ảnh , sau đó lưu link ảnh URL trong DB
++ Docker : Tạo môi trường chạy đồng nhất cho Node-JS , Redis , mongoDB , Elasticsearch , NodeJS , Python
++ Socket.IO : Chạy dữ liệu thời gian thực
++ ElasticSearch : tối ưu chỉ mục cho tìm kiếm các bài viết
++ PostMan : Kiểm thử các API
++ Sử dụng Nominatim - OpenStreetMap dịch vụ bản đồ để chuyển địa chỉ sang tọa độ
++ Tích hợp KEY từ OpenAI- Groq : cho chức năng chat giao tiếp tư vấn
++ Sử dụng Bcrypt chuyển mật khẩu sang chuỗi hash lưu trong DB.
+2.THÔNG TIN CHỨC NĂNG CÓ TRONG ỨNG DỤNG
+2.1Các chức năng chính tương tác trên GoogleMap : 
+- Theo dõi các bài đăng hiển thị trên bản đồ GoogleMap
+- Bật chế độ AI gợi ý các bài đăng và tư vấn thích hợp với nhu cầu
+- Tìm các bài đăng theo tiện ích cụ thể như : mua sắm , nhà hàng, cây xăng ,…
+- Vẽ và phân vùng tìm kiếm các BĐS cần xem
+- Chế độ gom nhóm các bài đăng cho dễ quan sát trực quan
+- Tìm kiếm và gợi ý địa chỉ cụ thể 
+2.2Chức năng chatBot-AI tư vấn :
+- Gợi ý tư vấn cho người dùng các bài đăng thích hợp từ Model đã Train
+- Người dùng có thể tư vấn các bài đăng có mức giá ở địa chỉ cụ thể 
+- Xem lại lịch sử chatbot
+2.3Các chức năng trong ứng dụng :
+- Đăng nhập / Đăng ký / Khôi phục pass qua Email / Đăng nhập GG
+- Hiển thị các thông tin loại bất động sản / bài mới tại trang chính 
+- Tìm kiếm thông tin BĐS theo loại / từ khóa / khoảng giá 
+- Đăng bài tính phí thanh toán thông qua test VNPay
+- Lưu lịch sử giao dịch thanh toán
+- Tạo cuộc trò chuyện và nhắn tin thông qua bài viết của người đăng BĐS 
+- Lưu yêu thích các BĐS 
+- Xem chi tiết thông tin BĐS và bình luận / phản hồi / đánh giá cho người dùng trong chi tiết bài đăng , AI hỗ trợ gợi ý các BĐS cùng loại đang xem
+- Lưu các thông báo tương tác gần đây trong ứng dụng
+- Đăng gửi các góp ý & phản hồi 
+- Thông tin hồ sơ cá nhân 
+- Xem danh sách bài đăng thuộc trong tài khoản
+- Danh sách tin tức 
+2.4Các chức năng trong thống kê thông tin bất động sản : 
+- Thống kê theo khu vực (biểu đồ cột, phân bố theo tỉnh/quận/phường)
+- Thống kê tiện nghi & nội thất (biểu đồ tròn, phân bố các tiện nghi phổ biến)
+- Thống kê tăng trưởng theo thời gian
+- Hành vi người dùng (lượt xem, yêu thích, liên hệ, tỷ lệ chuyển đổi)
+- Phân bố diện tích (biểu đồ cột hoặc box plot)
+- Phân bố giá (biểu đồ cột hoặc box plot)
+Phân loại BĐS (biểu đồ tròn, % nhà nguyên căn, chung cư, văn phòng, v.v.)
+Khu vực nổi bật (danh sách top 5-10 khu vực có nhiều BĐS nhất)
+Tổng quan (các chỉ số chính: tổng số BĐS, giá TB, khu vực hot nhất)
+
+* Thông tin chức năng ở phía quản trị ứng dụng : 
