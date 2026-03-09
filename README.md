@@ -14,7 +14,26 @@
  <img src="Screen/8.png" width="30%" />
   <img src="Screen/9.png" width="30%" />
 </p>
-
+<p float="left">
+  <img src="Screen/10.png" width="30%" />
+ <img src="Screen/11.png" width="30%" />
+  <img src="Screen/12.png" width="30%" />
+</p>
+<p float="left">
+  <img src="Screen/13.png" width="30%" />
+ <img src="Screen/14.png" width="30%" />
+  <img src="Screen/15.png" width="30%" />
+</p>
+<p float="left">
+  <img src="Screen/16.png" width="30%" />
+ <img src="Screen/17.png" width="30%" />
+  <img src="Screen/18.png" width="30%" />
+</p>
+<p float="left">
+  <img src="Screen/19.png" width="30%" />
+ <img src="Screen/20.png" width="30%" />
+  <img src="Screen/21.png" width="30%" />
+</p>
 ỨNG DỤNG ĐĂNG TIN BẤT ĐỘNG SẢN TÍCH HỢP MODEL AI GỢI Ý CÁ NHÂN HÓA
 1.CÔNG NGHỆ SỬ DỤNG
 1.1Về phía Front-End
