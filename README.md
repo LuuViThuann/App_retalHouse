@@ -1,10 +1,19 @@
-
+* MỘT SỐ ẢNH MINH HOẠT ỨNG DỤNG TRÊN GOOGLE-MAP
 <p float="left">
-  <img src="Screen/startlogin.jpg" width="30%" />
-  <img src="Screen/dangNhap.jpg" width="30%" />
-  <img src="Screen/trangchu.jpg" width="30%" />
+  <img src="Screen/1.png" width="30%" />
+ <img src="Screen/2.png" width="30%" />
+  <img src="Screen/3.png" width="30%" />
 </p>
-
+<p float="left">
+  <img src="Screen/4.png" width="30%" />
+ <img src="Screen/5.png" width="30%" />
+  <img src="Screen/6.png" width="30%" />
+</p>
+<p float="left">
+  <img src="Screen/7.png" width="30%" />
+ <img src="Screen/8.png" width="30%" />
+  <img src="Screen/9.png" width="30%" />
+</p>
 
 ỨNG DỤNG ĐĂNG TIN BẤT ĐỘNG SẢN TÍCH HỢP MODEL AI GỢI Ý CÁ NHÂN HÓA
 1.CÔNG NGHỆ SỬ DỤNG
