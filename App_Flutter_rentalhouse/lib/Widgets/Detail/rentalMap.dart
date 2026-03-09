@@ -7,9 +7,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_rentalhouse/Widgets/Detail/AIExplanationDialog.dart';
 import 'package:flutter_rentalhouse/Widgets/Detail/AddressSearchResult.dart';
 import 'package:flutter_rentalhouse/Widgets/Detail/ClusterItem.dart';
+import 'package:flutter_rentalhouse/Widgets/Detail/DrawAreaWidget.dart';
 import 'package:flutter_rentalhouse/Widgets/Detail/FilterDialogWidget.dart';
 import 'package:flutter_rentalhouse/Widgets/Detail/HorizontalRentalList.dart';
 import 'package:flutter_rentalhouse/Widgets/Detail/LoadingPoi.dart';
+import 'package:flutter_rentalhouse/Widgets/Detail/MapToolbar.dart';
 import 'package:flutter_rentalhouse/Widgets/Detail/NearbyRentals.dart';
 import 'package:flutter_rentalhouse/Widgets/Detail/analytics_screen.dart';
 import 'package:flutter_rentalhouse/Widgets/Detail/customMarker.dart';
@@ -80,18 +82,20 @@ class _RentalMapViewState extends State<RentalMapView>
   String? _currentUserId;
   bool _isLoadingAIExplanation = false;
 
-  // 🔥 NEW: Address Search Variables
+  // ── Draw Area State ──────────────────────────────────
+  bool _isDrawMode = false;
+  DrawMode _activeDrawMode = DrawMode.none;
+  DrawAreaResult? _lastDrawResult;
+  List<Rental> _drawFilteredRentals = [];
+  bool _isDrawFilterActive = false;
+  Polygon? _drawnPolygon;
+
+  //  Address Search Variables
   bool _showAddressSearch = false;
   AddressSearchResult? _selectedAddress;
 
-  // 🔥 NEW: Tracking keyboard visibility
+  //  Tracking keyboard visibility
   double _keyboardHeight = 0;
-
-
-// Hoặc tốt hơn là:
-  AnimationController? _controlsAnimationController;
-  Animation<Offset>? _controlsSlideAnimation;
-  Animation<double>? _controlsOpacityAnimation;
 
   AnimationController? _badgeAnimationController;
   Animation<double>? _badgeOpacityAnimation;
@@ -99,18 +103,162 @@ class _RentalMapViewState extends State<RentalMapView>
 
   bool _showControls = true;
 
-  List<Rental> _allNearbyRentals = [];     // ✅ Luôn giữ data thường (không AI)
-  List<Rental> _allAINearbyRentals = [];   // ✅ Giữ data AI recommendations
+  List<Rental> _allNearbyRentals = [];
+  List<Rental> _allAINearbyRentals = [];
 
-  LatLngBounds? _lastFetchedBounds;  // Bounds lần fetch trước
-  static const double _viewportPadding = 0.3; // Mở rộng 30% để pre-load
+  LatLngBounds? _lastFetchedBounds;
+  static const double _viewportPadding = 0.3;
 
-// Thêm vào đầu class _RentalMapViewState
+
   final Map<String, BitmapDescriptor> _markerIconCache = {};
   bool _isUpdatingMarkers = false;
-  Set<String> _currentVisibleIds = {}; // Track IDs đang hiển thị
+  Set<String> _currentVisibleIds = {};
 
 
+  void _showDrawModeSelector() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (_) => DrawModeSelector(
+        onFreehand: () {
+          Navigator.pop(context);
+          _startDrawMode(DrawMode.freehand);
+        },
+        onPolygon: () {
+          Navigator.pop(context);
+          _startDrawMode(DrawMode.polygon);
+        },
+        onCancel: () => Navigator.pop(context),
+      ),
+    );
+  }
+// ── Hàm: Bắt đầu chế độ vẽ ─────────────────────────────────
+
+  void _startDrawMode(DrawMode mode) {
+    setState(() {
+      _isDrawMode = true;
+      _activeDrawMode = mode;
+      _drawnPolygon = null;
+      _drawFilteredRentals = [];
+      _isDrawFilterActive = false;
+    });
+    _toggleControlsVisibility(false);
+  }
+
+
+// ── Hàm: Hủy chế độ vẽ ─────────────────────────────────────
+
+  void _cancelDrawMode() {
+    setState(() {
+      _isDrawMode = false;
+      _activeDrawMode = DrawMode.none;
+      _lastDrawResult = null;
+      _isDrawFilterActive = false;
+      _drawFilteredRentals = [];
+      _drawnPolygon = null;
+    });
+    _toggleControlsVisibility(true);
+  }
+  Future<void> _onDrawAreaCompleted(DrawAreaResult result) async {
+    setState(() {
+      _lastDrawResult = result;
+      _isDrawMode = false;
+      _activeDrawMode = DrawMode.none;
+    });
+
+    // Tạo Google Maps Polygon để hiển thị vùng đã vẽ
+    final polygonId = PolygonId('draw_area_${DateTime.now().millisecondsSinceEpoch}');
+    setState(() {
+      _drawnPolygon = Polygon(
+        polygonId: polygonId,
+        points: result.polygon,
+        strokeColor: const Color(0xFF2E7D32),
+        strokeWidth: 3,
+        fillColor: const Color(0x3326A69A),
+      );
+    });
+
+    // Lọc rentals trong vùng vẽ
+    final List<Rental> allRentals = _isAIMode
+        ? _allAINearbyRentals
+        : _allNearbyRentals;
+
+    final filtered = allRentals.where((rental) {
+      final lat = _safeParseDouble(rental.location['latitude'], '') ?? 0.0;
+      final lng = _safeParseDouble(rental.location['longitude'], '') ?? 0.0;
+      if (lat == 0.0 && lng == 0.0) return false;
+      return DrawAreaHelper.isPointInPolygon(LatLng(lat, lng), result.polygon);
+    }).toList();
+
+    setState(() {
+      _drawFilteredRentals = filtered;
+      _isDrawFilterActive = true;
+      _filteredNearbyRentals = filtered;
+      _isFilterApplied = true;
+    });
+
+    _toggleControlsVisibility(true);
+    await _updateMarkersWithClustering();
+
+    // Di chuyển camera đến tâm vùng vẽ
+    _animateToPosition(result.center, 14.0);
+
+    // Thông báo kết quả
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              const Icon(Icons.check_circle, color: Colors.white),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      'Tìm thấy ${filtered.length} bài trong vùng',
+                      style: const TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                    Text(
+                      'Bán kính ~${result.approximateRadiusKm.toStringAsFixed(1)} km',
+                      style: const TextStyle(fontSize: 12),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          backgroundColor: const Color(0xFF2E7D32),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          margin: const EdgeInsets.all(16),
+          duration: const Duration(seconds: 3),
+          action: SnackBarAction(
+            label: 'Xóa vùng',
+            textColor: Colors.white,
+            onPressed: _clearDrawArea,
+          ),
+        ),
+      );
+    }
+  }
+  void _clearDrawArea() {
+    setState(() {
+      _isDrawFilterActive = false;
+      _drawFilteredRentals = [];
+      _lastDrawResult = null;
+      _drawnPolygon = null;
+      _filteredNearbyRentals = List.from(_originalNearbyRentals);
+      _isFilterApplied = false;
+    });
+    _updateMarkersWithClustering();
+    _showSnackbar(
+      message: 'Đã xóa vùng tìm kiếm',
+      backgroundColor: Colors.grey[700],
+    );
+  }
  // THÊM HÀM INITIALIZE BADGE ANIMATION
   void _initializeBadgeAnimationIfNeeded() {
     if (_badgeAnimationController != null) return; // Đã init rồi
@@ -147,29 +295,6 @@ class _RentalMapViewState extends State<RentalMapView>
       await _badgeAnimationController!.forward();
     }
   }
-
-  void _initializeAnimationsIfNeeded() {
-    if (_controlsAnimationController != null) return; // Đã init rồi
-
-    _controlsAnimationController = AnimationController(
-      duration: const Duration(milliseconds: 300),
-      vsync: this,
-    );
-
-    _controlsSlideAnimation = Tween<Offset>(
-      begin: const Offset(0, 0),
-      end: const Offset(-0.5, 0),
-    ).animate(
-      CurvedAnimation(parent: _controlsAnimationController!, curve: Curves.easeInOut),
-    );
-
-    _controlsOpacityAnimation = Tween<double>(
-      begin: 1.0,
-      end: 0.0,
-    ).animate(
-      CurvedAnimation(parent: _controlsAnimationController!, curve: Curves.easeInOut),
-    );
-  }
   // ============================================
   // HÀM KHỞI TẠO VÀ CẬP NHẬT
   // ============================================
@@ -182,8 +307,6 @@ class _RentalMapViewState extends State<RentalMapView>
     //Lấy user ID từ AuthService
     _getCurrentUser();
 
-
-    _initializeAnimationsIfNeeded();
     _initializeBadgeAnimationIfNeeded();
 
     WidgetsBinding.instance.addObserver(this);
@@ -211,18 +334,7 @@ class _RentalMapViewState extends State<RentalMapView>
 
   Future<void> _toggleControlsVisibility(bool show) async {
     if (show == _showControls) return;
-
-    _initializeAnimationsIfNeeded(); // ✅ Đảm bảo animations đã init
-
-    setState(() {
-      _showControls = show;
-    });
-
-    if (show) {
-      await _controlsAnimationController!.reverse();
-    } else {
-      await _controlsAnimationController!.forward();
-    }
+    setState(() { _showControls = show; });
   }
   //  NEW: Helper method để lấy current user
   Future<void> _getCurrentUser() async {
@@ -669,8 +781,8 @@ class _RentalMapViewState extends State<RentalMapView>
               const SizedBox(width: 12),
               Text(
                 _isAIMode
-                    ? '🤖 Đã bật gợi ý AI (${_originalNearbyRentals.length} bài)'
-                    : '📍 Đã tắt AI - hiển thị ${_originalNearbyRentals.length} bài thường',
+                    ? 'Đã bật gợi ý AI (${_originalNearbyRentals.length} bài)'
+                    : 'Đã tắt AI - hiển thị ${_originalNearbyRentals.length} bài thường',
                 style: const TextStyle(fontWeight: FontWeight.w600),
               ),
             ],
@@ -767,9 +879,11 @@ class _RentalMapViewState extends State<RentalMapView>
       // Nếu visibleRentals được truyền vào (từ viewport) thì dùng nó
       // Nếu không thì lấy từ state hiện tại
       final List<Rental> displayRentals = visibleRentals ?? (
-          _isFilterApplied
+          _isDrawFilterActive
+              ? _drawFilteredRentals
+              : (_isFilterApplied
               ? _filteredNearbyRentals
-              : _originalNearbyRentals
+              : _originalNearbyRentals)
       );
 
       // Fallback: nếu displayRentals trống nhưng viewModel có data
@@ -1110,8 +1224,7 @@ class _RentalMapViewState extends State<RentalMapView>
   @override
   void dispose() {
     _cameraDebounce?.cancel();
-    _aiRefreshDebounce?.cancel();  // 🔥 Hủy debounce timer khi dispose
-    _controlsAnimationController?.dispose();
+    _aiRefreshDebounce?.cancel();
     _markerIconCache.clear();
     _badgeAnimationController?.dispose(); // ✅ THÊM DÒNG NÀY
     WidgetsBinding.instance.removeObserver(this);
@@ -1936,197 +2049,200 @@ class _RentalMapViewState extends State<RentalMapView>
       _toggleBadgeVisibility(false);
     });
   }
-  // 📍 REPLACE ENTIRE _buildTopLeftControls() METHOD
+
 
   Widget _buildTopLeftControls() {
     final rentalViewModel = Provider.of<RentalViewModel>(context);
-    final displayCount = _isPOIFilterActive
-        ? _filteredNearbyRentals.length
-        : (_isFilterApplied
-        ? _filteredNearbyRentals.length
-        : _originalNearbyRentals.length);
 
-    if (_controlsSlideAnimation == null || _controlsOpacityAnimation == null) {
-      _initializeAnimationsIfNeeded();
-    }
+    // ── Tính badge text cho từng tool ──────────────────────
+    final String? drawBadge = _isDrawFilterActive
+        ? '${_drawFilteredRentals.length}'
+        : null;
+
+    final String? poiBadge = _isPOIFilterActive
+        ? (_isAIMode ? 'AI+POI' : 'bật')
+        : null;
+
+    final String? aiBadge = _isAIMode
+        ? '${_originalNearbyRentals.length}'
+        : null;
+
+    final String? clusterBadge = _useCluster ? 'ON' : null;
+
+    final String? filterBadge = _isFilterApplied
+        ? '${_filteredNearbyRentals.length}'
+        : null;
+
+    // ── Danh sách tools ────────────────────────────────────
+    final tools = [
+      // 1. Vẽ vùng
+      MapToolItem(
+        id: 'draw',
+        icon: Icons.draw_outlined,
+        activeIcon: Icons.draw,
+        label: 'Vẽ vùng',
+        activeColor: const Color(0xFF2E7D32),
+        isActive: _isDrawFilterActive,
+        badgeText: drawBadge,
+        onTap: () async => _showDrawModeSelector(),
+        onActiveTap: () async => _clearDrawArea(),
+      ),
+
+      // 2. Tìm gần tiện ích (POI)
+      MapToolItem(
+        id: 'poi',
+        icon: Icons.location_city_outlined,
+        activeIcon: Icons.location_city,
+        label: 'Gần tiện ích',
+        activeColor: Colors.teal.shade700,
+        isActive: _isPOIFilterActive,
+        badgeText: poiBadge,
+        onTap: () async {
+          setState(() => _showAddressSearch = false);
+          _showPOISelector();
+        },
+        onActiveTap: () async {
+          setState(() => _showAddressSearch = false);
+          _clearPOIFilter();
+        },
+      ),
+
+      // 3. AI thông minh
+      MapToolItem(
+        id: 'ai',
+        icon: Icons.auto_awesome_outlined,
+        activeIcon: Icons.auto_awesome,
+        iconWidget: Image.asset(
+          'assets/img/modeai.png',
+          width: 44,
+          height: 44,
+          fit: BoxFit.cover,
+        ),
+        activeIconWidget: Image.asset(
+          'assets/img/modeai.png',
+          width: 44,
+          height: 44,
+          fit: BoxFit.cover,
+        ),
+        label: 'Gợi ý AI',
+        activeColor: Colors.indigo.shade600,
+        isActive: _isAIMode,
+        badgeText: aiBadge,
+        onTap: () async {
+          if (!rentalViewModel.isLoading) {
+            setState(() => _showAddressSearch = false);
+            await _toggleAIMode();
+          }
+        },
+        onActiveTap: () async {
+          if (!rentalViewModel.isLoading) {
+            setState(() => _showAddressSearch = false);
+            await _toggleAIMode();
+          }
+        },
+      ),
+
+      // 4. Gom nhóm cluster
+      MapToolItem(
+        id: 'cluster',
+        icon: Icons.bubble_chart_outlined,
+        activeIcon: Icons.bubble_chart,
+        label: 'Gom nhóm',
+        activeColor: Colors.blue.shade600,
+        isActive: _useCluster,
+        badgeText: clusterBadge,
+        onTap: () async {
+          setState(() => _useCluster = !_useCluster);
+          await _updateMarkersWithClustering();
+        },
+        onActiveTap: () async {
+          setState(() => _useCluster = false);
+          await _updateMarkersWithClustering();
+        },
+      ),
+
+      // 5. Bộ lọc giá/khoảng cách
+      MapToolItem(
+        id: 'filter',
+        icon: Icons.tune_outlined,
+        activeIcon: Icons.tune,
+        label: 'Bộ lọc',
+        activeColor: Colors.orange.shade700,
+        isActive: _isFilterApplied,
+        badgeText: filterBadge,
+        onTap: () async {
+          setState(() => _showAddressSearch = false);
+          _showFilterDialog();
+        },
+        onActiveTap: () async {
+          setState(() {
+            _filteredNearbyRentals = List.from(_originalNearbyRentals);
+            _isFilterApplied = false;
+          });
+          await _updateMarkersWithClustering();
+        },
+      ),
+
+      // 6. Refresh
+      MapToolItem(
+        id: 'refresh',
+        icon: Icons.refresh_rounded,
+        activeIcon: Icons.refresh_rounded,
+        label: 'Làm mới',
+        activeColor: Colors.grey.shade600,
+        isActive: false,
+        onTap: () async {
+          if (rentalViewModel.isLoading) return;
+          setState(() {
+            _filteredNearbyRentals = List.from(_originalNearbyRentals);
+            _isFilterApplied = false;
+            _isAIMode = false;
+            _isPOIFilterActive = false;
+            _currentFilterResult = null;
+            _showAddressSearch = false;
+            _selectedAddress = null;
+            _isDrawFilterActive = false;
+            _drawFilteredRentals = [];
+            _lastDrawResult = null;
+            _drawnPolygon = null;
+            _resetImpressions();
+          });
+          rentalViewModel.resetNearbyFilters();
+          rentalViewModel.clearPOISelections();
+          await _fetchNearbyRentals();
+          _showSnackbar(
+            message: 'Đã làm mới · ${_originalNearbyRentals.length} bài',
+            backgroundColor: Colors.green[700],
+          );
+        },
+      ),
+    ];
+
     return Positioned(
-      top: 60,
-      left: 16,
-      child: SlideTransition(
-        position: _controlsSlideAnimation!,
-        child: FadeTransition(
-          opacity: _controlsOpacityAnimation!,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const SizedBox(height: 16),
-              // ============================================
-              // 1️⃣ POI FILTER BUTTON
-              // ============================================
-              _buildControlButton(
-                label: _isPOIFilterActive
-                    ? (_isAIMode ? 'AI + Tiện ích' : 'Đang lọc tiện ích')
-                    : 'Tìm gần tiện ích',
-                icon: Icons.location_city,
-                isActive: _isPOIFilterActive,
-                onTap: () {
-                  setState(() => _showAddressSearch = false);
-                  if (_isPOIFilterActive) {
-                    _clearPOIFilter();
-                  } else {
-                    _showPOISelector();
-                  }
-                },
-              ),
-              const SizedBox(height: 12),
+      top: 70,   // Dưới address search bar một chút
+      left: 12,
+      child: SafeArea(
+        bottom: false,
+        child: Stack(
+          children: [
+            // Toolbar chính
+            MapToolbar(
+              tools: tools,
+              visible: _showControls,
+            ),
 
-              // ============================================
-              // 2️⃣ AI TOGGLE BUTTON
-              // ============================================
-              _buildControlButton(
-                label: _isAIMode
-                    ? (_isPOIFilterActive ? 'AI + POI' : 'AI đang bật')
-                    : 'Lọc thông minh AI',
-                icon: _isAIMode ? Icons.psychology : Icons.location_on,
-                isActive: _isAIMode,
-                onTap: rentalViewModel.isLoading
-                    ? null
-                    : () {
-                  setState(() => _showAddressSearch = false);
-                  _toggleAIMode();
-                },
-              ),
-              const SizedBox(height: 12),
-
-              // ============================================
-              // 3️⃣ CLUSTER TOGGLE BUTTON
-              // ============================================
-              _buildClusterToggle(),
-              const SizedBox(height: 12),
-
-              // ============================================
-              // 4️⃣ FILTER BUTTON
-              // ============================================
-              if (!_isPOIFilterActive)
-                _buildControlButton(
-                  label: _isFilterApplied ? 'Đang lọc' : 'Lọc',
-                  icon: Icons.tune_rounded,
-                  isActive: _isFilterApplied,
-                  onTap: () {
-                    setState(() => _showAddressSearch = false);
-                    _showFilterDialog();
-                  },
-                ),
-              if (!_isPOIFilterActive) const SizedBox(height: 12),
-
-              // ============================================
-              // 5️⃣ REFRESH BUTTON
-              // ============================================
-              Container(
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(12),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.1),
-                      blurRadius: 8,
-                      offset: const Offset(0, 2),
-                    ),
-                  ],
-                ),
-                child: Material(
-                  color: Colors.transparent,
-                  child: InkWell(
-                    onTap: rentalViewModel.isLoading
-                        ? null
-                        : () async {
-                      debugPrint('🔄 REFRESH button tapped');
-
-                      setState(() {
-                        _filteredNearbyRentals = List.from(_originalNearbyRentals);
-                        _isFilterApplied = false;
-                        _isAIMode = false;
-                        _isPOIFilterActive = false;
-                        _currentFilterResult = null;
-                        _showAddressSearch = false;
-                        _selectedAddress = null;
-                        _resetImpressions();
-                      });
-
-                      rentalViewModel.resetNearbyFilters();
-                      rentalViewModel.clearPOISelections();
-
-                      await _fetchNearbyRentals();
-
-                      if (mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Row(
-                              children: [
-                                const Icon(Icons.check_circle,
-                                    color: Colors.white),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment:
-                                    CrossAxisAlignment.start,
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      const Text(
-                                        'Đã làm mới danh sách',
-                                        style: TextStyle(
-                                          fontWeight: FontWeight.w600,
-                                          fontSize: 14,
-                                        ),
-                                      ),
-                                      const SizedBox(height: 2),
-                                      Text(
-                                        'Hiển thị ${_originalNearbyRentals.length} bài gợi ý',
-                                        style: const TextStyle(
-                                          fontSize: 12,
-                                          fontWeight: FontWeight.w400,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            ),
-                            backgroundColor: Colors.green[700],
-                            behavior: SnackBarBehavior.floating,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            margin: const EdgeInsets.all(16),
-                            duration: const Duration(seconds: 2),
-                          ),
-                        );
-
-                        _updateMarkersWithClustering();
-                      }
-                    },
-                    borderRadius: BorderRadius.circular(12),
-                    child: Padding(
-                      padding: const EdgeInsets.all(12),
-                      child: rentalViewModel.isLoading
-                          ? SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          valueColor: AlwaysStoppedAnimation<Color>(
-                            Colors.blue[700]!,
-                          ),
-                        ),
-                      )
-                          : Icon(Icons.refresh_rounded,
-                          color: Colors.blue[700], size: 20),
-                    ),
-                  ),
+            // Spinner đè lên nút AI khi đang loading
+            if (rentalViewModel.isLoading && _isAIMode)
+              Positioned(
+                // Nút AI là vị trí thứ 3 (index 2), mỗi nút cao 44 + 10 padding
+                top: 2 * (44 + 10).toDouble(),
+                left: 0,
+                child: LoadingToolOverlay(
+                  isLoading: true,
+                  color: Colors.indigo.shade600,
                 ),
               ),
-            ],
-          ),
+          ],
         ),
       ),
     );
@@ -2553,6 +2669,7 @@ class _RentalMapViewState extends State<RentalMapView>
                         _currentLatLng ??
                         const LatLng(10.0, 105.0),
                     zoom: 16.0,
+
                   ),
                   onMapCreated: (GoogleMapController controller) {
                     _controller = controller;
@@ -2582,6 +2699,7 @@ class _RentalMapViewState extends State<RentalMapView>
                   onTap: (_) => _hideRentalInfo(),
 
                   markers: _markers,
+                  polygons: _drawnPolygon != null ? {_drawnPolygon!} : {},
                   myLocationEnabled: true,
                   myLocationButtonEnabled: true,
                   zoomControlsEnabled: true,
@@ -2700,6 +2818,16 @@ class _RentalMapViewState extends State<RentalMapView>
           // Custom info window overlay
           _buildCustomInfoWindow(),
 
+          if (_isDrawMode)
+            Positioned.fill(
+              child: DrawAreaOverlay(
+                mapController: _controller,
+                drawMode: _activeDrawMode,
+                onAreaCompleted: _onDrawAreaCompleted,
+                onCancel: _cancelDrawMode,
+              ),
+            ),
+
           // Horizontal rental list at bottom
           Positioned(
             bottom: _keyboardHeight,
@@ -2750,15 +2878,17 @@ class _RentalMapViewState extends State<RentalMapView>
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                       decoration: BoxDecoration(
-                        color: _isPOIFilterActive && _isAIMode
-                            ? Colors.blue[700]
+                        color: _isDrawFilterActive
+                            ? const Color(0xFF2E7D32)
+                            : (_isPOIFilterActive && _isAIMode
+                            ? Colors.teal.shade700
                             : (_isPOIFilterActive
-                            ? Colors.green[600]
+                            ? Colors.teal.shade700
                             : (_isAIMode
-                            ? Colors.blue[700]
+                            ? Colors.indigo.shade600
                             : (_isFilterApplied
-                            ? Colors.orange[600]
-                            : Colors.green[600]))),
+                            ? Colors.orange.shade700
+                            : Colors.green[600]!)))),
                         borderRadius: BorderRadius.circular(12),
                         boxShadow: [
                           BoxShadow(
@@ -2769,7 +2899,9 @@ class _RentalMapViewState extends State<RentalMapView>
                         ],
                       ),
                       child: Text(
-                        _isPOIFilterActive && _isAIMode
+                        _isDrawFilterActive
+                            ? ' ${_drawFilteredRentals.length} bài trong vùng vẽ'
+                            : (_isPOIFilterActive && _isAIMode
                             ? '$displayCount bài AI đã tìm gần tiện ích'
                             : (_isPOIFilterActive
                             ? '$displayCount bài gần tiện ích'
@@ -2777,7 +2909,7 @@ class _RentalMapViewState extends State<RentalMapView>
                             ? '$displayCount gợi ý từ AI'
                             : (_isFilterApplied
                             ? '${_filteredNearbyRentals.length}/${_originalNearbyRentals.length} bài'
-                            : '$displayCount bài'))),
+                            : '$displayCount bài')))),
                         style: const TextStyle(
                           color: Colors.white,
                           fontWeight: FontWeight.bold,

@@ -260,8 +260,7 @@ class _HomeContentState extends State<HomeContent> {
               children: [
                 // Badge gradient
                 Container(
-                  padding:
-                  const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  padding: const EdgeInsets.all(1.5), // độ dày viền
                   decoration: BoxDecoration(
                     gradient: const LinearGradient(
                       begin: Alignment.topLeft,
@@ -273,41 +272,37 @@ class _HomeContentState extends State<HomeContent> {
                       ],
                     ),
                     borderRadius: BorderRadius.circular(20),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.blue.withOpacity(0.3),
-                        blurRadius: 8,
-                        offset: const Offset(0, 3),
-                      ),
-                    ],
                   ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      // Icon xoay khi đang load
-                      state.isLoading
-                          ? const SizedBox(
-                        width: 16,
-                        height: 16,
-                        child: CircularProgressIndicator(
-                          color: Colors.white,
-                          strokeWidth: 2,
-                        ),
-                      )
-                          : const Icon(Icons.auto_awesome,
-                          color: Colors.white, size: 16),
-                      const SizedBox(width: 6),
-                      Text(
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(19),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
                         state.isLoading
-                            ? 'AI đang phân tích...'
-                            : 'Trợ lý AI gợi ý cho bạn',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
+                            ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                            : const Icon(Icons.auto_awesome,
+                            color: Color(0xFF1E40AF), size: 16),
+                        const SizedBox(width: 6),
+                        Text(
+                          state.isLoading
+                              ? 'AI đang phân tích...'
+                              : 'Trợ lý AI gợi ý cho bạn',
+                          style: const TextStyle(
+                            color: Color(0xFF1E40AF),
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
 
@@ -2174,7 +2169,6 @@ class _WelcomeToastState extends State<_WelcomeToast>
   void initState() {
     super.initState();
     _controller.forward();
-    // Tự biến mất sau 3 giây
     Future.delayed(const Duration(seconds: 30), _dismiss);
   }
 
@@ -2201,11 +2195,18 @@ class _WelcomeToastState extends State<_WelcomeToast>
         child: Material(
           color: Colors.transparent,
           child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            padding: const EdgeInsets.all(1.5),
             decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: const Color(0xFFE8EDF5), width: 1),
+              gradient: const LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  Color(0xFF1E40AF),
+                  Color(0xFF42A5F5),
+                  Color(0xFF26C6DA),
+                ],
+              ),
+              borderRadius: BorderRadius.circular(17.5),
               boxShadow: [
                 BoxShadow(
                   color: Colors.black.withOpacity(0.10),
@@ -2220,93 +2221,191 @@ class _WelcomeToastState extends State<_WelcomeToast>
                 ),
               ],
             ),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                // GIF to hơn, nền xanh nổi bật
-                Image.asset(
-                  'assets/img/heloai.gif',
-                  width: 112,
-                  height: 112,
-                  fit: BoxFit.contain,
-                  errorBuilder: (_, __, ___) => const Icon(
-                    Icons.waving_hand,
-                    color: Color(0xFF1E40AF),
-                    size: 28,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  // GIF
+                  Image.asset(
+                    'assets/img/heloai.gif',
+                    width: 112,
+                    height: 112,
+                    fit: BoxFit.contain,
+                    errorBuilder: (_, __, ___) => const Icon(
+                      Icons.waving_hand,
+                      color: Color(0xFF1E40AF),
+                      size: 28,
+                    ),
                   ),
-                ),
-                const SizedBox(width: 14),
+                  const SizedBox(width: 14),
 
-                // Nội dung text
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      // Dòng tag nhỏ phía trên
-                      Row(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 8, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFEFF6FF),
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                            child: const Text(
-                              'Trợ lý AI bất động sản',
-                              style: TextStyle(
-                                fontSize: 10,
-                                fontWeight: FontWeight.w600,
-                                color: Color(0xFF1E40AF),
+                  // Nội dung text
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        // Tag + badge thông báo
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(1.5),
+                              decoration: BoxDecoration(
+                                gradient: const LinearGradient(
+                                  begin: Alignment.topLeft,
+                                  end: Alignment.bottomRight,
+                                  colors: [
+                                    Color(0xFF1E40AF),
+                                    Color(0xFF42A5F5),
+                                    Color(0xFF26C6DA),
+                                  ],
+                                ),
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 8, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(18.5),
+                                ),
+                                child: const Text(
+                                  'Trợ lý AI bất động sản',
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w600,
+                                    color: Color(0xFF1E40AF),
+                                  ),
+                                ),
                               ),
                             ),
+                            const SizedBox(width: 6),
+                            // Badge thông báo mới
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFDC2626),
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(
+                                    Icons.circle,
+                                    size: 5,
+                                    color: Colors.white,
+                                  ),
+                                  const SizedBox(width: 3),
+                                  Text(
+                                    '${_getTodayListings()} mới hôm nay',
+                                    style: const TextStyle(
+                                      fontSize: 9,
+                                      fontWeight: FontWeight.w700,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 5),
+                        Row(
+                          children: [
+                            const Icon(
+                              Icons.notifications_rounded,
+                              size: 13,
+                              color: Color(0xFF1E40AF),
+                            ),
+                            const SizedBox(width: 4),
+                            const Text(
+                              'Thông báo',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                                color: Color(0xFF1E40AF),
+                                letterSpacing: 0.3,
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            Expanded(
+                              child: Container(
+                                height: 1,
+                                decoration: BoxDecoration(
+                                  gradient: LinearGradient(
+                                    colors: [
+                                      const Color(0xFF42A5F5).withOpacity(0.5),
+                                      Colors.transparent,
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 5),
+                        // Dòng chào chính
+                        Text(
+                          widget.message,
+                          style: const TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xFF1A1A2E),
+                            letterSpacing: -0.2,
                           ),
-                        ],
-                      ),
-                      const SizedBox(height: 5),
-                      // Dòng chào chính
-                      Text(
-                        widget.message,
-                        style: const TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w700,
-                          color: Color(0xFF1A1A2E),
-                          letterSpacing: -0.2,
                         ),
-                      ),
-                      const SizedBox(height: 3),
-                      // Dòng phụ
-                      Text(
-                        'Chào mừng bạn quay lại ! Hôm nay có ${_getTodayListings()} bất động sản mới cho bạn.',
-                        style: const TextStyle(
-                          fontSize: 13,
-                          color: Color(0xFF6B7280),
-                          fontWeight: FontWeight.w400,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 8),
+                        const SizedBox(height: 4),
 
-                // Nút đóng
-                GestureDetector(
-                  onTap: _dismiss,
-                  child: Container(
-                    padding: const EdgeInsets.all(4),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFF3F4F6),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: const Icon(
-                      Icons.close_rounded,
-                      color: Color(0xFF9CA3AF),
-                      size: 16,
+                        // Dòng phụ với icon
+                        Row(
+                          children: [
+                            const Icon(
+                              Icons.trending_up_rounded,
+                              size: 12,
+                              color: Color(0xFF10B981),
+                            ),
+                            const SizedBox(width: 4),
+                            const Expanded(
+                              child: Text(
+                                'Thị trường hôm nay đang sôi động — để AI tìm BĐS phù hợp nhất cho bạn.',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: Color(0xFF6B7280),
+                                  fontWeight: FontWeight.w400,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
                     ),
                   ),
-                ),
-              ],
+                  const SizedBox(width: 8),
+
+                  // Nút đóng
+                  GestureDetector(
+                    onTap: _dismiss,
+                    child: Container(
+                      padding: const EdgeInsets.all(4),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF3F4F6),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Icon(
+                        Icons.close_rounded,
+                        color: Color(0xFF9CA3AF),
+                        size: 16,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ),
@@ -2314,7 +2413,6 @@ class _WelcomeToastState extends State<_WelcomeToast>
     );
   }
 
-// Helper — số ngẫu nhiên trông thực tế
   String _getTodayListings() {
     final values = ['12', '8', '15', '23', '6'];
     return values[DateTime.now().minute % values.length];
